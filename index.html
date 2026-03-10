@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Alleata · Operaciones</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 :root {
@@ -279,7 +280,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--navy-500);letter-spacing:1px;">
-      v1.0.5 · 10 mar 2026
+      v1.2.0 · 10 mar 2026
     </div>
   </div>
 </div>
@@ -328,7 +329,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--navy-500);letter-spacing:1px;">
-      v1.0.5 · 10 mar 2026
+      v1.2.0 · 10 mar 2026
     </div>
   </div>
 </nav>
@@ -341,7 +342,7 @@ tr:hover td{background:var(--surface2);}
       <span class="crumb-current" id="topbar-title">Dashboard</span>
     </div>
     <div class="topbar-right" id="topbar-date"></div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--navy-500);margin-left:12px;">v1.0.5</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--navy-500);margin-left:12px;">v1.2.0</div>
   </div>
   <div class="content">
 
@@ -389,24 +390,87 @@ tr:hover td{background:var(--surface2);}
 
     <!-- ENVIOS -->
     <div class="module" id="mod-envios">
-      <div class="card">
-        <div class="card-title">➕ Registrar envío</div>
-        <div class="row">
-          <div class="field"><label class="label">Nro. de seguimiento</label><input class="input" id="envTrack" placeholder="CA123456789AR" /></div>
-          <div class="field"><label class="label">Cliente</label><input class="input" id="envCliente" placeholder="Nombre del cliente" /></div>
-        </div>
-        <div class="row">
-          <div class="field"><label class="label">Producto</label><input class="input" id="envProducto" placeholder="SIM CLARO x5" /></div>
-          <div class="field"><label class="label">Fecha</label><input class="input" id="envFecha" type="date" /></div>
-        </div>
-        <div class="field"><label class="label">Notas</label><input class="input" id="envNotas" placeholder="Opcional..." /></div>
-        <button class="btn btn-sm" onclick="addEnvio()">Registrar envío</button>
+
+      <!-- Stats row -->
+      <div class="stats-row" id="envStatsRow" style="display:none">
+        <div class="stat-box s-blue"><div class="stat-num" id="env-s-total">0</div><div class="stat-label">Total OTs</div></div>
+        <div class="stat-box" style="border-left:2px solid var(--yellow)"><div class="stat-num" style="color:var(--yellow)" id="env-s-transito">0</div><div class="stat-label">En tránsito</div></div>
+        <div class="stat-box" style="border-left:2px solid var(--green)"><div class="stat-num" style="color:var(--green)" id="env-s-entregado">0</div><div class="stat-label">Entregados</div></div>
+        <div class="stat-box" style="border-left:2px solid var(--red)"><div class="stat-num" style="color:var(--red)" id="env-s-problema">0</div><div class="stat-label">Con problema</div></div>
       </div>
-      <div class="sec-title"><div class="sec-dot" style="background:var(--blue)"></div>Envíos registrados</div>
+
+      <!-- API status banner -->
+      <div style="background:rgba(26,159,212,.07);border:1px solid rgba(26,159,212,.15);border-radius:10px;padding:11px 16px;margin-bottom:14px;display:flex;align-items:center;gap:10px;">
+        <span style="font-size:16px">🔌</span>
+        <div style="flex:1">
+          <div style="font-size:12px;font-weight:700;color:var(--blue)">Integración Correo Argentino · MiCorreo API</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:1px">Fase 1 — Import SF + Tracking manual · Fase 2 pendiente credenciales MiCorreo</div>
+        </div>
+        <span class="badge badge-yellow">Pendiente API</span>
+      </div>
+
+      <!-- IMPORT SF (solo admin) -->
+      <div class="card" id="sfImportCard" style="margin-bottom:14px;display:none">
+        <div class="card-title">📤 Importar reporte Salesforce</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;line-height:1.6;">
+          Subí el Excel exportado de SF (<strong style="color:var(--text)">DESPACHADO CORREO ARGENTINO</strong>). El sistema asignará cada OT al usuario correspondiente según el nombre del responsable.
+        </div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <label style="background:var(--grad);color:#fff;border:none;padding:9px 18px;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;cursor:pointer;border-radius:8px;display:inline-flex;align-items:center;gap:8px;">
+            📂 Seleccionar Excel
+            <input type="file" id="sfFileInput" accept=".xlsx,.xls" style="display:none" onchange="importSF(event)">
+          </label>
+          <div id="sfImportMsg" style="font-size:12px;color:var(--text-muted)"></div>
+        </div>
+        <div id="sfImportProgress" style="display:none;margin-top:10px">
+          <div class="progress-text" id="sfProgressText">Procesando...</div>
+          <div class="progress-track" style="margin-top:6px"><div class="progress-fill" id="sfProgressFill"></div></div>
+        </div>
+        <div id="sfImportResult"></div>
+      </div>
+
+      <!-- Filtros (solo admin) -->
+      <div id="envFiltrosCard" style="display:none;margin-bottom:14px">
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+          <div class="field" style="margin:0;min-width:180px">
+            <label class="label">Filtrar por responsable</label>
+            <select class="select" id="envFiltroResp" onchange="renderEnvios()">
+              <option value="">Todos</option>
+            </select>
+          </div>
+          <div class="field" style="margin:0;min-width:160px">
+            <label class="label">Estado</label>
+            <select class="select" id="envFiltroEstado" onchange="renderEnvios()">
+              <option value="">Todos</option>
+              <option>En tránsito</option><option>En camino</option>
+              <option>Entregado</option><option>Demorado</option>
+              <option>Perdido</option><option>Devuelto</option>
+            </select>
+          </div>
+          <button class="btn-ghost btn-sm" onclick="limpiarFiltros()">Limpiar filtros</button>
+        </div>
+      </div>
+
+      <!-- Tabla OTs -->
+      <div class="sec-title"><div class="sec-dot" style="background:var(--blue)"></div><span id="envTablaLabel">Mis OTs despachadas</span></div>
       <div class="card"><div class="table-wrap">
-        <table><thead><tr><th>Tracking</th><th>Cliente</th><th>Producto</th><th>Fecha</th><th>Estado</th><th>Notas</th><th></th></tr></thead>
-        <tbody id="enviosTable"></tbody></table>
-        <div class="empty" id="enviosEmpty"><div class="empty-icon">📭</div><p>No hay envíos registrados</p></div>
+        <table>
+          <thead><tr>
+            <th>OT / Cuenta</th>
+            <th>Responsable</th>
+            <th>Tracking</th>
+            <th>Despacho</th>
+            <th>Destino</th>
+            <th>Estado</th>
+            <th>Obs.</th>
+            <th></th>
+          </tr></thead>
+          <tbody id="enviosTable"></tbody>
+        </table>
+        <div class="empty" id="enviosEmpty">
+          <div class="empty-icon">📭</div>
+          <p id="enviosEmptyMsg">No hay OTs asignadas</p>
+        </div>
       </div></div>
     </div>
 
@@ -621,7 +685,7 @@ function goTo(mod){
   const navEl=document.querySelector(`.nav-item[data-mod="${mod}"]`);
   if(navEl)navEl.classList.add('active');
   document.getElementById('topbar-title').textContent=MOD_INFO[mod]||mod;
-  if(mod==='envios')renderEnvios();
+  if(mod==='envios'){initEnvios();renderEnvios();}
   if(mod==='devoluciones')renderDevs();
   if(mod==='horas')renderHoras();
   if(mod==='ajustes')loadUsers();
@@ -744,29 +808,209 @@ sdz.addEventListener('drop',e=>{e.preventDefault();sdz.classList.remove('drag');
 document.getElementById('simFileInput').addEventListener('change',e=>simProcessFiles(Array.from(e.target.files)));
 
 // ── ENVIOS ──
-async function addEnvio(){
-  const track=document.getElementById('envTrack').value.trim();
-  const cliente=document.getElementById('envCliente').value.trim();
-  if(!track||!cliente){alert('Completá tracking y cliente');return;}
-  const{error}=await sb.from('envios').insert({user_id:currentUser.id,track,cliente,producto:document.getElementById('envProducto').value.trim(),fecha:document.getElementById('envFecha').value||new Date().toISOString().slice(0,10),notas:document.getElementById('envNotas').value.trim(),estado:'En tránsito'});
-  if(error){alert('Error: '+error.message);return;}
-  ['envTrack','envCliente','envProducto','envNotas'].forEach(id=>document.getElementById(id).value='');
+// ── ENVIOS / OTs ──
+async function initEnvios(){
+  const isAdmin=currentProfile?.rol==='admin';
+  if(isAdmin){
+    document.getElementById('sfImportCard').style.display='block';
+    document.getElementById('envFiltrosCard').style.display='block';
+    document.getElementById('envTablaLabel').textContent='Todas las OTs despachadas';
+    await loadFiltroResponsables();
+  }
+}
+
+async function loadFiltroResponsables(){
+  const{data}=await sb.from('envios').select('responsable').order('responsable');
+  const uniq=[...new Set((data||[]).map(r=>r.responsable).filter(Boolean))];
+  const sel=document.getElementById('envFiltroResp');
+  sel.innerHTML='<option value="">Todos</option>'+uniq.map(r=>`<option>${r}</option>`).join('');
+}
+
+function limpiarFiltros(){
+  document.getElementById('envFiltroResp').value='';
+  document.getElementById('envFiltroEstado').value='';
+  renderEnvios();
+}
+
+// Import SF Excel
+async function importSF(e){
+  const file=e.target.files[0];
+  if(!file)return;
+  const msg=document.getElementById('sfImportMsg');
+  const prog=document.getElementById('sfImportProgress');
+  const fill=document.getElementById('sfProgressFill');
+  const ptext=document.getElementById('sfProgressText');
+  const result=document.getElementById('sfImportResult');
+  msg.textContent='';result.innerHTML='';
+  prog.style.display='block';
+  ptext.textContent='Leyendo archivo...';fill.style.width='20%';
+
+  try{
+    const data=await file.arrayBuffer();
+    const{read,utils}=XLSX;
+    const wb=read(data);
+    const ws=wb.Sheets[wb.SheetNames[0]];
+    const rows=utils.sheet_to_json(ws,{header:1,defval:null});
+
+    // Find header row (row with 'N° de seguimiento')
+    let headerIdx=-1;
+    for(let i=0;i<rows.length;i++){
+      if(rows[i]&&rows[i].some(c=>String(c||'').includes('N° de seguimiento'))){headerIdx=i;break;}
+    }
+    if(headerIdx===-1)throw new Error('No se encontró la fila de encabezados');
+    const headers=rows[headerIdx].map(h=>String(h||'').trim());
+
+    const col=(name)=>headers.findIndex(h=>h.includes(name));
+    const iResp=col('Responsable');
+    const iOT=col('Número de orden');
+    const iSFId=col('Id. de orden');
+    const iTipo=col('Tipo de registro');
+    const iCuenta=col('cuenta');
+    const iTracking=col('N° de seguimiento');
+    const iObs=col('Observaciones');
+    const iFecha=col('Fecha de Despacho');
+    const iCiudad=col('Ciudad');
+    const iProv=col('Estado/Provincia');
+    const iAsig=col('Asignación');
+
+    const dataRows=rows.slice(headerIdx+1).filter(r=>r&&r.some(c=>c!==null)&&String(r[1]||'')!=='Subtotal'&&String(r[1]||'')!=='Total');
+
+    ptext.textContent=`Procesando ${dataRows.length} OTs...`;fill.style.width='50%';
+
+    let importadas=0,duplicadas=0,errores=0;
+    const inserts=[];
+    for(const r of dataRows){
+      const track=String(r[iTracking]||'').trim();
+      const ot=String(r[iOT]||'').trim();
+      if(!track&&!ot)continue;
+      inserts.push({
+        user_id:currentUser.id, // owner = admin who imports
+        sf_id:String(r[iSFId]||'').trim(),
+        ot_numero:ot,
+        tipo:String(r[iTipo]||'').trim(),
+        responsable:String(r[iResp]||'').trim(),
+        cuenta:String(r[iCuenta]||'').trim(),
+        track:track,
+        fecha:String(r[iFecha]||'').trim(),
+        ciudad:String(r[iCiudad]||'').trim(),
+        provincia:String(r[iProv]||'').trim(),
+        asignacion:String(r[iAsig]||'').trim(),
+        notas:String(r[iObs]||'').trim(),
+        estado:'En tránsito',
+        ultimo_evento:'Importado desde SF',
+        ultimo_evento_fecha:new Date().toISOString().slice(0,10)
+      });
+    }
+
+    // Upsert by sf_id to avoid duplicates
+    fill.style.width='80%';ptext.textContent='Guardando en base de datos...';
+    for(const item of inserts){
+      const{error}=await sb.from('envios').upsert(item,{onConflict:'sf_id',ignoreDuplicates:false});
+      if(error){
+        if(error.code==='23505')duplicadas++;
+        else{errores++;console.error(error);}
+      }else importadas++;
+    }
+
+    fill.style.width='100%';
+    ptext.textContent=`✅ Listo — ${importadas} importadas, ${duplicadas} ya existían, ${errores} errores`;
+    result.innerHTML=`<div class="alert alert-ok" style="margin-top:10px">
+      ✅ <strong>${importadas}</strong> OTs importadas · 
+      <strong>${duplicadas}</strong> ya existían (actualizadas) · 
+      <strong>${errores}</strong> errores
+    </div>`;
+    await loadFiltroResponsables();
+    renderEnvios();loadBadges();
+  }catch(err){
+    ptext.textContent='Error: '+err.message;
+    result.innerHTML=`<div class="alert alert-err">${err.message}</div>`;
+  }
+  e.target.value='';
+}
+
+async function renderEnvios(){
+  const isAdmin=currentProfile?.rol==='admin';
+  let query=sb.from('envios').select('*').order('fecha',{ascending:false});
+
+  if(!isAdmin){
+    // Match by responsable name
+    const nombre=currentProfile?.nombre||'';
+    query=query.ilike('responsable',`%${nombre}%`);
+  } else {
+    const filtroResp=document.getElementById('envFiltroResp')?.value||'';
+    const filtroEst=document.getElementById('envFiltroEstado')?.value||'';
+    if(filtroResp)query=query.ilike('responsable',`%${filtroResp}%`);
+    if(filtroEst)query=query.eq('estado',filtroEst);
+  }
+
+  const{data:envios}=await query;
+  const list=envios||[];
+  const empty=document.getElementById('enviosEmpty');
+  empty.style.display=list.length?'none':'block';
+
+  if(list.length){
+    document.getElementById('envStatsRow').style.display='flex';
+    document.getElementById('env-s-total').textContent=list.length;
+    document.getElementById('env-s-transito').textContent=list.filter(e=>['En tránsito','En camino'].includes(e.estado)).length;
+    document.getElementById('env-s-entregado').textContent=list.filter(e=>e.estado==='Entregado').length;
+    document.getElementById('env-s-problema').textContent=list.filter(e=>['Demorado','Perdido','Devuelto'].includes(e.estado)).length;
+  }
+
+  document.getElementById('enviosTable').innerHTML=list.map(e=>{
+    const estadoClass={'En tránsito':'badge-yellow','En camino':'badge-blue','Entregado':'badge-green','Demorado':'badge-orange','Perdido':'badge-red','Devuelto':'badge-red'}[e.estado]||'badge-gray';
+    return`<tr>
+      <td>
+        <div style="font-weight:700;font-size:12px;color:var(--teal)">${e.ot_numero||'—'}</div>
+        <div style="font-size:10px;color:var(--text-muted);margin-top:2px">${e.tipo||''}</div>
+        <div style="font-size:10px;color:var(--text-muted)">${e.cuenta||''}</div>
+      </td>
+      <td style="font-size:13px;font-weight:600">${e.responsable||'—'}</td>
+      <td>
+        <div class="mono" style="font-size:10px;word-break:break-all">${e.track||'—'}</div>
+        ${e.track?`<a href="https://www.correoargentino.com.ar/formularios/e-commerce?id=${e.track}" target="_blank" style="font-size:10px;color:var(--blue);text-decoration:none;">🔗 Correo Arg.</a>`:''}
+      </td>
+      <td class="mono" style="font-size:11px">${e.fecha||'—'}</td>
+      <td>
+        <div style="font-size:12px">${e.ciudad||'—'}</div>
+        <div style="font-size:10px;color:var(--text-muted)">${e.provincia||''}</div>
+      </td>
+      <td>
+        <select class="select" style="width:126px;padding:4px 8px;font-size:11px" onchange="updateEnvioEstado('${e.id}',this.value)">
+          ${['En tránsito','En camino','Entregado','Demorado','Perdido','Devuelto'].map(s=>`<option ${e.estado===s?'selected':''}>${s}</option>`).join('')}
+        </select>
+        <div style="font-size:9px;color:var(--text-muted);margin-top:3px">${e.ultimo_evento_fecha||''}</div>
+      </td>
+      <td style="max-width:160px">
+        <div style="font-size:11px;color:var(--text-muted);line-height:1.4">${e.notas||'—'}</div>
+        ${e.ultimo_evento&&e.ultimo_evento!=='Importado desde SF'?`<div style="font-size:10px;color:var(--teal);margin-top:2px">${e.ultimo_evento}</div>`:''}
+      </td>
+      <td>
+        <div style="display:flex;gap:5px">
+          <button title="Actualizar observación" style="background:var(--surface2);border:1px solid var(--border2);color:var(--text-muted);font-size:11px;padding:4px 7px;border-radius:6px;cursor:pointer" onclick="openUpdateEvento('${e.id}','${(e.ultimo_evento||'').replace(/'/g,'&#39;')}')">✏️</button>
+          ${isAdmin?`<button title="Eliminar" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:13px;padding:4px" onclick="deleteEnvio('${e.id}')">🗑</button>`:''}
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+async function updateEnvioEstado(id,estado){
+  await sb.from('envios').update({estado,ultimo_evento_fecha:new Date().toISOString().slice(0,10)}).eq('id',id);
+  loadBadges();renderEnvios();
+}
+function openUpdateEvento(id,current){
+  const nuevo=prompt('Actualizar observación / evento:',current);
+  if(nuevo===null)return;
+  sb.from('envios').update({ultimo_evento:nuevo,ultimo_evento_fecha:new Date().toISOString().slice(0,10)}).eq('id',id).then(()=>renderEnvios());
+}
+async function deleteEnvio(id){
+  if(!confirm('¿Eliminar esta OT?'))return;
+  await sb.from('envios').delete().eq('id',id);
   renderEnvios();loadBadges();
 }
-async function renderEnvios(){
-  const{data:envios}=await sb.from('envios').select('*').eq('user_id',currentUser.id).order('created_at',{ascending:false});
-  document.getElementById('enviosEmpty').style.display=(envios?.length)?'none':'block';
-  document.getElementById('enviosTable').innerHTML=(envios||[]).map(e=>`<tr>
-    <td class="mono">${e.track}</td><td>${e.cliente}</td><td>${e.producto||'—'}</td><td class="mono">${e.fecha}</td>
-    <td><select class="select" style="width:128px;padding:4px 8px;font-size:12px" onchange="updateEnvioEstado('${e.id}',this.value)">
-      ${['En tránsito','Entregado','Demorado','Perdido'].map(s=>`<option ${e.estado===s?'selected':''}>${s}</option>`).join('')}
-    </select></td>
-    <td style="color:var(--text-muted);font-size:12px">${e.notas||'—'}</td>
-    <td><button style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:14px;padding:4px" onclick="deleteEnvio('${e.id}')">🗑</button></td>
-  </tr>`).join('');
-}
-async function updateEnvioEstado(id,estado){await sb.from('envios').update({estado}).eq('id',id);loadBadges();}
-async function deleteEnvio(id){if(!confirm('¿Eliminar este envío?'))return;await sb.from('envios').delete().eq('id',id);renderEnvios();loadBadges();}
+// legacy - not used but keep for safety
+async function addEnvio(){}
+
 
 // ── DEVOLUCIONES ──
 async function addDevolucion(){
