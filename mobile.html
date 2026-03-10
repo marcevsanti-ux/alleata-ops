@@ -299,6 +299,7 @@ body{background:var(--navy);color:var(--text);font-family:'Inter',sans-serif;fon
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='sb_publishable_W3fP-CCb0m-B0v5tdaHQCg_2L43Rx5J';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
+const SUPABASE_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDA0NjQ5NzMsImV4cCI6MjA1NjA0MDk3M30.oOBFaGEMBMxJJjFMXnZBbShFL7GBMr8we4BKGK7FXCU';
 const{createClient}=supabase;
 const sb=createClient(SUPABASE_URL,SUPABASE_KEY);
 
@@ -416,7 +417,7 @@ function addToHistorial(item){
 async function ocrGemini(b64,mime){
   const prompt=`Chips SIM Claro Argentina. Arriba: prefijo (ej: "8954318224"). Abajo: sufijo (ej: "056426839 0"). ICCID = PREFIJO+SUFIJO. Respondé SOLO con números completos, uno por línea.`;
   const r=await fetch(GEMINI_PROXY,{
-    method:'POST',headers:{'Content-Type':'application/json'},
+    method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${SUPABASE_ANON}`},
     body:JSON.stringify({contents:[{parts:[{text:prompt},{inline_data:{mime_type:mime,data:b64}}]}],generationConfig:{temperature:0,maxOutputTokens:512}})
   });
   if(!r.ok){const e=await r.json();throw new Error(e.error?.message||'Error Gemini');}
