@@ -298,7 +298,7 @@ body{background:var(--navy);color:var(--text);font-family:'Inter',sans-serif;fon
 <script>
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='sb_publishable_W3fP-CCb0m-B0v5tdaHQCg_2L43Rx5J';
-const GEMINI_KEY='AIzaSyBTo3WBJ1Awyx9qVjLz1psRIiEZBGqiWlg';
+const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
 const{createClient}=supabase;
 const sb=createClient(SUPABASE_URL,SUPABASE_KEY);
 
@@ -415,8 +415,8 @@ function addToHistorial(item){
 // ── OCR ──
 async function ocrGemini(b64,mime){
   const prompt=`Chips SIM Claro Argentina. Arriba: prefijo (ej: "8954318224"). Abajo: sufijo (ej: "056426839 0"). ICCID = PREFIJO+SUFIJO. Respondé SOLO con números completos, uno por línea.`;
-  const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_KEY}`,{
-    method:'POST',headers:{'Content-Type':'application/json','Referer':'https://marcevsanti-ux.github.io/'},
+  const r=await fetch(GEMINI_PROXY,{
+    method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({contents:[{parts:[{text:prompt},{inline_data:{mime_type:mime,data:b64}}]}],generationConfig:{temperature:0,maxOutputTokens:512}})
   });
   if(!r.ok){const e=await r.json();throw new Error(e.error?.message||'Error Gemini');}
