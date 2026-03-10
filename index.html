@@ -280,7 +280,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--navy-500);letter-spacing:1px;">
-      v1.2.0 · 10 mar 2026
+      v1.2.1 · 10 mar 2026
     </div>
   </div>
 </div>
@@ -329,7 +329,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--navy-500);letter-spacing:1px;">
-      v1.2.0 · 10 mar 2026
+      v1.2.1 · 10 mar 2026
     </div>
   </div>
 </nav>
@@ -342,7 +342,7 @@ tr:hover td{background:var(--surface2);}
       <span class="crumb-current" id="topbar-title">Dashboard</span>
     </div>
     <div class="topbar-right" id="topbar-date"></div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--navy-500);margin-left:12px;">v1.2.0</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--navy-500);margin-left:12px;">v1.2.1</div>
   </div>
   <div class="content">
 
@@ -461,6 +461,7 @@ tr:hover td{background:var(--surface2);}
             <th>Tracking</th>
             <th>Despacho</th>
             <th>Destino</th>
+            <th>Costo</th>
             <th>Estado</th>
             <th>Obs.</th>
             <th></th>
@@ -845,6 +846,20 @@ async function importSF(e){
   prog.style.display='block';
   ptext.textContent='Leyendo archivo...';fill.style.width='20%';
 
+  // Detect estado from observaciones text
+  function detectEstado(obs){
+    if(!obs)return'En tránsito';
+    const o=obs.toUpperCase();
+    if(o.includes('ENTREGADO')||o.includes('ENTREGA OK'))return'Entregado';
+    if(o.includes('EN ESPERA EN SUCURSAL'))return'En espera en sucursal';
+    if(o.includes('EN PODER DEL DISTRIBUIDOR'))return'En camino';
+    if(o.includes('CENTRO DE PROCESAMIENTO')||o.includes('CLASIFICACI'))return'En camino';
+    if(o.includes('DEVUELTO')||o.includes('DEVOLUCION')||o.includes('DEVOLUCIÓN'))return'Devuelto';
+    if(o.includes('PERDIDO'))return'Perdido';
+    if(o.includes('DEMORADO'))return'Demorado';
+    return'En tránsito';
+  }
+
   try{
     const data=await file.arrayBuffer();
     const{read,utils}=XLSX;
@@ -852,7 +867,6 @@ async function importSF(e){
     const ws=wb.Sheets[wb.SheetNames[0]];
     const rows=utils.sheet_to_json(ws,{header:1,defval:null});
 
-    // Find header row (row with 'N° de seguimiento')
     let headerIdx=-1;
     for(let i=0;i<rows.length;i++){
       if(rows[i]&&rows[i].some(c=>String(c||'').includes('N° de seguimiento'))){headerIdx=i;break;}
@@ -872,19 +886,20 @@ async function importSF(e){
     const iCiudad=col('Ciudad');
     const iProv=col('Estado/Provincia');
     const iAsig=col('Asignación');
+    const iCosto=col('Costo de envio');
 
     const dataRows=rows.slice(headerIdx+1).filter(r=>r&&r.some(c=>c!==null)&&String(r[1]||'')!=='Subtotal'&&String(r[1]||'')!=='Total');
 
     ptext.textContent=`Procesando ${dataRows.length} OTs...`;fill.style.width='50%';
 
     let importadas=0,duplicadas=0,errores=0;
-    const inserts=[];
     for(const r of dataRows){
       const track=String(r[iTracking]||'').trim();
       const ot=String(r[iOT]||'').trim();
       if(!track&&!ot)continue;
-      inserts.push({
-        user_id:currentUser.id, // owner = admin who imports
+      const obs=String(r[iObs]||'').trim();
+      const item={
+        user_id:currentUser.id,
         sf_id:String(r[iSFId]||'').trim(),
         ot_numero:ot,
         tipo:String(r[iTipo]||'').trim(),
@@ -895,16 +910,12 @@ async function importSF(e){
         ciudad:String(r[iCiudad]||'').trim(),
         provincia:String(r[iProv]||'').trim(),
         asignacion:String(r[iAsig]||'').trim(),
-        notas:String(r[iObs]||'').trim(),
-        estado:'En tránsito',
-        ultimo_evento:'Importado desde SF',
+        notas:obs,
+        costo_envio:iCosto>=0&&r[iCosto]?Number(r[iCosto]):null,
+        estado:detectEstado(obs),
+        ultimo_evento:obs||'Importado desde SF',
         ultimo_evento_fecha:new Date().toISOString().slice(0,10)
-      });
-    }
-
-    // Upsert by sf_id to avoid duplicates
-    fill.style.width='80%';ptext.textContent='Guardando en base de datos...';
-    for(const item of inserts){
+      };
       const{error}=await sb.from('envios').upsert(item,{onConflict:'sf_id',ignoreDuplicates:false});
       if(error){
         if(error.code==='23505')duplicadas++;
@@ -913,10 +924,9 @@ async function importSF(e){
     }
 
     fill.style.width='100%';
-    ptext.textContent=`✅ Listo — ${importadas} importadas, ${duplicadas} ya existían, ${errores} errores`;
+    ptext.textContent=`✅ Listo`;
     result.innerHTML=`<div class="alert alert-ok" style="margin-top:10px">
-      ✅ <strong>${importadas}</strong> OTs importadas · 
-      <strong>${duplicadas}</strong> ya existían (actualizadas) · 
+      ✅ <strong>${importadas}</strong> OTs importadas/actualizadas · 
       <strong>${errores}</strong> errores
     </div>`;
     await loadFiltroResponsables();
@@ -975,8 +985,11 @@ async function renderEnvios(){
         <div style="font-size:10px;color:var(--text-muted)">${e.provincia||''}</div>
       </td>
       <td>
-        <select class="select" style="width:126px;padding:4px 8px;font-size:11px" onchange="updateEnvioEstado('${e.id}',this.value)">
-          ${['En tránsito','En camino','Entregado','Demorado','Perdido','Devuelto'].map(s=>`<option ${e.estado===s?'selected':''}>${s}</option>`).join('')}
+        ${e.costo_envio?`<div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--teal);font-weight:600">$${Number(e.costo_envio).toLocaleString('es-AR')}</div>`:'<span style="color:var(--text-muted);font-size:11px">—</span>'}
+      </td>
+      <td>
+        <select class="select" style="width:160px;padding:4px 8px;font-size:11px" onchange="updateEnvioEstado('${e.id}',this.value)">
+          ${['En tránsito','En camino','En espera en sucursal','Entregado','Demorado','Perdido','Devuelto'].map(s=>`<option ${e.estado===s?'selected':''}>${s}</option>`).join('')}
         </select>
         <div style="font-size:9px;color:var(--text-muted);margin-top:3px">${e.ultimo_evento_fecha||''}</div>
       </td>
