@@ -506,7 +506,35 @@ function renderHistorial(){
       </div>
       <div class="hist-time">${date}<br>${time}</div>
     </div>`;
-  }).join('')+'<button class="hist-clear" onclick="clearHistorial()">🗑 Limpiar historial</button>';
+  }).join('')+`<div style="display:flex;gap:8px;margin-top:8px;">
+    <button class="hist-clear" style="flex:1;background:rgba(29,191,142,0.12);color:var(--teal);border-color:rgba(29,191,142,0.3);" onclick="exportHistorial()">⬇️ Exportar CSV</button>
+    <button class="hist-clear" style="flex:1;" onclick="clearHistorial()">🗑 Limpiar</button>
+  </div>`;
+}
+
+function exportHistorial(){
+  if(!historial.length){alert('No hay escaneos para exportar.');return;}
+  const headers=['Fecha','Hora','Serie (ICCID)','Línea','Estado','Cuenta','Ubicación','Encontrada'];
+  const rows=historial.map(h=>{
+    const d=new Date(h.ts);
+    const fecha=d.toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric'});
+    const hora=d.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+    const serie=h.serie||h.detected||h.number||'';
+    const linea=h.linea||'';
+    const estado=h.found?(h.estado||'SIN ESTADO'):'NO REGISTRADA';
+    const cuenta=h.cuenta||'';
+    const ubicacion=h.ubicacion||'';
+    const encontrada=h.found?'SÍ':'NO';
+    return[fecha,hora,serie,linea,estado,cuenta,ubicacion,encontrada].map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',');
+  });
+  const csv='\uFEFF'+[headers.join(','),...rows].join('\n');
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  const now=new Date();
+  const fname=`historial_sims_${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}.csv`;
+  a.href=url;a.download=fname;a.click();
+  URL.revokeObjectURL(url);
 }
 
 function clearHistorial(){
