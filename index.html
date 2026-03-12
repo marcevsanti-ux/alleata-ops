@@ -828,23 +828,11 @@ async function loadBadges(){
 }
 
 // ── SIM ──
-function lookupSIM(number){
+async function lookupSIM(number){
   const clean=String(number).replace(/\s/g,'');
-  if(SIMS_DB[clean])return{found:true,...SIMS_DB[clean]};
-  if(DB_BY_LINEA[clean])return{found:true,...DB_BY_LINEA[clean]};
-  if(/^\d{7,11}$/.test(clean)){
-    for(const p of KNOWN_PREFIXES){
-      for(const c of[p+clean,p+clean+'0',clean.startsWith('0')?p+clean.slice(1):null].filter(Boolean))
-        if(SIMS_DB[c])return{found:true,...SIMS_DB[c]};
-    }
-  }
-  if(clean.length>=7){
-    const s=clean.slice(-9);
-    for(const[k,v]of Object.entries(SIMS_DB))
-      if(k.endsWith(s)||k.endsWith(s+'0'))return{found:true,...v};
-  }
-  const nz=clean.replace(/^0+/,'');
-  if(DB_BY_LINEA[nz])return{found:true,...DB_BY_LINEA[nz]};
+  if(!clean||clean.length<4)return{found:false,number:clean};
+  const sim=await simSmartLookup(clean);
+  if(sim)return{found:true,...sim};
   return{found:false,number:clean};
 }
 function simCardHTML(item){
@@ -889,8 +877,8 @@ async function simProcessFiles(files){
     try{
       const b64=await toB64(files[i]);
       const{numbers,suffixes}=await ocrGemini(b64,files[i].type);
-      let fr=numbers.map(n=>{return{...lookupSIM(n),detected:n,_source:files[i].name}});
-      if(!fr.length)suffixes.forEach(s=>{const r=lookupSIM(s);if(r.found)fr.push({...r,detected:s,_source:files[i].name});});
+      let fr=await Promise.all(numbers.map(async n=>({...await lookupSIM(n),detected:n,_source:files[i].name})));
+      if(!fr.length){for(const s of suffixes){const r=await lookupSIM(s);if(r.found){fr.push({...r,detected:s,_source:files[i].name});break;}}}
       if(!fr.length)fr.push({found:false,number:'(no detectado)',_source:files[i].name});
       simResults.push(...fr);
       thumbEls[i].className=fr.some(r=>r.found)?'thumb done-ok':'thumb done-warn';
@@ -913,7 +901,7 @@ function renderSimResults(){
   if(notFound.length)html+=`<div class="sec-title"><div class="sec-dot" style="background:var(--red)"></div>Sin registro (${notFound.length})</div><div class="sim-grid">${notFound.map(simCardHTML).join('')}</div>`;
   document.getElementById('simResults').innerHTML=html;
 }
-function simSearchManual(){const v=document.getElementById('simManualInput').value.trim();if(!v)return;document.getElementById('simManualResult').innerHTML=simCardHTML(lookupSIM(v));}
+// simSearchManual defined above (async Supabase version)
 document.getElementById('simManualInput').addEventListener('keydown',e=>{if(e.key==='Enter')simSearchManual();});
 const sdz=document.getElementById('simDropZone');
 sdz.addEventListener('dragover',e=>{e.preventDefault();sdz.classList.add('drag');});
@@ -1467,4 +1455,3 @@ function showToast(msg,type='ok'){
 </script>
 </body>
 </html>
-
