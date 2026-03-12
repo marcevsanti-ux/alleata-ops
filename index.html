@@ -1176,7 +1176,7 @@ function userCardHTML(p){
         <div class="user-card-email">${p.email}</div>
         ${p.celular?`<div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--teal);margin-top:2px">📱 ${p.celular}</div>`:''}
       </div>
-      ${!isSelf?`<div class="user-card-actions"><button class="btn-ghost btn-sm" onclick="openEditUser('${p.id}')" style="padding:5px 10px;font-size:11px">✏️ Editar</button><button class="btn-danger" onclick="deleteUser('${p.id}','${(p.nombre||'').replace(/'/g,\"\\'\")}')">🗑</button></div>`:''}
+      ${!isSelf?`<div class="user-card-actions"><button class="btn-ghost btn-sm" onclick="openEditUser('${p.id}')" style="padding:5px 10px;font-size:11px">✏️ Editar</button><button class="btn-danger" onclick="deleteUser('${p.id}')">🗑</button></div>`:''}
     </div>
     <div class="mod-section">
       <div class="mod-section-label">Módulos habilitados</div>
@@ -1213,10 +1213,12 @@ async function setUserRol(uid,rol,btn){
   });
 }
 
-async function deleteUser(uid,nombre){
-  if(!confirm(`¿Eliminar al usuario "${nombre||uid}"?\n\nSe eliminará su perfil del sistema.`))return;
+async function deleteUser(uid){
+  const u=(window._usersList||[]).find(x=>x.id===uid);
+  const nombre=u?u.nombre||u.email:uid;
+  if(!confirm('¿Eliminar al usuario "'+nombre+'"?\n\nSe eliminará su perfil del sistema.'))return;
   await sb.from('profiles').delete().eq('id',uid);
-  showToast(`Usuario eliminado correctamente`,'ok');
+  showToast('Usuario eliminado correctamente','ok');
   loadUsers();
 }
 </script>
