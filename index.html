@@ -280,7 +280,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--navy-500);letter-spacing:1px;">
-      v1.2.2 · 10 mar 2026
+      v1.2.3 · 10 mar 2026
     </div>
   </div>
 </div>
@@ -329,7 +329,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--navy-500);letter-spacing:1px;">
-      v1.2.2 · 10 mar 2026
+      v1.2.3 · 10 mar 2026
     </div>
   </div>
 </nav>
@@ -342,7 +342,7 @@ tr:hover td{background:var(--surface2);}
       <span class="crumb-current" id="topbar-title">Dashboard</span>
     </div>
     <div class="topbar-right" id="topbar-date"></div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--navy-500);margin-left:12px;">v1.2.2</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--navy-500);margin-left:12px;">v1.2.3</div>
   </div>
   <div class="content">
 
@@ -532,7 +532,7 @@ tr:hover td{background:var(--surface2);}
           <div class="field"><label class="label">Email</label><input class="input" id="ajEmail" type="email" placeholder="gonzalo@alleata.com" /></div>
         </div>
         <div class="row">
-          <div class="field"><label class="label">Contraseña inicial</label><input class="input" id="ajPass" type="password" placeholder="Mínimo 6 caracteres" /></div>
+          <div class="field"><label class="label">Contraseña inicial</label><div style="position:relative;display:flex;align-items:center"><input class="input" id="ajPass" type="password" placeholder="Mínimo 6 caracteres" style="padding-right:42px" /><button type="button" onclick="togglePassVisibility('ajPass',this)" style="position:absolute;right:10px;background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:16px;padding:4px;line-height:1;transition:color .2s" title="Mostrar/ocultar contraseña">👁</button></div></div>
           <div class="field"><label class="label">Celular</label><input class="input" id="ajCelular" type="tel" placeholder="+54 11 1234-5678" /></div>
           <div class="field"><label class="label">Rol</label>
             <select class="select" id="ajRol">
@@ -1127,11 +1127,11 @@ async function createUser(){
   const modulos=[...document.querySelectorAll('#createModPills .mod-pill.active')].map(el=>el.dataset.mod);
   if(!modulos.length){msg.innerHTML='<div class="alert alert-err">Habilitá al menos un módulo</div>';return;}
   msg.innerHTML='<div class="alert alert-info">Creando usuario...</div>';
-  const{data,error}=await sb.auth.signUp({email,password:pass});
+  const{data,error}=await sb.auth.signUp({email,password:pass,options:{emailRedirectTo:'https://marcevsanti-ux.github.io/alleata-ops/'}});
   if(error){msg.innerHTML=`<div class="alert alert-err">${error.message}</div>`;return;}
   if(data.user){
     await sb.from('profiles').upsert({id:data.user.id,email,nombre,rol,modulos,celular:document.getElementById('ajCelular').value.trim()});
-    msg.innerHTML='<div class="alert alert-ok">✅ Usuario creado. Debe confirmar su email antes de ingresar.</div>';
+    msg.innerHTML='<div class="alert alert-ok">✅ Usuario creado. Se envió un email de confirmación (el link redirige al portal de producción).</div>';
     document.getElementById('ajNombre').value='';
     document.getElementById('ajEmail').value='';
     document.getElementById('ajPass').value='';
@@ -1142,6 +1142,7 @@ async function createUser(){
 
 async function loadUsers(){
   const{data:profiles}=await sb.from('profiles').select('*').order('created_at',{ascending:true});
+  window._usersList=profiles||[];
   const grid=document.getElementById('usersGrid');
   if(!profiles?.length){grid.innerHTML='<div class="empty" style="grid-column:1/-1"><div class="empty-icon">👥</div><p>No hay usuarios</p></div>';return;}
   grid.innerHTML=profiles.map(p=>userCardHTML(p)).join('');
@@ -1175,7 +1176,7 @@ function userCardHTML(p){
         <div class="user-card-email">${p.email}</div>
         ${p.celular?`<div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--teal);margin-top:2px">📱 ${p.celular}</div>`:''}
       </div>
-      ${!isSelf?`<button class="btn-danger" onclick="deleteUser('${p.id}')">Eliminar</button>`:''}
+      ${!isSelf?`<div class="user-card-actions"><button class="btn-ghost btn-sm" onclick="openEditUser('${p.id}')" style="padding:5px 10px;font-size:11px">✏️ Editar</button><button class="btn-danger" onclick="deleteUser('${p.id}','${(p.nombre||'').replace(/'/g,\"\\'\")}')">🗑</button></div>`:''}
     </div>
     <div class="mod-section">
       <div class="mod-section-label">Módulos habilitados</div>
@@ -1212,11 +1213,124 @@ async function setUserRol(uid,rol,btn){
   });
 }
 
-async function deleteUser(uid){
-  if(!confirm('¿Eliminar este usuario permanentemente?'))return;
+async function deleteUser(uid,nombre){
+  if(!confirm(`¿Eliminar al usuario "${nombre||uid}"?\n\nSe eliminará su perfil del sistema.`))return;
   await sb.from('profiles').delete().eq('id',uid);
+  showToast(`Usuario eliminado correctamente`,'ok');
   loadUsers();
 }
 </script>
+
+<!-- MODAL EDITAR USUARIO -->
+<div class="modal-overlay" id="modalEditUser">
+  <div class="modal" style="max-width:520px">
+    <button class="modal-close" onclick="closeModal('modalEditUser')">✕</button>
+    <div class="modal-title">✏️ Editar usuario</div>
+    <input type="hidden" id="editUserId" />
+    <div class="row">
+      <div class="field"><label class="label">Nombre completo</label><input class="input" id="editNombre" placeholder="Nombre del usuario" /></div>
+      <div class="field"><label class="label">Celular</label><input class="input" id="editCelular" type="tel" placeholder="+54 11 1234-5678" /></div>
+    </div>
+    <div class="field">
+      <label class="label">Nueva contraseña <span style="color:var(--text-muted);font-weight:400;text-transform:none;font-size:10px">(dejar vacío para no cambiar)</span></label>
+      <div style="position:relative;display:flex;align-items:center">
+        <input class="input" id="editPass" type="password" placeholder="Mínimo 6 caracteres" style="padding-right:42px" />
+        <button type="button" onclick="togglePassVisibility('editPass',this)" style="position:absolute;right:10px;background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:16px;padding:4px;line-height:1" title="Ver/ocultar">👁</button>
+      </div>
+    </div>
+    <div class="field"><label class="label">Rol</label>
+      <select class="select" id="editRol">
+        <option value="operador">Operador</option>
+        <option value="admin">Administrador</option>
+      </select>
+    </div>
+    <div class="field">
+      <label class="label" style="margin-bottom:10px">Módulos habilitados</label>
+      <div class="mod-pills" id="editModPills">
+        <div class="mod-pill" data-mod="sims" onclick="toggleEditMod(this)"><span class="pill-dot"></span>📡 SIMs</div>
+        <div class="mod-pill" data-mod="envios" onclick="toggleEditMod(this)"><span class="pill-dot"></span>🚚 Envíos</div>
+        <div class="mod-pill" data-mod="devoluciones" onclick="toggleEditMod(this)"><span class="pill-dot"></span>🔄 Devoluciones</div>
+        <div class="mod-pill" data-mod="horas" onclick="toggleEditMod(this)"><span class="pill-dot"></span>⏱ Horas</div>
+      </div>
+    </div>
+    <div id="editUserMsg"></div>
+    <div style="display:flex;gap:10px;margin-top:6px">
+      <button class="btn btn-sm" onclick="saveEditUser()">Guardar cambios</button>
+      <button class="btn-ghost btn-sm" onclick="closeModal('modalEditUser')">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+function togglePassVisibility(inputId,btn){
+  const input=document.getElementById(inputId);
+  if(!input)return;
+  if(input.type==='password'){input.type='text';btn.textContent='🙈';}
+  else{input.type='password';btn.textContent='👁';}
+}
+
+function toggleEditMod(el){el.classList.toggle('active');}
+
+function openEditUser(userId){
+  const user=(window._usersList||[]).find(u=>u.id===userId);
+  if(!user)return;
+  document.getElementById('editUserId').value=userId;
+  document.getElementById('editNombre').value=user.nombre||'';
+  document.getElementById('editCelular').value=user.celular||'';
+  document.getElementById('editPass').value='';
+  document.getElementById('editRol').value=user.rol||'operador';
+  document.getElementById('editUserMsg').innerHTML='';
+  const mods=user.modulos||[];
+  document.querySelectorAll('#editModPills .mod-pill').forEach(p=>{
+    p.classList.toggle('active',mods.includes(p.dataset.mod));
+  });
+  const pi=document.getElementById('editPass');
+  pi.type='password';
+  const eb=pi.parentElement.querySelector('button');
+  if(eb)eb.textContent='👁';
+  document.getElementById('modalEditUser').classList.add('show');
+}
+
+async function saveEditUser(){
+  const userId=document.getElementById('editUserId').value;
+  const nombre=document.getElementById('editNombre').value.trim();
+  const celular=document.getElementById('editCelular').value.trim();
+  const rol=document.getElementById('editRol').value;
+  const newPass=document.getElementById('editPass').value;
+  const msgEl=document.getElementById('editUserMsg');
+  const modulos=Array.from(document.querySelectorAll('#editModPills .mod-pill.active')).map(p=>p.dataset.mod);
+  if(!nombre){msgEl.innerHTML='<div class="alert alert-err">El nombre es obligatorio.</div>';return;}
+  msgEl.innerHTML='<div class="alert alert-info">Guardando...</div>';
+  try{
+    const{error:pe}=await sb.from('profiles').update({nombre,celular,rol,modulos}).eq('id',userId);
+    if(pe)throw pe;
+    if(newPass&&newPass.length>=6){
+      try{
+        await sb.functions.invoke('admin-update-user',{body:{userId,password:newPass}});
+      }catch(e2){
+        msgEl.innerHTML='<div class="alert alert-err">⚠️ Perfil guardado, pero no se pudo cambiar la contraseña (falta edge function admin-update-user).</div>';
+        window._usersList=(await sb.from('profiles').select('*').order('created_at',{ascending:true})).data||[];
+        document.getElementById('usersGrid').innerHTML=(window._usersList).map(p=>userCardHTML(p)).join('');
+        return;
+      }
+    }
+    msgEl.innerHTML='<div class="alert alert-ok">✅ Usuario actualizado correctamente.</div>';
+    window._usersList=(await sb.from('profiles').select('*').order('created_at',{ascending:true})).data||[];
+    document.getElementById('usersGrid').innerHTML=(window._usersList).map(p=>userCardHTML(p)).join('');
+    setTimeout(()=>closeModal('modalEditUser'),1400);
+  }catch(e){
+    msgEl.innerHTML=`<div class="alert alert-err">Error: ${e.message}</div>`;
+  }
+}
+
+function showToast(msg,type='ok'){
+  let t=document.getElementById('gToast');
+  if(!t){t=document.createElement('div');t.id='gToast';t.style.cssText='position:fixed;bottom:24px;right:24px;z-index:9999;min-width:240px;max-width:360px';document.body.appendChild(t);}
+  t.innerHTML=`<div class="alert ${type==='ok'?'alert-ok':'alert-err'}" style="box-shadow:0 8px 24px rgba(0,0,0,.5)">${msg}</div>`;
+  clearTimeout(t._timer);
+  t._timer=setTimeout(()=>{t.innerHTML='';},4000);
+}
+</script>
+
 </body>
 </html>
