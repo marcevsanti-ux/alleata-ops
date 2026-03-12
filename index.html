@@ -280,7 +280,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--navy-500);letter-spacing:1px;">
-      v1.2.3 · 10 mar 2026
+      v1.2.4 · 12 mar 2026
     </div>
   </div>
 </div>
@@ -329,7 +329,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--navy-500);letter-spacing:1px;">
-      v1.2.3 · 10 mar 2026
+      v1.2.4 · 12 mar 2026
     </div>
   </div>
 </nav>
@@ -342,7 +342,7 @@ tr:hover td{background:var(--surface2);}
       <span class="crumb-current" id="topbar-title">Dashboard</span>
     </div>
     <div class="topbar-right" id="topbar-date"></div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--navy-500);margin-left:12px;">v1.2.3</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--navy-500);margin-left:12px;">v1.2.4</div>
   </div>
   <div class="content">
 
@@ -353,6 +353,12 @@ tr:hover td{background:var(--surface2);}
         <div class="welcome-text">
           <h2 id="welcomeMsg">Bienvenido</h2>
           <p>Portal centralizado de operaciones y logística.<br>Seleccioná un módulo para comenzar.</p>
+        </div>
+        <div style="margin-left:auto;display:flex;flex-direction:column;align-items:center;gap:6px;opacity:0.85;">
+          <div style="background:#fff;border-radius:10px;padding:7px;box-shadow:0 2px 8px rgba(0,0,0,.25);">
+            <canvas id="qrCanvas" width="80" height="80"></canvas>
+          </div>
+          <span style="font-size:10px;color:var(--text-muted);letter-spacing:.5px;text-transform:uppercase;font-weight:600;">App Mobile</span>
         </div>
       </div>
       <div class="dash-grid" id="dashGrid"></div>
@@ -586,6 +592,7 @@ tr:hover td{background:var(--surface2);}
 <script>
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='sb_publishable_W3fP-CCb0m-B0v5tdaHQCg_2L43Rx5J';
+const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
 const SUPABASE_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const{createClient}=supabase;
@@ -644,6 +651,7 @@ function showApp(){
   document.getElementById('sideUserRole').textContent=isAdmin?'Administrador':'Operador';
   document.getElementById('sideUserAvatar').textContent=nombre[0].toUpperCase();
   document.getElementById('welcomeMsg').textContent=`Hola, ${nombre} 👋`;
+  setTimeout(()=>{ if(window._drawQR) window._drawQR(); },100);
   if(isAdmin){
     document.getElementById('nav-ajustes').style.display='flex';
     document.getElementById('nav-section-config').style.display='block';
@@ -1127,11 +1135,11 @@ async function createUser(){
   const modulos=[...document.querySelectorAll('#createModPills .mod-pill.active')].map(el=>el.dataset.mod);
   if(!modulos.length){msg.innerHTML='<div class="alert alert-err">Habilitá al menos un módulo</div>';return;}
   msg.innerHTML='<div class="alert alert-info">Creando usuario...</div>';
-  const{data,error}=await sb.auth.signUp({email,password:pass,options:{emailRedirectTo:'https://marcevsanti-ux.github.io/alleata-ops/'}});
+  const{data,error}=await sb.auth.admin.createUser({email,password:pass,email_confirm:true});
   if(error){msg.innerHTML=`<div class="alert alert-err">${error.message}</div>`;return;}
   if(data.user){
     await sb.from('profiles').upsert({id:data.user.id,email,nombre,rol,modulos,celular:document.getElementById('ajCelular').value.trim()});
-    msg.innerHTML='<div class="alert alert-ok">✅ Usuario creado. Se envió un email de confirmación (el link redirige al portal de producción).</div>';
+    msg.innerHTML='<div class="alert alert-ok">✅ Usuario creado y confirmado. Puede ingresar al portal de inmediato.</div>';
     document.getElementById('ajNombre').value='';
     document.getElementById('ajEmail').value='';
     document.getElementById('ajPass').value='';
@@ -1334,5 +1342,23 @@ function showToast(msg,type='ok'){
 }
 </script>
 
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+<script>
+  (function(){
+    function drawQR(){
+      var canvas=document.getElementById('qrCanvas');
+      if(!canvas)return;
+      new QRCode(canvas,{
+        text:'https://marcevsanti-ux.github.io/alleata-ops/mobile.html',
+        width:80,height:80,
+        colorDark:'#0d1b2a',colorLight:'#ffffff',
+        correctLevel:QRCode.CorrectLevel.M
+      });
+    }
+    // Draw after login renders the dashboard
+    document.addEventListener('qrReady',drawQR);
+    window._drawQR=drawQR;
+  })();
+</script>
 </body>
 </html>
