@@ -413,13 +413,18 @@ async function doLogin() {
       body: JSON.stringify({ email, password: pass })
     });
     const d = await r.json();
-    if (d.error || d.error_description) throw new Error(d.error_description || d.error);
+    console.log('Auth response:', JSON.stringify(d).substring(0, 200));
+    if (!r.ok || d.error || d.error_description) throw new Error(d.error_description || d.error || 'Error de autenticación');
+    if (!d.access_token) throw new Error('No se recibió token');
     setToken(d.access_token);
-    localStorage.setItem('sb_user', JSON.stringify({ email: d.user?.email, id: d.user?.id }));
-    currentUser = { email: d.user?.email, id: d.user?.id };
+    const userId = d.user?.id || d.user_id;
+    const userEmail = d.user?.email || email;
+    localStorage.setItem('sb_user', JSON.stringify({ email: userEmail, id: userId }));
+    currentUser = { email: userEmail, id: userId };
     await enterApp();
   } catch(e) {
-    errEl.textContent = 'Email o contraseña incorrectos.';
+    console.error('Login error:', e.message);
+    errEl.textContent = e.message || 'Email o contraseña incorrectos.';
   } finally {
     btn.style.display = 'block';
     spinner.style.display = 'none';
