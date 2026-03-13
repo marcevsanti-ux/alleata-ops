@@ -198,7 +198,7 @@
   </div>
   <div class="login-brand">Alleata</div>
   <div class="login-sub">Portal de Operaciones · SIMs Mobile</div>
-  <div style="position:relative;z-index:1;font-size:11px;color:var(--text-muted);font-family:var(--font-mono);margin-bottom:32px;">v2.0.4</div>
+  <div style="position:relative;z-index:1;font-size:11px;color:var(--text-muted);font-family:var(--font-mono);margin-bottom:32px;">v2.0.5</div>
   <div class="login-card">
     <h2>Iniciar sesión</h2>
     <div class="field">
@@ -231,7 +231,7 @@
       <svg viewBox="0 0 36 36" fill="none"><path d="M8 26L18 10L28 26" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 20H24" stroke="white" stroke-width="3" stroke-linecap="round"/></svg>
     </div>
     <span class="topbar-title">Verificador SIMs</span>
-    <span style="font-size:10px;color:var(--text-muted);font-family:var(--font-mono);margin-right:4px;">v2.0.4</span>
+    <span style="font-size:10px;color:var(--text-muted);font-family:var(--font-mono);margin-right:4px;">v2.0.5</span>
     <div class="topbar-user" id="topbar-user-btn" onclick="openDrawer()">?</div>
   </div>
 
@@ -621,10 +621,27 @@ Respondé SOLO con JSON sin markdown ni texto extra:
       })
     });
     const d = await r.json();
-    let raw = d?.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
-    raw = raw.replace(/```json\n?|\n?```/g,'').trim();
-    let extracted;
-    try { extracted = JSON.parse(raw); } catch { extracted = {}; }
+    let raw = d?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    console.log('Gemini raw:', raw.substring(0, 300));
+    
+    // Clean and parse JSON
+    let extracted = {};
+    try {
+      const cleaned = raw.replace(/```json\n?|\n?```|```/g,'').trim();
+      extracted = JSON.parse(cleaned);
+    } catch {
+      // Fallback: extraer números con regex directamente del texto
+      const nums = raw.match(/\d{6,}/g) || [];
+      console.log('Fallback nums:', nums);
+      const iccid = nums.find(n => n.startsWith('8954') && n.length >= 10);
+      const long = nums.find(n => n.length >= 15);
+      extracted = {
+        linea1: iccid || null,
+        linea2: nums.find(n => n !== iccid && n.length >= 6) || null,
+        serie_completa: long || null,
+        linea: nums.find(n => n.length === 10 && !n.startsWith('895')) || null
+      };
+    }
     console.log('Gemini extrajo:', JSON.stringify(extracted));
 
     // Construir candidatos incluyendo concatenación de las dos mitades
@@ -659,22 +676,27 @@ Respondé SOLO con JSON sin markdown ni texto extra:
 function showScanResult(el, sim, extracted) {
   if (sim) {
     el.innerHTML = buildResultCard(sim);
-  } else if (extracted.serie || extracted.linea) {
-    const series = extracted.serie || extracted.linea;
-    el.innerHTML = `
-      <div class="result-card">
-        <div class="result-header">
-          <div class="result-status warn"></div>
-          <span>SIM no encontrada en DB</span>
-          <span class="badge default">Sin registro</span>
-        </div>
-        <div class="result-body">
-          <div class="result-row"><span class="label">Detectado</span><span class="value" style="font-family:var(--font-mono)">${series}</span></div>
-          ${!dbLoaded ? '<div style="color:var(--amber);font-size:12px;margin-top:4px;">⚠️ Base de datos no disponible en esta versión.</div>' : ''}
-        </div>
-      </div>`;
   } else {
-    el.innerHTML = `<div class="result-card"><div class="result-not-found">No se pudo detectar una SIM en la imagen.<br>Intentá con mejor iluminación o encuadre.</div></div>`;
+    const serie = extracted.serie_completa || extracted.serie || extracted.linea1;
+    const linea = extracted.linea;
+    if (serie || linea) {
+      el.innerHTML = `
+        <div class="result-card">
+          <div class="result-header">
+            <div class="result-status warn"></div>
+            <span>SIM no encontrada en DB</span>
+            <span class="badge default">Sin registro</span>
+          </div>
+          <div class="result-body">
+            ${serie ? `<div class="result-row"><span class="label">Serie detectada</span><span class="value">${serie}</span></div>` : ''}
+            ${extracted.linea1 ? `<div class="result-row"><span class="label">Línea 1</span><span class="value">${extracted.linea1}</span></div>` : ''}
+            ${extracted.linea2 ? `<div class="result-row"><span class="label">Línea 2</span><span class="value">${extracted.linea2}</span></div>` : ''}
+            ${linea ? `<div class="result-row"><span class="label">Teléfono</span><span class="value">${linea}</span></div>` : ''}
+          </div>
+        </div>`;
+    } else {
+      el.innerHTML = `<div class="result-card"><div class="result-not-found">No se pudo detectar una SIM en la imagen.<br>Intentá con mejor iluminación o encuadre.</div></div>`;
+    }
   }
 }
 
