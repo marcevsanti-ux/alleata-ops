@@ -198,7 +198,7 @@
   </div>
   <div class="login-brand">Alleata</div>
   <div class="login-sub">Portal de Operaciones · SIMs Mobile</div>
-  <div style="position:relative;z-index:1;font-size:11px;color:var(--text-muted);font-family:var(--font-mono);margin-bottom:32px;">v2.0.3</div>
+  <div style="position:relative;z-index:1;font-size:11px;color:var(--text-muted);font-family:var(--font-mono);margin-bottom:32px;">v2.0.4</div>
   <div class="login-card">
     <h2>Iniciar sesión</h2>
     <div class="field">
@@ -231,7 +231,7 @@
       <svg viewBox="0 0 36 36" fill="none"><path d="M8 26L18 10L28 26" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 20H24" stroke="white" stroke-width="3" stroke-linecap="round"/></svg>
     </div>
     <span class="topbar-title">Verificador SIMs</span>
-    <span style="font-size:10px;color:var(--text-muted);font-family:var(--font-mono);margin-right:4px;">v2.0.3</span>
+    <span style="font-size:10px;color:var(--text-muted);font-family:var(--font-mono);margin-right:4px;">v2.0.4</span>
     <div class="topbar-user" id="topbar-user-btn" onclick="openDrawer()">?</div>
   </div>
 
@@ -596,15 +596,17 @@ async function processImage(b64, mime) {
   const resultEl = document.getElementById('scan-result');
   resultEl.innerHTML = `<div class="processing"><div class="spinner"></div><p>Analizando imagen con IA...</p></div>`;
 
-  const prompt = `Analizá esta imagen. Extraé TODOS los números visibles, especialmente los impresos en chips SIM o etiquetas.
+  const prompt = `Analizá esta imagen de un chip SIM CLARO Argentina.
 
-IMPORTANTE:
-- Serie ICCID: empieza con 8954, tiene 19-20 dígitos (ej: 8954318226183622230)
-- Línea: número de 10 dígitos (ej: 1137946976 o 056427050)
-- Extraé TODOS los números que veas aunque estén cortados o sean parciales
+El ICCID está impreso en DOS líneas que forman un número de 19-20 dígitos:
+- Primera línea: primeros ~10 dígitos, empieza con 8954 (ej: "8954318224")
+- Segunda línea: últimos ~9 dígitos (ej: "056427050 0" → "0564270500")
+- Serie completa = linea1 + linea2 sin espacios (ej: "89543182240564270500")
 
-Respondé SOLO con este JSON sin texto adicional:
-{"serie":"número más largo que empiece con 895 o null","linea":"número de 10 dígitos o null","otros":["cualquier otro número de 6+ dígitos"]}`;
+También puede haber número de línea telefónica de 10 dígitos.
+
+Respondé SOLO con JSON sin markdown ni texto extra:
+{"linea1":"primera mitad","linea2":"segunda mitad sin espacios","serie_completa":"ambas concatenadas","linea":"tel 10 dígitos o null"}`;
 
   try {
     const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_KEY}`, {
@@ -625,14 +627,28 @@ Respondé SOLO con este JSON sin texto adicional:
     try { extracted = JSON.parse(raw); } catch { extracted = {}; }
     console.log('Gemini extrajo:', JSON.stringify(extracted));
 
+    // Construir candidatos incluyendo concatenación de las dos mitades
+    const serie_completa = extracted.serie_completa || 
+      ((extracted.linea1 && extracted.linea2) ? 
+        (extracted.linea1 + extracted.linea2).replace(/\s+/g,'') : null);
+    
+    const candidates = [
+      serie_completa,
+      extracted.serie,
+      extracted.linea1,
+      extracted.linea,
+      ...(extracted.otros||[])
+    ].filter(Boolean);
+    
+    console.log('Candidatos lookup:', candidates);
+
     // Lookup en Supabase
     resultEl.innerHTML = `<div class="processing"><div class="spinner"></div><p>Buscando en base de datos...</p></div>`;
-    const candidates = [extracted.serie, extracted.linea, ...(extracted.otros||[])].filter(Boolean);
     const sim = await lookupSIMMulti(candidates);
 
     showScanResult(resultEl, sim, extracted);
-    if (sim || extracted.serie || extracted.linea) {
-      addToHistory(sim, extracted);
+    if (sim || serie_completa || extracted.linea) {
+      addToHistory(sim, { ...extracted, serie: serie_completa });
     }
   } catch(e) {
     resultEl.innerHTML = `<div class="result-card"><div class="result-not-found">❌ Error al procesar la imagen.<br><small>${e.message}</small></div></div>`;
