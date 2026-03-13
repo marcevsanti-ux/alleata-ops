@@ -198,7 +198,7 @@
   </div>
   <div class="login-brand">Alleata</div>
   <div class="login-sub">Portal de Operaciones · SIMs Mobile</div>
-  <div style="position:relative;z-index:1;font-size:11px;color:var(--text-muted);font-family:var(--font-mono);margin-bottom:32px;">v2.0.6</div>
+  <div style="position:relative;z-index:1;font-size:11px;color:var(--text-muted);font-family:var(--font-mono);margin-bottom:32px;">v2.0.7</div>
   <div class="login-card">
     <h2>Iniciar sesión</h2>
     <div class="field">
@@ -231,7 +231,7 @@
       <svg viewBox="0 0 36 36" fill="none"><path d="M8 26L18 10L28 26" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 20H24" stroke="white" stroke-width="3" stroke-linecap="round"/></svg>
     </div>
     <span class="topbar-title">Verificador SIMs</span>
-    <span style="font-size:10px;color:var(--text-muted);font-family:var(--font-mono);margin-right:4px;">v2.0.6</span>
+    <span style="font-size:10px;color:var(--text-muted);font-family:var(--font-mono);margin-right:4px;">v2.0.7</span>
     <div class="topbar-user" id="topbar-user-btn" onclick="openDrawer()">?</div>
   </div>
 
@@ -614,7 +614,16 @@ async function processImage(b64, mime) {
     });
     const d = await r.json();
     const text = d?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    const geminiError = d?.error?.message || null;
     console.log('Gemini raw:', text);
+    
+    // Mostrar debug en pantalla temporalmente
+    resultEl.innerHTML = `<div class="result-card"><div class="result-body" style="font-size:11px;font-family:monospace;word-break:break-all;color:var(--text-muted)">
+      <b style="color:var(--teal)">DEBUG Gemini:</b><br>
+      ${geminiError ? `❌ Error: ${geminiError}<br>` : ''}
+      ${text ? `✅ Texto: ${text.substring(0,200)}` : '⚠️ Sin respuesta'}
+    </div></div>`;
+    await new Promise(r => setTimeout(r, 3000)); // mostrar 3 segundos
 
     // Extraer con regex igual que el mobile viejo
     const numbers  = [...new Set(text.match(/8954\d{9,}/g) || [])];
