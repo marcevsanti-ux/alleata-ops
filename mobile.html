@@ -198,7 +198,7 @@
   </div>
   <div class="login-brand">Alleata</div>
   <div class="login-sub">Portal de Operaciones · SIMs Mobile</div>
-  <div style="position:relative;z-index:1;font-size:11px;color:var(--text-muted);font-family:var(--font-mono);margin-bottom:32px;">v2.0.5</div>
+  <div style="position:relative;z-index:1;font-size:11px;color:var(--text-muted);font-family:var(--font-mono);margin-bottom:32px;">v2.0.6</div>
   <div class="login-card">
     <h2>Iniciar sesión</h2>
     <div class="field">
@@ -231,7 +231,7 @@
       <svg viewBox="0 0 36 36" fill="none"><path d="M8 26L18 10L28 26" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 20H24" stroke="white" stroke-width="3" stroke-linecap="round"/></svg>
     </div>
     <span class="topbar-title">Verificador SIMs</span>
-    <span style="font-size:10px;color:var(--text-muted);font-family:var(--font-mono);margin-right:4px;">v2.0.5</span>
+    <span style="font-size:10px;color:var(--text-muted);font-family:var(--font-mono);margin-right:4px;">v2.0.6</span>
     <div class="topbar-user" id="topbar-user-btn" onclick="openDrawer()">?</div>
   </div>
 
@@ -596,17 +596,9 @@ async function processImage(b64, mime) {
   const resultEl = document.getElementById('scan-result');
   resultEl.innerHTML = `<div class="processing"><div class="spinner"></div><p>Analizando imagen con IA...</p></div>`;
 
-  const prompt = `Analizá esta imagen de un chip SIM CLARO Argentina.
+  const KNOWN_PREFIXES=["8954310226","8954343122","8954318226","8995431224","8954310196","8954310202","8954318202","8954318224","8954316225","8954311624","8954310211","8954343082","8954310174","8954318211","8954343052","0000000000","8954310184","8954312252","8954318185","8954318216","8954341012","8954310166","8954316244","8954343102","8954314146","8954343012","8954318246","8954312245","8954310163","8954310216","8954310072","8954310213","8954316252","8954318245","8954343310","8954314165","8954310191","8943122451","8954318215","8954312224","8954318236","8954312212","8954318153","8954313012"];
 
-El ICCID está impreso en DOS líneas que forman un número de 19-20 dígitos:
-- Primera línea: primeros ~10 dígitos, empieza con 8954 (ej: "8954318224")
-- Segunda línea: últimos ~9 dígitos (ej: "056427050 0" → "0564270500")
-- Serie completa = linea1 + linea2 sin espacios (ej: "89543182240564270500")
-
-También puede haber número de línea telefónica de 10 dígitos.
-
-Respondé SOLO con JSON sin markdown ni texto extra:
-{"linea1":"primera mitad","linea2":"segunda mitad sin espacios","serie_completa":"ambas concatenadas","linea":"tel 10 dígitos o null"}`;
+  const prompt = `Chips SIM Claro Argentina. Arriba: prefijo (ej: "8954318224"). Abajo: sufijo (ej: "056426839 0"). ICCID = PREFIJO+SUFIJO. Respondé SOLO con números completos, uno por línea.`;
 
   try {
     const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_KEY}`, {
@@ -614,58 +606,44 @@ Respondé SOLO con JSON sin markdown ni texto extra:
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contents: [{ parts: [
-          { inlineData: { mimeType: mime, data: b64 } },
-          { text: prompt }
+          { text: prompt },
+          { inlineData: { mimeType: mime, data: b64 } }
         ]}],
-        generationConfig: { temperature: 0, maxOutputTokens: 300 }
+        generationConfig: { temperature: 0, maxOutputTokens: 512 }
       })
     });
     const d = await r.json();
-    let raw = d?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    console.log('Gemini raw:', raw.substring(0, 300));
-    
-    // Clean and parse JSON
-    let extracted = {};
-    try {
-      const cleaned = raw.replace(/```json\n?|\n?```|```/g,'').trim();
-      extracted = JSON.parse(cleaned);
-    } catch {
-      // Fallback: extraer números con regex directamente del texto
-      const nums = raw.match(/\d{6,}/g) || [];
-      console.log('Fallback nums:', nums);
-      const iccid = nums.find(n => n.startsWith('8954') && n.length >= 10);
-      const long = nums.find(n => n.length >= 15);
-      extracted = {
-        linea1: iccid || null,
-        linea2: nums.find(n => n !== iccid && n.length >= 6) || null,
-        serie_completa: long || null,
-        linea: nums.find(n => n.length === 10 && !n.startsWith('895')) || null
-      };
-    }
-    console.log('Gemini extrajo:', JSON.stringify(extracted));
+    const text = d?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    console.log('Gemini raw:', text);
 
-    // Construir candidatos incluyendo concatenación de las dos mitades
-    const serie_completa = extracted.serie_completa || 
-      ((extracted.linea1 && extracted.linea2) ? 
-        (extracted.linea1 + extracted.linea2).replace(/\s+/g,'') : null);
-    
-    const candidates = [
-      serie_completa,
-      extracted.serie,
-      extracted.linea1,
-      extracted.linea,
-      ...(extracted.otros||[])
-    ].filter(Boolean);
-    
-    console.log('Candidatos lookup:', candidates);
+    // Extraer con regex igual que el mobile viejo
+    const numbers  = [...new Set(text.match(/8954\d{9,}/g) || [])];
+    const suffixes = [...new Set(text.match(/\b0\d{7,9}\b/g) || [])];
+    console.log('Numbers:', numbers, 'Suffixes:', suffixes);
+
+    // Construir candidatos: ICCIDs completos + sufijos combinados con prefijos
+    const allCandidates = [...numbers];
+    for (const s of suffixes) {
+      for (const p of KNOWN_PREFIXES) {
+        allCandidates.push(p + s);
+        allCandidates.push(p + s + '0');
+        if (s.startsWith('0')) allCandidates.push(p + s.slice(1));
+      }
+    }
+    // También sufijo directo (últimos 9 dígitos)
+    for (const s of suffixes) allCandidates.push(s);
+
+    console.log('Candidatos:', allCandidates.slice(0, 5), '...');
+
+    const extracted = { serie: numbers[0] || null, linea: null, suffixes, numbers };
 
     // Lookup en Supabase
     resultEl.innerHTML = `<div class="processing"><div class="spinner"></div><p>Buscando en base de datos...</p></div>`;
-    const sim = await lookupSIMMulti(candidates);
+    const sim = await lookupSIMMulti([...new Set(allCandidates)].slice(0, 20));
 
     showScanResult(resultEl, sim, extracted);
-    if (sim || serie_completa || extracted.linea) {
-      addToHistory(sim, { ...extracted, serie: serie_completa });
+    if (sim || numbers.length || suffixes.length) {
+      addToHistory(sim, extracted);
     }
   } catch(e) {
     resultEl.innerHTML = `<div class="result-card"><div class="result-not-found">❌ Error al procesar la imagen.<br><small>${e.message}</small></div></div>`;
@@ -677,9 +655,9 @@ function showScanResult(el, sim, extracted) {
   if (sim) {
     el.innerHTML = buildResultCard(sim);
   } else {
-    const serie = extracted.serie_completa || extracted.serie || extracted.linea1;
-    const linea = extracted.linea;
-    if (serie || linea) {
+    const serie = extracted.serie || (extracted.numbers||[])[0];
+    const sufijo = (extracted.suffixes||[])[0];
+    if (serie || sufijo) {
       el.innerHTML = `
         <div class="result-card">
           <div class="result-header">
@@ -688,10 +666,8 @@ function showScanResult(el, sim, extracted) {
             <span class="badge default">Sin registro</span>
           </div>
           <div class="result-body">
-            ${serie ? `<div class="result-row"><span class="label">Serie detectada</span><span class="value">${serie}</span></div>` : ''}
-            ${extracted.linea1 ? `<div class="result-row"><span class="label">Línea 1</span><span class="value">${extracted.linea1}</span></div>` : ''}
-            ${extracted.linea2 ? `<div class="result-row"><span class="label">Línea 2</span><span class="value">${extracted.linea2}</span></div>` : ''}
-            ${linea ? `<div class="result-row"><span class="label">Teléfono</span><span class="value">${linea}</span></div>` : ''}
+            ${serie ? `<div class="result-row"><span class="label">ICCID detectado</span><span class="value">${serie}</span></div>` : ''}
+            ${sufijo ? `<div class="result-row"><span class="label">Sufijo detectado</span><span class="value">${sufijo}</span></div>` : ''}
           </div>
         </div>`;
     } else {
