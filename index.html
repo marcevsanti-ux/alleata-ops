@@ -280,7 +280,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--navy-500);letter-spacing:1px;">
-      v1.4.2 · 14 mar 2026
+      v1.5.0 · 14 mar 2026
     </div>
   </div>
 </div>
@@ -329,7 +329,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--navy-500);letter-spacing:1px;">
-      v1.4.2 · 14 mar 2026
+      v1.5.0 · 14 mar 2026
     </div>
   </div>
 </nav>
@@ -342,7 +342,7 @@ tr:hover td{background:var(--surface2);}
       <span class="crumb-current" id="topbar-title">Dashboard</span>
     </div>
     <div class="topbar-right" id="topbar-date"></div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--navy-500);margin-left:12px;">v1.4.2</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--navy-500);margin-left:12px;">v1.5.0</div>
   </div>
   <div class="content">
 
@@ -415,22 +415,43 @@ tr:hover td{background:var(--surface2);}
 
       <!-- IMPORT SF (solo admin) -->
       <div class="card" id="sfImportCard" style="margin-bottom:14px;display:none">
-        <div class="card-title">📤 Importar reporte Salesforce</div>
-        <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;line-height:1.6;">
-          Subí el Excel exportado de SF (<strong style="color:var(--text)">DESPACHADO CORREO ARGENTINO</strong>). El sistema asignará cada OT al usuario correspondiente según el nombre del responsable.
+        <div class="card-title">📤 Importar reportes Salesforce</div>
+        <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:4px">
+          <!-- Import Correo Argentino -->
+          <div style="flex:1;min-width:280px;background:var(--navy-700);border-radius:10px;padding:14px">
+            <div style="font-size:12px;font-weight:700;color:var(--blue);margin-bottom:6px">🚚 Correo Argentino — Despachados</div>
+            <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px;line-height:1.5">Excel <strong style="color:var(--text)">DESPACHADO CORREO ARGENTINO</strong>. Asigna OTs por responsable.</div>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+              <label style="background:var(--grad);color:#fff;border:none;padding:8px 14px;font-family:'Inter',sans-serif;font-size:12px;font-weight:600;cursor:pointer;border-radius:8px;display:inline-flex;align-items:center;gap:6px;">
+                📂 Seleccionar Excel
+                <input type="file" id="sfFileInput" accept=".xlsx,.xls" style="display:none" onchange="importSF(event)">
+              </label>
+              <div id="sfImportMsg" style="font-size:11px;color:var(--text-muted)"></div>
+            </div>
+            <div id="sfImportProgress" style="display:none;margin-top:8px">
+              <div class="progress-text" id="sfProgressText">Procesando...</div>
+              <div class="progress-track" style="margin-top:4px"><div class="progress-fill" id="sfProgressFill"></div></div>
+            </div>
+            <div id="sfImportResult"></div>
+          </div>
+          <!-- Import Pre-Colecta / Hoja de Ruta -->
+          <div style="flex:1;min-width:280px;background:var(--navy-700);border-radius:10px;padding:14px">
+            <div style="font-size:12px;font-weight:700;color:var(--teal);margin-bottom:6px">🗺️ Pre-Colecta — Hoja de Ruta ALLEATA</div>
+            <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px;line-height:1.5">Excel <strong style="color:var(--text)">PRE-COLECTA</strong>. Solo logística ALLEATA. Ruta de Marcelo y Angel.</div>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+              <label style="background:var(--grad);color:#fff;border:none;padding:8px 14px;font-family:'Inter',sans-serif;font-size:12px;font-weight:600;cursor:pointer;border-radius:8px;display:inline-flex;align-items:center;gap:6px;">
+                📂 Seleccionar Excel
+                <input type="file" id="pcFileInput" accept=".xlsx,.xls" style="display:none" onchange="importPreColecta(event)">
+              </label>
+              <div id="pcImportMsg" style="font-size:11px;color:var(--text-muted)"></div>
+            </div>
+            <div id="pcImportProgress" style="display:none;margin-top:8px">
+              <div class="progress-text" id="pcProgressText">Procesando...</div>
+              <div class="progress-track" style="margin-top:4px"><div class="progress-fill" id="pcProgressFill"></div></div>
+            </div>
+            <div id="pcImportResult"></div>
+          </div>
         </div>
-        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-          <label style="background:var(--grad);color:#fff;border:none;padding:9px 18px;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;cursor:pointer;border-radius:8px;display:inline-flex;align-items:center;gap:8px;">
-            📂 Seleccionar Excel
-            <input type="file" id="sfFileInput" accept=".xlsx,.xls" style="display:none" onchange="importSF(event)">
-          </label>
-          <div id="sfImportMsg" style="font-size:12px;color:var(--text-muted)"></div>
-        </div>
-        <div id="sfImportProgress" style="display:none;margin-top:10px">
-          <div class="progress-text" id="sfProgressText">Procesando...</div>
-          <div class="progress-track" style="margin-top:6px"><div class="progress-fill" id="sfProgressFill"></div></div>
-        </div>
-        <div id="sfImportResult"></div>
       </div>
 
       <!-- Filtros (solo admin) -->
@@ -1370,6 +1391,122 @@ async function importSIMs(e){
   e.target.value='';
 }
 // ── FIN IMPORT SIMs ──
+
+// ── IMPORT PRE-COLECTA (Hoja de Ruta ALLEATA) ──
+async function importPreColecta(e){
+  const file=e.target.files[0];
+  if(!file)return;
+  const msg=document.getElementById('pcImportMsg');
+  const prog=document.getElementById('pcImportProgress');
+  const fill=document.getElementById('pcProgressFill');
+  const ptext=document.getElementById('pcProgressText');
+  const result=document.getElementById('pcImportResult');
+  msg.textContent='';result.innerHTML='';
+  prog.style.display='block';
+  ptext.textContent='Leyendo archivo...';fill.style.width='10%';
+
+  try{
+    const data=await file.arrayBuffer();
+    const{read,utils}=XLSX;
+    const wb=read(data);
+    const ws=wb.Sheets[wb.SheetNames[0]];
+    const rows=utils.sheet_to_json(ws,{header:1,defval:null});
+
+    // Buscar fila de encabezados (tiene "Id. de orden de trabajo")
+    let headerIdx=-1;
+    for(let i=0;i<rows.length;i++){
+      if(rows[i]&&rows[i].some(c=>String(c||'').includes('Id. de orden de trabajo'))){
+        headerIdx=i;break;
+      }
+    }
+    if(headerIdx===-1)throw new Error('No se encontró la fila de encabezados. Verificá que sea el reporte Pre-Colecta de SF.');
+
+    const headers=rows[headerIdx].map(h=>String(h||'').trim());
+    const col=(name)=>headers.findIndex(h=>h.includes(name));
+
+    // Mapeo de columnas del reporte Pre-Colecta
+    const iLogistica=col('Logística');
+    const iSFId=col('Id. de orden de trabajo');
+    const iResp=col('Responsable de la OT');
+    const iTipo=col('Tipo de registro');
+    const iOT=col('Número de orden');
+    const iFecha=col('Fecha de creación');
+    const iComercio=col('Nombre del comercio');
+    const iCuenta=col('Cuenta');
+    const iContacto=col('Contacto');
+    const iHorario=col('Horario');
+    const iCalle=col('Calle');
+    const iCiudad=col('Ciudad');
+    const iCP=col('Código postal');
+    const iProv=col('Estado/Provincia');
+    const iObs=col('Observaciones');
+    const iCUIT=col('CUIT');
+    const iEmail=col('Email');
+    const iTracking=col('N° de seguimiento');
+
+    // Filtrar solo ALLEATA y agrupar logistica por merge de celdas
+    const dataRows=rows.slice(headerIdx+1).filter(r=>r&&r.some(c=>c!==null));
+    
+    let currentLogistica='';
+    const alleataRows=[];
+    for(const r of dataRows){
+      if(r[iLogistica])currentLogistica=String(r[iLogistica]).trim();
+      if(currentLogistica.toUpperCase()==='ALLEATA'&&r[iSFId]){
+        alleataRows.push({...r,_logistica:currentLogistica});
+      }
+    }
+
+    if(!alleataRows.length)throw new Error('No se encontraron OTs de logística ALLEATA en el archivo.');
+    
+    ptext.textContent=`Procesando ${alleataRows.length} OTs ALLEATA...`;fill.style.width='40%';
+
+    // Buscar user_id del responsable
+    const{data:profiles}=await sb.from('profiles').select('id,nombre');
+    const findUser=(nombre)=>{
+      if(!nombre)return null;
+      const p=profiles?.find(p=>p.nombre&&nombre.toLowerCase().includes(p.nombre.toLowerCase().split(' ')[0].toLowerCase()));
+      return p?.id||null;
+    };
+
+    const records=alleataRows.map(r=>({
+      sf_id:String(r[iSFId]||'').trim(),
+      user_id:findUser(String(r[iResp]||'')),
+      responsable:String(r[iResp]||'').trim(),
+      tipo:String(r[iTipo]||'').trim(),
+      ot_numero:String(r[iOT]||'').trim(),
+      fecha:String(r[iFecha]||'').trim(),
+      nombre_comercio:String(r[iComercio]||'').trim(),
+      cuenta:String(r[iCuenta]||'').trim(),
+      contacto:String(r[iContacto]||'').trim(),
+      horario:String(r[iHorario]||'').trim(),
+      direccion_completa:String(r[iCalle]||'').trim(),
+      ciudad:String(r[iCiudad]||'').trim(),
+      cp_dest:String(r[iCP]||'').trim(),
+      provincia:String(r[iProv]||'').trim(),
+      notas:String(r[iObs]||'').trim(),
+      cuit:String(r[iCUIT]||'').replace(/\.0$/,'').trim(),
+      email_dest:String(r[iEmail]||'').trim(),
+      track:String(r[iTracking]||'').trim(),
+      logistica:'ALLEATA',
+      estado:'Pre-Colecta',
+    })).filter(r=>r.sf_id);
+
+    const{error}=await sb.from('envios').upsert(records,{onConflict:'sf_id',ignoreDuplicates:false});
+    if(error)throw error;
+
+    fill.style.width='100%';
+    ptext.textContent='✅ Importación completada';
+    result.innerHTML=`<div class="alert alert-ok" style="margin-top:8px">
+      ✅ <strong>${records.length}</strong> OTs ALLEATA importadas en estado <strong>Pre-Colecta</strong>
+    </div>`;
+    loadBadges();
+  }catch(err){
+    prog.style.display='none';
+    result.innerHTML=`<div class="alert alert-err">❌ ${err.message}</div>`;
+  }
+  e.target.value='';
+}
+// ── FIN IMPORT PRE-COLECTA ──
 
 async function loadUsers(){
   const{data:profiles}=await sb.from('profiles').select('*').order('created_at',{ascending:true});
