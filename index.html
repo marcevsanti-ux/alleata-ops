@@ -280,7 +280,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--navy-500);letter-spacing:1px;">
-      v1.5.0 · 14 mar 2026
+      v1.5.2 · 14 mar 2026
     </div>
   </div>
 </div>
@@ -329,7 +329,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--navy-500);letter-spacing:1px;">
-      v1.5.0 · 14 mar 2026
+      v1.5.2 · 14 mar 2026
     </div>
   </div>
 </nav>
@@ -342,7 +342,7 @@ tr:hover td{background:var(--surface2);}
       <span class="crumb-current" id="topbar-title">Dashboard</span>
     </div>
     <div class="topbar-right" id="topbar-date"></div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--navy-500);margin-left:12px;">v1.5.0</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--navy-500);margin-left:12px;">v1.5.2</div>
   </div>
   <div class="content">
 
@@ -436,7 +436,10 @@ tr:hover td{background:var(--surface2);}
           </div>
           <!-- Import Pre-Colecta / Hoja de Ruta -->
           <div style="flex:1;min-width:280px;background:var(--navy-700);border-radius:10px;padding:14px">
-            <div style="font-size:12px;font-weight:700;color:var(--teal);margin-bottom:6px">🗺️ Pre-Colecta — Hoja de Ruta ALLEATA</div>
+            <div style="font-size:12px;font-weight:700;color:var(--teal);margin-bottom:4px">🗺️ Logística Alleata — Hoja de Ruta</div>
+            <a href="https://alleata.lightning.force.com/lightning/r/Report/00ORm000000g3hRMAQ/view?queryScope=userFolders" target="_blank" style="font-size:10px;color:var(--blue);text-decoration:none;display:inline-flex;align-items:center;gap:4px;margin-bottom:8px;opacity:.8;transition:opacity .2s" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.8">
+              ↗ Ver reporte en Salesforce
+            </a>
             <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px;line-height:1.5">Excel <strong style="color:var(--text)">PRE-COLECTA</strong>. Solo logística ALLEATA. Ruta de Marcelo y Angel.</div>
             <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
               <label style="background:var(--grad);color:#fff;border:none;padding:8px 14px;font-family:'Inter',sans-serif;font-size:12px;font-weight:600;cursor:pointer;border-radius:8px;display:inline-flex;align-items:center;gap:6px;">
@@ -1460,7 +1463,19 @@ async function importPreColecta(e){
     
     ptext.textContent=`Procesando ${alleataRows.length} OTs ALLEATA...`;fill.style.width='40%';
 
-    // Buscar user_id del responsable
+    // Función para convertir fecha DD/M/YYYY o D/M/YYYY a YYYY-MM-DD
+    function parseDate(str){
+      if(!str)return null;
+      const s=String(str).trim();
+      const parts=s.split('/');
+      if(parts.length===3){
+        const d=parts[0].padStart(2,'0');
+        const m=parts[1].padStart(2,'0');
+        const y=parts[2].length===2?'20'+parts[2]:parts[2];
+        return `${y}-${m}-${d}`;
+      }
+      return s;
+    }
     const{data:profiles}=await sb.from('profiles').select('id,nombre');
     const findUser=(nombre)=>{
       if(!nombre)return null;
@@ -1474,7 +1489,7 @@ async function importPreColecta(e){
       responsable:String(r[iResp]||'').trim(),
       tipo:String(r[iTipo]||'').trim(),
       ot_numero:String(r[iOT]||'').trim(),
-      fecha:String(r[iFecha]||'').trim(),
+      fecha:parseDate(r[iFecha]),
       nombre_comercio:String(r[iComercio]||'').trim(),
       cuenta:String(r[iCuenta]||'').trim(),
       contacto:String(r[iContacto]||'').trim(),
