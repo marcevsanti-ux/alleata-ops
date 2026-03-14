@@ -1,5 +1,5 @@
 # ALLEATA OPS PORTAL — Estado del Proyecto
-**Fecha:** 13 mar 2026 | **Versión actual:** v1.2.1 (desktop) · v2.1.1 (mobile)
+**Fecha:** 13 mar 2026 | **Versión actual:** v1.3.0 (desktop) · v2.1.1 (mobile)
 
 ---
 
@@ -8,17 +8,28 @@
 ### Supabase
 - **Proyecto:** alleata-ops
 - **URL:** https://njkstpfmcfhqxdadqbdy.supabase.co
-- **Publishable Key:** sb_publishable_W3fP-CCb0m-B0v5tdaHQCg_2L43Rx5J
-- **Secret Key:** sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq
+- **Anon JWT Key:** eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA
 - **Región:** São Paulo (sa-east-1), Free plan
+- **NOTA:** Las keys `sb_publishable_*` y `sb_secret_*` son inválidas — usar siempre el JWT anon key
 
 ### Gemini API
 - **Key activa:** AIzaSyA8A-fiQnmI59MuHr6tg7PKXpS2XsJOfqs
 - **Proyecto Google:** ALLEATA-SIM (Nivel 1)
 - **Modelo:** gemini-2.5-flash
-- **Restricción:** Ninguna (key protegida via Supabase Edge Function proxy)
+- **Restricción:** Ninguna (key protegida via Supabase Edge Function)
 - **Proxy URL:** https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy
-- **IMPORTANTE:** Key guardada como secret en Supabase — nunca expuesta en código fuente
+- **IMPORTANTE:** Key guardada como secret `GEMINI_KEY` en Supabase — nunca expuesta en código fuente
+- **Deploy:** `supabase functions deploy gemini-proxy --no-verify-jwt`
+
+### Supabase CLI (instalado en desktop)
+- **Instalado via:** Scoop (Windows PowerShell)
+- **Versión:** 2.78.1
+- **Proyecto linkeado:** njkstpfmcfhqxdadqbdy
+- **Comandos útiles:**
+  ```powershell
+  supabase functions deploy gemini-proxy --no-verify-jwt
+  supabase secrets set GEMINI_KEY=nueva_key
+  ```
 
 ### GitHub
 - **Repo:** github.com/marcevsanti-ux/alleata-ops (público)
@@ -27,7 +38,8 @@
 
 ### Usuario Admin
 - **Email:** marcelos@moretti.com.ar
-- **Rol:** admin (seteado vía SQL)
+- **Password:** Admin2026!
+- **Rol:** admin
 
 ---
 
@@ -35,9 +47,11 @@
 
 | Archivo | Descripción | Versión |
 |---------|-------------|---------|
-| index.html | Portal desktop completo | v1.2.1 |
+| index.html | Portal desktop completo | v1.3.0 |
 | mobile.html | App mobile SIMs | v2.1.1 |
 | setup.sql | Tablas + RLS Supabase | — |
+| supabase/functions/gemini-proxy/index.ts | Edge Function proxy Gemini | v1.0 |
+| docs/ALLEATA_OPS_PROJECT_SUMMARY.md | Este documento | — |
 
 ---
 
@@ -56,23 +70,34 @@ celular text
 created_at timestamptz
 ```
 
+#### sims (6.891 registros)
+```sql
+id uuid
+serie text        -- ICCID completo (19-20 dígitos, empieza con 8954)
+linea text        -- Número de línea telefónica (10 dígitos)
+ubicacion text    -- Ubicación física
+cuenta text       -- Cuenta/cliente asignado
+estado text       -- ASIGNADA | DISPONIBLE | SIN INFORMACIÓN | EXTRAVIADA | ENVIO FALLIDO | TERMINAL DEVUELTA
+updated_at timestamptz
+```
+
 #### envios
 ```sql
 id uuid
 user_id uuid (FK auth.users)
-sf_id text UNIQUE          -- ID de SF para upsert sin duplicados
-ot_numero text             -- Número OT (ej: 00019425)
-tipo text                  -- Tipo de registro OT
-responsable text           -- Nombre del responsable (match con profiles.nombre)
-cuenta text                -- Cuenta Salesforce
-track text                 -- N° seguimiento Correo Argentino
-fecha text                 -- Fecha de despacho
+sf_id text UNIQUE
+ot_numero text
+tipo text
+responsable text
+cuenta text
+track text
+fecha text
 ciudad text
 provincia text
 asignacion text
-notas text                 -- Observaciones generales SF
-costo_envio numeric        -- Costo de envío
-estado text                -- Auto-detectado de observaciones al importar
+notas text
+costo_envio numeric
+estado text
 ultimo_evento text
 ultimo_evento_fecha text
 email_dest text
@@ -104,86 +129,82 @@ tarea text
 created_at timestamptz
 ```
 
-### RLS Policies (ejecutadas y confirmadas)
+### RLS Policies
 ```sql
--- profiles: todos pueden leer, cada uno actualiza el suyo
+-- profiles
 create policy "profiles_select" on profiles for select using (true);
 create policy "profiles_update" on profiles for update using (auth.uid() = id);
 
+-- sims: lectura para usuarios autenticados
+ALTER TABLE sims ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "sims_select_authenticated" ON sims FOR SELECT TO authenticated USING (true);
+
 -- envios, devoluciones, horas: cada usuario ve los suyos
 -- (políticas estándar user_id = auth.uid())
-```
-
-### Columnas agregadas (ejecutar si no están)
-```sql
-alter table profiles add column if not exists celular text;
-alter table envios add column if not exists sf_id text unique;
-alter table envios add column if not exists ot_numero text;
-alter table envios add column if not exists tipo text;
-alter table envios add column if not exists responsable text;
-alter table envios add column if not exists cuenta text;
-alter table envios add column if not exists ciudad text;
-alter table envios add column if not exists provincia text;
-alter table envios add column if not exists asignacion text;
-alter table envios add column if not exists email_dest text;
-alter table envios add column if not exists cp_dest text;
-alter table envios add column if not exists ultimo_evento text;
-alter table envios add column if not exists ultimo_evento_fecha text;
-alter table envios add column if not exists costo_envio numeric;
 ```
 
 ---
 
 ## 🏗️ ARQUITECTURA DEL PORTAL
 
-### index.html (Desktop)
-- Login con Supabase Auth
-- Sidebar navy con logo Alleata
+### index.html (Desktop) — v1.3.0
+- Login con Supabase Auth (JWT anon key)
+- Sidebar navy con logo Alleata + QR code al mobile centrado en dashboard
 - Módulos: Dashboard, SIMs, Envíos, Devoluciones, Horas, Ajustes
-- Versión visible en topbar (derecha) y sidebar footer
+- Versión visible en topbar y sidebar footer
 
 ### Módulos implementados
 
-#### SIMs
-- Upload de fotos → OCR con Gemini 2.0 Flash
-- Base de datos 6.878 SIMs CLARO embebida en el HTML (~1.9MB)
-- Lógica de lookup: serie completa → línea → sufijo → prefijos conocidos → últimos 9 dígitos
+#### SIMs (v1.3.0 — migrado a Supabase)
+- Upload de fotos → OCR con Gemini 2.5 Flash via proxy
+- **Base de datos en Supabase** (tabla `sims`, 6.891 registros) — ya NO embebida en HTML
+- Lookup inteligente: serie completa → línea → sufijo → búsqueda parcial
 - Búsqueda manual por serie, sufijo o línea
-- 44 prefijos conocidos (todos empiezan con 8954...)
+- Funciones: `simSmartLookup`, `simLookupBySerie`, `simLookupByLinea`, `simLookupBySufijo`
+- Stats dinámicas desde Supabase (`loadSimStats`)
 
 #### Envíos (v1.2.1)
-- **Flujo:** Admin importa Excel SF → sistema asigna OTs por responsable
-- Import Excel de SF (DESPACHADO CORREO ARGENTINO)
-- Estado auto-detectado desde campo Observaciones del SF
+- Flujo: Admin importa Excel SF → sistema asigna OTs por responsable
+- Import Excel SF (DESPACHADO CORREO ARGENTINO)
+- Estado auto-detectado desde campo Observaciones
 - Admin ve todas las OTs + filtros por responsable/estado
 - Operador ve solo sus OTs (match por profiles.nombre = responsable)
 - Link directo a tracking Correo Argentino
-- Campos: OT, tipo, responsable, cuenta, tracking, fecha, ciudad, provincia, costo_envio, estado, observaciones
-- **Pendiente:** Integración API MiCorreo (credenciales en gestión con ejecutivo de cuentas)
+- **Pendiente:** Integración API MiCorreo
 
 #### Ajustes (solo Admin)
-- Crear usuarios con email, contraseña, rol y módulos habilitados
-- Pills interactivas por módulo (activar/desactivar por usuario)
-- Selector de rol (Operador/Admin) por usuario
-- Campo celular (a futuro: WhatsApp/SMS)
-- Eliminar usuarios
+- Crear/editar/eliminar usuarios
+- Pills interactivas por módulo
+- Selector de rol (Operador/Admin)
+- Campo celular
+- Edge function `admin-update-user` para cambio de password (pendiente deploy)
 
 #### Devoluciones
-- Registro de devoluciones con motivo y estado
+- Registro con motivo y estado
 - Estados: Pendiente, En proceso, Resuelta
 
 #### Horas
 - Control semanal por integrante
 - Vista de equipo con totales por semana
 
-### mobile.html (Mobile SIMs)
-- Login Supabase
+### mobile.html — v2.1.1
+- Login Supabase (JWT anon key)
 - 3 tabs: Escanear / Buscar / Historial
 - Cámara trasera directa en iOS/Android
-- OCR Gemini mismo que desktop
+- OCR Gemini 2.5 Flash via proxy Supabase (sin key expuesta)
+- Lookup en tabla `sims` de Supabase
+- Prompt OCR: prefijo arriba + sufijo abajo = ICCID completo
+- Regex extracción: `/8954\d{9,}/g` (ICCID) + `/\b0\d{7,9}\b/g` (sufijo)
 - Historial local (localStorage, últimos 100 escaneos)
-- Drawer con info de usuario y link al portal completo
-- Versión visible en topbar
+- Drawer con info de usuario + link al portal
+- Versión visible en login y topbar
+
+### gemini-proxy (Edge Function)
+- Archivo: `supabase/functions/gemini-proxy/index.ts`
+- Recibe requests del portal/mobile y llama a Gemini con key secreta
+- Sin verificación JWT (`--no-verify-jwt`)
+- Modelo: gemini-2.5-flash
+- CORS habilitado para todos los orígenes
 
 ---
 
@@ -199,11 +220,6 @@ alter table envios add column if not exists costo_envio numeric;
 --grad: linear-gradient(135deg, #1dbf8e, #1a9fd4)
 ```
 
-### Logo
-- PNG base64 embebido en ambos HTMLs
-- Fuente: /mnt/user-data/uploads/logo.png
-- BUG PENDIENTE: logo con fondo blanco en login (necesita versión transparente)
-
 ### Fuentes
 - Inter (UI)
 - JetBrains Mono (números, series, códigos)
@@ -212,7 +228,8 @@ alter table envios add column if not exists costo_envio numeric;
 
 ## 🐛 BUGS PENDIENTES
 
-1. **Logo con fondo blanco** en login y sidebar — necesita PNG con fondo transparente (logo navy/blanco sin "Powered by Moretti")
+1. **Logo con fondo blanco** en login y sidebar — necesita PNG con fondo transparente
+2. **Edge function `admin-update-user`** — pendiente deploy para cambio de password desde Ajustes
 
 ---
 
@@ -222,19 +239,18 @@ alter table envios add column if not exists costo_envio numeric;
 - Credenciales: usuario + password (en gestión con ejecutivo Correo Argentino)
 - API Base: https://api.correoargentino.com.ar/micorreo/v1
 - Auth: JWT via Basic Auth → Bearer token
-- Endpoints a implementar:
-  - POST /token → obtener JWT
-  - GET /shipping/tracking → estado real del envío
-  - POST /shipping/import → registrar envío
+- Endpoints: POST /token · GET /shipping/tracking · POST /shipping/import
 - Actualización automática de estados cada X horas
 
-### Pendiente
+### Fase 3 — Mobile completo
+- Módulo Envíos mobile (ver OTs asignadas)
+- Hoja de ruta diaria
+- Evidencia fotográfica de casuísticas
 - Notificaciones WhatsApp/SMS al celular del operador
-- Módulo mobile completo (Envíos, Hoja de ruta, Evidencia de casuísticas)
 
 ---
 
-## 👥 EQUIPO (usuarios del portal)
+## 👥 EQUIPO
 - **marcelos** (marcelos@moretti.com.ar) — Admin
 - **Gonzalo Marvaldi** — Operador (responsable OTs en SF)
 - **Andres Veyga** — Operador
@@ -244,28 +260,15 @@ alter table envios add column if not exists costo_envio numeric;
 
 ## 📋 FUENTE DE DATOS SIMs
 - Archivo original: LISTADO_DE_SIMS-2026-02-25-16-32-26.xlsx
-- 6.878 SIMs totales
-- Columnas usadas: D=serie, E=linea, F=ubicacion, H=cuenta, I=estado
+- 6.891 SIMs en Supabase (tabla `sims`)
+- Columnas: serie, linea, ubicacion, cuenta, estado
 - Estados: ASIGNADA, DISPONIBLE, SIN INFORMACIÓN, EXTRAVIADA, ENVIO FALLIDO, TERMINAL DEVUELTA
-- JSON embebido en HTML como variable JS (SIMS_DB + DB_BY_LINEA + KNOWN_PREFIXES)
 
 ---
 
 ## 📄 FORMATO EXCEL SF (DESPACHADO CORREO ARGENTINO)
-- Fila 13: encabezados
-- Columnas relevantes:
-  - Id. de orden de trabajo (sf_id, único para upsert)
-  - Tipo de registro de orden de trabajo
-  - Responsable de la OT: Nombre completo
-  - Número de orden de trabajo
-  - cuenta
-  - Fecha de Despacho
-  - N° de seguimiento (tracking Correo Argentino)
-  - Observaciones generales → usado para auto-detectar estado
-  - Dirección de envío (Ciudad)
-  - Dirección de envío (Estado/Provincia)
-  - Asignación: Nombre de asignación
-  - Costo de envio (numeric)
+- Fila de encabezados: contiene "N° de seguimiento"
+- Columnas relevantes: Id. de orden, Tipo de registro, Responsable, Número OT, cuenta, Fecha Despacho, N° seguimiento, Observaciones, Ciudad, Estado/Provincia, Asignación, Costo de envio
 
 ## 🔄 DETECCIÓN AUTOMÁTICA DE ESTADO (desde Observaciones SF)
 - "EN ESPERA EN SUCURSAL" → En espera en sucursal
