@@ -240,6 +240,7 @@ tr:hover td{background:var(--surface2);}
 .role-btn{padding:5px 14px;border-radius:20px;border:1.5px solid var(--border2);cursor:pointer;font-size:11px;font-weight:600;color:var(--text-muted);background:var(--navy-700);transition:all .2s;font-family:'Inter',sans-serif;}
 .role-btn:hover{border-color:var(--border2);color:var(--text);}
 .role-btn.active-operador{border-color:var(--blue);color:var(--blue);background:rgba(26,159,212,.08);}
+.role-btn.active-logistica{border-color:var(--teal);color:var(--teal);background:rgba(29,191,142,.08);}
 .role-btn.active-admin{border-color:var(--teal);color:var(--teal);background:rgba(29,191,142,.08);}
 .users-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px;}
 
@@ -280,7 +281,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--navy-500);letter-spacing:1px;">
-      v1.5.2 · 14 mar 2026
+      v1.5.3 · 14 mar 2026
     </div>
   </div>
 </div>
@@ -329,7 +330,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--navy-500);letter-spacing:1px;">
-      v1.5.2 · 14 mar 2026
+      v1.5.3 · 14 mar 2026
     </div>
   </div>
 </nav>
@@ -342,7 +343,7 @@ tr:hover td{background:var(--surface2);}
       <span class="crumb-current" id="topbar-title">Dashboard</span>
     </div>
     <div class="topbar-right" id="topbar-date"></div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--navy-500);margin-left:12px;">v1.5.2</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--navy-500);margin-left:12px;">v1.5.3</div>
   </div>
   <div class="content">
 
@@ -404,7 +405,7 @@ tr:hover td{background:var(--surface2);}
       </div>
 
       <!-- API status banner -->
-      <div style="background:rgba(26,159,212,.07);border:1px solid rgba(26,159,212,.15);border-radius:10px;padding:11px 16px;margin-bottom:14px;display:flex;align-items:center;gap:10px;">
+      <div id="micorreoBanner" style="background:rgba(26,159,212,.07);border:1px solid rgba(26,159,212,.15);border-radius:10px;padding:11px 16px;margin-bottom:14px;display:flex;align-items:center;gap:10px;">
         <span style="font-size:16px">🔌</span>
         <div style="flex:1">
           <div style="font-size:12px;font-weight:700;color:var(--blue)">Integración Correo Argentino · MiCorreo API</div>
@@ -586,6 +587,7 @@ tr:hover td{background:var(--surface2);}
           <div class="field"><label class="label">Rol</label>
             <select class="select" id="ajRol">
               <option value="operador">Operador</option>
+              <option value="logistica">Logística</option>
               <option value="admin">Administrador</option>
             </select>
           </div>
@@ -795,11 +797,11 @@ function showApp(){
   document.getElementById('appShell').style.display='block';
   const nombre=currentProfile.nombre||currentProfile.email;
   const isAdmin=currentProfile.rol==='admin';
+  const isLogistica=currentProfile.rol==='logistica';
   const modulos=currentProfile.modulos||['sims','envios','devoluciones','horas'];
   document.getElementById('sideUserName').textContent=nombre;
-  document.getElementById('sideUserRole').textContent=isAdmin?'Administrador':'Operador';
-  document.getElementById('sideUserAvatar').textContent=nombre[0].toUpperCase();
-  document.getElementById('welcomeMsg').textContent=`Hola, ${nombre} 👋`;
+  const rolLabel={'admin':'Administrador','logistica':'Logística','operador':'Operador'}[currentProfile.rol]||'Operador';
+  document.getElementById('sideUserRole').textContent=rolLabel;
   setTimeout(()=>{ if(window._drawQR) window._drawQR(); },100);
   if(isAdmin){
     document.getElementById('nav-ajustes').style.display='flex';
@@ -958,11 +960,17 @@ document.getElementById('simFileInput').addEventListener('change',e=>simProcessF
 // ── ENVIOS / OTs ──
 async function initEnvios(){
   const isAdmin=currentProfile?.rol==='admin';
+  const isLogistica=currentProfile?.rol==='logistica';
   if(isAdmin){
     document.getElementById('sfImportCard').style.display='block';
     document.getElementById('envFiltrosCard').style.display='block';
     document.getElementById('envTablaLabel').textContent='Todas las OTs despachadas';
     await loadFiltroResponsables();
+  }
+  if(isLogistica){
+    document.getElementById('envTablaLabel').textContent='OTs Logística Alleata — Pre-Colecta y Despachadas';
+    const banner=document.getElementById('micorreoBanner');
+    if(banner)banner.style.display='none';
   }
 }
 
@@ -1086,10 +1094,14 @@ async function importSF(e){
 
 async function renderEnvios(){
   const isAdmin=currentProfile?.rol==='admin';
+  const isLogistica=currentProfile?.rol==='logistica';
   let query=sb.from('envios').select('*').order('fecha',{ascending:false});
 
-  if(!isAdmin){
-    // Match by responsable name
+  if(isLogistica){
+    // Logística ve todas las OTs de ALLEATA
+    query=query.eq('logistica','ALLEATA');
+  } else if(!isAdmin){
+    // Operador ve sus OTs por nombre
     const nombre=currentProfile?.nombre||'';
     query=query.ilike('responsable',`%${nombre}%`);
   } else {
@@ -1545,6 +1557,7 @@ function userCardHTML(p){
       <div class="mod-section-label">Rol</div>
       <div class="role-selector">
         <button class="role-btn ${p.rol==='operador'?'active-operador':''}" onclick="setUserRol('${p.id}','operador',this)">👤 Operador</button>
+        <button class="role-btn ${p.rol==='logistica'?'active-logistica':''}" onclick="setUserRol('${p.id}','logistica',this)">🚚 Logística</button>
         <button class="role-btn ${p.rol==='admin'?'active-admin':''}" onclick="setUserRol('${p.id}','admin',this)">⚙️ Admin</button>
       </div>
     </div>`;
@@ -1626,6 +1639,7 @@ async function deleteUser(uid){
     <div class="field"><label class="label">Rol</label>
       <select class="select" id="editRol">
         <option value="operador">Operador</option>
+        <option value="logistica">Logística</option>
         <option value="admin">Administrador</option>
       </select>
     </div>
