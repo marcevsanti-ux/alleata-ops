@@ -280,7 +280,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--navy-500);letter-spacing:1px;">
-      v1.3.0 · 12 mar 2026
+      v1.4.0 · 14 mar 2026
     </div>
   </div>
 </div>
@@ -329,7 +329,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--navy-500);letter-spacing:1px;">
-      v1.3.0 · 12 mar 2026
+      v1.4.0 · 14 mar 2026
     </div>
   </div>
 </nav>
@@ -342,7 +342,7 @@ tr:hover td{background:var(--surface2);}
       <span class="crumb-current" id="topbar-title">Dashboard</span>
     </div>
     <div class="topbar-right" id="topbar-date"></div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--navy-500);margin-left:12px;">v1.3.0</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--navy-500);margin-left:12px;">v1.4.0</div>
   </div>
   <div class="content">
 
@@ -354,9 +354,9 @@ tr:hover td{background:var(--surface2);}
           <h2 id="welcomeMsg">Bienvenido</h2>
           <p>Portal centralizado de operaciones y logística.<br>Seleccioná un módulo para comenzar.</p>
         </div>
-        <div style="margin-left:auto;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;align-self:center;">
-          <div id="qrCanvas" style="background:#fff;border-radius:10px;padding:7px;box-shadow:0 2px 8px rgba(0,0,0,.25);width:80px;height:80px;"></div>
-          <span style="font-size:10px;color:var(--text-muted);letter-spacing:.5px;text-transform:uppercase;font-weight:600;">App Mobile</span>
+        <div style="margin-left:auto;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;align-self:center;flex-shrink:0;">
+          <div id="qrCanvas" style="background:#fff;border-radius:12px;padding:8px;box-shadow:0 4px 16px rgba(0,0,0,.3);width:88px;height:88px;display:flex;align-items:center;justify-content:center;"></div>
+          <span style="font-size:10px;color:var(--teal);letter-spacing:1px;text-transform:uppercase;font-weight:700;">APP MOBILE</span>
         </div>
       </div>
       <div class="dash-grid" id="dashGrid"></div>
@@ -526,8 +526,29 @@ tr:hover td{background:var(--surface2);}
       </div></div>
     </div>
 
-    <!-- AJUSTES -->
+    <!-- AJUSTES --
     <div class="module" id="mod-ajustes">
+
+      <!-- Actualizar base SIMs (solo admin) -->
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-title">📡 Base de datos SIMs</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px;line-height:1.6;">
+          Subí el Excel de CLARO con el listado actualizado de SIMs. El sistema hará un <strong style="color:var(--text)">upsert</strong> por número de serie — actualizará los existentes y agregará los nuevos sin borrar registros que no vengan en el archivo.
+        </div>
+        <div id="simsDbStats" style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap"></div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <label style="background:var(--grad);color:#fff;border:none;padding:9px 18px;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;cursor:pointer;border-radius:8px;display:inline-flex;align-items:center;gap:8px;">
+            📂 Seleccionar Excel SIMs
+            <input type="file" id="simsFileInput" accept=".xlsx,.xls" style="display:none" onchange="importSIMs(event)">
+          </label>
+          <div id="simsImportMsg" style="font-size:12px;color:var(--text-muted)"></div>
+        </div>
+        <div id="simsImportProgress" style="display:none;margin-top:10px">
+          <div class="progress-text" id="simsProgressText">Procesando...</div>
+          <div class="progress-track" style="margin-top:6px"><div class="progress-fill" id="simsProgressFill"></div></div>
+        </div>
+        <div id="simsImportResult" style="margin-top:10px"></div>
+      </div>
       <!-- Nuevo usuario -->
       <div class="card" style="margin-bottom:16px">
         <div class="card-title">👤 Crear nuevo usuario</div>
@@ -595,7 +616,7 @@ const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini
 const SUPABASE_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const{createClient}=supabase;
 const sb=createClient(SUPABASE_URL,SUPABASE_KEY);
-// ========== SIMS — Supabase functions (v1.3.0) ==========
+// ========== SIMS — Supabase functions (v1.4.0) ==========
 // Reemplaza SIMS_DB, DB_BY_LINEA y KNOWN_PREFIXES embebidos
 // Requiere: const sb = createClient(SUPABASE_URL, SUPABASE_KEY) ya definido
 
@@ -802,7 +823,7 @@ function goTo(mod){
   if(mod==='envios'){initEnvios();renderEnvios();}
   if(mod==='devoluciones')renderDevs();
   if(mod==='horas')renderHoras();
-  if(mod==='ajustes')loadUsers();
+  if(mod==='ajustes'){loadUsers();loadSimsDbStats();}
 }
 function updateDate(){
   document.getElementById('topbar-date').textContent=new Date().toLocaleDateString('es-AR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
@@ -1239,6 +1260,112 @@ async function createUser(){
     loadUsers();
   }
 }
+
+// ── IMPORT SIMs ──
+async function loadSimsDbStats(){
+  const el=document.getElementById('simsDbStats');
+  if(!el)return;
+  try{
+    const[{count:total},{count:asig},{count:disp},{count:ext}]=await Promise.all([
+      sb.from('sims').select('*',{count:'exact',head:true}),
+      sb.from('sims').select('*',{count:'exact',head:true}).eq('estado','ASIGNADA'),
+      sb.from('sims').select('*',{count:'exact',head:true}).eq('estado','DISPONIBLE'),
+      sb.from('sims').select('*',{count:'exact',head:true}).eq('estado','EXTRAVIADA'),
+    ]);
+    el.innerHTML=`
+      <div class="stat-box s-teal" style="min-width:80px;padding:10px 14px"><div class="stat-num" style="font-size:20px">${(total||0).toLocaleString()}</div><div class="stat-label">Total</div></div>
+      <div class="stat-box s-green" style="min-width:80px;padding:10px 14px"><div class="stat-num" style="font-size:20px;color:var(--green)">${(asig||0).toLocaleString()}</div><div class="stat-label">Asignadas</div></div>
+      <div class="stat-box s-blue" style="min-width:80px;padding:10px 14px"><div class="stat-num" style="font-size:20px;color:var(--blue)">${(disp||0).toLocaleString()}</div><div class="stat-label">Disponibles</div></div>
+      <div class="stat-box s-red" style="min-width:80px;padding:10px 14px"><div class="stat-num" style="font-size:20px;color:var(--red)">${(ext||0).toLocaleString()}</div><div class="stat-label">Extraviadas</div></div>`;
+  }catch(e){el.innerHTML='<div class="alert alert-err">Error cargando stats</div>';}
+}
+
+async function importSIMs(e){
+  const file=e.target.files[0];
+  if(!file)return;
+  const msg=document.getElementById('simsImportMsg');
+  const prog=document.getElementById('simsImportProgress');
+  const fill=document.getElementById('simsProgressFill');
+  const ptext=document.getElementById('simsProgressText');
+  const result=document.getElementById('simsImportResult');
+  msg.textContent='';result.innerHTML='';
+  prog.style.display='block';
+  ptext.textContent='Leyendo archivo...';fill.style.width='10%';
+
+  try{
+    const data=await file.arrayBuffer();
+    const{read,utils}=XLSX;
+    const wb=read(data);
+    const ws=wb.Sheets[wb.SheetNames[0]];
+    const rows=utils.sheet_to_json(ws,{header:1,defval:null});
+
+    // Detectar fila de encabezados buscando "serie" o "ICCID"
+    let headerIdx=0;
+    for(let i=0;i<Math.min(rows.length,10);i++){
+      if(rows[i]&&rows[i].some(c=>String(c||'').toLowerCase().includes('serie')||String(c||'').toLowerCase().includes('iccid'))){
+        headerIdx=i;break;
+      }
+    }
+    const headers=rows[headerIdx].map(h=>String(h||'').trim().toLowerCase());
+
+    // Mapear columnas — soporta múltiples nombres posibles
+    const col=(names)=>{
+      for(const n of names){
+        const idx=headers.findIndex(h=>h.includes(n));
+        if(idx!==-1)return idx;
+      }
+      return -1;
+    };
+    const iSerie=col(['serie','iccid']);
+    const iLinea=col(['linea','línea','numero de linea','número de línea','phone']);
+    const iUbic=col(['ubicacion','ubicación','location','deposito','depósito']);
+    const iCuenta=col(['cuenta','account','cliente','customer']);
+    const iEstado=col(['estado','status','state']);
+
+    if(iSerie===-1)throw new Error('No se encontró columna de serie/ICCID en el archivo');
+
+    const dataRows=rows.slice(headerIdx+1).filter(r=>r&&r[iSerie]);
+    ptext.textContent=`Procesando ${dataRows.length} SIMs...`;fill.style.width='40%';
+
+    // Upsert en lotes de 500
+    const BATCH=500;
+    let insertadas=0,actualizadas=0,errores=0;
+    for(let i=0;i<dataRows.length;i+=BATCH){
+      const batch=dataRows.slice(i,i+BATCH).map(r=>({
+        serie:String(r[iSerie]||'').replace(/\s/g,''),
+        linea:iLinea!==-1?String(r[iLinea]||'').replace(/\s/g,'')||null:null,
+        ubicacion:iUbic!==-1?String(r[iUbic]||'')||null:null,
+        cuenta:iCuenta!==-1?String(r[iCuenta]||'')||null:null,
+        estado:iEstado!==-1?(String(r[iEstado]||'').toUpperCase()||'SIN INFORMACIÓN'):'SIN INFORMACIÓN',
+        updated_at:new Date().toISOString(),
+      })).filter(r=>r.serie&&r.serie.length>5);
+
+      const{error}=await sb.from('sims').upsert(batch,{onConflict:'serie',ignoreDuplicates:false});
+      if(error){errores+=batch.length;console.error(error);}
+      else insertadas+=batch.length;
+
+      const pct=Math.round(((i+BATCH)/dataRows.length)*80)+10;
+      fill.style.width=Math.min(pct,90)+'%';
+      ptext.textContent=`Procesando... ${Math.min(i+BATCH,dataRows.length)} de ${dataRows.length}`;
+    }
+
+    fill.style.width='100%';
+    ptext.textContent='✅ Importación completada';
+
+    result.innerHTML=`<div class="alert alert-ok" style="margin-top:8px">
+      ✅ <strong>${insertadas.toLocaleString()}</strong> SIMs procesadas
+      ${errores?`· ⚠️ ${errores} con error`:''}
+    </div>`;
+    msg.textContent='';
+    await loadSimStats();
+    await loadSimsDbStats();
+  }catch(err){
+    prog.style.display='none';
+    result.innerHTML=`<div class="alert alert-err">❌ Error: ${err.message}</div>`;
+  }
+  e.target.value='';
+}
+// ── FIN IMPORT SIMs ──
 
 async function loadUsers(){
   const{data:profiles}=await sb.from('profiles').select('*').order('created_at',{ascending:true});
