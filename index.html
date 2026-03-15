@@ -281,7 +281,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--navy-500);letter-spacing:1px;">
-      v1.5.4 · 15 mar 2026
+      v1.5.5 · 15 mar 2026
     </div>
   </div>
 </div>
@@ -330,7 +330,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--navy-500);letter-spacing:1px;">
-      v1.5.4 · 15 mar 2026
+      v1.5.5 · 15 mar 2026
     </div>
   </div>
 </nav>
@@ -343,7 +343,7 @@ tr:hover td{background:var(--surface2);}
       <span class="crumb-current" id="topbar-title">Dashboard</span>
     </div>
     <div class="topbar-right" id="topbar-date"></div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--navy-500);margin-left:12px;">v1.5.4</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--navy-500);margin-left:12px;">v1.5.5</div>
   </div>
   <div class="content">
 
@@ -481,12 +481,22 @@ tr:hover td{background:var(--surface2);}
       </div>
 
       <!-- Tabla OTs -->
-      <div class="sec-title"><div class="sec-dot" style="background:var(--blue)"></div><span id="envTablaLabel">Mis OTs despachadas</span></div>
+      <div class="sec-title" style="display:flex;align-items:center;justify-content:space-between">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div class="sec-dot" style="background:var(--blue)"></div>
+          <span id="envTablaLabel">Mis OTs despachadas</span>
+        </div>
+        <button id="btnPrintSelected" onclick="printSelectedRotulos()" style="display:none;background:var(--grad);color:#fff;border:none;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;gap:6px;align-items:center">
+          🖨️ Imprimir seleccionados (<span id="selectedCount">0</span>)
+        </button>
+      </div>
       <div class="card"><div class="table-wrap">
         <table>
           <thead><tr>
+            <th style="width:32px"><input type="checkbox" id="chkAll" onclick="toggleAllEnvios(this)" style="cursor:pointer"></th>
             <th>OT / Cuenta</th>
             <th>Responsable</th>
+            <th>Zona</th>
             <th>Tracking</th>
             <th>Despacho</th>
             <th>Destino</th>
@@ -1125,14 +1135,17 @@ async function renderEnvios(){
   }
 
   document.getElementById('enviosTable').innerHTML=list.map(e=>{
-    const estadoClass={'En tránsito':'badge-yellow','En camino':'badge-blue','Entregado':'badge-green','Demorado':'badge-orange','Perdido':'badge-red','Devuelto':'badge-red'}[e.estado]||'badge-gray';
+    const estadoClass={'En tránsito':'badge-yellow','En camino':'badge-blue','Entregado':'badge-green','Demorado':'badge-orange','Perdido':'badge-red','Devuelto':'badge-red','Pre-Colecta':'badge-gray'}[e.estado]||'badge-gray';
+    const z=detectarZona(e.ciudad,e.provincia,e.cp_dest);
     return`<tr>
+      <td style="text-align:center"><input type="checkbox" class="envio-chk" data-id="${e.id}" onchange="updateSelectedCount()" style="cursor:pointer;width:15px;height:15px"></td>
       <td>
         <div style="font-weight:700;font-size:12px;color:var(--teal)">${e.ot_numero||'—'}</div>
         <div style="font-size:10px;color:var(--text-muted);margin-top:2px">${e.tipo||''}</div>
         <div style="font-size:10px;color:var(--text-muted)">${e.cuenta||''}</div>
       </td>
       <td style="font-size:13px;font-weight:600">${e.responsable||'—'}</td>
+      <td><span style="font-size:11px;font-weight:700;color:${z.color};white-space:nowrap">${z.icon} ${z.zona}</span></td>
       <td>
         <div class="mono" style="font-size:10px;word-break:break-all">${e.track||'—'}</div>
         ${e.track?`<a href="https://www.correoargentino.com.ar/formularios/e-commerce?id=${e.track}" target="_blank" style="font-size:10px;color:var(--blue);text-decoration:none;">🔗 Correo Arg.</a>`:''}
@@ -1175,6 +1188,42 @@ function openUpdateEvento(id,current){
   if(nuevo===null)return;
   sb.from('envios').update({ultimo_evento:nuevo,ultimo_evento_fecha:new Date().toISOString().slice(0,10)}).eq('id',id).then(()=>renderEnvios());
 }
+
+// ── ZONA AMBA ──
+function detectarZona(ciudad,provincia,cp){
+  const c=(ciudad||'').toLowerCase().trim();
+  const p=(provincia||'').toLowerCase().trim();
+  const cpStr=String(cp||'').toUpperCase().trim();
+  if(p.includes('ciudad autónoma')||p.includes('caba')||cpStr.startsWith('C1'))
+    return{zona:'CABA',color:'#1a9fd4',icon:'🏙️'};
+  const norte=['san isidro','vicente lópez','vicente lopez','san martín','san martin','tigre','escobar','pilar','san fernando','malvinas argentinas','josé c. paz','jose c. paz','san miguel','campana','zárate','zarate'];
+  if(norte.some(n=>c.includes(n)))return{zona:'Zona Norte',color:'#10b981',icon:'⬆️'};
+  const sur=['lomas de zamora','lanús','lanus','avellaneda','quilmes','berazategui','florencio varela','almirante brown','ezeiza','esteban echeverría','esteban echeverria','la plata','berisso','ensenada','presidente perón','presidente peron','san vicente','monte grande','guernica','temperley','banfield'];
+  if(sur.some(s=>c.includes(s)))return{zona:'Zona Sur',color:'#f59e0b',icon:'⬇️'};
+  const oeste=['la matanza','morón','moron','hurlingham','ituzaingó','ituzaingo','merlo','moreno','tres de febrero','luján','lujan','marcos paz','ramos mejía','ramos mejia','san justo','haedo','castelar'];
+  if(oeste.some(o=>c.includes(o)))return{zona:'Zona Oeste',color:'#8b5cf6',icon:'⬅️'};
+  if(cpStr.startsWith('B16')||cpStr.startsWith('B15'))return{zona:'Zona Norte',color:'#10b981',icon:'⬆️'};
+  if(cpStr.startsWith('B18')||cpStr.startsWith('B19'))return{zona:'Zona Sur',color:'#f59e0b',icon:'⬇️'};
+  if(cpStr.startsWith('B17')||cpStr.startsWith('B67'))return{zona:'Zona Oeste',color:'#8b5cf6',icon:'⬅️'};
+  return{zona:'Fuera AMBA',color:'#ef4444',icon:'📦'};
+}
+function toggleAllEnvios(chk){
+  document.querySelectorAll('.envio-chk').forEach(c=>{c.checked=chk.checked;});
+  updateSelectedCount();
+}
+function updateSelectedCount(){
+  const sel=document.querySelectorAll('.envio-chk:checked').length;
+  const btn=document.getElementById('btnPrintSelected');
+  const cnt=document.getElementById('selectedCount');
+  if(btn)btn.style.display=sel>0?'inline-flex':'none';
+  if(cnt)cnt.textContent=sel;
+}
+async function printSelectedRotulos(){
+  const ids=[...document.querySelectorAll('.envio-chk:checked')].map(c=>c.dataset.id);
+  for(const id of ids)await printRotulo(id);
+}
+// ── FIN ZONA AMBA ──
+
 async function printRotulo(id){
   const{data:e}=await sb.from('envios').select('*').eq('id',id).single();
   if(!e)return;
