@@ -281,7 +281,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--navy-500);letter-spacing:1px;">
-      v1.5.3 · 14 mar 2026
+      v1.5.4 · 15 mar 2026
     </div>
   </div>
 </div>
@@ -330,7 +330,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--navy-500);letter-spacing:1px;">
-      v1.5.3 · 14 mar 2026
+      v1.5.4 · 15 mar 2026
     </div>
   </div>
 </nav>
@@ -343,7 +343,7 @@ tr:hover td{background:var(--surface2);}
       <span class="crumb-current" id="topbar-title">Dashboard</span>
     </div>
     <div class="topbar-right" id="topbar-date"></div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--navy-500);margin-left:12px;">v1.5.3</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--navy-500);margin-left:12px;">v1.5.4</div>
   </div>
   <div class="content">
 
@@ -964,7 +964,7 @@ async function initEnvios(){
   if(isAdmin){
     document.getElementById('sfImportCard').style.display='block';
     document.getElementById('envFiltrosCard').style.display='block';
-    document.getElementById('envTablaLabel').textContent='Todas las OTs despachadas';
+    document.getElementById('envTablaLabel').textContent='Pre-Colecta Alleata';
     await loadFiltroResponsables();
   }
   if(isLogistica){
@@ -1157,6 +1157,7 @@ async function renderEnvios(){
       </td>
       <td>
         <div style="display:flex;gap:5px">
+          <button title="Imprimir rótulo" style="background:var(--surface2);border:1px solid var(--border2);color:var(--teal);font-size:11px;padding:4px 7px;border-radius:6px;cursor:pointer" onclick="printRotulo('${e.id}')">🖨️</button>
           <button title="Actualizar observación" style="background:var(--surface2);border:1px solid var(--border2);color:var(--text-muted);font-size:11px;padding:4px 7px;border-radius:6px;cursor:pointer" onclick="openUpdateEvento('${e.id}','${(e.ultimo_evento||'').replace(/'/g,'&#39;')}')">✏️</button>
           ${isAdmin?`<button title="Eliminar" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:13px;padding:4px" onclick="deleteEnvio('${e.id}')">🗑</button>`:''}
         </div>
@@ -1174,6 +1175,106 @@ function openUpdateEvento(id,current){
   if(nuevo===null)return;
   sb.from('envios').update({ultimo_evento:nuevo,ultimo_evento_fecha:new Date().toISOString().slice(0,10)}).eq('id',id).then(()=>renderEnvios());
 }
+async function printRotulo(id){
+  const{data:e}=await sb.from('envios').select('*').eq('id',id).single();
+  if(!e)return;
+
+  // Determinar código tipo de OT
+  const tipoCode=e.tipo?.toUpperCase().includes('SIMCARD')?'INS':
+                 e.tipo?.toUpperCase().includes('CAMBIO')?'CAM':
+                 e.tipo?.toUpperCase().includes('RETIRO')?'RET':'OT';
+
+  // Dirección para QR de geoubicación
+  const direccionQR=encodeURIComponent(`${e.direccion_completa||''} ${e.ciudad||''} ${e.provincia||''} Argentina`);
+  const mapsUrl=`https://www.google.com/maps/search/?api=1&query=${direccionQR}`;
+
+  const w=window.open('','_blank','width=420,height=620');
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
+  <title>Rótulo OT ${e.ot_numero}</title>
+  <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"><\/script>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box;}
+    body{font-family:'Arial',sans-serif;background:#fff;width:378px;padding:8px;}
+    .header{display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid #000;padding-bottom:6px;margin-bottom:6px;}
+    .header-left{font-size:8px;line-height:1.4;color:#333;}
+    .header-logo{font-size:18px;font-weight:900;letter-spacing:-1px;color:#1dbf8e;}
+    .tipo{font-size:11px;font-weight:700;text-align:center;border:1px solid #000;padding:3px;margin-bottom:4px;}
+    .ot-num{font-size:36px;font-weight:900;text-align:center;letter-spacing:-1px;border:2px solid #000;padding:4px;margin-bottom:6px;}
+    .row{display:flex;align-items:baseline;gap:4px;margin-bottom:3px;font-size:10px;}
+    .lbl{font-weight:700;font-size:9px;min-width:90px;}
+    .val{font-size:11px;font-weight:700;}
+    .val-big{font-size:13px;font-weight:900;text-transform:uppercase;}
+    .divider{border-top:1px solid #000;margin:6px 0;}
+    .bottom{display:flex;gap:8px;align-items:flex-start;margin-top:6px;}
+    .qr-section{display:flex;flex-direction:column;align-items:center;gap:3px;}
+    .qr-label{font-size:7px;font-weight:700;text-align:center;}
+    .obs-section{flex:1;}
+    .obs-label{font-size:9px;font-weight:700;}
+    .obs-val{font-size:10px;min-height:50px;border:1px solid #ccc;padding:3px;margin-top:2px;}
+    .tipo-badge{font-size:32px;font-weight:900;background:#000;color:#fff;padding:8px 14px;text-align:center;min-width:70px;}
+    .footer{border-top:2px solid #000;margin-top:6px;padding-top:4px;}
+    .footer-lbl{font-size:8px;font-weight:700;}
+    .footer-val{font-size:9px;background:#000;color:#fff;padding:2px 6px;display:inline-block;margin-top:2px;}
+    @media print{body{margin:0;padding:6px;} button{display:none!important;}}
+  </style>
+  </head><body>
+  <div class="header">
+    <div>
+      <div class="header-logo">alleata</div>
+      <div class="header-left">Andrés Moretti e Hijos S.A.<br>Logística Alleata<br>(+54 11) 4103-4600</div>
+    </div>
+    <img src="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='60' height='40'><text y='30' font-size='28' font-weight='bold' fill='%23333'>Moretti</text></svg>" style="height:36px;opacity:.7">
+  </div>
+
+  <div class="tipo">TIPO DE O.T.: &nbsp;&nbsp; ${e.tipo||'—'}</div>
+  <div class="ot-num">O.T.: ${e.ot_numero||'—'}</div>
+
+  <div class="row"><span class="lbl">DESTINATARIO :</span></div>
+  <div style="font-size:14px;font-weight:900;text-align:center;text-transform:uppercase;margin-bottom:6px;border:1px solid #eee;padding:3px">${e.cuenta||'—'}</div>
+
+  <div class="row"><span class="lbl">DIRECCIÓN :</span><span class="val">${e.direccion_completa||'—'}</span></div>
+  <div class="row"><span class="lbl">C.P. :</span><span class="val">${e.cp_dest||'—'}</span></div>
+  <div class="row"><span class="lbl">LOCALIDAD :</span><span class="val">${e.ciudad||'—'}</span></div>
+  <div class="row"><span class="lbl">PCIA. :</span><span class="val">${e.provincia||'—'}</span></div>
+  <div class="row"><span class="lbl">CONTACTO :</span><span class="val">${e.contacto||'—'}</span></div>
+  <div class="row"><span class="lbl">HORARIO :</span><span class="val" style="font-size:10px">${e.horario||'—'}</span></div>
+  <div class="row"><span class="lbl">NOMBRE FANTASÍA :</span><span class="val" style="font-size:10px">${e.nombre_comercio||'—'}</span></div>
+
+  <div class="divider"></div>
+  <div class="bottom">
+    <div class="qr-section">
+      <div id="qrcode"></div>
+      <div class="qr-label">GEOUBICACION POR QR</div>
+    </div>
+    <div class="obs-section">
+      <div class="obs-label">OBS. :</div>
+      <div class="obs-val">${e.notas||''}</div>
+    </div>
+    <div class="tipo-badge">${tipoCode}</div>
+  </div>
+
+  <div class="footer">
+    <div class="footer-lbl">REMITENTE :</div>
+    <div class="footer-val">Logística Alleata &nbsp;·&nbsp; Andrés Moretti e Hijos S.A.</div>
+  </div>
+
+  <div style="text-align:center;margin-top:10px">
+    <button onclick="window.print()" style="background:#1dbf8e;color:#fff;border:none;padding:8px 20px;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer">🖨️ Imprimir rótulo</button>
+  </div>
+
+  <script>
+    new QRCode(document.getElementById('qrcode'),{
+      text:'${mapsUrl}',
+      width:90,height:90,
+      colorDark:'#000000',colorLight:'#ffffff',
+      correctLevel:QRCode.CorrectLevel.M
+    });
+    window.onafterprint=()=>window.close();
+  <\/script>
+  </body></html>`);
+  w.document.close();
+}
+
 async function deleteEnvio(id){
   if(!confirm('¿Eliminar esta OT?'))return;
   await sb.from('envios').delete().eq('id',id);
