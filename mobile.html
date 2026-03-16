@@ -152,7 +152,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
       <div class="login-logo">
         <img id="loginLogo" src="" alt="Alleata">
         <div class="login-sub">Portal de Operaciones</div>
-        <div class="login-version">v2.3.1 · mobile</div>
+        <div class="login-version">v2.3.2 · mobile</div>
       </div>
       <div class="field"><label class="label">Email</label><input class="input" id="lEmail" type="email" placeholder="usuario@alleata.com" autocomplete="email"></div>
       <div class="field"><label class="label">Contraseña</label><input class="input" id="lPass" type="password" placeholder="••••••••" autocomplete="current-password"></div>
@@ -168,7 +168,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
   <div class="topbar">
     <img id="appLogo" src="" alt="Alleata">
     <div class="topbar-title" id="topbarTitle">Operaciones</div>
-    <div class="topbar-version">v2.3.1</div>
+    <div class="topbar-version">v2.3.2</div>
     <div class="topbar-avatar" id="topbarAvatar" onclick="openDrawer()">?</div>
   </div>
 
@@ -200,6 +200,11 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
         <div class="scan-overlay">
           <div class="scan-frame"></div>
           <div class="scan-line"></div>
+        </div>
+        <!-- Tap to start — necesario en iOS para pedir permiso desde interacción del usuario -->
+        <div id="scanTapOverlay" onclick="iniciarCamaraManual()" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,.7);cursor:pointer;border-radius:14px;gap:10px">
+          <div style="font-size:40px">📷</div>
+          <div style="font-size:14px;font-weight:700;color:#fff">Tocá para activar la cámara</div>
         </div>
       </div>
       <div class="scan-status" id="rutaScanStatus">Apuntá la cámara al código QR del rótulo</div>
@@ -408,10 +413,11 @@ function switchTab(tab){
   document.getElementById('tab-'+tab).classList.add('active');
   document.getElementById('content-'+tab).classList.add('active');
   if(tab==='ruta'){
-    startRutaScanner();
     loadRuta();
+    // No arrancamos la cámara automáticamente — el usuario debe tocar el overlay
+    // Esto es necesario en iOS para que el pedido de permiso salga del contexto de un tap
   } else {
-    stopRutaScanner();
+    stopRutaScanner(); // detener cámara al salir del tab
   }
   if(tab==='historial')renderHistorial();
 }
@@ -605,6 +611,14 @@ async function sendWasender(ot, evento){
 }
 
 // ── SCANNER DE RUTA (QR) ──
+async function iniciarCamaraManual(){
+  // Ocultar overlay — esta función se llama desde un tap del usuario
+  // lo que garantiza que iOS acepte el pedido de permiso de cámara
+  const overlay=document.getElementById('scanTapOverlay');
+  if(overlay)overlay.style.display='none';
+  await startRutaScanner();
+}
+
 let _scannerInterval=null;
 
 async function startRutaScanner(){
@@ -638,6 +652,9 @@ function stopRutaScanner(){
   if(rutaScannerStream){rutaScannerStream.getTracks().forEach(t=>t.stop());rutaScannerStream=null;}
   const video=document.getElementById('rutaVideo');
   if(video)video.srcObject=null;
+  // Mostrar overlay nuevamente para que el usuario pueda reiniciar la cámara
+  const overlay=document.getElementById('scanTapOverlay');
+  if(overlay)overlay.style.display='flex';
 }
 
 let _scanning=false; // evitar procesamiento simultáneo
