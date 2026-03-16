@@ -152,7 +152,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
       <div class="login-logo">
         <img id="loginLogo" src="" alt="Alleata">
         <div class="login-sub">Portal de Operaciones</div>
-        <div class="login-version">v2.6.0 · mobile</div>
+        <div class="login-version">v2.6.1 · mobile</div>
       </div>
       <div class="field"><label class="label">Email</label><input class="input" id="lEmail" type="email" placeholder="usuario@alleata.com" autocomplete="email"></div>
       <div class="field"><label class="label">Contraseña</label><input class="input" id="lPass" type="password" placeholder="••••••••" autocomplete="current-password"></div>
@@ -168,7 +168,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
   <div class="topbar">
     <img id="appLogo" src="" alt="Alleata">
     <div class="topbar-title" id="topbarTitle">Operaciones</div>
-    <div class="topbar-version">v2.6.0</div>
+    <div class="topbar-version">v2.6.1</div>
     <div class="topbar-avatar" id="topbarAvatar" onclick="openDrawer()">?</div>
   </div>
 
@@ -1151,11 +1151,12 @@ async function capturarSimFrame(){
       document.getElementById('simDetectedWrap').style.display='none';
       document.getElementById('simDetectedNum').textContent='';
       document.getElementById('simScanStatus').textContent='📷 Enfocá el chip y tocá Capturar';
-      document.getElementById('simCaptureBtn').style.display='block';
-      document.getElementById('simCaptureBtn').style.opacity='1';
+      const cb=document.getElementById('simCaptureBtn');
+      cb.style.display='block';
+      cb.style.opacity='1';
+      cb.textContent='📷 Capturar';
       _simLocked=false;
       _simScanning=false;
-      // Reactivar cámara si se detuvo
       if(!_simStream)iniciarSimCamera();
     };
     results.appendChild(btn);
@@ -1171,7 +1172,15 @@ async function capturarSimFrame(){
 function detenerSimCamera(){
   if(_simInterval){clearInterval(_simInterval);_simInterval=null;}
   if(_simStream){_simStream.getTracks().forEach(t=>t.stop());_simStream=null;}
-  document.getElementById('simCaptureBtn').style.display='none';
+  // Resetear UI para que se pueda reactivar
+  const captureBtn=document.getElementById('simCaptureBtn');
+  const uploadBtn=document.getElementById('simUploadBtn');
+  const overlay=document.getElementById('simTapOverlay');
+  if(captureBtn){captureBtn.style.display='none';captureBtn.textContent='📷 Capturar';}
+  if(uploadBtn){uploadBtn.style.display='none';}
+  if(overlay){overlay.style.display='flex';}
+  _simScanning=false;
+  _simLocked=false;
   const slider=document.getElementById('simZoomSlider');
   if(slider){slider.value=1;}
   aplicarSimZoom(1);
