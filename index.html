@@ -281,7 +281,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--navy-500);letter-spacing:1px;">
-      v1.6.3 · 16 mar 2026
+      v1.6.4 · 16 mar 2026
     </div>
   </div>
 </div>
@@ -330,7 +330,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--navy-500);letter-spacing:1px;">
-      v1.6.3 · 16 mar 2026
+      v1.6.4 · 16 mar 2026
     </div>
   </div>
 </nav>
@@ -343,7 +343,7 @@ tr:hover td{background:var(--surface2);}
       <span class="crumb-current" id="topbar-title">Dashboard</span>
     </div>
     <div class="topbar-right" id="topbar-date"></div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--navy-500);margin-left:12px;">v1.6.3</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--navy-500);margin-left:12px;">v1.6.4</div>
   </div>
   <div class="content">
 
@@ -404,6 +404,8 @@ tr:hover td{background:var(--surface2);}
         <div class="stat-box" style="border-left:2px solid var(--green)"><div class="stat-num" style="color:var(--green)" id="env-s-entregado">0</div><div class="stat-label">Entregados</div></div>
         <div class="stat-box" style="border-left:2px solid var(--red)"><div class="stat-num" style="color:var(--red)" id="env-s-problema">0</div><div class="stat-label">Con problema</div></div>
       </div>
+      <!-- Stats por logística (admin) -->
+      <div id="envLogisticaStats" style="display:none;gap:12px;margin-bottom:14px;flex-wrap:wrap"></div>
       <!-- Stats logística — por zona -->
       <div class="stats-row" id="envZonaRow" style="display:none">
         <div class="stat-box" id="zcard-caba" onclick="filtrarZona('CABA')" style="border-left:3px solid #1a9fd4;cursor:pointer;transition:all .2s" onmouseover="this.style.background='rgba(26,159,212,.1)'" onmouseout="this.style.background=''">
@@ -1197,12 +1199,60 @@ async function renderEnvios(){
       document.getElementById('env-s-transito').textContent=list.filter(e=>['En tránsito','En camino'].includes(e.estado)).length;
       document.getElementById('env-s-entregado').textContent=list.filter(e=>e.estado==='Entregado').length;
       document.getElementById('env-s-problema').textContent=list.filter(e=>['Demorado','Perdido','Devuelto'].includes(e.estado)).length;
+      // Stats por logística
+      renderLogisticaStats(list);
     }
   }
 
   // Save full list for zona filtering
   _listAllZonas=list;
   renderEnviosTable(list);
+}
+
+function renderLogisticaStats(list){
+  const el=document.getElementById('envLogisticaStats');
+  if(!el)return;
+  // Agrupar por logística (null/vacío = Correo Argentino)
+  const grupos={};
+  list.forEach(e=>{
+    const log=e.logistica||'Correo Argentino';
+    if(!grupos[log])grupos[log]={total:0,transito:0,entregado:0,problema:0};
+    grupos[log].total++;
+    if(['En tránsito','En camino','Despachado','En espera en sucursal'].includes(e.estado))grupos[log].transito++;
+    if(e.estado==='Entregado')grupos[log].entregado++;
+    if(['Demorado','Perdido','Devuelto'].includes(e.estado))grupos[log].problema++;
+  });
+  const logColors={'ALLEATA':'#1dbf8e','Correo Argentino':'#1a9fd4'};
+  const logIcons={'ALLEATA':'🚚','Correo Argentino':'📮'};
+  const keys=Object.keys(grupos).sort();
+  if(keys.length<=1){el.style.display='none';return;}
+  el.style.display='flex';
+  el.innerHTML=keys.map(log=>{
+    const g=grupos[log];
+    const color=logColors[log]||'#6b8eaa';
+    const icon=logIcons[log]||'📦';
+    return`<div style="background:var(--surface);border:1px solid var(--border);border-top:3px solid ${color};border-radius:10px;padding:12px 16px;flex:1;min-width:200px">
+      <div style="font-size:11px;font-weight:700;color:${color};letter-spacing:.5px;margin-bottom:10px">${icon} ${log.toUpperCase()}</div>
+      <div style="display:flex;gap:16px;flex-wrap:wrap">
+        <div style="text-align:center">
+          <div style="font-size:22px;font-weight:800;color:var(--text);font-family:'JetBrains Mono',monospace">${g.total}</div>
+          <div style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px">Total</div>
+        </div>
+        <div style="text-align:center">
+          <div style="font-size:22px;font-weight:800;color:var(--yellow);font-family:'JetBrains Mono',monospace">${g.transito}</div>
+          <div style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px">En tránsito</div>
+        </div>
+        <div style="text-align:center">
+          <div style="font-size:22px;font-weight:800;color:var(--green);font-family:'JetBrains Mono',monospace">${g.entregado}</div>
+          <div style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px">Entregados</div>
+        </div>
+        <div style="text-align:center">
+          <div style="font-size:22px;font-weight:800;color:var(--red);font-family:'JetBrains Mono',monospace">${g.problema}</div>
+          <div style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px">Con problema</div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 function renderEnviosTable(list){
