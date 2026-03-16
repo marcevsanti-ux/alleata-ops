@@ -152,7 +152,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
       <div class="login-logo">
         <img id="loginLogo" src="" alt="Alleata">
         <div class="login-sub">Portal de Operaciones</div>
-        <div class="login-version">v2.3.0 · mobile</div>
+        <div class="login-version">v2.3.1 · mobile</div>
       </div>
       <div class="field"><label class="label">Email</label><input class="input" id="lEmail" type="email" placeholder="usuario@alleata.com" autocomplete="email"></div>
       <div class="field"><label class="label">Contraseña</label><input class="input" id="lPass" type="password" placeholder="••••••••" autocomplete="current-password"></div>
@@ -168,7 +168,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
   <div class="topbar">
     <img id="appLogo" src="" alt="Alleata">
     <div class="topbar-title" id="topbarTitle">Operaciones</div>
-    <div class="topbar-version">v2.3.0</div>
+    <div class="topbar-version">v2.3.1</div>
     <div class="topbar-avatar" id="topbarAvatar" onclick="openDrawer()">?</div>
   </div>
 
@@ -605,23 +605,28 @@ async function sendWasender(ot, evento){
 }
 
 // ── SCANNER DE RUTA (QR) ──
-let _scannerLoopId=null; // requestAnimationFrame id
+let _scannerInterval=null;
 
 async function startRutaScanner(){
   if(rutaScannerActive)return;
   const status=document.getElementById('rutaScanStatus');
   try{
     const stream=await navigator.mediaDevices.getUserMedia({
-      video:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:720}}
-    });
+      video:{facingMode:{exact:'environment'},width:{ideal:1280},height:{ideal:720}}
+    }).catch(()=>navigator.mediaDevices.getUserMedia({
+      video:{facingMode:'environment'} // fallback sin exact por si falla en algunos iOS
+    }));
     rutaScannerStream=stream;
-    rutaScannerActive=true;
     const video=document.getElementById('rutaVideo');
     video.srcObject=stream;
-    await new Promise(r=>{video.onloadedmetadata=r;});
-    video.play();
+    // Esperar que el video esté listo (crítico en iOS)
+    await new Promise(r=>{
+      video.onloadedmetadata=()=>{video.play().then(r).catch(r);};
+    });
+    rutaScannerActive=true;
     status.textContent='📷 Cámara activa — apuntá al QR del rótulo';
-    _scanLoop();
+    // setInterval es más confiable que rAF en iOS Safari
+    _scannerInterval=setInterval(_doScan,350);
   }catch(e){
     status.textContent='⚠️ Sin acceso a cámara: '+e.message;
   }
@@ -629,54 +634,39 @@ async function startRutaScanner(){
 
 function stopRutaScanner(){
   rutaScannerActive=false;
-  if(_scannerLoopId){cancelAnimationFrame(_scannerLoopId);_scannerLoopId=null;}
+  if(_scannerInterval){clearInterval(_scannerInterval);_scannerInterval=null;}
   if(rutaScannerStream){rutaScannerStream.getTracks().forEach(t=>t.stop());rutaScannerStream=null;}
   const video=document.getElementById('rutaVideo');
   if(video)video.srcObject=null;
 }
 
-let _lastScan=0;
-function _scanLoop(){
-  if(!rutaScannerActive)return;
-  _scannerLoopId=requestAnimationFrame(()=>{
-    const now=Date.now();
-    if(now-_lastScan>400){ // scan every 400ms
-      _lastScan=now;
-      _doScan();
-    }
-    _scanLoop();
-  });
-}
-
+let _scanning=false; // evitar procesamiento simultáneo
 async function _doScan(){
+  if(!rutaScannerActive||_scanning)return;
   const video=document.getElementById('rutaVideo');
   const canvas=document.getElementById('rutaCanvas');
-  if(!video||!canvas||video.readyState<2||video.videoWidth===0)return;
+  if(!video||!canvas||video.paused||video.ended||video.readyState<2||video.videoWidth===0)return;
+  _scanning=true;
   canvas.width=video.videoWidth;
   canvas.height=video.videoHeight;
   const ctx=canvas.getContext('2d');
   ctx.drawImage(video,0,0);
 
-  // Method 1: BarcodeDetector (Chrome Android, Edge)
-  if('BarcodeDetector' in window){
-    try{
+  try{
+    // Method 1: BarcodeDetector (Chrome Android, Edge)
+    if('BarcodeDetector' in window){
       const bd=new BarcodeDetector({formats:['qr_code']});
       const codes=await bd.detect(canvas);
-      if(codes.length>0){await handleRutaQR(codes[0].rawValue);return;}
-    }catch(e){}
-  }
-
-  // Method 2: jsQR from CDN (if loaded)
-  if(typeof jsQR==='function'){
-    try{
+      if(codes.length>0){_scanning=false;await handleRutaQR(codes[0].rawValue);return;}
+    }
+    // Method 2: jsQR (iOS Safari, Firefox)
+    if(typeof jsQR==='function'){
       const img=ctx.getImageData(0,0,canvas.width,canvas.height);
       const code=jsQR(img.data,img.width,img.height,{inversionAttempts:'attemptBoth'});
-      if(code){await handleRutaQR(code.data);return;}
-    }catch(e){}
-  }
-
-  // Method 3: native <input type=file> fallback indicator
-  // (no auto-detect possible, user must use manual button below)
+      if(code){_scanning=false;await handleRutaQR(code.data);return;}
+    }
+  }catch(e){}
+  _scanning=false;
 }
 
 async function handleRutaQR(value){
@@ -694,7 +684,7 @@ async function handleRutaQR(value){
   // Resume scanner after showing card
   setTimeout(()=>{
     rutaScannerActive=true;
-    _scanLoop();
+    if(!_scannerInterval)_scannerInterval=setInterval(_doScan,350);
   },1500);
 }
 
