@@ -152,7 +152,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
       <div class="login-logo">
         <img id="loginLogo" src="" alt="Alleata">
         <div class="login-sub">Portal de Operaciones</div>
-        <div class="login-version">v2.4.3 · mobile</div>
+        <div class="login-version">v2.4.5 · mobile</div>
       </div>
       <div class="field"><label class="label">Email</label><input class="input" id="lEmail" type="email" placeholder="usuario@alleata.com" autocomplete="email"></div>
       <div class="field"><label class="label">Contraseña</label><input class="input" id="lPass" type="password" placeholder="••••••••" autocomplete="current-password"></div>
@@ -168,7 +168,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
   <div class="topbar">
     <img id="appLogo" src="" alt="Alleata">
     <div class="topbar-title" id="topbarTitle">Operaciones</div>
-    <div class="topbar-version">v2.4.3</div>
+    <div class="topbar-version">v2.4.5</div>
     <div class="topbar-avatar" id="topbarAvatar" onclick="openDrawer()">?</div>
   </div>
 
@@ -269,13 +269,16 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
         <!-- Marco de escaneo -->
         <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none">
           <div style="width:70%;aspect-ratio:1;border:2px solid var(--teal);border-radius:12px;box-shadow:0 0 0 9999px rgba(0,0,0,.45)"></div>
-          <div id="simScanLine" style="position:absolute;width:64%;height:2px;background:linear-gradient(90deg,transparent,var(--teal),transparent);animation:scanAnim 2s linear infinite"></div>
+        </div>
+        <!-- Botón captura — tap sobre el visor cuando esté enfocado -->
+        <div id="simCaptureBtn" onclick="capturarSimFrame()" style="display:none;position:absolute;bottom:12px;left:50%;transform:translateX(-50%);background:var(--teal);color:#fff;font-size:13px;font-weight:700;padding:10px 28px;border-radius:30px;cursor:pointer;box-shadow:0 4px 16px rgba(29,191,142,.4)">
+          📷 Capturar
         </div>
         <!-- Overlay tap para iniciar -->
-        <div id="simTapOverlay" onclick="iniciarSimCamera()" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,.75);cursor:pointer;border-radius:0;gap:10px">
+        <div id="simTapOverlay" onclick="iniciarSimCamera()" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,.75);cursor:pointer;gap:10px">
           <div style="font-size:40px">📡</div>
-          <div style="color:#fff;font-weight:700;font-size:15px">Tocá para escanear SIM</div>
-          <div style="color:var(--text-muted);font-size:12px">Apuntá al chip · detección automática</div>
+          <div style="color:#fff;font-weight:700;font-size:15px">Tocá para activar cámara</div>
+          <div style="color:var(--text-muted);font-size:12px">Luego apuntá y tocá Capturar</div>
         </div>
       </div>
       <!-- Zoom slider -->
@@ -1008,22 +1011,112 @@ async function iniciarSimCamera(){
   overlay.style.display='none';
   status.textContent='Iniciando cámara...';
   try{
-    _simStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment',width:{ideal:1280},height:{ideal:1280}},audio:false});
+    _simStream=await navigator.mediaDevices.getUserMedia({
+      video:{facingMode:'environment',width:{ideal:1920},height:{ideal:1920}},
+      audio:false
+    });
     video.srcObject=_simStream;
     await video.play();
-    status.textContent='🔍 Buscando chip SIM...';
+    status.textContent='📷 Enfocá el chip y tocá Capturar';
+    document.getElementById('simCaptureBtn').style.display='block';
     _simLocked=false;
-    _simInterval=setInterval(_simDoScan,800);
+    _simScanning=false;
   }catch(err){
     overlay.style.display='flex';
     status.textContent='❌ No se pudo acceder a la cámara';
   }
 }
 
+async function capturarSimFrame(){
+  if(_simScanning)return;
+  const video=document.getElementById('simVideo');
+  const status=document.getElementById('simScanStatus');
+  const captureBtn=document.getElementById('simCaptureBtn');
+  if(!video.videoWidth){status.textContent='⏳ Cámara no lista, intentá de nuevo';return;}
+
+  _simScanning=true;
+  captureBtn.style.opacity='0.5';
+  status.textContent='🧠 Analizando con IA...';
+
+  try{
+    const canvas=document.getElementById('simCanvas');
+    canvas.width=video.videoWidth;
+    canvas.height=video.videoHeight;
+    const ctx=canvas.getContext('2d');
+    // Recortar centro según zoom
+    const z=_simZoom||1;
+    const sw=video.videoWidth/z;
+    const sh=video.videoHeight/z;
+    const sx=(video.videoWidth-sw)/2;
+    const sy=(video.videoHeight-sh)/2;
+    ctx.drawImage(video,sx,sy,sw,sh,0,0,canvas.width,canvas.height);
+    // Mejorar contraste
+    ctx.filter='contrast(1.6) brightness(1.15) saturate(0)';
+    ctx.drawImage(canvas,0,0);
+    ctx.filter='none';
+    const b64=canvas.toDataURL('image/jpeg',0.95).split(',')[1];
+
+    const res=await callGemini(b64,'image/jpeg');
+    const{serie,linea,sufijo,prefijo}=parseGeminiSIM(res);
+
+    // Mostrar siempre lo que interpretó
+    const detWrap=document.getElementById('simDetectedWrap');
+    const detNum=document.getElementById('simDetectedNum');
+    detWrap.style.display='block';
+    if(serie){
+      detNum.textContent=`Serie: ${serie}`;
+    } else if(sufijo||prefijo){
+      detNum.innerHTML=`<span style="color:var(--blue)">${prefijo||'—'}</span> · <span style="color:var(--teal)">${sufijo||'—'}</span>`;
+    } else if(linea){
+      detNum.textContent=`Línea: ${linea}`;
+    } else {
+      detNum.textContent='No se leyeron números — intentá de nuevo';
+      status.textContent='🔍 No detectado — ajustá el zoom y volvé a capturar';
+      captureBtn.style.opacity='1';
+      _simScanning=false;
+      return;
+    }
+
+    captureBtn.style.display='none';
+    status.textContent='🔍 Buscando en base de datos...';
+    const result=await simLookup(serie,linea,sufijo,prefijo);
+    const results=document.getElementById('simResults');
+    results.innerHTML='';
+    appendSimResult(results,result,serie||sufijo||linea);
+    saveHistorial(serie||sufijo||'unknown',result);
+
+    if(result.found&&navigator.vibrate)navigator.vibrate([100,50,100]);
+
+    // Botón para escanear otro
+    const btn=document.createElement('button');
+    btn.className='btn';
+    btn.style.cssText='width:calc(100% - 28px);margin:10px 14px 14px;display:block;';
+    btn.textContent='📡 Escanear otro chip';
+    btn.onclick=()=>{
+      results.innerHTML='';
+      document.getElementById('simDetectedWrap').style.display='none';
+      document.getElementById('simDetectedNum').textContent='';
+      document.getElementById('simScanStatus').textContent='📷 Enfocá el chip y tocá Capturar';
+      document.getElementById('simCaptureBtn').style.display='block';
+      document.getElementById('simCaptureBtn').style.opacity='1';
+      _simLocked=false;
+      _simScanning=false;
+      // Reactivar cámara si se detuvo
+      if(!_simStream)iniciarSimCamera();
+    };
+    results.appendChild(btn);
+
+  }catch(err){
+    status.textContent='❌ Error — intentá de nuevo';
+    captureBtn.style.opacity='1';
+  }
+  _simScanning=false;
+}
+
 function detenerSimCamera(){
   if(_simInterval){clearInterval(_simInterval);_simInterval=null;}
   if(_simStream){_simStream.getTracks().forEach(t=>t.stop());_simStream=null;}
-  // Reset zoom
+  document.getElementById('simCaptureBtn').style.display='none';
   const slider=document.getElementById('simZoomSlider');
   if(slider){slider.value=1;}
   aplicarSimZoom(1);
@@ -1047,7 +1140,11 @@ async function _simDoScan(){
     const sx=(video.videoWidth-sw)/2;
     const sy=(video.videoHeight-sh)/2;
     ctx.drawImage(video,sx,sy,sw,sh,0,0,canvas.width,canvas.height);
-    const b64=canvas.toDataURL('image/jpeg',0.92).split(',')[1];
+    // Mejorar contraste para que Gemini lea mejor los números
+    ctx.filter='contrast(1.6) brightness(1.15) saturate(0)';
+    ctx.drawImage(canvas,0,0);
+    ctx.filter='none';
+    const b64=canvas.toDataURL('image/jpeg',0.95).split(',')[1];
 
     document.getElementById('simScanStatus').textContent='🧠 Analizando con IA...';
 
