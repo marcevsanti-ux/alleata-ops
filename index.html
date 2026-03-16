@@ -281,7 +281,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--navy-500);letter-spacing:1px;">
-      v1.6.2 · 16 mar 2026
+      v1.6.3 · 16 mar 2026
     </div>
   </div>
 </div>
@@ -330,7 +330,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--navy-500);letter-spacing:1px;">
-      v1.6.2 · 16 mar 2026
+      v1.6.3 · 16 mar 2026
     </div>
   </div>
 </nav>
@@ -343,7 +343,7 @@ tr:hover td{background:var(--surface2);}
       <span class="crumb-current" id="topbar-title">Dashboard</span>
     </div>
     <div class="topbar-right" id="topbar-date"></div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--navy-500);margin-left:12px;">v1.6.2</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--navy-500);margin-left:12px;">v1.6.3</div>
   </div>
   <div class="content">
 
@@ -1379,6 +1379,15 @@ async function printRotulo(id){
                  e.tipo?.toUpperCase().includes('CAMBIO')?'CAM':
                  e.tipo?.toUpperCase().includes('RETIRO')?'RET':'OT';
 
+  // Badge de zona
+  const ciudadZ=(e.ciudad||'').toLowerCase();
+  const provZ=(e.provincia||'').toLowerCase();
+  let zonaCode='FUERA', zonaColor='#ef4444';
+  if(provZ.includes('ciudad autónoma')||provZ.includes('caba')||ciudadZ.includes('buenos aires')&&provZ.includes('ciudad')){zonaCode='CABA';zonaColor='#1a9fd4';}
+  else if(['san isidro','vicente lópez','vicente lopez','tigre','pilar','escobar','san fernando','malvinas argentinas','san miguel','san martín','san martin'].some(n=>ciudadZ.includes(n))){zonaCode='ZN';zonaColor='#10b981';}
+  else if(['lomas de zamora','lanús','lanus','avellaneda','quilmes','berazategui','florencio varela','almirante brown','ezeiza','esteban echeverría','esteban echeverria','la plata','guernica','monte grande','temperley','banfield'].some(n=>ciudadZ.includes(n))){zonaCode='ZS';zonaColor='#f59e0b';}
+  else if(['la matanza','morón','moron','hurlingham','ituzaingó','ituzaingo','merlo','moreno','tres de febrero','luján','lujan','ramos mejía','ramos mejia','san justo','haedo','castelar'].some(n=>ciudadZ.includes(n))){zonaCode='ZO';zonaColor='#8b5cf6';}
+
   // Dirección para QR de geoubicación
   const direccionQR=encodeURIComponent(`${e.direccion_completa||''} ${e.ciudad||''} ${e.provincia||''} Argentina`);
   const mapsUrl=`https://www.google.com/maps/search/?api=1&query=${direccionQR}`;
@@ -1406,7 +1415,8 @@ async function printRotulo(id){
     .obs-section{flex:1;}
     .obs-label{font-size:9px;font-weight:700;}
     .obs-val{font-size:10px;min-height:50px;border:1px solid #ccc;padding:3px;margin-top:2px;}
-    .tipo-badge{font-size:32px;font-weight:900;background:#000;color:#fff;padding:8px 14px;text-align:center;min-width:70px;}
+    .tipo-badge{font-size:28px;font-weight:900;background:#000;color:#fff;padding:6px 12px;text-align:center;min-width:60px;}
+    .zona-badge-print{font-size:16px;font-weight:900;padding:6px 10px;text-align:center;min-width:60px;border:2px solid;}
     .footer{border-top:2px solid #000;margin-top:6px;padding-top:4px;}
     .footer-lbl{font-size:8px;font-weight:700;}
     .footer-val{font-size:9px;background:#000;color:#fff;padding:2px 6px;display:inline-block;margin-top:2px;}
@@ -1450,7 +1460,10 @@ async function printRotulo(id){
       <div class="obs-label">OBS. :</div>
       <div class="obs-val">${e.notas||''}</div>
     </div>
-    <div class="tipo-badge">${tipoCode}</div>
+    <div style="display:flex;flex-direction:column;gap:4px;align-items:center">
+      <div class="tipo-badge">${tipoCode}</div>
+      <div class="zona-badge-print" style="color:${zonaColor};border-color:${zonaColor};background:${zonaColor}15">${zonaCode}</div>
+    </div>
   </div>
 
   <div class="footer">
