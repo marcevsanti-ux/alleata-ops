@@ -152,7 +152,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
       <div class="login-logo">
         <img id="loginLogo" src="" alt="Alleata">
         <div class="login-sub">Portal de Operaciones</div>
-        <div class="login-version">v2.4.7 · mobile</div>
+        <div class="login-version">v2.4.8 · mobile</div>
       </div>
       <div class="field"><label class="label">Email</label><input class="input" id="lEmail" type="email" placeholder="usuario@alleata.com" autocomplete="email"></div>
       <div class="field"><label class="label">Contraseña</label><input class="input" id="lPass" type="password" placeholder="••••••••" autocomplete="current-password"></div>
@@ -168,7 +168,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
   <div class="topbar">
     <img id="appLogo" src="" alt="Alleata">
     <div class="topbar-title" id="topbarTitle">Operaciones</div>
-    <div class="topbar-version">v2.4.7</div>
+    <div class="topbar-version">v2.4.8</div>
     <div class="topbar-avatar" id="topbarAvatar" onclick="openDrawer()">?</div>
   </div>
 
@@ -271,14 +271,20 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
           <div style="width:70%;aspect-ratio:1;border:2px solid var(--teal);border-radius:12px;box-shadow:0 0 0 9999px rgba(0,0,0,.45)"></div>
         </div>
         <!-- Botón captura — tap sobre el visor cuando esté enfocado -->
-        <div id="simCaptureBtn" onclick="capturarSimFrame()" style="display:none;position:absolute;bottom:12px;left:50%;transform:translateX(-50%);background:var(--teal);color:#fff;font-size:13px;font-weight:700;padding:10px 28px;border-radius:30px;cursor:pointer;box-shadow:0 4px 16px rgba(29,191,142,.4)">
+        <div id="simCaptureBtn" onclick="capturarSimFrame()" style="display:none;position:absolute;bottom:12px;left:35%;transform:translateX(-50%);background:var(--teal);color:#fff;font-size:13px;font-weight:700;padding:10px 20px;border-radius:30px;cursor:pointer;box-shadow:0 4px 16px rgba(29,191,142,.4)">
           📷 Capturar
         </div>
+        <!-- Botón subir foto -->
+        <div onclick="document.getElementById('simUploadInput').click()" style="display:none;position:absolute;bottom:12px;right:8%;background:var(--navy-700);color:var(--teal);font-size:12px;font-weight:700;padding:10px 16px;border-radius:30px;cursor:pointer;border:1px solid var(--teal)" id="simUploadBtn">
+          🖼️ Subir
+        </div>
+        <input type="file" id="simUploadInput" accept="image/*" style="display:none" onchange="procesarFotoSIM(event)">
         <!-- Overlay tap para iniciar -->
         <div id="simTapOverlay" onclick="iniciarSimCamera()" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,.75);cursor:pointer;gap:10px">
           <div style="font-size:40px">📡</div>
           <div style="color:#fff;font-weight:700;font-size:15px">Tocá para activar cámara</div>
           <div style="color:var(--text-muted);font-size:12px">Luego apuntá y tocá Capturar</div>
+          <div onclick="event.stopPropagation();document.getElementById('simUploadInput').click()" style="margin-top:6px;background:var(--navy-700);color:var(--teal);font-size:12px;font-weight:700;padding:8px 20px;border-radius:20px;border:1px solid var(--teal)">🖼️ O subir foto</div>
         </div>
       </div>
       <!-- Zoom slider -->
@@ -1019,11 +1025,53 @@ async function iniciarSimCamera(){
     await video.play();
     status.textContent='📷 Enfocá el chip y tocá Capturar';
     document.getElementById('simCaptureBtn').style.display='block';
+    document.getElementById('simUploadBtn').style.display='block';
     _simLocked=false;
     _simScanning=false;
   }catch(err){
     overlay.style.display='flex';
     status.textContent='❌ No se pudo acceder a la cámara';
+  }
+}
+
+async function procesarFotoSIM(e){
+  const file=e.target.files[0];
+  if(!file)return;
+  e.target.value=''; // reset para poder subir la misma foto de nuevo
+  const status=document.getElementById('simScanStatus');
+  const detWrap=document.getElementById('simDetectedWrap');
+  const detNum=document.getElementById('simDetectedNum');
+  const results=document.getElementById('simResults');
+  results.innerHTML='';
+  detWrap.style.display='none';
+  status.textContent='🧠 Analizando foto con IA...';
+  try{
+    const b64=await fileToB64(file);
+    const res=await callGemini(b64,file.type);
+    console.log('GEMINI RAW (foto):', res);
+    // Mostrar respuesta cruda para debug
+    status.textContent='📋 '+res.substring(0,120);
+    const{serie,linea,sufijo,prefijo}=parseGeminiSIM(res);
+    detWrap.style.display='block';
+    if(serie){
+      detNum.textContent=`Serie: ${serie}`;
+    } else if(sufijo||prefijo){
+      detNum.innerHTML=`<span style="color:var(--blue)">${prefijo||'—'}</span> · <span style="color:var(--teal)">${sufijo||'—'}</span>`;
+    } else if(linea){
+      detNum.textContent=`Línea: ${linea}`;
+    } else {
+      detNum.textContent='No se leyeron números';
+      return;
+    }
+    status.textContent='🔍 Buscando en base de datos...';
+    const result=await simLookup(serie,linea,sufijo,prefijo);
+    results.innerHTML='';
+    appendSimResult(results,result,serie||sufijo||linea);
+    saveHistorial(serie||sufijo||'unknown',result);
+    if(result.found&&navigator.vibrate)navigator.vibrate([100,50,100]);
+    status.textContent=result.found?'✅ SIM encontrada':'❌ SIM no registrada';
+  }catch(err){
+    status.textContent='❌ Error: '+err.message;
   }
 }
 
