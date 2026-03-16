@@ -152,7 +152,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
       <div class="login-logo">
         <img id="loginLogo" src="" alt="Alleata">
         <div class="login-sub">Portal de Operaciones</div>
-        <div class="login-version">v2.3.3 · mobile</div>
+        <div class="login-version">v2.3.4 · mobile</div>
       </div>
       <div class="field"><label class="label">Email</label><input class="input" id="lEmail" type="email" placeholder="usuario@alleata.com" autocomplete="email"></div>
       <div class="field"><label class="label">Contraseña</label><input class="input" id="lPass" type="password" placeholder="••••••••" autocomplete="current-password"></div>
@@ -168,7 +168,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
   <div class="topbar">
     <img id="appLogo" src="" alt="Alleata">
     <div class="topbar-title" id="topbarTitle">Operaciones</div>
-    <div class="topbar-version">v2.3.3</div>
+    <div class="topbar-version">v2.3.4</div>
     <div class="topbar-avatar" id="topbarAvatar" onclick="openDrawer()">?</div>
   </div>
 
@@ -316,8 +316,32 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
     <div class="modal-title" id="modalCierre-title">Cerrar OT</div>
     <input type="hidden" id="modalCierre-id">
     <input type="hidden" id="modalCierre-resultado">
-    <label class="label" style="margin-bottom:8px;display:block">Notas / observaciones</label>
-    <textarea id="modalCierre-notas" rows="3" placeholder="Opcional: descripción de lo ocurrido..."></textarea>
+
+    <label class="label" style="margin-bottom:6px;display:block">Datos de envío</label>
+    <select id="modalCierre-datoEnvio" onchange="onDatoEnvioChange()" style="width:100%;background:var(--navy-700);border:1px solid var(--border2);color:var(--text);font-family:'Inter',sans-serif;font-size:14px;padding:11px 12px;border-radius:10px;outline:none;margin-bottom:12px">
+      <option value="">-- Ninguno --</option>
+      <option value="Información correcta">Información correcta</option>
+      <option value="Falta horarios">Falta horarios</option>
+      <option value="Mal indicada la dirección">Mal indicada la dirección</option>
+      <option value="Mal indicados los horarios">Mal indicados los horarios</option>
+    </select>
+
+    <label class="label" style="margin-bottom:6px;display:block">Observaciones</label>
+    <textarea id="modalCierre-notas" rows="3" placeholder="Opcional: descripción de lo ocurrido..." style="margin-bottom:12px"></textarea>
+
+    <label class="label" style="margin-bottom:6px;display:block">
+      Foto de evidencia <span id="fotoRequeridaLabel" style="color:var(--red);display:none">*requerida</span>
+    </label>
+    <div id="fotoPreview" style="display:none;margin-bottom:8px;position:relative">
+      <img id="fotoImg" style="width:100%;border-radius:10px;max-height:180px;object-fit:cover" src="">
+      <button onclick="quitarFoto()" style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,.6);border:none;color:#fff;width:26px;height:26px;border-radius:50%;cursor:pointer;font-size:14px">✕</button>
+    </div>
+    <label style="display:flex;align-items:center;gap:8px;background:var(--surface2);border:1px dashed var(--border2);border-radius:10px;padding:12px;cursor:pointer;margin-bottom:14px" id="fotoLabel">
+      <span style="font-size:20px">📷</span>
+      <span style="font-size:13px;color:var(--text-muted)" id="fotoLabelText">Tocar para sacar foto</span>
+      <input type="file" id="modalFotoInput" accept="image/*" capture="environment" style="display:none" onchange="previewFoto(event)">
+    </label>
+
     <div class="modal-btns">
       <button class="btn btn-cancel" onclick="closeModalCierre()">Cancelar</button>
       <button class="btn" id="modalCierre-confirm" onclick="confirmarCierreOT()">Confirmar</button>
@@ -714,30 +738,109 @@ function showScanFeedback(msg,type){
 }
 
 // ── CIERRE DE OT ──
+let _fotoBlob=null;
+let _fotoBase64=null;
+
 function openCierreModal(id,resultado){
   document.getElementById('modalCierre-id').value=id;
   document.getElementById('modalCierre-resultado').value=resultado;
   document.getElementById('modalCierre-notas').value='';
+  document.getElementById('modalCierre-datoEnvio').value='';
   document.getElementById('modalCierre-title').textContent=resultado==='Entregado'?'✅ Confirmar entrega':'❌ Registrar entrega fallida';
   document.getElementById('modalCierre-confirm').style.background=resultado==='Entregado'?'var(--green)':'var(--red)';
+  document.getElementById('fotoRequeridaLabel').style.display='none';
+  document.getElementById('fotoLabelText').textContent='Tocar para sacar foto';
+  document.getElementById('fotoPreview').style.display='none';
+  document.getElementById('fotoImg').src='';
+  document.getElementById('modalFotoInput').value='';
+  _fotoBlob=null;_fotoBase64=null;
   document.getElementById('modalCierre').classList.add('show');
 }
 
-function closeModalCierre(){document.getElementById('modalCierre').classList.remove('show');}
+function closeModalCierre(){
+  document.getElementById('modalCierre').classList.remove('show');
+  _fotoBlob=null;_fotoBase64=null;
+}
+
+function onDatoEnvioChange(){
+  const val=document.getElementById('modalCierre-datoEnvio').value;
+  const req=document.getElementById('fotoRequeridaLabel');
+  req.style.display=val==='Mal indicada la dirección'?'inline':'none';
+}
+
+function previewFoto(e){
+  const file=e.target.files[0];
+  if(!file)return;
+  _fotoBlob=file;
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    _fotoBase64=ev.target.result;
+    document.getElementById('fotoImg').src=_fotoBase64;
+    document.getElementById('fotoPreview').style.display='block';
+    document.getElementById('fotoLabelText').textContent='Cambiar foto';
+  };
+  reader.readAsDataURL(file);
+}
+
+function quitarFoto(){
+  _fotoBlob=null;_fotoBase64=null;
+  document.getElementById('fotoImg').src='';
+  document.getElementById('fotoPreview').style.display='none';
+  document.getElementById('fotoLabelText').textContent='Tocar para sacar foto';
+  document.getElementById('modalFotoInput').value='';
+}
 
 async function confirmarCierreOT(){
   const id=document.getElementById('modalCierre-id').value;
   const resultado=document.getElementById('modalCierre-resultado').value;
   const notas=document.getElementById('modalCierre-notas').value.trim();
+  const datoEnvio=document.getElementById('modalCierre-datoEnvio').value;
+
+  // Validar foto requerida para "Mal indicada la dirección"
+  if(datoEnvio==='Mal indicada la dirección'&&!_fotoBlob){
+    document.getElementById('fotoRequeridaLabel').style.display='inline';
+    document.getElementById('fotoRequeridaLabel').textContent='*foto requerida para esta opción';
+    return;
+  }
+
+  const btn=document.getElementById('modalCierre-confirm');
+  btn.disabled=true;btn.textContent='⏳ Guardando...';
+
+  // Subir foto a Supabase Storage si existe
+  let fotoUrl=null;
+  if(_fotoBlob){
+    try{
+      const ext=_fotoBlob.type.includes('png')?'png':'jpg';
+      const path=`evidencias/${id}_${Date.now()}.${ext}`;
+      const{data,error}=await sb.storage.from('evidencias').upload(path,_fotoBlob,{
+        contentType:_fotoBlob.type,upsert:true
+      });
+      if(!error){
+        const{data:urlData}=sb.storage.from('evidencias').getPublicUrl(path);
+        fotoUrl=urlData.publicUrl;
+      }
+    }catch(e){console.warn('Error subiendo foto:',e);}
+  }
+
   const estado=resultado==='Entregado'?'Entregado':'Demorado';
-  await sb.from('envios').update({
-    estado,resultado,notas_cierre:notas,
+  const evento=resultado==='Entregado'?'Entregado por logística Alleata':'Entrega fallida'+(datoEnvio?' — '+datoEnvio:'')+(notas?' — '+notas:'');
+
+  const update={
+    estado,
+    resultado,
+    notas_cierre:notas||null,
+    dato_envio:datoEnvio||null,
+    foto_evidencia:fotoUrl||null,
     fecha_cierre:new Date().toISOString().slice(0,10),
-    ultimo_evento:resultado==='Entregado'?'Entregado por logística Alleata':'Entrega fallida — '+notas,
+    ultimo_evento:evento,
     ultimo_evento_fecha:new Date().toISOString().slice(0,10)
-  }).eq('id',id);
+  };
+
+  const{error}=await sb.from('envios').update(update).eq('id',id);
+  btn.disabled=false;btn.textContent='Confirmar';
+  if(error){alert('Error: '+error.message);return;}
   closeModalCierre();
-  await loadRuta();
+  await loadEnTransito();
 }
 
 function abrirMaps(direccion){
