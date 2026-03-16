@@ -281,7 +281,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--navy-500);letter-spacing:1px;">
-      v1.6.0 · 16 mar 2026
+      v1.6.1 · 16 mar 2026
     </div>
   </div>
 </div>
@@ -330,7 +330,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--navy-500);letter-spacing:1px;">
-      v1.6.0 · 16 mar 2026
+      v1.6.1 · 16 mar 2026
     </div>
   </div>
 </nav>
@@ -343,7 +343,7 @@ tr:hover td{background:var(--surface2);}
       <span class="crumb-current" id="topbar-title">Dashboard</span>
     </div>
     <div class="topbar-right" id="topbar-date"></div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--navy-500);margin-left:12px;">v1.6.0</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--navy-500);margin-left:12px;">v1.6.1</div>
   </div>
   <div class="content">
 
@@ -406,29 +406,33 @@ tr:hover td{background:var(--surface2);}
       </div>
       <!-- Stats logística — por zona -->
       <div class="stats-row" id="envZonaRow" style="display:none">
-        <div class="stat-box" style="border-left:3px solid #1a9fd4">
+        <div class="stat-box" id="zcard-caba" onclick="filtrarZona('CABA')" style="border-left:3px solid #1a9fd4;cursor:pointer;transition:all .2s" onmouseover="this.style.background='rgba(26,159,212,.1)'" onmouseout="this.style.background=''">
           <div class="stat-num" style="color:#1a9fd4;font-size:22px" id="z-caba">0</div>
           <div class="stat-label">🏙️ CABA</div>
           <div style="font-size:9px;color:var(--text-muted);margin-top:2px" id="z-caba-km"></div>
         </div>
-        <div class="stat-box" style="border-left:3px solid #10b981">
+        <div class="stat-box" id="zcard-norte" onclick="filtrarZona('Zona Norte')" style="border-left:3px solid #10b981;cursor:pointer;transition:all .2s" onmouseover="this.style.background='rgba(16,185,129,.1)'" onmouseout="this.style.background=''">
           <div class="stat-num" style="color:#10b981;font-size:22px" id="z-norte">0</div>
           <div class="stat-label">⬆️ Zona Norte</div>
           <div style="font-size:9px;color:var(--text-muted);margin-top:2px" id="z-norte-km"></div>
         </div>
-        <div class="stat-box" style="border-left:3px solid #f59e0b">
+        <div class="stat-box" id="zcard-sur" onclick="filtrarZona('Zona Sur')" style="border-left:3px solid #f59e0b;cursor:pointer;transition:all .2s" onmouseover="this.style.background='rgba(245,158,11,.1)'" onmouseout="this.style.background=''">
           <div class="stat-num" style="color:#f59e0b;font-size:22px" id="z-sur">0</div>
           <div class="stat-label">⬇️ Zona Sur</div>
           <div style="font-size:9px;color:var(--text-muted);margin-top:2px" id="z-sur-km"></div>
         </div>
-        <div class="stat-box" style="border-left:3px solid #8b5cf6">
+        <div class="stat-box" id="zcard-oeste" onclick="filtrarZona('Zona Oeste')" style="border-left:3px solid #8b5cf6;cursor:pointer;transition:all .2s" onmouseover="this.style.background='rgba(139,92,246,.1)'" onmouseout="this.style.background=''">
           <div class="stat-num" style="color:#8b5cf6;font-size:22px" id="z-oeste">0</div>
           <div class="stat-label">⬅️ Zona Oeste</div>
           <div style="font-size:9px;color:var(--text-muted);margin-top:2px" id="z-oeste-km"></div>
         </div>
-        <div class="stat-box" style="border-left:3px solid #ef4444">
+        <div class="stat-box" id="zcard-fuera" onclick="filtrarZona('Fuera AMBA')" style="border-left:3px solid #ef4444;cursor:pointer;transition:all .2s" onmouseover="this.style.background='rgba(239,68,68,.1)'" onmouseout="this.style.background=''">
           <div class="stat-num" style="color:#ef4444;font-size:22px" id="z-fuera">0</div>
           <div class="stat-label">📦 Fuera AMBA</div>
+        </div>
+        <div class="stat-box" id="zcard-todas" onclick="filtrarZona('')" style="border-left:3px solid var(--border2);cursor:pointer;transition:all .2s" onmouseover="this.style.background='rgba(255,255,255,.05)'" onmouseout="this.style.background=''">
+          <div class="stat-num" style="color:var(--text-muted);font-size:22px" id="z-total">0</div>
+          <div class="stat-label">📋 Todas</div>
         </div>
       </div>
 
@@ -1175,6 +1179,7 @@ async function renderEnvios(){
       document.getElementById('z-sur').textContent=zonas.Sur.length;
       document.getElementById('z-oeste').textContent=zonas.Oeste.length;
       document.getElementById('z-fuera').textContent=zonas.Fuera.length;
+      document.getElementById('z-total').textContent=list.length;
       // Distancia promedio por zona
       const avgKm=(arr)=>{
         const kms=arr.map(e=>{const c=COORDS_CIUDAD[(e.ciudad||'').toLowerCase().trim()];return c?Math.round(haversine(CENTRAL_LAT,CENTRAL_LNG,c.lat,c.lng)):null;}).filter(Boolean);
@@ -1195,6 +1200,16 @@ async function renderEnvios(){
     }
   }
 
+  // Save full list for zona filtering
+  _listAllZonas=list;
+  renderEnviosTable(list);
+}
+
+function renderEnviosTable(list){
+  const isLogistica=currentProfile?.rol==='logistica';
+  const isAdmin=currentProfile?.rol==='admin';
+  const empty=document.getElementById('enviosEmpty');
+  empty.style.display=list.length?'none':'block';
   document.getElementById('enviosTable').innerHTML=list.map(e=>{
     const estadoClass={'En tránsito':'badge-yellow','En camino':'badge-blue','Entregado':'badge-green','Demorado':'badge-orange','Perdido':'badge-red','Devuelto':'badge-red','Pre-Colecta':'badge-gray'}[e.estado]||'badge-gray';
     const z=detectarZona(e.ciudad,e.provincia,e.cp_dest);
@@ -1250,7 +1265,23 @@ function openUpdateEvento(id,current){
   sb.from('envios').update({ultimo_evento:nuevo,ultimo_evento_fecha:new Date().toISOString().slice(0,10)}).eq('id',id).then(()=>renderEnvios());
 }
 
-// ── DISTANCIA HAVERSINE desde Barracas (California 2082) ──
+// ── FILTRO ZONA LOGÍSTICA ──
+let _zonaFiltro='';
+let _listAllZonas=[];
+function filtrarZona(zona){
+  _zonaFiltro=zona;
+  ['caba','norte','sur','oeste','fuera','todas'].forEach(z=>{
+    const card=document.getElementById('zcard-'+z);
+    if(!card)return;
+    const active=(zona===''&&z==='todas')||(zona==='CABA'&&z==='caba')||
+      (zona==='Zona Norte'&&z==='norte')||(zona==='Zona Sur'&&z==='sur')||
+      (zona==='Zona Oeste'&&z==='oeste')||(zona==='Fuera AMBA'&&z==='fuera');
+    card.style.outline=active?'2px solid var(--teal)':'none';
+  });
+  const filtered=zona?_listAllZonas.filter(e=>detectarZona(e.ciudad,e.provincia,e.cp_dest).zona===zona):_listAllZonas;
+  renderEnviosTable(filtered);
+}
+// ── FIN FILTRO ZONA ──
 const CENTRAL_LAT=-34.648,CENTRAL_LNG=-58.377;
 const COORDS_CIUDAD={
   // CABA
