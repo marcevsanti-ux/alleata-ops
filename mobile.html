@@ -152,7 +152,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
       <div class="login-logo">
         <img id="loginLogo" src="" alt="Alleata">
         <div class="login-sub">Portal de Operaciones</div>
-        <div class="login-version">v2.4.5 · mobile</div>
+        <div class="login-version">v2.4.6 · mobile</div>
       </div>
       <div class="field"><label class="label">Email</label><input class="input" id="lEmail" type="email" placeholder="usuario@alleata.com" autocomplete="email"></div>
       <div class="field"><label class="label">Contraseña</label><input class="input" id="lPass" type="password" placeholder="••••••••" autocomplete="current-password"></div>
@@ -168,7 +168,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
   <div class="topbar">
     <img id="appLogo" src="" alt="Alleata">
     <div class="topbar-title" id="topbarTitle">Operaciones</div>
-    <div class="topbar-version">v2.4.5</div>
+    <div class="topbar-version">v2.4.6</div>
     <div class="topbar-avatar" id="topbarAvatar" onclick="openDrawer()">?</div>
   </div>
 
@@ -1028,33 +1028,36 @@ async function iniciarSimCamera(){
 }
 
 async function capturarSimFrame(){
+  _simScanning=false; // reset por las dudas
   if(_simScanning)return;
   const video=document.getElementById('simVideo');
   const status=document.getElementById('simScanStatus');
   const captureBtn=document.getElementById('simCaptureBtn');
-  if(!video.videoWidth){status.textContent='⏳ Cámara no lista, intentá de nuevo';return;}
+  if(!video.videoWidth||!video.srcObject){
+    status.textContent='⏳ Cámara no lista, intentá de nuevo';
+    return;
+  }
 
   _simScanning=true;
   captureBtn.style.opacity='0.5';
+  captureBtn.textContent='⏳ Procesando...';
   status.textContent='🧠 Analizando con IA...';
 
   try{
-    const canvas=document.getElementById('simCanvas');
-    canvas.width=video.videoWidth;
-    canvas.height=video.videoHeight;
+    // Usar un canvas temporal limpio para la captura
+    const canvas=document.createElement('canvas');
+    const z=Math.max(1,_simZoom||1);
+    const sw=Math.floor(video.videoWidth/z);
+    const sh=Math.floor(video.videoHeight/z);
+    const sx=Math.floor((video.videoWidth-sw)/2);
+    const sy=Math.floor((video.videoHeight-sh)/2);
+    // Escalar a 800x800 max para no sobrecargar
+    const outSize=Math.min(800,Math.max(sw,sh));
+    canvas.width=outSize;
+    canvas.height=outSize;
     const ctx=canvas.getContext('2d');
-    // Recortar centro según zoom
-    const z=_simZoom||1;
-    const sw=video.videoWidth/z;
-    const sh=video.videoHeight/z;
-    const sx=(video.videoWidth-sw)/2;
-    const sy=(video.videoHeight-sh)/2;
-    ctx.drawImage(video,sx,sy,sw,sh,0,0,canvas.width,canvas.height);
-    // Mejorar contraste
-    ctx.filter='contrast(1.6) brightness(1.15) saturate(0)';
-    ctx.drawImage(canvas,0,0);
-    ctx.filter='none';
-    const b64=canvas.toDataURL('image/jpeg',0.95).split(',')[1];
+    ctx.drawImage(video,sx,sy,sw,sh,0,0,outSize,outSize);
+    const b64=canvas.toDataURL('image/jpeg',0.92).split(',')[1];
 
     const res=await callGemini(b64,'image/jpeg');
     const{serie,linea,sufijo,prefijo}=parseGeminiSIM(res);
@@ -1073,6 +1076,7 @@ async function capturarSimFrame(){
       detNum.textContent='No se leyeron números — intentá de nuevo';
       status.textContent='🔍 No detectado — ajustá el zoom y volvé a capturar';
       captureBtn.style.opacity='1';
+      captureBtn.textContent='📷 Capturar';
       _simScanning=false;
       return;
     }
@@ -1107,8 +1111,9 @@ async function capturarSimFrame(){
     results.appendChild(btn);
 
   }catch(err){
-    status.textContent='❌ Error — intentá de nuevo';
+    status.textContent='❌ Error: '+err.message;
     captureBtn.style.opacity='1';
+    captureBtn.textContent='📷 Capturar';
   }
   _simScanning=false;
 }
