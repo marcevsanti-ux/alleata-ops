@@ -152,7 +152,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
       <div class="login-logo">
         <img id="loginLogo" src="" alt="Alleata">
         <div class="login-sub">Portal de Operaciones</div>
-        <div class="login-version">v2.3.4 · mobile</div>
+        <div class="login-version">v2.3.5 · mobile</div>
       </div>
       <div class="field"><label class="label">Email</label><input class="input" id="lEmail" type="email" placeholder="usuario@alleata.com" autocomplete="email"></div>
       <div class="field"><label class="label">Contraseña</label><input class="input" id="lPass" type="password" placeholder="••••••••" autocomplete="current-password"></div>
@@ -168,7 +168,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
   <div class="topbar">
     <img id="appLogo" src="" alt="Alleata">
     <div class="topbar-title" id="topbarTitle">Operaciones</div>
-    <div class="topbar-version">v2.3.4</div>
+    <div class="topbar-version">v2.3.5</div>
     <div class="topbar-avatar" id="topbarAvatar" onclick="openDrawer()">?</div>
   </div>
 
@@ -251,6 +251,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
         <span>🚚 EN RUTA HOY</span>
         <span id="transitoCount" style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 7px;border-radius:8px;font-size:10px">0</span>
       </div>
+      <div id="kmIndicador" style="display:none;background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--teal);border-radius:12px;padding:12px 14px;margin-bottom:12px"></div>
       <div id="rutaActivaList">
         <div class="empty"><div class="empty-icon">🚚</div><p>Sin OTs en tránsito hoy</p></div>
       </div>
@@ -358,7 +359,8 @@ const{createClient}=supabase;
 const sb=createClient(SUPABASE_URL,SUPABASE_KEY);
 
 let currentUser=null,currentProfile=null;
-let rutaActiva=[];        // OTs en tránsito del usuario
+let rutaActiva=[];
+let rutaDelDia=[];  // OTs aceptadas hoy en orden
 let rutaScannerStream=null;
 let rutaScannerActive=false;
 
@@ -495,6 +497,75 @@ function getDistKm(ciudad){
   return Math.round(haversine(CENTRAL_LAT,CENTRAL_LNG,coords.lat,coords.lng));
 }
 
+// ── KM DE RUTA ──
+const BASE_LAT=-34.648,BASE_LNG=-58.377; // California 2082, Barracas
+
+function calcKmRuta(ots){
+  // Calcula km totales: BASE → OT1 → OT2 → ... → OTn → BASE
+  if(!ots.length)return{kmTotal:0,detalle:[]};
+  let kmTotal=0;
+  const detalle=[];
+  let prevLat=BASE_LAT,prevLng=BASE_LNG;
+
+  for(const ot of ots){
+    const key=(ot.ciudad||'').toLowerCase().trim();
+    const coords=COORDS_CIUDAD[key];
+    if(!coords){detalle.push({ot_numero:ot.ot_numero,ciudad:ot.ciudad,km_desde_anterior:null,nota:'sin coordenadas'});continue;}
+    const km=Math.round(haversine(prevLat,prevLng,coords.lat,coords.lng)*10)/10;
+    kmTotal+=km;
+    detalle.push({ot_numero:ot.ot_numero,ciudad:ot.ciudad,km_desde_anterior:km});
+    prevLat=coords.lat;prevLng=coords.lng;
+  }
+  // Regreso a Barracas
+  const kmRegreso=Math.round(haversine(prevLat,prevLng,BASE_LAT,BASE_LNG)*10)/10;
+  kmTotal+=kmRegreso;
+  detalle.push({ot_numero:'REGRESO',ciudad:'Barracas',km_desde_anterior:kmRegreso});
+  return{kmTotal:Math.round(kmTotal*10)/10,detalle};
+}
+
+async function guardarRutaDiaria(){
+  if(!currentUser||!rutaDelDia.length)return;
+  const fecha=new Date().toISOString().slice(0,10);
+  const{kmTotal,detalle}=calcKmRuta(rutaDelDia);
+  const ots_ids=rutaDelDia.map(o=>o.id);
+  const ots_numeros=rutaDelDia.map(o=>o.ot_numero||o.id);
+
+  // Upsert por fecha + user_id
+  const{data:existing}=await sb.from('rutas_diarias')
+    .select('id').eq('fecha',fecha).eq('user_id',currentUser.id).maybeSingle();
+
+  if(existing){
+    await sb.from('rutas_diarias').update({
+      ots_ids,ots_numeros,km_total:kmTotal,km_detalle:detalle,confirmada_at:new Date().toISOString()
+    }).eq('id',existing.id);
+  } else {
+    await sb.from('rutas_diarias').insert({
+      fecha,user_id:currentUser.id,ots_ids,ots_numeros,km_total:kmTotal,
+      km_detalle:detalle,confirmada_at:new Date().toISOString()
+    });
+  }
+  // Actualizar indicador km en pantalla
+  renderKmIndicador(kmTotal,detalle);
+}
+
+function renderKmIndicador(kmTotal,detalle){
+  const el=document.getElementById('kmIndicador');
+  if(!el)return;
+  el.style.display='block';
+  el.innerHTML=`<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+    <div>
+      <div style="font-size:22px;font-weight:800;color:var(--teal);font-family:'JetBrains Mono',monospace">${kmTotal} km</div>
+      <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px">Recorrido estimado del día (ida + vuelta a Barracas)</div>
+    </div>
+    <div style="flex:1;display:flex;flex-direction:column;gap:3px">
+      ${detalle.map((d,i)=>`<div style="font-size:10px;color:${d.ot_numero==='REGRESO'?'var(--text-muted)':'var(--text)'}">
+        ${i===0?'🏭':'→'} ${d.ot_numero==='REGRESO'?'🏭 Regreso Barracas':d.ot_numero+' · '+d.ciudad}
+        <span style="color:var(--teal);font-family:'JetBrains Mono',monospace;margin-left:4px">${d.km_desde_anterior!=null?d.km_desde_anterior+'km':'?'}</span>
+      </div>`).join('')}
+    </div>
+  </div>`;
+}
+
 // ── RUTA ──
 // WASENDER (dejar vacío hasta tener API key)
 const WASENDER_KEY='';
@@ -503,6 +574,13 @@ let otScaneadaActual=null; // OT mostrada en el card de confirmación
 
 async function loadRuta(){
   if(!currentUser)return;
+  // Cargar ruta del día guardada (para restaurar km si recarga la app)
+  const fecha=new Date().toISOString().slice(0,10);
+  const{data:rutaHoy}=await sb.from('rutas_diarias')
+    .select('*').eq('fecha',fecha).eq('user_id',currentUser.id).maybeSingle();
+  if(rutaHoy?.km_total){
+    renderKmIndicador(rutaHoy.km_total,rutaHoy.km_detalle||[]);
+  }
   await loadEnTransito();
 }
 
@@ -601,8 +679,11 @@ async function aceptarOT(){
     ultimo_evento_fecha:new Date().toISOString().slice(0,10)
   }).eq('id',otScaneadaActual.id);
   if(error){btn.disabled=false;btn.textContent='✅ Aceptar OT';alert('Error: '+error.message);return;}
-  // TODO: enviar WhatsApp via WasenderAPI cuando WASENDER_KEY esté disponible
-  // if(WASENDER_KEY) await sendWasender(otScaneadaActual, 'en_transito');
+
+  // Agregar a ruta del día y recalcular km
+  rutaDelDia.push({...otScaneadaActual});
+  await guardarRutaDiaria();
+
   cancelarOTScaneada();
   await loadEnTransito();
   showScanFeedback('✅ OT '+otScaneadaActual.ot_numero+' aceptada — en tránsito','ok');
