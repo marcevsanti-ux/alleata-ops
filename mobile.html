@@ -152,7 +152,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
       <div class="login-logo">
         <img id="loginLogo" src="" alt="Alleata">
         <div class="login-sub">Portal de Operaciones</div>
-        <div class="login-version">v2.4.0 · mobile</div>
+        <div class="login-version">v2.4.1 · mobile</div>
       </div>
       <div class="field"><label class="label">Email</label><input class="input" id="lEmail" type="email" placeholder="usuario@alleata.com" autocomplete="email"></div>
       <div class="field"><label class="label">Contraseña</label><input class="input" id="lPass" type="password" placeholder="••••••••" autocomplete="current-password"></div>
@@ -168,7 +168,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
   <div class="topbar">
     <img id="appLogo" src="" alt="Alleata">
     <div class="topbar-title" id="topbarTitle">Operaciones</div>
-    <div class="topbar-version">v2.4.0</div>
+    <div class="topbar-version">v2.4.1</div>
     <div class="topbar-avatar" id="topbarAvatar" onclick="openDrawer()">?</div>
   </div>
 
@@ -277,6 +277,14 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
           <div style="color:#fff;font-weight:700;font-size:15px">Tocá para escanear SIM</div>
           <div style="color:var(--text-muted);font-size:12px">Apuntá al chip · detección automática</div>
         </div>
+      </div>
+      <!-- Zoom slider -->
+      <div style="padding:6px 14px;background:var(--navy-900);display:flex;align-items:center;gap:10px">
+        <span style="font-size:13px">🔍</span>
+        <input type="range" id="simZoomSlider" min="1" max="4" step="0.1" value="1"
+          style="flex:1;accent-color:var(--teal);cursor:pointer;height:4px"
+          oninput="aplicarSimZoom(parseFloat(this.value))">
+        <span id="simZoomLabel" style="font-size:11px;color:var(--text-muted);min-width:28px;text-align:right;font-family:'JetBrains Mono',monospace">1×</span>
       </div>
       <!-- Status -->
       <div id="simScanStatus" style="padding:10px 14px;text-align:center;font-size:12px;color:var(--text-muted);border-top:1px solid var(--border);background:var(--surface)">
@@ -947,6 +955,52 @@ let _simInterval=null;
 let _simScanning=false;
 let _simLocked=false; // evitar múltiples resultados seguidos
 
+let _simZoom=1;
+
+function aplicarSimZoom(val){
+  _simZoom=val;
+  document.getElementById('simZoomLabel').textContent=val.toFixed(1)+'×';
+  // Zoom via CSS transform en el video
+  const video=document.getElementById('simVideo');
+  video.style.transform=`scale(${val})`;
+  video.style.transformOrigin='center center';
+  // Intentar zoom nativo de cámara si está disponible (Android Chrome)
+  if(_simStream){
+    const track=_simStream.getVideoTracks()[0];
+    const caps=track.getCapabilities?.();
+    if(caps?.zoom){
+      const zoomVal=caps.zoom.min+(caps.zoom.max-caps.zoom.min)*((val-1)/3);
+      track.applyConstraints({advanced:[{zoom:zoomVal}]}).catch(()=>{});
+    }
+  }
+}
+
+// Pinch to zoom
+(function initSimPinch(){
+  let _pinchDist=null;
+  let _pinchZoomStart=1;
+  function dist(touches){
+    const dx=touches[0].clientX-touches[1].clientX;
+    const dy=touches[0].clientY-touches[1].clientY;
+    return Math.sqrt(dx*dx+dy*dy);
+  }
+  document.addEventListener('touchstart',e=>{
+    if(!document.getElementById('simCamWrap').contains(e.target))return;
+    if(e.touches.length===2){_pinchDist=dist(e.touches);_pinchZoomStart=_simZoom;}
+  },{passive:true});
+  document.addEventListener('touchmove',e=>{
+    if(e.touches.length!==2||!_pinchDist)return;
+    if(!document.getElementById('simCamWrap').contains(e.target))return;
+    const newDist=dist(e.touches);
+    const ratio=newDist/_pinchDist;
+    const newZoom=Math.min(4,Math.max(1,_pinchZoomStart*ratio));
+    const slider=document.getElementById('simZoomSlider');
+    if(slider){slider.value=newZoom;}
+    aplicarSimZoom(newZoom);
+  },{passive:true});
+  document.addEventListener('touchend',e=>{if(e.touches.length<2)_pinchDist=null;},{passive:true});
+})();
+
 async function iniciarSimCamera(){
   const overlay=document.getElementById('simTapOverlay');
   const video=document.getElementById('simVideo');
@@ -969,6 +1023,10 @@ async function iniciarSimCamera(){
 function detenerSimCamera(){
   if(_simInterval){clearInterval(_simInterval);_simInterval=null;}
   if(_simStream){_simStream.getTracks().forEach(t=>t.stop());_simStream=null;}
+  // Reset zoom
+  const slider=document.getElementById('simZoomSlider');
+  if(slider){slider.value=1;}
+  aplicarSimZoom(1);
 }
 
 async function _simDoScan(){
