@@ -281,7 +281,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--navy-500);letter-spacing:1px;">
-      v1.5.7 · 15 mar 2026
+      v1.6.0 · 16 mar 2026
     </div>
   </div>
 </div>
@@ -330,7 +330,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--navy-500);letter-spacing:1px;">
-      v1.5.7 · 15 mar 2026
+      v1.6.0 · 16 mar 2026
     </div>
   </div>
 </nav>
@@ -343,7 +343,7 @@ tr:hover td{background:var(--surface2);}
       <span class="crumb-current" id="topbar-title">Dashboard</span>
     </div>
     <div class="topbar-right" id="topbar-date"></div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--navy-500);margin-left:12px;">v1.5.7</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--navy-500);margin-left:12px;">v1.6.0</div>
   </div>
   <div class="content">
 
@@ -397,11 +397,39 @@ tr:hover td{background:var(--surface2);}
     <div class="module" id="mod-envios">
 
       <!-- Stats row -->
+      <!-- Stats admin/operador -->
       <div class="stats-row" id="envStatsRow" style="display:none">
         <div class="stat-box s-blue"><div class="stat-num" id="env-s-total">0</div><div class="stat-label">Total OTs</div></div>
         <div class="stat-box" style="border-left:2px solid var(--yellow)"><div class="stat-num" style="color:var(--yellow)" id="env-s-transito">0</div><div class="stat-label">En tránsito</div></div>
         <div class="stat-box" style="border-left:2px solid var(--green)"><div class="stat-num" style="color:var(--green)" id="env-s-entregado">0</div><div class="stat-label">Entregados</div></div>
         <div class="stat-box" style="border-left:2px solid var(--red)"><div class="stat-num" style="color:var(--red)" id="env-s-problema">0</div><div class="stat-label">Con problema</div></div>
+      </div>
+      <!-- Stats logística — por zona -->
+      <div class="stats-row" id="envZonaRow" style="display:none">
+        <div class="stat-box" style="border-left:3px solid #1a9fd4">
+          <div class="stat-num" style="color:#1a9fd4;font-size:22px" id="z-caba">0</div>
+          <div class="stat-label">🏙️ CABA</div>
+          <div style="font-size:9px;color:var(--text-muted);margin-top:2px" id="z-caba-km"></div>
+        </div>
+        <div class="stat-box" style="border-left:3px solid #10b981">
+          <div class="stat-num" style="color:#10b981;font-size:22px" id="z-norte">0</div>
+          <div class="stat-label">⬆️ Zona Norte</div>
+          <div style="font-size:9px;color:var(--text-muted);margin-top:2px" id="z-norte-km"></div>
+        </div>
+        <div class="stat-box" style="border-left:3px solid #f59e0b">
+          <div class="stat-num" style="color:#f59e0b;font-size:22px" id="z-sur">0</div>
+          <div class="stat-label">⬇️ Zona Sur</div>
+          <div style="font-size:9px;color:var(--text-muted);margin-top:2px" id="z-sur-km"></div>
+        </div>
+        <div class="stat-box" style="border-left:3px solid #8b5cf6">
+          <div class="stat-num" style="color:#8b5cf6;font-size:22px" id="z-oeste">0</div>
+          <div class="stat-label">⬅️ Zona Oeste</div>
+          <div style="font-size:9px;color:var(--text-muted);margin-top:2px" id="z-oeste-km"></div>
+        </div>
+        <div class="stat-box" style="border-left:3px solid #ef4444">
+          <div class="stat-num" style="color:#ef4444;font-size:22px" id="z-fuera">0</div>
+          <div class="stat-label">📦 Fuera AMBA</div>
+        </div>
       </div>
 
       <!-- API status banner -->
@@ -493,7 +521,7 @@ tr:hover td{background:var(--surface2);}
       <div class="card"><div class="table-wrap">
         <table>
           <thead><tr>
-            <th style="width:32px"><input type="checkbox" id="chkAll" onclick="toggleAllEnvios(this)" style="cursor:pointer"></th>
+            <th style="width:32px" id="thChkAll"><input type="checkbox" id="chkAll" onclick="toggleAllEnvios(this)" style="cursor:pointer"></th>
             <th>OT / Cuenta</th>
             <th>Responsable</th>
             <th>Zona</th>
@@ -981,6 +1009,8 @@ async function initEnvios(){
     document.getElementById('envTablaLabel').textContent='Pre-Colecta Alleata';
     const banner=document.getElementById('micorreoBanner');
     if(banner)banner.style.display='none';
+    const thChk=document.getElementById('thChkAll');
+    if(thChk)thChk.style.display='none';
   }
 }
 
@@ -1127,18 +1157,49 @@ async function renderEnvios(){
   empty.style.display=list.length?'none':'block';
 
   if(list.length){
-    document.getElementById('envStatsRow').style.display='flex';
-    document.getElementById('env-s-total').textContent=list.length;
-    document.getElementById('env-s-transito').textContent=list.filter(e=>['En tránsito','En camino'].includes(e.estado)).length;
-    document.getElementById('env-s-entregado').textContent=list.filter(e=>e.estado==='Entregado').length;
-    document.getElementById('env-s-problema').textContent=list.filter(e=>['Demorado','Perdido','Devuelto'].includes(e.estado)).length;
+    if(isLogistica){
+      // Zona stats para logística
+      document.getElementById('envZonaRow').style.display='flex';
+      document.getElementById('envStatsRow').style.display='none';
+      const zonas={CABA:[],Norte:[],Sur:[],Oeste:[],Fuera:[]};
+      list.forEach(e=>{
+        const z=detectarZona(e.ciudad,e.provincia,e.cp_dest);
+        if(z.zona==='CABA')zonas.CABA.push(e);
+        else if(z.zona==='Zona Norte')zonas.Norte.push(e);
+        else if(z.zona==='Zona Sur')zonas.Sur.push(e);
+        else if(z.zona==='Zona Oeste')zonas.Oeste.push(e);
+        else zonas.Fuera.push(e);
+      });
+      document.getElementById('z-caba').textContent=zonas.CABA.length;
+      document.getElementById('z-norte').textContent=zonas.Norte.length;
+      document.getElementById('z-sur').textContent=zonas.Sur.length;
+      document.getElementById('z-oeste').textContent=zonas.Oeste.length;
+      document.getElementById('z-fuera').textContent=zonas.Fuera.length;
+      // Distancia promedio por zona
+      const avgKm=(arr)=>{
+        const kms=arr.map(e=>{const c=COORDS_CIUDAD[(e.ciudad||'').toLowerCase().trim()];return c?Math.round(haversine(CENTRAL_LAT,CENTRAL_LNG,c.lat,c.lng)):null;}).filter(Boolean);
+        return kms.length?Math.round(kms.reduce((a,b)=>a+b,0)/kms.length):null;
+      };
+      ['CABA','Norte','Sur','Oeste'].forEach(z=>{
+        const avg=avgKm(zonas[z]);
+        const el=document.getElementById('z-'+z.toLowerCase()+'-km');
+        if(el)el.textContent=avg?`~${avg}km promedio`:'';
+      });
+    } else {
+      document.getElementById('envStatsRow').style.display='flex';
+      document.getElementById('envZonaRow').style.display='none';
+      document.getElementById('env-s-total').textContent=list.length;
+      document.getElementById('env-s-transito').textContent=list.filter(e=>['En tránsito','En camino'].includes(e.estado)).length;
+      document.getElementById('env-s-entregado').textContent=list.filter(e=>e.estado==='Entregado').length;
+      document.getElementById('env-s-problema').textContent=list.filter(e=>['Demorado','Perdido','Devuelto'].includes(e.estado)).length;
+    }
   }
 
   document.getElementById('enviosTable').innerHTML=list.map(e=>{
     const estadoClass={'En tránsito':'badge-yellow','En camino':'badge-blue','Entregado':'badge-green','Demorado':'badge-orange','Perdido':'badge-red','Devuelto':'badge-red','Pre-Colecta':'badge-gray'}[e.estado]||'badge-gray';
     const z=detectarZona(e.ciudad,e.provincia,e.cp_dest);
     return`<tr>
-      <td style="text-align:center"><input type="checkbox" class="envio-chk" data-id="${e.id}" onchange="updateSelectedCount()" style="cursor:pointer;width:15px;height:15px"></td>
+      <td style="text-align:center">${isLogistica?'':` <input type="checkbox" class="envio-chk" data-id="${e.id}" onchange="updateSelectedCount()" style="cursor:pointer;width:15px;height:15px">`}</td>
       <td>
         <div style="font-weight:700;font-size:12px;color:var(--teal)">${e.ot_numero||'—'}</div>
         <div style="font-size:10px;color:var(--text-muted);margin-top:2px">${e.tipo||''}</div>
