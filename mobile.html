@@ -152,7 +152,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
       <div class="login-logo">
         <img id="loginLogo" src="" alt="Alleata">
         <div class="login-sub">Portal de Operaciones</div>
-        <div class="login-version">v2.5.9 · mobile</div>
+        <div class="login-version">v2.6.0 · mobile</div>
       </div>
       <div class="field"><label class="label">Email</label><input class="input" id="lEmail" type="email" placeholder="usuario@alleata.com" autocomplete="email"></div>
       <div class="field"><label class="label">Contraseña</label><input class="input" id="lPass" type="password" placeholder="••••••••" autocomplete="current-password"></div>
@@ -168,7 +168,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
   <div class="topbar">
     <img id="appLogo" src="" alt="Alleata">
     <div class="topbar-title" id="topbarTitle">Operaciones</div>
-    <div class="topbar-version">v2.5.9</div>
+    <div class="topbar-version">v2.6.0</div>
     <div class="topbar-avatar" id="topbarAvatar" onclick="openDrawer()">?</div>
   </div>
 
@@ -1353,22 +1353,21 @@ function parseGeminiSIM(text){
 
 async function simLookup(serie,linea,sufijo,prefijo){
   if(serie){
-    const{data}=await sb.from('sims').select('*').eq('serie',serie).single();
-    if(data)return{found:true,...data};
+    const{data}=await sb.from('sims').select('*').eq('serie',serie).limit(1);
+    if(data?.length)return{found:true,...data[0]};
   }
-  // Intentar armar serie desde prefijo+sufijo
   if(prefijo&&sufijo){
     const combinada=(prefijo+sufijo).replace(/\s/g,'');
-    const{data}=await sb.from('sims').select('*').eq('serie',combinada).single();
-    if(data)return{found:true,...data};
+    const{data}=await sb.from('sims').select('*').eq('serie',combinada).limit(1);
+    if(data?.length)return{found:true,...data[0]};
   }
   if(sufijo){
     const{data}=await sb.from('sims').select('*').ilike('serie','%'+sufijo.replace(/\s/g,'')).limit(1);
     if(data?.length)return{found:true,...data[0]};
   }
   if(linea){
-    const{data}=await sb.from('sims').select('*').eq('linea',linea).single();
-    if(data)return{found:true,...data};
+    const{data}=await sb.from('sims').select('*').eq('linea',linea).limit(1);
+    if(data?.length)return{found:true,...data[0]};
   }
   return{found:false,serie,linea};
 }
