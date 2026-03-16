@@ -281,7 +281,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--navy-500);letter-spacing:1px;">
-      v1.5.6 · 15 mar 2026
+      v1.5.7 · 15 mar 2026
     </div>
   </div>
 </div>
@@ -330,7 +330,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--navy-500);letter-spacing:1px;">
-      v1.5.6 · 15 mar 2026
+      v1.5.7 · 15 mar 2026
     </div>
   </div>
 </nav>
@@ -343,7 +343,7 @@ tr:hover td{background:var(--surface2);}
       <span class="crumb-current" id="topbar-title">Dashboard</span>
     </div>
     <div class="topbar-right" id="topbar-date"></div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--navy-500);margin-left:12px;">v1.5.6</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--navy-500);margin-left:12px;">v1.5.7</div>
   </div>
   <div class="content">
 
@@ -498,7 +498,7 @@ tr:hover td{background:var(--surface2);}
             <th>Responsable</th>
             <th>Zona</th>
             <th>Tracking</th>
-            <th>Despacho</th>
+            <th>Distancia</th>
             <th>Destino</th>
             <th>Costo</th>
             <th>Estado</th>
@@ -1150,7 +1150,7 @@ async function renderEnvios(){
         <div class="mono" style="font-size:10px;word-break:break-all">${e.track||'—'}</div>
         ${e.track?`<a href="https://www.correoargentino.com.ar/formularios/e-commerce?id=${e.track}" target="_blank" style="font-size:10px;color:var(--blue);text-decoration:none;">🔗 Correo Arg.</a>`:''}
       </td>
-      <td class="mono" style="font-size:11px">${e.fecha||'—'}</td>
+      <td class="mono" style="font-size:11px">${calcDistancia(e.ciudad,e.provincia)}</td>
       <td>
         <div style="font-size:12px">${e.ciudad||'—'}</div>
         <div style="font-size:10px;color:var(--text-muted)">${e.provincia||''}</div>
@@ -1170,7 +1170,7 @@ async function renderEnvios(){
       </td>
       <td>
         <div style="display:flex;gap:5px">
-          <button title="Imprimir rótulo" style="background:var(--surface2);border:1px solid var(--border2);color:var(--teal);font-size:11px;padding:4px 7px;border-radius:6px;cursor:pointer" onclick="printRotulo('${e.id}')">🖨️</button>
+          <button title="Imprimir rótulo" style="background:var(--surface2);border:1px solid var(--border2);color:var(--teal);font-size:11px;padding:4px 7px;border-radius:6px;cursor:pointer;${currentProfile?.rol==='logistica'?'display:none':''}" onclick="printRotulo('${e.id}')">🖨️</button>
           <button title="Actualizar observación" style="background:var(--surface2);border:1px solid var(--border2);color:var(--text-muted);font-size:11px;padding:4px 7px;border-radius:6px;cursor:pointer" onclick="openUpdateEvento('${e.id}','${(e.ultimo_evento||'').replace(/'/g,'&#39;')}')">✏️</button>
           ${isAdmin?`<button title="Eliminar" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:13px;padding:4px" onclick="deleteEnvio('${e.id}')">🗑</button>`:''}
         </div>
@@ -1189,7 +1189,57 @@ function openUpdateEvento(id,current){
   sb.from('envios').update({ultimo_evento:nuevo,ultimo_evento_fecha:new Date().toISOString().slice(0,10)}).eq('id',id).then(()=>renderEnvios());
 }
 
-// ── ZONA AMBA ──
+// ── DISTANCIA HAVERSINE desde Barracas (California 2082) ──
+const CENTRAL_LAT=-34.648,CENTRAL_LNG=-58.377;
+const COORDS_CIUDAD={
+  // CABA
+  'buenos aires':{lat:-34.603,lng:-58.381},'ciudad autónoma de buenos aires':{lat:-34.603,lng:-58.381},
+  // Zona Norte
+  'san isidro':{lat:-34.472,lng:-58.527},'vicente lópez':{lat:-34.527,lng:-58.479},
+  'vicente lopez':{lat:-34.527,lng:-58.479},'san martín':{lat:-34.576,lng:-58.540},
+  'san martin':{lat:-34.576,lng:-58.540},'tigre':{lat:-34.426,lng:-58.579},
+  'escobar':{lat:-34.348,lng:-58.793},'pilar':{lat:-34.459,lng:-58.914},
+  'san fernando':{lat:-34.445,lng:-58.557},'malvinas argentinas':{lat:-34.432,lng:-58.702},
+  'josé c. paz':{lat:-34.513,lng:-58.764},'jose c. paz':{lat:-34.513,lng:-58.764},
+  'san miguel':{lat:-34.540,lng:-58.714},'campana':{lat:-34.165,lng:-58.959},
+  'zárate':{lat:-34.098,lng:-59.027},'zarate':{lat:-34.098,lng:-59.027},
+  // Zona Sur
+  'lomas de zamora':{lat:-34.761,lng:-58.400},'lanús':{lat:-34.701,lng:-58.397},
+  'lanus':{lat:-34.701,lng:-58.397},'avellaneda':{lat:-34.664,lng:-58.366},
+  'quilmes':{lat:-34.721,lng:-58.254},'berazategui':{lat:-34.763,lng:-58.212},
+  'florencio varela':{lat:-34.808,lng:-58.275},'almirante brown':{lat:-34.836,lng:-58.397},
+  'ezeiza':{lat:-34.860,lng:-58.527},'esteban echeverría':{lat:-34.816,lng:-58.463},
+  'esteban echeverria':{lat:-34.816,lng:-58.463},'la plata':{lat:-34.921,lng:-57.954},
+  'guernica':{lat:-34.921,lng:-58.378},'monte grande':{lat:-34.813,lng:-58.460},
+  'temperley':{lat:-34.770,lng:-58.397},'banfield':{lat:-34.744,lng:-58.397},
+  'presidente perón':{lat:-34.873,lng:-58.439},'presidente peron':{lat:-34.873,lng:-58.439},
+  // Zona Oeste
+  'la matanza':{lat:-34.770,lng:-58.607},'morón':{lat:-34.653,lng:-58.621},
+  'moron':{lat:-34.653,lng:-58.621},'hurlingham':{lat:-34.588,lng:-58.638},
+  'ituzaingó':{lat:-34.659,lng:-58.672},'ituzaingo':{lat:-34.659,lng:-58.672},
+  'merlo':{lat:-34.672,lng:-58.727},'moreno':{lat:-34.637,lng:-58.789},
+  'tres de febrero':{lat:-34.605,lng:-58.561},'luján':{lat:-34.569,lng:-59.109},
+  'lujan':{lat:-34.569,lng:-59.109},'ramos mejía':{lat:-34.644,lng:-58.564},
+  'ramos mejia':{lat:-34.644,lng:-58.564},'san justo':{lat:-34.681,lng:-58.562},
+  'haedo':{lat:-34.643,lng:-58.598},'castelar':{lat:-34.655,lng:-58.642},
+  // Interior
+  'monte grande':{lat:-34.813,lng:-58.460},'general pico':{lat:-35.656,lng:-63.757},
+};
+function haversine(lat1,lng1,lat2,lng2){
+  const R=6371,dLat=(lat2-lat1)*Math.PI/180,dLng=(lng2-lng1)*Math.PI/180;
+  const a=Math.sin(dLat/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+function calcDistancia(ciudad,provincia){
+  if(!ciudad)return'—';
+  const key=ciudad.toLowerCase().trim();
+  const coords=COORDS_CIUDAD[key];
+  if(!coords)return`<span style="color:var(--text-muted);font-size:10px">~?km</span>`;
+  const dist=haversine(CENTRAL_LAT,CENTRAL_LNG,coords.lat,coords.lng);
+  const color=dist<20?'var(--teal)':dist<40?'var(--amber)':'var(--red)';
+  return`<span style="color:${color};font-weight:700">~${Math.round(dist)}km</span>`;
+}
+// ── FIN DISTANCIA ──
 function detectarZona(ciudad,provincia,cp){
   const c=(ciudad||'').toLowerCase().trim();
   const p=(provincia||'').toLowerCase().trim();
@@ -1215,7 +1265,8 @@ function updateSelectedCount(){
   const sel=document.querySelectorAll('.envio-chk:checked').length;
   const btn=document.getElementById('btnPrintSelected');
   const cnt=document.getElementById('selectedCount');
-  if(btn)btn.style.display=sel>0?'inline-flex':'none';
+  const isLogistica=currentProfile?.rol==='logistica';
+  if(btn)btn.style.display=(sel>0&&!isLogistica)?'inline-flex':'none';
   if(cnt)cnt.textContent=sel;
 }
 async function printSelectedRotulos(){
@@ -1324,7 +1375,7 @@ async function printRotulo(id){
       correctLevel:QRCode.CorrectLevel.M
     });
     new QRCode(document.getElementById('qrRuta'),{
-      text:'ALLEATA-OT:${e.sf_id}|${e.ot_numero}',
+      text:'https://marcevsanti-ux.github.io/alleata-ops/mobile.html?ot=${e.sf_id}',
       width:70,height:70,
       colorDark:'#000000',colorLight:'#ffffff',
       correctLevel:QRCode.CorrectLevel.M
