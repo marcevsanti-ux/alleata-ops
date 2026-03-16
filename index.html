@@ -281,7 +281,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--navy-500);letter-spacing:1px;">
-      v1.7.1 · 16 mar 2026
+      v1.7.2 · 16 mar 2026
     </div>
   </div>
 </div>
@@ -330,7 +330,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--navy-500);letter-spacing:1px;">
-      v1.7.1 · 16 mar 2026
+      v1.7.2 · 16 mar 2026
     </div>
   </div>
 </nav>
@@ -343,7 +343,7 @@ tr:hover td{background:var(--surface2);}
       <span class="crumb-current" id="topbar-title">Dashboard</span>
     </div>
     <div class="topbar-right" id="topbar-date"></div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--navy-500);margin-left:12px;">v1.7.1</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--navy-500);margin-left:12px;">v1.7.2</div>
   </div>
   <div class="content">
 
@@ -1326,7 +1326,10 @@ function renderEnviosTable(list){
       </td>
       <td>
         <div style="display:flex;gap:5px">
-          <button title="Imprimir rótulo" style="background:var(--surface2);border:1px solid var(--border2);color:var(--teal);font-size:11px;padding:4px 7px;border-radius:6px;cursor:pointer;${currentProfile?.rol==='logistica'?'display:none':''}" onclick="printRotulo('${e.id}')">🖨️</button>
+          ${(e.estado==='Entregado'||e.estado==='Entregado por logística Alleata')
+            ? `<button title="OT ya entregada" style="background:var(--surface2);border:1px solid var(--border2);color:var(--text-muted);font-size:11px;padding:4px 7px;border-radius:6px;cursor:not-allowed;opacity:0.35;${currentProfile?.rol==='logistica'?'display:none':''}" disabled>🖨️</button>`
+            : `<button title="Imprimir rótulo" style="background:var(--surface2);border:1px solid var(--border2);color:var(--teal);font-size:11px;padding:4px 7px;border-radius:6px;cursor:pointer;${currentProfile?.rol==='logistica'?'display:none':''}" onclick="printRotulo('${e.id}')">🖨️</button>`
+          }
           <button title="Actualizar observación" style="background:var(--surface2);border:1px solid var(--border2);color:var(--text-muted);font-size:11px;padding:4px 7px;border-radius:6px;cursor:pointer" onclick="openUpdateEvento('${e.id}','${(e.ultimo_evento||'').replace(/'/g,'&#39;')}')">✏️</button>
           ${isAdmin?`<button title="Eliminar" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:13px;padding:4px" onclick="deleteEnvio('${e.id}')">🗑</button>`:''}
         </div>
@@ -1472,74 +1475,65 @@ async function printRotulo(id){
   const direccionQR=encodeURIComponent(`${e.direccion_completa||''} ${e.ciudad||''} ${e.provincia||''} Argentina`);
   const mapsUrl=`https://www.google.com/maps/search/?api=1&query=${direccionQR}`;
 
-  const w=window.open('','_blank','width=430,height=680');
+  const w=window.open('','_blank','width=430,height=700');
   w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
   <title>Rótulo OT ${e.ot_numero}</title>
   <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"><\/script>
   <style>
-    /* === SATO 100x150mm portrait === */
-    @page{
-      size: 100mm 150mm;
-      margin: 0;
-    }
+    @page{ size:100mm 150mm; margin:0; }
     *{margin:0;padding:0;box-sizing:border-box;}
-    html,body{
-      width:100mm;
-      font-family:'Arial',sans-serif;
-      background:#fff;
-      font-size:9px;
-    }
-    .rotulo{
-      width:100mm;
-      padding:2.5mm;
-      display:flex;
-      flex-direction:column;
-    }
+    html,body{width:100mm;font-family:'Arial',sans-serif;background:#fff;font-size:10px;}
+    .rotulo{width:100mm;padding:3mm;display:flex;flex-direction:column;gap:0;}
+
     /* HEADER */
-    .header{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #000;padding-bottom:1mm;margin-bottom:1mm;}
-    .header-logo{font-size:13px;font-weight:900;letter-spacing:-1px;color:#1dbf8e;}
-    .header-info{font-size:6px;line-height:1.4;color:#444;text-align:right;}
+    .hdr{display:flex;align-items:center;justify-content:space-between;border-bottom:1.5px solid #000;padding-bottom:1.5mm;margin-bottom:2mm;}
+    .hdr-logo{font-size:16px;font-weight:900;letter-spacing:-1px;color:#1dbf8e;}
+    .hdr-info{font-size:6.5px;line-height:1.5;color:#444;text-align:right;}
+
     /* TIPO */
-    .tipo{font-size:7.5px;font-weight:700;text-align:center;border:1px solid #000;padding:1mm;margin-bottom:1mm;}
+    .tipo{font-size:8.5px;font-weight:700;text-align:center;border:1.5px solid #000;padding:1.5mm;margin-bottom:2mm;letter-spacing:.3px;}
+
     /* BLOQUE OT */
-    .ot-block{display:flex;align-items:center;justify-content:space-between;border:2px solid #000;padding:1.5mm 2mm;margin-bottom:1mm;gap:1mm;}
-    .ot-num{font-size:22px;font-weight:900;letter-spacing:-1px;line-height:1;}
+    .ot-block{display:flex;align-items:center;justify-content:space-between;border:2.5px solid #000;padding:2mm 3mm;margin-bottom:2mm;}
+    .ot-num{font-size:26px;font-weight:900;letter-spacing:-1px;line-height:1;}
     .qr-ruta{text-align:center;flex-shrink:0;}
-    .qr-ruta-lbl{font-size:5.5px;font-weight:700;margin-top:1px;}
+    .qr-ruta-lbl{font-size:6px;font-weight:700;margin-top:1.5px;text-transform:uppercase;}
+
     /* DESTINATARIO */
-    .destinatario{font-size:9px;font-weight:900;text-align:center;text-transform:uppercase;background:#f5f5f5;padding:1mm;margin-bottom:1mm;line-height:1.2;border:1px solid #ddd;}
-    /* FILAS DE DATOS */
-    .rows{margin-bottom:1mm;}
-    .row{display:flex;align-items:baseline;gap:1.5mm;margin-bottom:0.6mm;}
-    .lbl{font-weight:700;font-size:6.5px;min-width:20mm;color:#555;}
-    .val{font-size:7.5px;font-weight:700;color:#000;}
-    /* SECCIÓN BOTTOM */
-    .divider{border-top:1px solid #000;margin:1mm 0;}
-    .bottom{display:flex;gap:2mm;align-items:center;}
-    .qr-geo{display:flex;flex-direction:column;align-items:center;gap:0.5mm;flex-shrink:0;}
-    .qr-geo-lbl{font-size:5px;font-weight:700;text-align:center;}
+    .dest{font-size:10.5px;font-weight:900;text-align:center;text-transform:uppercase;background:#f0f0f0;padding:1.5mm 2mm;margin-bottom:2mm;line-height:1.3;border:1px solid #ccc;}
+
+    /* FILAS */
+    .row{display:flex;align-items:baseline;gap:2mm;margin-bottom:1.2mm;}
+    .lbl{font-weight:700;font-size:7px;min-width:22mm;color:#555;text-transform:uppercase;}
+    .val{font-size:8.5px;font-weight:700;color:#000;}
+
+    /* BOTTOM */
+    .divider{border-top:1.5px solid #000;margin:2mm 0 1.5mm;}
+    .bottom{display:flex;gap:2mm;align-items:flex-start;}
+    .qr-geo{display:flex;flex-direction:column;align-items:center;gap:1mm;flex-shrink:0;}
+    .qr-geo-lbl{font-size:5.5px;font-weight:700;text-align:center;text-transform:uppercase;}
     .obs-wrap{flex:1;min-width:0;}
-    .obs-lbl{font-size:6.5px;font-weight:700;}
-    .obs-val{font-size:6.5px;min-height:8mm;max-height:10mm;overflow:hidden;border:1px solid #ccc;padding:1mm;margin-top:0.5mm;word-break:break-word;line-height:1.3;}
-    .badges{display:flex;flex-direction:column;gap:1mm;align-items:center;flex-shrink:0;}
-    .tipo-badge{font-size:16px;font-weight:900;background:#000;color:#fff;padding:2mm 3mm;text-align:center;min-width:12mm;line-height:1;}
-    .zona-badge{font-size:10px;font-weight:900;padding:1.5mm 2mm;text-align:center;min-width:12mm;border:2px solid;line-height:1;}
+    .obs-lbl{font-size:7px;font-weight:700;text-transform:uppercase;margin-bottom:1mm;}
+    .obs-val{font-size:7.5px;min-height:14mm;border:1px solid #ccc;padding:1.5mm;word-break:break-word;line-height:1.4;color:#222;}
+    .badges{display:flex;flex-direction:column;gap:1.5mm;align-items:center;flex-shrink:0;}
+    .tipo-badge{font-size:18px;font-weight:900;background:#000;color:#fff;padding:2.5mm 3.5mm;text-align:center;min-width:13mm;line-height:1;}
+    .zona-badge{font-size:11px;font-weight:900;padding:2mm 2.5mm;text-align:center;min-width:13mm;border:2px solid;line-height:1;}
+
     /* FOOTER */
-    .footer{border-top:1px solid #000;padding-top:1mm;margin-top:1mm;}
-    .footer-lbl{font-size:6px;font-weight:700;color:#555;}
-    .footer-val{font-size:6.5px;background:#000;color:#fff;padding:0.8mm 1.5mm;display:inline-block;margin-top:0.5mm;}
-    /* BOTÓN IMPRIMIR — solo en pantalla */
-    .btn-print{display:block;width:95mm;margin:4px auto 0;padding:8px;background:#1dbf8e;color:#fff;border:none;font-size:14px;font-weight:700;cursor:pointer;border-radius:5px;font-family:Arial,sans-serif;}
-    @media print{
-      .btn-print{display:none!important;}
-    }
+    .footer{border-top:1.5px solid #000;padding-top:1.5mm;margin-top:2mm;}
+    .footer-lbl{font-size:6.5px;font-weight:700;color:#555;text-transform:uppercase;}
+    .footer-val{font-size:7px;background:#000;color:#fff;padding:1mm 2mm;display:inline-block;margin-top:1mm;}
+
+    /* BOTÓN */
+    .btn-print{display:block;width:95mm;margin:6px auto 0;padding:9px;background:#1dbf8e;color:#fff;border:none;font-size:14px;font-weight:700;cursor:pointer;border-radius:5px;font-family:Arial,sans-serif;}
+    @media print{.btn-print{display:none!important;}}
   </style>
   </head><body>
   <div class="rotulo">
 
-    <div class="header">
-      <div class="header-logo">alleata</div>
-      <div class="header-info">Andrés Moretti e Hijos S.A.<br>Logística Alleata · (+54 11) 4103-4600</div>
+    <div class="hdr">
+      <div class="hdr-logo">alleata</div>
+      <div class="hdr-info">Andrés Moretti e Hijos S.A.<br>Logística Alleata &nbsp;·&nbsp; (+54 11) 4103-4600</div>
     </div>
 
     <div class="tipo">TIPO DE O.T.: &nbsp; ${e.tipo||'—'}</div>
@@ -1548,30 +1542,28 @@ async function printRotulo(id){
       <div class="ot-num">O.T.: ${e.ot_numero||'—'}</div>
       <div class="qr-ruta">
         <div id="qrRuta"></div>
-        <div class="qr-ruta-lbl">ESCANEAR RUTA</div>
+        <div class="qr-ruta-lbl">Escanear Ruta</div>
       </div>
     </div>
 
-    <div class="destinatario">${e.cuenta||'—'}</div>
+    <div class="dest">${e.cuenta||'—'}</div>
 
-    <div class="rows">
-      <div class="row"><span class="lbl">DIRECCIÓN :</span><span class="val">${e.direccion_completa||'—'}</span></div>
-      <div class="row"><span class="lbl">C.P. :</span><span class="val">${e.cp_dest||'—'}</span></div>
-      <div class="row"><span class="lbl">LOCALIDAD :</span><span class="val">${e.ciudad||'—'}</span></div>
-      <div class="row"><span class="lbl">PCIA. :</span><span class="val">${e.provincia||'—'}</span></div>
-      <div class="row"><span class="lbl">CONTACTO :</span><span class="val">${e.contacto||'—'}</span></div>
-      <div class="row"><span class="lbl">HORARIO :</span><span class="val">${e.horario||'—'}</span></div>
-      <div class="row"><span class="lbl">NOMBRE FANTASÍA :</span><span class="val">${e.nombre_comercio||'—'}</span></div>
-    </div>
+    <div class="row"><span class="lbl">Dirección</span><span class="val">${e.direccion_completa||'—'}</span></div>
+    <div class="row"><span class="lbl">C.P.</span><span class="val">${e.cp_dest||'—'}</span></div>
+    <div class="row"><span class="lbl">Localidad</span><span class="val">${e.ciudad||'—'}</span></div>
+    <div class="row"><span class="lbl">Provincia</span><span class="val">${e.provincia||'—'}</span></div>
+    <div class="row"><span class="lbl">Contacto</span><span class="val">${e.contacto||'—'}</span></div>
+    <div class="row"><span class="lbl">Horario</span><span class="val">${e.horario||'—'}</span></div>
+    <div class="row"><span class="lbl">Nombre Fantasía</span><span class="val">${e.nombre_comercio||'—'}</span></div>
 
     <div class="divider"></div>
     <div class="bottom">
       <div class="qr-geo">
         <div id="qrcode"></div>
-        <div class="qr-geo-lbl">GEOUBICACION</div>
+        <div class="qr-geo-lbl">Geo&shy;ubicación</div>
       </div>
       <div class="obs-wrap">
-        <div class="obs-lbl">OBS. :</div>
+        <div class="obs-lbl">Observaciones</div>
         <div class="obs-val">${e.notas||''}</div>
       </div>
       <div class="badges">
@@ -1581,23 +1573,22 @@ async function printRotulo(id){
     </div>
 
     <div class="footer">
-      <div class="footer-lbl">REMITENTE :</div>
+      <div class="footer-lbl">Remitente</div>
       <div class="footer-val">Logística Alleata &nbsp;·&nbsp; Andrés Moretti e Hijos S.A.</div>
     </div>
 
-  </div><!-- /rotulo -->
+  </div>
   <button class="btn-print" onclick="window.print()">🖨️ Imprimir rótulo</button>
 
   <script>
     new QRCode(document.getElementById('qrcode'),{
-      text:'${mapsUrl}',
-      width:65,height:65,
+      text:'${mapsUrl}',width:72,height:72,
       colorDark:'#000000',colorLight:'#ffffff',
       correctLevel:QRCode.CorrectLevel.M
     });
     new QRCode(document.getElementById('qrRuta'),{
       text:'https://marcevsanti-ux.github.io/alleata-ops/mobile.html?ot=${sfIdParaQR}',
-      width:60,height:60,
+      width:65,height:65,
       colorDark:'#000000',colorLight:'#ffffff',
       correctLevel:QRCode.CorrectLevel.M
     });
