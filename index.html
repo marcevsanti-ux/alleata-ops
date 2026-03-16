@@ -281,7 +281,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v1.8.3 · 16 mar 2026
+      v1.8.4 · 16 mar 2026
     </div>
   </div>
 </div>
@@ -330,7 +330,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v1.8.3 · 16 mar 2026
+      v1.8.4 · 16 mar 2026
     </div>
   </div>
 </nav>
@@ -343,7 +343,8 @@ tr:hover td{background:var(--surface2);}
       <span class="crumb-current" id="topbar-title">Dashboard</span>
     </div>
     <div class="topbar-right" id="topbar-date"></div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v1.8.3</div>
+    <button onclick="refreshCurrentModule()" title="Actualizar" style="background:none;border:1px solid var(--border2);color:var(--text-muted);border-radius:7px;padding:4px 10px;cursor:pointer;font-size:13px;margin-left:10px;transition:all .2s" onmouseover="this.style.color='var(--teal)';this.style.borderColor='var(--teal)'" onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border2)'">↺</button>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v1.8.4</div>
   </div>
   <div class="content">
 
@@ -909,6 +910,21 @@ function goTo(mod){
   if(mod==='horas')renderHoras();
   if(mod==='ajustes'){loadUsers();loadSimsDbStats();_auditPage=0;loadAuditLog();}
 }
+function refreshCurrentModule(){
+  const active=document.querySelector('.module.active');
+  if(!active)return;
+  const mod=active.id.replace('mod-','');
+  const btn=document.querySelector('[onclick="refreshCurrentModule()"]');
+  if(btn){btn.textContent='↻';btn.style.color='var(--teal)';}
+  setTimeout(()=>{if(btn){btn.textContent='↺';btn.style.color='var(--text-muted)';}},600);
+  if(mod==='envios'){renderEnvios();loadBadges();}
+  else if(mod==='devoluciones'){renderDevs();loadBadges();}
+  else if(mod==='horas'){renderHoras();loadBadges();}
+  else if(mod==='sims'){loadSimsDbStats();}
+  else if(mod==='ajustes'){loadUsers();loadSimsDbStats();}
+  else{loadBadges();}
+}
+
 function updateDate(){
   document.getElementById('topbar-date').textContent=new Date().toLocaleDateString('es-AR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
 }
