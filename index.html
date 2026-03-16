@@ -281,7 +281,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v1.8.5 · 16 mar 2026
+      v1.8.6 · 16 mar 2026
     </div>
   </div>
 </div>
@@ -330,7 +330,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v1.8.5 · 16 mar 2026
+      v1.8.6 · 16 mar 2026
     </div>
   </div>
 </nav>
@@ -344,7 +344,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <div class="topbar-right" id="topbar-date"></div>
     <button onclick="refreshCurrentModule()" title="Actualizar" style="background:none;border:1px solid var(--border2);color:var(--text-muted);border-radius:7px;padding:4px 10px;cursor:pointer;font-size:13px;margin-left:10px;transition:all .2s" onmouseover="this.style.color='var(--teal)';this.style.borderColor='var(--teal)'" onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border2)'">↺</button>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v1.8.5</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v1.8.6</div>
   </div>
   <div class="content">
 
@@ -1709,6 +1709,7 @@ async function loadAuditLog(){
   const accion=document.getElementById('auditAccion')?.value||'';
   const search=document.getElementById('auditSearch')?.value?.trim()||'';
 
+  try{
   let q=sb.from('audit_log').select('*',{count:'exact'})
     .order('created_at',{ascending:false})
     .range(_auditPage*AUDIT_PAGE_SIZE,(_auditPage+1)*AUDIT_PAGE_SIZE-1);
@@ -1718,7 +1719,7 @@ async function loadAuditLog(){
   if(search)q=q.or(`campo.ilike.%${search}%,valor_antes.ilike.%${search}%,valor_despues.ilike.%${search}%,usuario_email.ilike.%${search}%`);
 
   const{data,error,count}=await q;
-  if(error){el.innerHTML=`<div style="color:var(--red);font-size:12px">Error: ${error.message}</div>`;return;}
+  if(error){el.innerHTML=`<div style="color:var(--text-muted);font-size:12px;padding:12px">Auditoría no disponible</div>`;if(pager)pager.innerHTML='';return;}
   if(!data?.length){el.innerHTML='<div class="empty"><div class="empty-icon">📋</div><p>Sin registros</p></div>';pager.innerHTML='';return;}
 
   const accionColor={INSERT:'var(--teal)',UPDATE:'var(--yellow)',DELETE:'var(--red)'};
@@ -1762,6 +1763,9 @@ async function loadAuditLog(){
     <span>${total} registros · pág ${_auditPage+1}/${totalPages||1}</span>
     <button onclick="_auditPage=Math.max(0,_auditPage-1);loadAuditLog()" ${_auditPage===0?'disabled':''} style="background:var(--surface2);border:1px solid var(--border2);color:var(--text-muted);padding:3px 10px;border-radius:6px;cursor:pointer;font-family:'Inter',sans-serif;font-size:11px">‹ Ant</button>
     <button onclick="_auditPage=Math.min(${totalPages-1},_auditPage+1);loadAuditLog()" ${_auditPage>=totalPages-1?'disabled':''} style="background:var(--surface2);border:1px solid var(--border2);color:var(--text-muted);padding:3px 10px;border-radius:6px;cursor:pointer;font-family:'Inter',sans-serif;font-size:11px">Sig ›</button>`;
+  }catch(e){
+    if(el)el.innerHTML='<div style="color:var(--text-muted);font-size:12px;padding:12px">Auditoría no disponible</div>';
+  }
 }
 
 const MODS_DEF=[
