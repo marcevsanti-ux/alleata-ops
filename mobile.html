@@ -152,7 +152,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
       <div class="login-logo">
         <img id="loginLogo" src="" alt="Alleata">
         <div class="login-sub">Portal de Operaciones</div>
-        <div class="login-version">v2.4.2 · mobile</div>
+        <div class="login-version">v2.4.3 · mobile</div>
       </div>
       <div class="field"><label class="label">Email</label><input class="input" id="lEmail" type="email" placeholder="usuario@alleata.com" autocomplete="email"></div>
       <div class="field"><label class="label">Contraseña</label><input class="input" id="lPass" type="password" placeholder="••••••••" autocomplete="current-password"></div>
@@ -168,7 +168,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
   <div class="topbar">
     <img id="appLogo" src="" alt="Alleata">
     <div class="topbar-title" id="topbarTitle">Operaciones</div>
-    <div class="topbar-version">v2.4.2</div>
+    <div class="topbar-version">v2.4.3</div>
     <div class="topbar-avatar" id="topbarAvatar" onclick="openDrawer()">?</div>
   </div>
 
@@ -1052,13 +1052,21 @@ async function _simDoScan(){
     document.getElementById('simScanStatus').textContent='🧠 Analizando con IA...';
 
     const res=await callGemini(b64,'image/jpeg');
-    const{serie,linea,sufijo}=parseGeminiSIM(res);
+    const{serie,linea,sufijo,prefijo}=parseGeminiSIM(res);
 
     // Mostrar siempre lo que interpretó
     const detWrap=document.getElementById('simDetectedWrap');
     const detNum=document.getElementById('simDetectedNum');
     detWrap.style.display='block';
-    detNum.textContent=serie?`Serie: ${serie}`:(sufijo?`Sufijo: ${sufijo}`:(linea?`Línea: ${linea}`:'No se leyeron números'));
+    if(serie){
+      detNum.textContent=`Serie: ${serie}`;
+    } else if(sufijo||prefijo){
+      detNum.innerHTML=`<span style="color:var(--blue)">${prefijo||'—'}</span> · <span style="color:var(--teal)">${sufijo||'—'}</span>`;
+    } else if(linea){
+      detNum.textContent=`Línea: ${linea}`;
+    } else {
+      detNum.textContent='No se leyeron números';
+    }
 
     if(!serie&&!linea&&!sufijo){
       document.getElementById('simScanStatus').textContent='🔍 No se detectó chip — seguí intentando...';
@@ -1071,7 +1079,7 @@ async function _simDoScan(){
     detenerSimCamera();
     document.getElementById('simScanStatus').textContent='🔍 Buscando en base de datos...';
 
-    const result=await simLookup(serie,linea,sufijo);
+    const result=await simLookup(serie,linea,sufijo,prefijo);
     const results=document.getElementById('simResults');
     results.innerHTML='';
     appendSimResult(results,result,serie||sufijo||linea);
@@ -1155,7 +1163,7 @@ async function callGemini(b64,mime){
     body:JSON.stringify({
       contents:[{parts:[
         {inline_data:{mime_type:mime,data:b64}},
-        {text:'Analizá esta imagen de un chip SIM. El ICCID/serie está dividido: la parte superior (prefijo ~10 dígitos, empieza con 8954) y la parte inferior (sufijo ~9-10 dígitos). El número de línea telefónica de 10 dígitos también puede aparecer. Devolvé SOLO JSON con campos: serie (ICCID completo 19-20 dígitos, null si no se ve completo), sufijo (últimos 9-10 dígitos del ICCID), linea (número de línea 10 dígitos, null si no se ve).'}
+        {text:'Mirá esta imagen de un chip SIM CLARO Argentina. Tiene DOS etiquetas con números:\n1. SUPERIOR: prefijo del ICCID, ~10 dígitos, empieza con 8954\n2. INFERIOR: sufijo del ICCID, ~10 dígitos (puede empezar con 0)\nJuntando prefijo+sufijo se forma el ICCID completo de 19-20 dígitos.\nTambién puede haber un número de línea de 10 dígitos que empieza con 11.\nLeé TODOS los números que veas aunque estén parciales.\nDevolvé SOLO JSON (sin markdown) con: {"prefijo": "8954XXXXXX o null", "sufijo": "XXXXXXXXXX o null", "serie": "ICCID completo si podés armarlo o null", "linea": "11XXXXXXXX o null"}'}
       ]}]
     })
   });
@@ -1167,21 +1175,43 @@ function parseGeminiSIM(text){
   try{
     const clean=text.replace(/```json|```/g,'').trim();
     const json=JSON.parse(clean);
-    return{serie:json.serie||null,linea:json.linea||null,sufijo:json.sufijo||null};
+    // Armar serie desde prefijo+sufijo si no viene completa
+    let serie=json.serie||null;
+    if(!serie&&json.prefijo&&json.sufijo){
+      const s=(json.prefijo+json.sufijo).replace(/\s/g,'');
+      if(s.length>=18)serie=s;
+    }
+    const sufijo=json.sufijo||null;
+    const prefijo=json.prefijo||null;
+    const linea=json.linea||null;
+    return{serie,linea,sufijo,prefijo};
   }catch{
+    // Fallback regex
     const serieMatch=text.match(/8954\d{9,}/);
-    const lineaMatch=text.match(/\b0\d{7,9}\b/);
-    return{serie:serieMatch?serieMatch[0]:null,linea:lineaMatch?lineaMatch[0]:null};
+    const sufijoMatch=text.match(/\b\d{9,10}\b/g);
+    const lineaMatch=text.match(/\b11\d{8}\b/);
+    return{
+      serie:serieMatch?serieMatch[0]:null,
+      linea:lineaMatch?lineaMatch[0]:null,
+      sufijo:sufijoMatch?sufijoMatch[sufijoMatch.length-1]:null,
+      prefijo:null
+    };
   }
 }
 
-async function simLookup(serie,linea,sufijo){
+async function simLookup(serie,linea,sufijo,prefijo){
   if(serie){
     const{data}=await sb.from('sims').select('*').eq('serie',serie).single();
     if(data)return{found:true,...data};
   }
+  // Intentar armar serie desde prefijo+sufijo
+  if(prefijo&&sufijo){
+    const combinada=(prefijo+sufijo).replace(/\s/g,'');
+    const{data}=await sb.from('sims').select('*').eq('serie',combinada).single();
+    if(data)return{found:true,...data};
+  }
   if(sufijo){
-    const{data}=await sb.from('sims').select('*').ilike('serie','%'+sufijo).limit(1);
+    const{data}=await sb.from('sims').select('*').ilike('serie','%'+sufijo.replace(/\s/g,'')).limit(1);
     if(data?.length)return{found:true,...data[0]};
   }
   if(linea){
