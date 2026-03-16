@@ -152,7 +152,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
       <div class="login-logo">
         <img id="loginLogo" src="" alt="Alleata">
         <div class="login-sub">Portal de Operaciones</div>
-        <div class="login-version">v2.2.1 · mobile</div>
+        <div class="login-version">v2.3.0 · mobile</div>
       </div>
       <div class="field"><label class="label">Email</label><input class="input" id="lEmail" type="email" placeholder="usuario@alleata.com" autocomplete="email"></div>
       <div class="field"><label class="label">Contraseña</label><input class="input" id="lPass" type="password" placeholder="••••••••" autocomplete="current-password"></div>
@@ -168,7 +168,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
   <div class="topbar">
     <img id="appLogo" src="" alt="Alleata">
     <div class="topbar-title" id="topbarTitle">Operaciones</div>
-    <div class="topbar-version">v2.2.1</div>
+    <div class="topbar-version">v2.3.0</div>
     <div class="topbar-avatar" id="topbarAvatar" onclick="openDrawer()">?</div>
   </div>
 
@@ -190,52 +190,67 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
 
   <!-- TAB: RUTA -->
   <div class="tab-content active" id="content-ruta">
-    <!-- Selección de OTs -->
-    <div id="rutaSeleccion">
-      <div class="card" style="margin-bottom:12px">
-        <div class="card-title">📷 Escanear rótulo de OT</div>
-        <div class="scanner-wrap" id="rutaScannerWrap">
-          <video id="rutaVideo" autoplay playsinline muted></video>
-          <canvas id="rutaCanvas" style="display:none"></canvas>
-          <div class="scan-overlay">
-            <div class="scan-frame"></div>
-            <div class="scan-line"></div>
-          </div>
+
+    <!-- SCANNER -->
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-title">📷 Escanear rótulo de OT</div>
+      <div class="scanner-wrap" id="rutaScannerWrap">
+        <video id="rutaVideo" autoplay playsinline muted></video>
+        <canvas id="rutaCanvas" style="display:none"></canvas>
+        <div class="scan-overlay">
+          <div class="scan-frame"></div>
+          <div class="scan-line"></div>
         </div>
-        <div class="scan-status" id="rutaScanStatus">Apuntá la cámara al código QR del rótulo</div>
       </div>
-      <!-- OTs seleccionadas para la ruta -->
-      <div id="rutaSelBar" style="display:none">
-        <div class="ruta-bar">
-          <div class="ruta-count" id="rutaCount">0</div>
-          <div style="flex:1">
-            <div style="font-size:13px;font-weight:700;color:var(--text)">OTs para hoy</div>
-            <div style="font-size:11px;color:var(--text-muted)">Reordená con ↑↓ según tu recorrido</div>
-          </div>
-        </div>
-        <div id="rutaSelList" style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px"></div>
-        <button class="btn-confirmar" id="btnConfirmarRuta" onclick="confirmarRuta()">🚚 Confirmar ruta del día</button>
-        <button class="btn-limpiar" onclick="limpiarRuta()">✕ Limpiar selección</button>
+      <div class="scan-status" id="rutaScanStatus">Apuntá la cámara al código QR del rótulo</div>
+      <div style="text-align:center;padding:8px 0 4px">
+        <button onclick="escanearConCamaraNativa()" style="background:none;border:1px solid var(--border2);color:var(--text-muted);font-size:11px;padding:6px 14px;border-radius:8px;cursor:pointer;font-family:'Inter',sans-serif">
+          📷 Usar cámara nativa
+        </button>
+        <input type="file" id="qrFileInput" accept="image/*" capture="environment" style="display:none" onchange="procesarImagenQR(event)">
       </div>
-      <!-- OTs disponibles -->
-      <div style="margin-top:16px">
-        <div style="font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--text-muted);margin-bottom:10px;display:flex;align-items:center;gap:8px">
-          <span>📋 OTs en Pre-Colecta</span>
-          <span id="precolectaCount" style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 7px;border-radius:8px;font-size:10px"></span>
+    </div>
+
+    <!-- OT SCANEADA — card de confirmación -->
+    <div id="otScaneadaCard" style="display:none;margin-bottom:12px">
+      <div style="background:var(--surface);border:2px solid var(--teal);border-radius:14px;padding:16px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <div>
+            <div style="font-size:10px;font-weight:700;letter-spacing:2px;color:var(--teal);text-transform:uppercase">OT Escaneada</div>
+            <div id="otS-num" style="font-size:22px;font-weight:800;color:var(--text);font-family:'JetBrains Mono',monospace"></div>
+            <div id="otS-tipo" style="font-size:11px;color:var(--text-muted)"></div>
+          </div>
+          <div id="otS-zona" class="zona-badge"></div>
         </div>
-        <div id="precolectaList">
-          <div class="empty"><div class="empty-icon">📦</div><p>Cargando OTs...</p></div>
+        <div id="otS-comercio" style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:4px"></div>
+        <div id="otS-cuenta" style="font-size:11px;color:var(--text-muted);margin-bottom:10px"></div>
+        <div style="display:flex;flex-direction:column;gap:5px;margin-bottom:12px">
+          <div class="ot-row"><span>📍</span><span id="otS-dir"></span></div>
+          <div class="ot-row" id="otS-horario-row"><span>🕐</span><span id="otS-horario"></span></div>
+          <div class="ot-row" id="otS-contacto-row"><span>📞</span><a id="otS-contacto" href="#" style="color:var(--blue)"></a></div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button onclick="aceptarOT()" style="flex:1;background:var(--grad);color:#fff;border:none;padding:13px;font-size:15px;font-weight:700;border-radius:10px;cursor:pointer;font-family:'Inter',sans-serif">
+            ✅ Aceptar OT
+          </button>
+          <button onclick="cancelarOTScaneada()" style="background:var(--surface2);border:1px solid var(--border2);color:var(--text-muted);padding:13px 16px;border-radius:10px;cursor:pointer;font-family:'Inter',sans-serif;font-size:13px">
+            ✕
+          </button>
         </div>
       </div>
     </div>
-    <!-- Hoja de Ruta activa (OTs en tránsito) -->
-    <div id="rutaActiva" style="display:none">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-        <div style="font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--teal)">🚚 EN RUTA HOY</div>
-        <button onclick="verPrecolecta()" style="background:none;border:1px solid var(--border2);color:var(--text-muted);padding:5px 10px;border-radius:8px;font-size:11px;cursor:pointer;font-family:'Inter',sans-serif">+ Agregar</button>
+
+    <!-- EN RUTA HOY -->
+    <div id="rutaActiva">
+      <div style="font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--text-muted);margin-bottom:10px;display:flex;align-items:center;gap:8px">
+        <span>🚚 EN RUTA HOY</span>
+        <span id="transitoCount" style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 7px;border-radius:8px;font-size:10px">0</span>
       </div>
-      <div id="rutaActivaList"></div>
+      <div id="rutaActivaList">
+        <div class="empty"><div class="empty-icon">🚚</div><p>Sin OTs en tránsito hoy</p></div>
+      </div>
     </div>
+
   </div>
 
   <!-- TAB: SIMS -->
@@ -314,7 +329,6 @@ const{createClient}=supabase;
 const sb=createClient(SUPABASE_URL,SUPABASE_KEY);
 
 let currentUser=null,currentProfile=null;
-let rutaSeleccionada=[];  // OTs seleccionadas para hoy
 let rutaActiva=[];        // OTs en tránsito del usuario
 let rutaScannerStream=null;
 let rutaScannerActive=false;
@@ -328,7 +342,7 @@ window.addEventListener('load',async()=>{
   // Handle QR URL param
   const params=new URLSearchParams(window.location.search);
   const otParam=params.get('ot');
-  if(otParam&&currentUser){await addOTByParam(otParam);}
+  if(otParam&&currentUser){await mostrarOTScaneada(otParam);}
 });
 
 // ── LOGIN ──
@@ -379,7 +393,7 @@ async function initApp(user){
   // Check URL param for OT scan
   const params=new URLSearchParams(window.location.search);
   const otParam=params.get('ot');
-  if(otParam)await addOTByParam(otParam);
+  if(otParam)await mostrarOTScaneada(otParam);
 }
 
 async function doLogout(){
@@ -452,35 +466,36 @@ function getDistKm(ciudad){
 }
 
 // ── RUTA ──
+// WASENDER (dejar vacío hasta tener API key)
+const WASENDER_KEY='';
+
+let otScaneadaActual=null; // OT mostrada en el card de confirmación
+
 async function loadRuta(){
   if(!currentUser)return;
-  const{data:ots}=await sb.from('envios').select('*')
-    .eq('logistica','ALLEATA')
-    .in('estado',['Pre-Colecta','Despachado','En Tránsito','En tránsito'])
-    .order('fecha',{ascending:true});
-  const all=ots||[];
-  const precolecta=all.filter(e=>e.estado==='Pre-Colecta');
-  const enTransito=all.filter(e=>['Despachado','En Tránsito','En tránsito'].includes(e.estado));
-  rutaActiva=enTransito;
-  document.getElementById('precolectaCount').textContent=precolecta.length;
-  renderPrecolecta(precolecta);
-  renderRutaActiva(enTransito);
-  // Mostrar sección correcta
-  if(enTransito.length>0){
-    document.getElementById('rutaActiva').style.display='block';
-  }
+  await loadEnTransito();
 }
 
-function renderPrecolecta(list){
-  precolectaCache=list; // cache for selection
-  const el=document.getElementById('precolectaList');
-  if(!list.length){el.innerHTML='<div class="empty"><div class="empty-icon">📦</div><p>Sin OTs en Pre-Colecta</p></div>';return;}
+async function loadEnTransito(){
+  const el=document.getElementById('rutaActivaList');
+  const count=document.getElementById('transitoCount');
+  el.innerHTML='<div class="empty"><div class="empty-icon">⏳</div><p>Cargando...</p></div>';
+  const{data:ots}=await sb.from('envios').select('*')
+    .eq('logistica','ALLEATA')
+    .in('estado',['En Tránsito','En tránsito'])
+    .order('ultimo_evento_fecha',{ascending:true});
+  const list=ots||[];
+  count.textContent=list.length;
+  if(!list.length){
+    el.innerHTML='<div class="empty"><div class="empty-icon">🚚</div><p>Sin OTs en tránsito hoy</p></div>';
+    return;
+  }
   el.innerHTML=list.map(e=>{
     const z=getZona(e.ciudad,e.provincia);
     const km=getDistKm(e.ciudad);
-    const sel=rutaSeleccionada.find(r=>r.id===e.id);
-    return`<div class="ot-card ${sel?'selected':''}" id="precard-${e.id}">
-      <div style="display:flex;align-items:flex-start;justify-content:space-between">
+    const mapsUrl='https://www.google.com/maps/search/?api=1&query='+encodeURIComponent((e.direccion_completa||'')+' '+(e.ciudad||'')+' Argentina');
+    return`<div class="ot-card en-transito" style="margin-bottom:10px">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px">
         <div>
           <div class="ot-num">${e.ot_numero||'—'}</div>
           <div class="ot-tipo">${e.tipo||''}</div>
@@ -489,219 +504,198 @@ function renderPrecolecta(list){
       </div>
       <div class="ot-comercio">${e.nombre_comercio||e.cuenta||'—'}</div>
       <div class="ot-cuenta">${e.cuenta||''}</div>
-      <div class="ot-row"><span>📍</span>${e.direccion_completa||''}, ${e.ciudad||''}</div>
-      ${e.horario?`<div class="ot-row"><span>🕐</span>${e.horario}</div>`:''}
-      ${e.contacto?`<div class="ot-row"><span>📞</span><a href="tel:${e.contacto}" style="color:var(--blue)">${e.contacto}</a></div>`:''}
-      <div class="ot-actions">
-        <button class="btn-sm" style="flex:1;background:${sel?'rgba(239,68,68,.1)':'rgba(29,191,142,.1)'};color:${sel?'var(--red)':'var(--teal)'};border:1px solid ${sel?'rgba(239,68,68,.25)':'rgba(29,191,142,.25)'}" onclick="toggleOTSeleccion('${e.id}')">
-          ${sel?'✕ Quitar':'+ Agregar a ruta'}
-        </button>
-        <button class="btn-sm btn-maps" onclick="abrirMaps('${(e.direccion_completa||'')+' '+(e.ciudad||'')+' Argentina'}')">🗺️</button>
+      <div style="display:flex;flex-direction:column;gap:4px;margin:8px 0">
+        <div class="ot-row"><span>📍</span>${e.direccion_completa||''}, ${e.ciudad||''}</div>
+        ${e.horario?`<div class="ot-row"><span>🕐</span>${e.horario}</div>`:''}
+        ${e.contacto?`<div class="ot-row"><span>📞</span><a href="tel:${e.contacto}" style="color:var(--blue);text-decoration:none">${e.contacto}</a></div>`:''}
       </div>
-    </div>`;
-  }).join('');
-}
-
-function renderRutaActiva(list){
-  const el=document.getElementById('rutaActivaList');
-  if(!list.length){el.innerHTML='';document.getElementById('rutaActiva').style.display='none';return;}
-  document.getElementById('rutaActiva').style.display='block';
-  el.innerHTML=list.map(e=>{
-    const z=getZona(e.ciudad,e.provincia);
-    return`<div class="ot-card en-transito">
-      <div style="display:flex;align-items:flex-start;justify-content:space-between">
-        <div>
-          <div class="ot-num">${e.ot_numero||'—'}</div>
-          <div class="ot-tipo">${e.tipo||''}</div>
-        </div>
-        <span class="zona-badge" style="color:${z.color};background:${z.color}20;border:1px solid ${z.color}40">${z.zona}</span>
-      </div>
-      <div class="ot-comercio">${e.nombre_comercio||e.cuenta||'—'}</div>
-      <div class="ot-row"><span>📍</span>${e.direccion_completa||''}, ${e.ciudad||''}</div>
-      ${e.horario?`<div class="ot-row"><span>🕐</span>${e.horario}</div>`:''}
-      ${e.contacto?`<div class="ot-row"><span>📞</span><a href="tel:${e.contacto}" style="color:var(--blue)">${e.contacto}</a></div>`:''}
       <div class="ot-actions">
         <button class="btn-sm btn-entregar" style="flex:1" onclick="openCierreModal('${e.id}','Entregado')">✅ Entregado</button>
         <button class="btn-sm btn-fallido" style="flex:1" onclick="openCierreModal('${e.id}','Fallido')">❌ Fallido</button>
-        <button class="btn-sm btn-maps" onclick="abrirMaps('${(e.direccion_completa||'')+' '+(e.ciudad||'')+' Argentina'}')">🗺️</button>
+        <a href="${mapsUrl}" target="_blank" class="btn-sm btn-maps">🗺️</a>
       </div>
     </div>`;
   }).join('');
 }
 
-// Cache of precolecta OT data for selection
-let precolectaCache=[];
-
-function toggleOTSeleccion(id){
-  const idx=rutaSeleccionada.findIndex(r=>r.id===id);
-  if(idx>=0){
-    rutaSeleccionada.splice(idx,1);
-  } else {
-    const ot=precolectaCache.find(e=>e.id===id);
-    if(ot) rutaSeleccionada.push({...ot});
+// Llamado desde handleRutaQR cuando se escanea un QR válido
+async function mostrarOTScaneada(sfId){
+  const status=document.getElementById('rutaScanStatus');
+  status.textContent='🔍 Buscando OT...';
+  const{data:ot,error}=await sb.from('envios').select('*').eq('sf_id',sfId).single();
+  if(error||!ot){
+    showScanFeedback('OT no encontrada: '+sfId,'error');
+    return;
   }
-  updateRutaSelBar();
-  renderRutaSelList();
-  // Re-style card
-  const card=document.getElementById('precard-'+id);
-  if(card){
-    const sel=rutaSeleccionada.find(r=>r.id===id);
-    card.classList.toggle('selected',!!sel);
-    const btn=card.querySelector('.ot-actions .btn-sm');
-    if(btn){
-      btn.style.background=sel?'rgba(239,68,68,.1)':'rgba(29,191,142,.1)';
-      btn.style.color=sel?'var(--red)':'var(--teal)';
-      btn.style.border=sel?'1px solid rgba(239,68,68,.25)':'1px solid rgba(29,191,142,.25)';
-      btn.textContent=sel?'✕ Quitar':'+ Agregar a ruta';
-    }
+  if(['En Tránsito','En tránsito','Entregado'].includes(ot.estado)){
+    showScanFeedback('OT '+ot.ot_numero+' ya está en '+ot.estado,'warn');
+    return;
   }
+  if(ot.estado!=='Pre-Colecta'){
+    showScanFeedback('OT '+ot.ot_numero+' · estado: '+ot.estado,'warn');
+    return;
+  }
+  otScaneadaActual=ot;
+  const z=getZona(ot.ciudad,ot.provincia);
+  const km=getDistKm(ot.ciudad);
+  // Poblar card
+  document.getElementById('otS-num').textContent=ot.ot_numero||'—';
+  document.getElementById('otS-tipo').textContent=ot.tipo||'';
+  document.getElementById('otS-zona').textContent=z.zona+(km?` · ~${km}km`:'');
+  document.getElementById('otS-zona').style.cssText=`color:${z.color};background:${z.color}20;border:1px solid ${z.color}40`;
+  document.getElementById('otS-comercio').textContent=ot.nombre_comercio||ot.cuenta||'—';
+  document.getElementById('otS-cuenta').textContent=ot.cuenta||'';
+  document.getElementById('otS-dir').textContent=(ot.direccion_completa||'')+', '+(ot.ciudad||'');
+  const horRow=document.getElementById('otS-horario-row');
+  const conRow=document.getElementById('otS-contacto-row');
+  if(ot.horario){document.getElementById('otS-horario').textContent=ot.horario;horRow.style.display='flex';}
+  else horRow.style.display='none';
+  if(ot.contacto){
+    const a=document.getElementById('otS-contacto');
+    a.textContent=ot.contacto;a.href='tel:'+ot.contacto;
+    conRow.style.display='flex';
+  } else conRow.style.display='none';
+  // Mostrar card
+  document.getElementById('otScaneadaCard').style.display='block';
+  if(navigator.vibrate)navigator.vibrate([80,40,80]);
+  status.textContent='✅ OT encontrada — aceptá o escaneá otro rótulo';
 }
 
-function moveRutaItem(idx, dir){
-  const newIdx=idx+dir;
-  if(newIdx<0||newIdx>=rutaSeleccionada.length)return;
-  const tmp=rutaSeleccionada[idx];
-  rutaSeleccionada[idx]=rutaSeleccionada[newIdx];
-  rutaSeleccionada[newIdx]=tmp;
-  renderRutaSelList();
-}
-
-function renderRutaSelList(){
-  const el=document.getElementById('rutaSelList');
-  if(!rutaSeleccionada.length){el.innerHTML='';return;}
-  el.innerHTML=rutaSeleccionada.map((e,i)=>{
-    const z=getZona(e.ciudad,e.provincia);
-    return`<div style="background:var(--surface);border:1px solid var(--border2);border-radius:12px;padding:10px 12px;display:flex;align-items:center;gap:10px">
-      <div class="priority-num">${i+1}</div>
-      <div style="flex:1;min-width:0">
-        <div style="font-size:13px;font-weight:700;color:var(--teal)">${e.ot_numero||'—'}</div>
-        <div style="font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${e.nombre_comercio||e.cuenta||'—'}</div>
-        <div style="font-size:10px;color:var(--text-muted)">${e.ciudad||''} · <span style="color:${z.color}">${z.zona}</span></div>
-      </div>
-      <div style="display:flex;flex-direction:column;gap:4px">
-        <button class="btn-order" onclick="moveRutaItem(${i},-1)" ${i===0?'disabled style="opacity:.3"':''}>↑</button>
-        <button class="btn-order" onclick="moveRutaItem(${i},1)" ${i===rutaSeleccionada.length-1?'disabled style="opacity:.3"':''}>↓</button>
-      </div>
-      <button onclick="toggleOTSeleccion('${e.id}')" style="background:none;border:none;color:var(--red);font-size:18px;cursor:pointer;padding:0 2px;flex-shrink:0">✕</button>
-    </div>`;
-  }).join('');
-}
-
-function updateRutaSelBar(){
-  const bar=document.getElementById('rutaSelBar');
-  const count=document.getElementById('rutaCount');
-  const btn=document.getElementById('btnConfirmarRuta');
-  bar.style.display=rutaSeleccionada.length>0?'block':'none';
-  count.textContent=rutaSeleccionada.length;
-  btn.disabled=rutaSeleccionada.length===0;
-}
-
-async function confirmarRuta(){
-  if(!rutaSeleccionada.length)return;
-  const btn=document.getElementById('btnConfirmarRuta');
-  btn.disabled=true;btn.textContent='Confirmando...';
-  const ids=rutaSeleccionada.map(r=>r.id);
+async function aceptarOT(){
+  if(!otScaneadaActual)return;
+  const btn=document.querySelector('#otScaneadaCard button');
+  btn.disabled=true;btn.textContent='⏳ Aceptando...';
   const{error}=await sb.from('envios').update({
     estado:'En tránsito',
-    user_id:currentUser.id,
-    ultimo_evento:'Despachado por logística Alleata',
+    ultimo_evento:'Aceptado por logística Alleata',
     ultimo_evento_fecha:new Date().toISOString().slice(0,10)
-  }).in('id',ids);
-  if(error){alert('Error: '+error.message);btn.disabled=false;btn.textContent='🚚 Confirmar ruta del día';return;}
-  rutaSeleccionada=[];
-  updateRutaSelBar();
-  renderRutaSelList();
-  btn.textContent='✅ ¡Ruta confirmada!';
-  setTimeout(()=>{btn.textContent='🚚 Confirmar ruta del día';},2000);
-  await loadRuta();
+  }).eq('id',otScaneadaActual.id);
+  if(error){btn.disabled=false;btn.textContent='✅ Aceptar OT';alert('Error: '+error.message);return;}
+  // TODO: enviar WhatsApp via WasenderAPI cuando WASENDER_KEY esté disponible
+  // if(WASENDER_KEY) await sendWasender(otScaneadaActual, 'en_transito');
+  cancelarOTScaneada();
+  await loadEnTransito();
+  showScanFeedback('✅ OT '+otScaneadaActual.ot_numero+' aceptada — en tránsito','ok');
+  otScaneadaActual=null;
 }
 
-function limpiarRuta(){
-  rutaSeleccionada=[];
-  updateRutaSelBar();
-  renderRutaSelList();
-  loadRuta();
+function cancelarOTScaneada(){
+  otScaneadaActual=null;
+  document.getElementById('otScaneadaCard').style.display='none';
+  document.getElementById('rutaScanStatus').textContent='📷 Cámara activa — apuntá al QR del rótulo';
 }
 
-function verPrecolecta(){
-  document.getElementById('rutaSeleccion').style.display='block';
-}
-
-async function addOTByParam(sfId){
-  // Called when QR scanned from rótulo → adds OT to selection
-  const{data:ot}=await sb.from('envios').select('*').eq('sf_id',sfId).single();
-  if(!ot){showScanFeedback('OT no encontrada: '+sfId,'error');return;}
-  if(ot.estado!=='Pre-Colecta'){showScanFeedback('OT '+ot.ot_numero+' ya está en '+ot.estado,'warn');return;}
-  if(rutaSeleccionada.find(r=>r.id===ot.id)){showScanFeedback('OT '+ot.ot_numero+' ya está en la selección','warn');return;}
-  rutaSeleccionada.push({...ot});
-  updateRutaSelBar();
-  renderRutaSelList();
-  showScanFeedback('✅ '+ot.ot_numero+' — '+(ot.nombre_comercio||ot.cuenta||'')+' agregada','ok');
-  if(navigator.vibrate)navigator.vibrate(100);
-  await loadRuta();
-  // Remove param from URL
-  window.history.replaceState({},'',window.location.pathname);
+// Placeholder WasenderAPI (activar cuando haya key)
+async function sendWasender(ot, evento){
+  if(!WASENDER_KEY)return;
+  const msgs={
+    en_transito:`Hola! Tu pedido de ${ot.cuenta} está en camino. Llegamos hoy ${ot.horario?'entre '+ot.horario:'durante el día'}. Consultas: +54 11 4103-4600`,
+    entregado:`¡Hola! Tu pedido de ${ot.cuenta} fue entregado exitosamente. ¡Gracias!`,
+    fallido:`Hola, intentamos entregar tu pedido de ${ot.cuenta} pero no pudimos concretarlo. Te contactaremos para reagendar.`
+  };
+  const telefono=(ot.contacto||'').replace(/\D/g,'');
+  if(!telefono)return;
+  try{
+    await fetch('https://api.wasenderapi.com/api/send-message',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+WASENDER_KEY},
+      body:JSON.stringify({phone:telefono,message:msgs[evento]||''})
+    });
+  }catch(e){console.warn('WasenderAPI error:',e);}
 }
 
 // ── SCANNER DE RUTA (QR) ──
+let _scannerLoopId=null; // requestAnimationFrame id
+
 async function startRutaScanner(){
   if(rutaScannerActive)return;
+  const status=document.getElementById('rutaScanStatus');
   try{
-    const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
+    const stream=await navigator.mediaDevices.getUserMedia({
+      video:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:720}}
+    });
     rutaScannerStream=stream;
     rutaScannerActive=true;
     const video=document.getElementById('rutaVideo');
     video.srcObject=stream;
-    scanRutaQR();
+    await new Promise(r=>{video.onloadedmetadata=r;});
+    video.play();
+    status.textContent='📷 Cámara activa — apuntá al QR del rótulo';
+    _scanLoop();
   }catch(e){
-    document.getElementById('rutaScanStatus').textContent='Sin acceso a cámara';
+    status.textContent='⚠️ Sin acceso a cámara: '+e.message;
   }
 }
 
 function stopRutaScanner(){
-  if(rutaScannerStream){rutaScannerStream.getTracks().forEach(t=>t.stop());rutaScannerStream=null;}
   rutaScannerActive=false;
+  if(_scannerLoopId){cancelAnimationFrame(_scannerLoopId);_scannerLoopId=null;}
+  if(rutaScannerStream){rutaScannerStream.getTracks().forEach(t=>t.stop());rutaScannerStream=null;}
+  const video=document.getElementById('rutaVideo');
+  if(video)video.srcObject=null;
 }
 
-async function scanRutaQR(){
+let _lastScan=0;
+function _scanLoop(){
   if(!rutaScannerActive)return;
+  _scannerLoopId=requestAnimationFrame(()=>{
+    const now=Date.now();
+    if(now-_lastScan>400){ // scan every 400ms
+      _lastScan=now;
+      _doScan();
+    }
+    _scanLoop();
+  });
+}
+
+async function _doScan(){
   const video=document.getElementById('rutaVideo');
   const canvas=document.getElementById('rutaCanvas');
-  if(!canvas||video.readyState<2){setTimeout(scanRutaQR,200);return;}
+  if(!video||!canvas||video.readyState<2||video.videoWidth===0)return;
   canvas.width=video.videoWidth;
   canvas.height=video.videoHeight;
   const ctx=canvas.getContext('2d');
   ctx.drawImage(video,0,0);
-  let detected=false;
-  // Try BarcodeDetector first (Chrome Android)
+
+  // Method 1: BarcodeDetector (Chrome Android, Edge)
   if('BarcodeDetector' in window){
     try{
-      const detector=new BarcodeDetector({formats:['qr_code']});
-      const codes=await detector.detect(canvas);
+      const bd=new BarcodeDetector({formats:['qr_code']});
+      const codes=await bd.detect(canvas);
       if(codes.length>0){await handleRutaQR(codes[0].rawValue);return;}
     }catch(e){}
   }
-  // Fallback: jsQR (works on iOS Safari)
-  if(!detected && typeof jsQR !== 'undefined'){
-    const imageData=ctx.getImageData(0,0,canvas.width,canvas.height);
-    const code=jsQR(imageData.data,imageData.width,imageData.height,{inversionAttempts:'dontInvert'});
-    if(code){await handleRutaQR(code.data);return;}
+
+  // Method 2: jsQR from CDN (if loaded)
+  if(typeof jsQR==='function'){
+    try{
+      const img=ctx.getImageData(0,0,canvas.width,canvas.height);
+      const code=jsQR(img.data,img.width,img.height,{inversionAttempts:'attemptBoth'});
+      if(code){await handleRutaQR(code.data);return;}
+    }catch(e){}
   }
-  setTimeout(scanRutaQR,300);
+
+  // Method 3: native <input type=file> fallback indicator
+  // (no auto-detect possible, user must use manual button below)
 }
 
 async function handleRutaQR(value){
-  // Expected: https://...mobile.html?ot=sf_id
+  if(!rutaScannerActive)return;
+  rutaScannerActive=false; // pause while processing
   const match=value.match(/[?&]ot=([^&]+)/);
-  if(!match){setTimeout(scanRutaQR,1000);return;}
+  if(!match){
+    showScanFeedback('⚠️ QR no es un rótulo Alleata','warn');
+    rutaScannerActive=true;
+    return;
+  }
   const sfId=match[1];
-  stopRutaScanner();
-  document.getElementById('rutaScanStatus').textContent='⏳ Cargando OT...';
-  await addOTByParam(sfId);
+  if(navigator.vibrate)navigator.vibrate([80,40,80]);
+  await mostrarOTScaneada(sfId);
+  // Resume scanner after showing card
   setTimeout(()=>{
-    startRutaScanner();
-    document.getElementById('rutaScanStatus').textContent='Apuntá la cámara al código QR del rótulo';
-  },2000);
+    rutaScannerActive=true;
+    _scanLoop();
+  },1500);
 }
 
 function showScanFeedback(msg,type){
@@ -889,6 +883,50 @@ function clearHistorial(){if(confirm('¿Limpiar historial?')){localStorage.remov
 // ── LOGO ──
 document.getElementById('loginLogo').src=LOGO_B64;
 document.getElementById('appLogo').src=LOGO_B64;
+
+// ── FALLBACK: cámara nativa para QR ──
+function escanearConCamaraNativa(){
+  document.getElementById('qrFileInput').click();
+}
+
+async function procesarImagenQR(e){
+  const file=e.target.files[0];
+  if(!file)return;
+  const status=document.getElementById('rutaScanStatus');
+  status.textContent='🔍 Analizando imagen...';
+  // Use jsQR on the captured image
+  const img=new Image();
+  const url=URL.createObjectURL(file);
+  img.onload=()=>{
+    const canvas=document.createElement('canvas');
+    canvas.width=img.width;canvas.height=img.height;
+    const ctx=canvas.getContext('2d');
+    ctx.drawImage(img,0,0);
+    URL.revokeObjectURL(url);
+    let found=false;
+    if(typeof jsQR==='function'){
+      const imgData=ctx.getImageData(0,0,canvas.width,canvas.height);
+      const code=jsQR(imgData.data,imgData.width,imgData.height,{inversionAttempts:'attemptBoth'});
+      if(code){handleRutaQR(code.data);found=true;}
+    }
+    if(!found){
+      // Last resort: try BarcodeDetector on image bitmap
+      if('BarcodeDetector' in window){
+        createImageBitmap(file).then(bmp=>{
+          const bd=new BarcodeDetector({formats:['qr_code']});
+          bd.detect(bmp).then(codes=>{
+            if(codes.length>0)handleRutaQR(codes[0].rawValue);
+            else status.textContent='⚠️ No se detectó QR en la imagen';
+          });
+        });
+      } else {
+        status.textContent='⚠️ No se detectó QR — intentá de nuevo con mejor luz';
+      }
+    }
+  };
+  img.src=url;
+  e.target.value=''; // reset input
+}
 
 // ── FIN ──
 </script>
