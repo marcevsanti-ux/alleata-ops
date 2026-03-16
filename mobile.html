@@ -152,7 +152,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
       <div class="login-logo">
         <img id="loginLogo" src="" alt="Alleata">
         <div class="login-sub">Portal de Operaciones</div>
-        <div class="login-version">v2.4.1 · mobile</div>
+        <div class="login-version">v2.4.2 · mobile</div>
       </div>
       <div class="field"><label class="label">Email</label><input class="input" id="lEmail" type="email" placeholder="usuario@alleata.com" autocomplete="email"></div>
       <div class="field"><label class="label">Contraseña</label><input class="input" id="lPass" type="password" placeholder="••••••••" autocomplete="current-password"></div>
@@ -168,7 +168,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
   <div class="topbar">
     <img id="appLogo" src="" alt="Alleata">
     <div class="topbar-title" id="topbarTitle">Operaciones</div>
-    <div class="topbar-version">v2.4.1</div>
+    <div class="topbar-version">v2.4.2</div>
     <div class="topbar-avatar" id="topbarAvatar" onclick="openDrawer()">?</div>
   </div>
 
@@ -1039,22 +1039,26 @@ async function _simDoScan(){
     const canvas=document.getElementById('simCanvas');
     canvas.width=video.videoWidth;
     canvas.height=video.videoHeight;
-    canvas.getContext('2d').drawImage(video,0,0);
-    const b64=canvas.toDataURL('image/jpeg',0.85).split(',')[1];
+    // Capturar con zoom aplicado — recortar el centro según el nivel de zoom
+    const ctx=canvas.getContext('2d');
+    const z=_simZoom||1;
+    const sw=video.videoWidth/z;
+    const sh=video.videoHeight/z;
+    const sx=(video.videoWidth-sw)/2;
+    const sy=(video.videoHeight-sh)/2;
+    ctx.drawImage(video,sx,sy,sw,sh,0,0,canvas.width,canvas.height);
+    const b64=canvas.toDataURL('image/jpeg',0.92).split(',')[1];
 
     document.getElementById('simScanStatus').textContent='🧠 Analizando con IA...';
 
     const res=await callGemini(b64,'image/jpeg');
     const{serie,linea,sufijo}=parseGeminiSIM(res);
 
-    // Mostrar número interpretado siempre
-    const detectado=serie||sufijo||linea;
+    // Mostrar siempre lo que interpretó
     const detWrap=document.getElementById('simDetectedWrap');
     const detNum=document.getElementById('simDetectedNum');
-    if(detectado){
-      detWrap.style.display='block';
-      detNum.textContent=serie?`Serie: ${serie}`:(sufijo?`Sufijo: ${sufijo}`:`Línea: ${linea}`);
-    }
+    detWrap.style.display='block';
+    detNum.textContent=serie?`Serie: ${serie}`:(sufijo?`Sufijo: ${sufijo}`:(linea?`Línea: ${linea}`:'No se leyeron números'));
 
     if(!serie&&!linea&&!sufijo){
       document.getElementById('simScanStatus').textContent='🔍 No se detectó chip — seguí intentando...';
@@ -1076,22 +1080,21 @@ async function _simDoScan(){
     // Vibrar si encontró
     if(result.found&&navigator.vibrate)navigator.vibrate([100,50,100]);
 
-    // Botón para escanear otro
+    // Botón para escanear otro — va DENTRO de results
     const btn=document.createElement('button');
     btn.className='btn';
-    btn.style.cssText='width:calc(100% - 28px);margin:10px 14px;';
+    btn.style.cssText='width:calc(100% - 28px);margin:10px 14px 14px;display:block;';
     btn.textContent='📡 Escanear otro chip';
     btn.onclick=()=>{
       results.innerHTML='';
       document.getElementById('simDetectedWrap').style.display='none';
       document.getElementById('simDetectedNum').textContent='';
       document.getElementById('simScanStatus').textContent='Apuntá la cámara al chip SIM';
-      btn.remove();
       _simLocked=false;
       _simScanning=false;
       iniciarSimCamera();
     };
-    results.after(btn);
+    results.appendChild(btn);
 
   }catch(err){
     document.getElementById('simScanStatus').textContent='❌ Error al procesar — reintentando...';
