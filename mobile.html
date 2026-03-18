@@ -152,7 +152,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
       <div class="login-logo">
         <img id="loginLogo" src="" alt="Alleata">
         <div class="login-sub">Portal de Operaciones</div>
-        <div class="login-version">v2.6.1 · mobile</div>
+        <div class="login-version">v2.7.0 · mobile</div>
       </div>
       <div class="field"><label class="label">Email</label><input class="input" id="lEmail" type="email" placeholder="usuario@alleata.com" autocomplete="email"></div>
       <div class="field"><label class="label">Contraseña</label><input class="input" id="lPass" type="password" placeholder="••••••••" autocomplete="current-password"></div>
@@ -168,7 +168,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
   <div class="topbar">
     <img id="appLogo" src="" alt="Alleata">
     <div class="topbar-title" id="topbarTitle">Operaciones</div>
-    <div class="topbar-version">v2.6.1</div>
+    <div class="topbar-version">v2.7.0</div>
     <div class="topbar-avatar" id="topbarAvatar" onclick="openDrawer()">?</div>
   </div>
 
@@ -391,6 +391,7 @@ const sb=createClient(SUPABASE_URL,SUPABASE_KEY);
 let currentUser=null,currentProfile=null;
 let rutaActiva=[];
 let rutaDelDia=[];  // OTs aceptadas hoy en orden
+let _otCierreActual=null; // OT activa en modal de cierre (para notif Ally)
 let rutaScannerStream=null;
 let rutaScannerActive=false;
 
@@ -599,6 +600,26 @@ function renderKmIndicador(kmTotal,detalle){
 // WASENDER (dejar vacío hasta tener API key)
 const WASENDER_KEY='';
 
+// ── ALLY AGENT — notificaciones internas a grupos ──
+const ALLY_URL='https://alleata-agent-production.up.railway.app';
+const ALLY_GROUP_TEST='120363231775970939@g.us';
+
+async function notificarAlly(ot, evento){
+  const grupo=ALLY_GROUP_TEST;
+  const mensajes={
+    en_transito:`📦 *Ops informa — OT en tránsito*\n\nOT ${ot.ot_numero}\n${ot.tipo||''}\n${ot.nombre_comercio||ot.cuenta||''}\n\n🚚 En tránsito — Logística Alleata`,
+    entregado:`✅ *Ops informa — OT entregada*\n\nOT ${ot.ot_numero}\n${ot.tipo||''}\n${ot.nombre_comercio||ot.cuenta||''}\n\n✅ Entregada con éxito`,
+    fallido:`❌ *Ops informa — OT con problema*\n\nOT ${ot.ot_numero}\n${ot.tipo||''}\n${ot.nombre_comercio||ot.cuenta||''}\n\n❌ Entrega fallida`
+  };
+  try{
+    await fetch(ALLY_URL+'/notificar',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({numero:grupo,mensaje:mensajes[evento]||''})
+    });
+  }catch(e){console.warn('Ally notif error:',e);}
+}
+
 let otScaneadaActual=null; // OT mostrada en el card de confirmación
 
 async function loadRuta(){
@@ -716,6 +737,7 @@ async function aceptarOT(){
   cancelarOTScaneada();
   await loadEnTransito();
   showScanFeedback('✅ OT '+otScaneadaActual.ot_numero+' aceptada — en tránsito','ok');
+  await notificarAlly(otScaneadaActual, 'en_transito');
   otScaneadaActual=null;
 }
 
@@ -864,6 +886,7 @@ function openCierreModal(id,resultado){
   document.getElementById('fotoImg').src='';
   document.getElementById('modalFotoInput').value='';
   _fotoBlob=null;_fotoBase64=null;
+  _otCierreActual=rutaDelDia.find(o=>o.id===id)||{id,ot_numero:id,tipo:'',nombre_comercio:'',cuenta:''};
   document.getElementById('modalCierre').classList.add('show');
 }
 
@@ -950,6 +973,8 @@ async function confirmarCierreOT(){
   btn.disabled=false;btn.textContent='Confirmar';
   if(error){alert('Error: '+error.message);return;}
   closeModalCierre();
+  await notificarAlly(_otCierreActual, resultado==='Entregado'?'entregado':'fallido');
+  _otCierreActual=null;
   await loadEnTransito();
 }
 
