@@ -152,7 +152,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
       <div class="login-logo">
         <img id="loginLogo" src="" alt="Alleata">
         <div class="login-sub">Portal de Operaciones</div>
-        <div class="login-version">v2.7.1 · mobile</div>
+        <div class="login-version">v2.7.2 · mobile</div>
       </div>
       <div class="field"><label class="label">Email</label><input class="input" id="lEmail" type="email" placeholder="usuario@alleata.com" autocomplete="email"></div>
       <div class="field"><label class="label">Contraseña</label><input class="input" id="lPass" type="password" placeholder="••••••••" autocomplete="current-password"></div>
@@ -168,7 +168,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
   <div class="topbar">
     <img id="appLogo" src="" alt="Alleata">
     <div class="topbar-title" id="topbarTitle">Operaciones</div>
-    <div class="topbar-version">v2.7.1</div>
+    <div class="topbar-version">v2.7.2</div>
     <div class="topbar-avatar" id="topbarAvatar" onclick="openDrawer()">?</div>
   </div>
 
@@ -607,9 +607,9 @@ const ALLY_GROUP_TEST='120363424299090366@g.us';
 async function notificarAlly(ot, evento){
   const grupo=ALLY_GROUP_TEST;
   const mensajes={
-    en_transito:`📦 *Ops informa — OT en tránsito*\n\nOT ${ot.ot_numero}\n${ot.tipo||''}\n${ot.nombre_comercio||ot.cuenta||''}\n\n🚚 En tránsito — Logística Alleata`,
-    entregado:`✅ *Ops informa — OT entregada*\n\nOT ${ot.ot_numero}\n${ot.tipo||''}\n${ot.nombre_comercio||ot.cuenta||''}\n\n✅ Entregada con éxito`,
-    fallido:`❌ *Ops informa — OT con problema*\n\nOT ${ot.ot_numero}\n${ot.tipo||''}\n${ot.nombre_comercio||ot.cuenta||''}\n\n❌ Entrega fallida`
+    en_transito:`📦 *Ops informa — OT en tránsito*\n\nOT ${ot.ot_numero}\n${ot.tipo||''}\n${ot.cuenta||''}\n\n🚚 En tránsito — Logística Alleata`,
+    entregado:`✅ *Ops informa — OT entregada*\n\nOT ${ot.ot_numero}\n${ot.tipo||''}\n${ot.cuenta||''}\n\n✅ Entregada con éxito`,
+    fallido:`❌ *Ops informa — OT con problema*\n\nOT ${ot.ot_numero}\n${ot.tipo||''}\n${ot.cuenta||''}\n\n❌ Entrega fallida`
   };
   try{
     await fetch(ALLY_URL+'/notificar',{
@@ -734,10 +734,11 @@ async function aceptarOT(){
   rutaDelDia.push({...otScaneadaActual});
   await guardarRutaDiaria();
 
+  const otParaNotif={...otScaneadaActual};
   cancelarOTScaneada();
   await loadEnTransito();
-  showScanFeedback('✅ OT '+otScaneadaActual.ot_numero+' aceptada — en tránsito','ok');
-  await notificarAlly(otScaneadaActual, 'en_transito');
+  showScanFeedback('✅ OT '+otParaNotif.ot_numero+' aceptada — en tránsito','ok');
+  await notificarAlly(otParaNotif, 'en_transito');
   otScaneadaActual=null;
 }
 
@@ -886,7 +887,7 @@ function openCierreModal(id,resultado){
   document.getElementById('fotoImg').src='';
   document.getElementById('modalFotoInput').value='';
   _fotoBlob=null;_fotoBase64=null;
-  _otCierreActual=rutaDelDia.find(o=>o.id===id)||{id,ot_numero:id,tipo:'',nombre_comercio:'',cuenta:''};
+  _otCierreActual=rutaDelDia.find(o=>o.id===id)||null;
   document.getElementById('modalCierre').classList.add('show');
 }
 
@@ -973,6 +974,11 @@ async function confirmarCierreOT(){
   btn.disabled=false;btn.textContent='Confirmar';
   if(error){alert('Error: '+error.message);return;}
   closeModalCierre();
+  // Si no tenemos la OT en memoria, buscarla en Supabase
+  if(!_otCierreActual){
+    const{data:otData}=await sb.from('envios').select('ot_numero,tipo,cuenta').eq('id',id).single();
+    _otCierreActual=otData||{ot_numero:'—',tipo:'',cuenta:''};
+  }
   await notificarAlly(_otCierreActual, resultado==='Entregado'?'entregado':'fallido');
   _otCierreActual=null;
   await loadEnTransito();
