@@ -1131,7 +1131,7 @@ async function importSF(e){
     const iCuenta=col('cuenta');
     const iTracking=col('N° de seguimiento');
     const iObs=col('Observaciones');
-    const iFecha=col('Fecha de Despacho');
+    const iFecha=col('Fecha de Despacho')>=0?col('Fecha de Despacho'):col('Fecha de creaci');
     const iCiudad=col('Ciudad');
     const iProv=col('Estado/Provincia');
     const iAsig=col('Asignación');
@@ -1159,6 +1159,20 @@ async function importSF(e){
 
     ptext.textContent=`Procesando ${dataRows.length} OTs...`;fill.style.width='50%';
 
+    function parseDate(str){
+      if(!str)return null;
+      const s=String(str).trim();
+      if(!s)return null;
+      const parts=s.split('/');
+      if(parts.length===3){
+        const d=parts[0].padStart(2,'0');
+        const m=parts[1].padStart(2,'0');
+        const y=parts[2].length===2?'20'+parts[2]:parts[2];
+        return `${y}-${m}-${d}`;
+      }
+      return s||null;
+    }
+
     let importadas=0,duplicadas=0,errores=0;
     for(const r of dataRows){
       const track=String(r[iTracking]||'').trim();
@@ -1173,7 +1187,7 @@ async function importSF(e){
         responsable:String(r[iResp]||'').trim(),
         cuenta:String(r[iCuenta]||'').trim(),
         track:track,
-        fecha:String(r[iFecha]||'').trim(),
+        fecha:parseDate(r[iFecha>=0?iFecha:undefined]),
         ciudad:String(r[iCiudad]||'').trim(),
         provincia:String(r[iProv]||'').trim(),
         asignacion:String(r[iAsig]||'').trim(),
