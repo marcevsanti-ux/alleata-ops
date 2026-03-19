@@ -281,7 +281,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v1.8.8 · 16 mar 2026
+      v1.8.9 · 19 mar 2026
     </div>
   </div>
 </div>
@@ -330,7 +330,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v1.8.8 · 16 mar 2026
+      v1.8.9 · 19 mar 2026
     </div>
   </div>
 </nav>
@@ -344,7 +344,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <div class="topbar-right" id="topbar-date"></div>
     <button onclick="refreshCurrentModule()" title="Actualizar" style="background:none;border:1px solid var(--border2);color:var(--text-muted);border-radius:7px;padding:4px 10px;cursor:pointer;font-size:13px;margin-left:10px;transition:all .2s" onmouseover="this.style.color='var(--teal)';this.style.borderColor='var(--teal)'" onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border2)'">↺</button>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v1.8.8</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v1.8.9</div>
   </div>
   <div class="content">
 
@@ -1336,11 +1336,86 @@ function renderEnviosTable(list){
             : `<button title="Imprimir rótulo" style="background:var(--surface2);border:1px solid var(--border2);color:var(--teal);font-size:11px;padding:4px 7px;border-radius:6px;cursor:pointer;${currentProfile?.rol==='logistica'?'display:none':''}" onclick="printRotulo('${e.id}')">🖨️</button>`
           }
           <button title="Actualizar observación" style="background:var(--surface2);border:1px solid var(--border2);color:var(--text-muted);font-size:11px;padding:4px 7px;border-radius:6px;cursor:pointer" onclick="openUpdateEvento('${e.id}','${(e.ultimo_evento||'').replace(/'/g,'&#39;')}')">✏️</button>
+          ${e.track?`<button id="track-btn-${e.id}" title="Consultar estado en Correo Argentino" style="background:var(--surface2);border:1px solid var(--border2);color:var(--blue);font-size:11px;padding:4px 7px;border-radius:6px;cursor:pointer" onclick="consultarTracking('${e.id}','${e.track}')">🔍</button>`:''}
           ${isAdmin?`<button title="Eliminar" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:13px;padding:4px" onclick="deleteEnvio('${e.id}')">🗑</button>`:''}
         </div>
       </td>
     </tr>`;
   }).join('');
+}
+
+// ── TRACKING CORREO ARGENTINO ──
+const ALLY_URL='https://alleata-agent-production.up.railway.app';
+
+async function consultarTracking(id, trackNum){
+  const btn=document.getElementById(`track-btn-${id}`);
+  if(btn){ btn.textContent='⏳'; btn.disabled=true; }
+
+  try {
+    // Llama al proxy en Railway → Railway llama a CA API con certificado
+    const res = await fetch(`${ALLY_URL}/correo-tracking?numero=${encodeURIComponent(trackNum)}`, {
+      headers:{ 'Content-Type':'application/json' }
+    });
+
+    if(!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+
+    // Mapear respuesta de CA a nuestros estados
+    const estadoCA = data.estado || data.status || data.descripcion || '';
+    const eventoCA = data.ultimo_evento || data.evento || data.descripcion || estadoCA;
+    const fechaCA  = data.fecha || data.fecha_evento || new Date().toISOString().slice(0,10);
+
+    const estadoMapeado = mapearEstadoCA(estadoCA);
+
+    // Actualizar en Supabase
+    await sb.from('envios').update({
+      estado: estadoMapeado,
+      ultimo_evento: eventoCA,
+      ultimo_evento_fecha: fechaCA.slice(0,10)
+    }).eq('id', id);
+
+    loadBadges(); renderEnvios();
+    showTrackingToast(`✅ ${trackNum}: ${estadoMapeado} — ${eventoCA}`,'teal');
+
+  } catch(err) {
+    // Si Railway aún no tiene el endpoint o CA no responde, mostramos info
+    console.warn('Tracking error:', err.message);
+    if(err.message.includes('404') || err.message.includes('Failed to fetch')){
+      showTrackingToast(`⚠️ Proxy de CA aún no configurado en Railway. Endpoint: /correo-tracking`,'yellow');
+    } else {
+      showTrackingToast(`❌ Error consultando tracking: ${err.message}`,'red');
+    }
+    if(btn){ btn.textContent='🔍'; btn.disabled=false; }
+  }
+}
+
+function mapearEstadoCA(estadoRaw){
+  const s=(estadoRaw||'').toUpperCase();
+  if(s.includes('ENTREGADO')||s.includes('ENTREGA OK')) return 'Entregado';
+  if(s.includes('DEVUELTO')||s.includes('DEVOLUCION')) return 'Devuelto';
+  if(s.includes('EN PODER DEL DISTRIBUIDOR')||s.includes('CAMINO')) return 'En camino';
+  if(s.includes('EN ESPERA EN SUCURSAL')||s.includes('SUCURSAL')) return 'En espera en sucursal';
+  if(s.includes('CENTRO DE PROCESAMIENTO')||s.includes('CLASIFIC')) return 'En tránsito';
+  if(s.includes('DEMORADO')||s.includes('DEMORA')) return 'Demorado';
+  if(s.includes('PERDIDO')) return 'Perdido';
+  if(s) return 'En tránsito';
+  return null;
+}
+
+function showTrackingToast(msg, tipo){
+  let toast=document.getElementById('trackingToast');
+  if(!toast){
+    toast=document.createElement('div');
+    toast.id='trackingToast';
+    toast.style.cssText='position:fixed;bottom:24px;right:24px;z-index:9999;padding:12px 18px;border-radius:10px;font-size:12px;font-family:JetBrains Mono,monospace;max-width:420px;line-height:1.5;transition:opacity 0.3s;box-shadow:0 4px 20px rgba(0,0,0,0.4)';
+    document.body.appendChild(toast);
+  }
+  const colors={teal:'background:#1dbf8e;color:#fff',yellow:'background:#f59e0b;color:#1a1a1a',red:'background:#ef4444;color:#fff'};
+  toast.style.cssText+=';'+colors[tipo]||colors.teal;
+  toast.textContent=msg;
+  toast.style.opacity='1';
+  clearTimeout(toast._t);
+  toast._t=setTimeout(()=>{toast.style.opacity='0';},4000);
 }
 
 async function updateEnvioEstado(id,estado){
