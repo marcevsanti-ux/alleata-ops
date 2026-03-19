@@ -1123,7 +1123,7 @@ async function importSF(e){
     if(headerIdx===-1)throw new Error('No se encontró la fila de encabezados');
     const headers=rows[headerIdx].map(h=>String(h||'').trim());
 
-    const col=(name)=>headers.findIndex(h=>h.includes(name));
+    const col=(name)=>headers.findIndex(h=>h.toLowerCase().includes(name.toLowerCase()));
     const iResp=col('Responsable');
     const iOT=col('Número de orden');
     const iSFId=col('Id. de orden');
@@ -1136,8 +1136,26 @@ async function importSF(e){
     const iProv=col('Estado/Provincia');
     const iAsig=col('Asignación');
     const iCosto=col('Costo de envio');
+    const iLogistica=col('Logística');
 
-    const dataRows=rows.slice(headerIdx+1).filter(r=>r&&r.some(c=>c!==null)&&String(r[1]||'')!=='Subtotal'&&String(r[1]||'')!=='Total');
+    // Soporte para archivo "Pre-Colecta todas las Logísticas"
+    // La columna Logística usa merge de celdas — propagar valor hacia abajo
+    let currentLogistica='CORREO ARGENTINO';
+    const allDataRows=rows.slice(headerIdx+1).filter(r=>r&&r.some(c=>c!==null)&&String(r[iLogistica>=0?iLogistica:1]||'')!=='Subtotal'&&String(r[iLogistica>=0?iLogistica:1]||'')!=='Total');
+    // Propagate logistica down (merged cells)
+    const rowsWithLog=allDataRows.map(r=>{
+      if(iLogistica>=0&&r[iLogistica]){
+        const v=String(r[iLogistica]).trim().toUpperCase();
+        if(v&&v!=='SUBTOTAL'&&v!=='TOTAL') currentLogistica=v;
+      }
+      return{...r,_log:currentLogistica};
+    });
+    // Filter: solo CORREO ARGENTINO (o sin logistica = archivo SF clásico)
+    const dataRows=rowsWithLog.filter(r=>
+      iLogistica<0 || r._log==='CORREO ARGENTINO'
+    );
+    const otrasLog=[...new Set(rowsWithLog.filter(r=>r._log!=='CORREO ARGENTINO').map(r=>r._log))].filter(Boolean);
+    if(otrasLog.length) msg.textContent=`ℹ️ Se ignoraron logísticas: ${otrasLog.join(', ')}`;
 
     ptext.textContent=`Procesando ${dataRows.length} OTs...`;fill.style.width='50%';
 
@@ -1162,6 +1180,7 @@ async function importSF(e){
         notas:obs,
         costo_envio:iCosto>=0&&r[iCosto]?Number(r[iCosto]):null,
         estado:detectEstado(obs),
+        logistica:'Correo Argentino',
         ultimo_evento:obs||'Importado desde SF',
         ultimo_evento_fecha:new Date().toISOString().slice(0,10)
       };
@@ -2103,8 +2122,15 @@ async function importPreColecta(e){
       }
     }
 
-    if(!alleataRows.length)throw new Error('No se encontraron OTs de logística ALLEATA en el archivo.');
-    
+    if(!alleataRows.length)throw new Error('No se encontraron OTs de logística ALLEATA en el archivo. Si querés importar Correo Argentino, usá el botón del canal derecho.');
+
+    // Avisar sobre otras logísticas presentes en el archivo
+    const otrasLog=[...new Set(dataRows.filter(r=>{
+      let l=''; if(r[iLogistica])l=String(r[iLogistica]).trim().toUpperCase();
+      return l&&l!=='ALLEATA'&&l!=='SUBTOTAL'&&l!=='TOTAL';
+    }).map(r=>r[iLogistica]))].filter(Boolean);
+    if(otrasLog.length) msg.textContent=`ℹ️ Se ignoraron logísticas: ${otrasLog.join(', ')}`;
+
     ptext.textContent=`Procesando ${alleataRows.length} OTs ALLEATA...`;fill.style.width='40%';
 
     // Función para convertir fecha DD/M/YYYY o D/M/YYYY a YYYY-MM-DD
