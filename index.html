@@ -281,7 +281,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v1.9.0 · 19 mar 2026
+      v1.9.1 · 19 mar 2026
     </div>
   </div>
 </div>
@@ -330,7 +330,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v1.9.0 · 19 mar 2026
+      v1.9.1 · 19 mar 2026
     </div>
   </div>
 </nav>
@@ -344,7 +344,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <div class="topbar-right" id="topbar-date"></div>
     <button onclick="refreshCurrentModule()" title="Actualizar" style="background:none;border:1px solid var(--border2);color:var(--text-muted);border-radius:7px;padding:4px 10px;cursor:pointer;font-size:13px;margin-left:10px;transition:all .2s" onmouseover="this.style.color='var(--teal)';this.style.borderColor='var(--teal)'" onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border2)'">↺</button>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v1.9.0</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v1.9.1</div>
   </div>
   <div class="content">
 
@@ -1613,7 +1613,122 @@ function updateSelectedCount(){
 }
 async function printSelectedRotulos(){
   const ids=[...document.querySelectorAll('.envio-chk:checked')].map(c=>c.dataset.id);
-  for(const id of ids)await printRotulo(id);
+  if(!ids.length)return;
+  if(ids.length===1){await printRotulo(ids[0]);return;}
+
+  // Cargar todas las OTs en paralelo
+  const envios=await Promise.all(ids.map(id=>sb.from('envios').select('*').eq('id',id).single().then(r=>r.data)));
+  const valid=envios.filter(Boolean);
+  if(!valid.length)return;
+
+  // Generar HTML de cada rótulo como función reutilizable
+  function buildRotuloHTML(e, isLast){
+    const sfIdParaQR=e.sf_id||e.id;
+    const tipoCode=e.tipo?.toUpperCase().includes('SIMCARD')?'INS':
+                   e.tipo?.toUpperCase().includes('CAMBIO')?'CAM':
+                   e.tipo?.toUpperCase().includes('RETIRO')?'RET':'OT';
+    const ciudadZ=(e.ciudad||'').toLowerCase();
+    const provZ=(e.provincia||'').toLowerCase();
+    let zonaCode='FUERA', zonaColor='#ef4444';
+    if(provZ.includes('ciudad autónoma')||provZ.includes('caba')){zonaCode='CABA';zonaColor='#1a9fd4';}
+    else if(['san isidro','vicente lópez','vicente lopez','tigre','pilar','escobar','san fernando','malvinas argentinas','san miguel','san martín','san martin'].some(n=>ciudadZ.includes(n))){zonaCode='ZN';zonaColor='#10b981';}
+    else if(['lomas de zamora','lanús','lanus','avellaneda','quilmes','berazategui','florencio varela','almirante brown','ezeiza','esteban echeverría','esteban echeverria','la plata','guernica','monte grande','temperley','banfield'].some(n=>ciudadZ.includes(n))){zonaCode='ZS';zonaColor='#f59e0b';}
+    else if(['la matanza','morón','moron','hurlingham','ituzaingó','ituzaingo','merlo','moreno','tres de febrero','luján','lujan','ramos mejía','ramos mejia','san justo','haedo','castelar'].some(n=>ciudadZ.includes(n))){zonaCode='ZO';zonaColor='#8b5cf6';}
+    const direccionQR=encodeURIComponent(`${e.direccion_completa||''} ${e.ciudad||''} ${e.provincia||''} Argentina`);
+    const mapsUrl=`https://www.google.com/maps/search/?api=1&query=${direccionQR}`;
+    const uid=e.id.replace(/-/g,'').slice(0,8);
+    return `
+    <div class="rotulo" style="${isLast?'':'page-break-after:always'}">
+      <div class="hdr">
+        <div class="hdr-logo">alleata</div>
+        <div class="hdr-info">Andrés Moretti e Hijos S.A.<br>Logística Alleata &nbsp;·&nbsp; (+54 11) 4103-4600</div>
+      </div>
+      <div class="tipo">TIPO DE O.T.: &nbsp; ${e.tipo||'—'}</div>
+      <div class="ot-block">
+        <div class="ot-num">O.T.: ${e.ot_numero||'—'}</div>
+        <div class="qr-ruta">
+          <div id="qrRuta_${uid}"></div>
+          <div class="qr-ruta-lbl">Escanear Ruta</div>
+        </div>
+      </div>
+      <div class="dest">${e.cuenta||'—'}</div>
+      <div class="row"><span class="lbl">Dirección</span><span class="val">${e.direccion_completa||'—'}</span></div>
+      <div class="row"><span class="lbl">C.P.</span><span class="val">${e.cp_dest||'—'}</span></div>
+      <div class="row"><span class="lbl">Localidad</span><span class="val">${e.ciudad||'—'}</span></div>
+      <div class="row"><span class="lbl">Provincia</span><span class="val">${e.provincia||'—'}</span></div>
+      <div class="row"><span class="lbl">Contacto</span><span class="val">${e.contacto||'—'}</span></div>
+      <div class="row"><span class="lbl">Horario</span><span class="val">${e.horario||'—'}</span></div>
+      <div class="row"><span class="lbl">Nombre Fantasía</span><span class="val">${e.nombre_comercio||'—'}</span></div>
+      <div class="divider"></div>
+      <div class="bottom">
+        <div class="qr-geo">
+          <div id="qrcode_${uid}"></div>
+          <div class="qr-geo-lbl">Geo&shy;ubicación</div>
+        </div>
+        <div class="obs-wrap">
+          <div class="obs-lbl">Observaciones</div>
+          <div class="obs-val">${e.notas||''}</div>
+        </div>
+        <div class="badges">
+          <div class="tipo-badge">${tipoCode}</div>
+          <div class="zona-badge" style="color:${zonaColor};border-color:${zonaColor};background:${zonaColor}15">${zonaCode}</div>
+        </div>
+      </div>
+      <div class="footer">
+        <div class="footer-lbl">Remitente</div>
+        <div class="footer-val">Logística Alleata &nbsp;·&nbsp; Andrés Moretti e Hijos S.A.</div>
+      </div>
+    </div>
+    <script>
+      new QRCode(document.getElementById('qrcode_${uid}'),{text:'${mapsUrl}',width:75,height:75,colorDark:'#000000',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.M});
+      new QRCode(document.getElementById('qrRuta_${uid}'),{text:'https://marcevsanti-ux.github.io/alleata-ops/mobile.html?ot=${sfIdParaQR}',width:68,height:68,colorDark:'#000000',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.M});
+    <\/script>`;
+  }
+
+  const w=window.open('','_blank','width=450,height=750');
+  const rotulosHTML=valid.map((e,i)=>buildRotuloHTML(e,i===valid.length-1)).join('');
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
+  <title>Rótulos (${valid.length} OTs)</title>
+  <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"><\/script>
+  <style>
+    @page{size:100mm 150mm;margin:0;}
+    *{margin:0;padding:0;box-sizing:border-box;}
+    html,body{width:100mm;font-family:'Arial',sans-serif;background:#fff;font-size:10px;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+    .rotulo{width:100mm;height:150mm;padding:3mm;display:flex;flex-direction:column;}
+    .hdr{display:flex;align-items:center;justify-content:space-between;border-bottom:1.5px solid #000;padding-bottom:1.5mm;margin-bottom:2mm;}
+    .hdr-logo{font-size:16px;font-weight:900;letter-spacing:-1px;color:#1dbf8e!important;}
+    .hdr-info{font-size:6.5px;line-height:1.5;color:#444;text-align:right;}
+    .tipo{font-size:9px;font-weight:700;text-align:center;border:1.5px solid #000;padding:1.5mm;margin-bottom:2mm;}
+    .ot-block{display:flex;align-items:center;justify-content:space-between;border:2.5px solid #000;padding:2mm 3mm;margin-bottom:2mm;}
+    .ot-num{font-size:28px;font-weight:900;letter-spacing:-1px;line-height:1;}
+    .qr-ruta{text-align:center;flex-shrink:0;}
+    .qr-ruta-lbl{font-size:6px;font-weight:700;margin-top:2px;text-transform:uppercase;}
+    .dest{font-size:11px;font-weight:900;text-align:center;text-transform:uppercase;background:#f0f0f0!important;padding:2mm;margin-bottom:2mm;line-height:1.3;border:1px solid #ccc;}
+    .row{display:flex;align-items:baseline;gap:2mm;margin-bottom:1.2mm;}
+    .lbl{font-weight:700;font-size:7.5px;min-width:24mm;color:#555;text-transform:uppercase;}
+    .val{font-size:9px;font-weight:700;color:#000;}
+    .divider{border-top:1.5px solid #000;margin:2mm 0 1.5mm;}
+    .bottom{display:flex;gap:2mm;align-items:flex-start;flex:1;}
+    .qr-geo{display:flex;flex-direction:column;align-items:center;gap:1mm;flex-shrink:0;}
+    .qr-geo-lbl{font-size:6px;font-weight:700;text-align:center;text-transform:uppercase;}
+    .obs-wrap{flex:1;min-width:0;display:flex;flex-direction:column;}
+    .obs-lbl{font-size:7.5px;font-weight:700;text-transform:uppercase;margin-bottom:1mm;}
+    .obs-val{font-size:8px;flex:1;border:1px solid #ccc;padding:1.5mm;word-break:break-word;line-height:1.4;}
+    .badges{display:flex;flex-direction:column;gap:2mm;align-items:center;flex-shrink:0;}
+    .tipo-badge{font-size:20px;font-weight:900;background:#000!important;color:#fff!important;padding:3mm 4mm;text-align:center;min-width:14mm;line-height:1;}
+    .zona-badge{font-size:12px;font-weight:900;padding:2mm 3mm;text-align:center;min-width:14mm;border:2.5px solid;line-height:1;}
+    .footer{border-top:1.5px solid #000;padding-top:1.5mm;margin-top:2mm;}
+    .footer-lbl{font-size:7px;font-weight:700;color:#555;text-transform:uppercase;}
+    .footer-val{font-size:7.5px;background:#000!important;color:#fff!important;padding:1mm 2mm;display:inline-block;margin-top:0.5mm;}
+    .btn-print{display:block;width:95mm;margin:8px auto;padding:8px;background:#1dbf8e;color:#fff;border:none;font-size:13px;font-weight:700;cursor:pointer;border-radius:5px;font-family:Arial,sans-serif;}
+    @media print{.btn-print{display:none!important;}}
+  </style>
+  </head><body>
+  ${rotulosHTML}
+  <button class="btn-print" onclick="window.print()">🖨️ Imprimir ${valid.length} rótulos</button>
+  <script>window.onafterprint=()=>window.close();<\/script>
+  </body></html>`);
+  w.document.close();
 }
 // ── FIN ZONA AMBA ──
 
