@@ -152,7 +152,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
       <div class="login-logo">
         <img id="loginLogo" src="" alt="Alleata">
         <div class="login-sub">Portal de Operaciones</div>
-        <div class="login-version">v2.7.3 · mobile</div>
+        <div class="login-version">v2.7.4 · mobile</div>
       </div>
       <div class="field"><label class="label">Email</label><input class="input" id="lEmail" type="email" placeholder="usuario@alleata.com" autocomplete="email"></div>
       <div class="field"><label class="label">Contraseña</label><input class="input" id="lPass" type="password" placeholder="••••••••" autocomplete="current-password"></div>
@@ -168,7 +168,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
   <div class="topbar">
     <img id="appLogo" src="" alt="Alleata">
     <div class="topbar-title" id="topbarTitle">Operaciones</div>
-    <div class="topbar-version">v2.7.3</div>
+    <div class="topbar-version">v2.7.4</div>
     <div class="topbar-avatar" id="topbarAvatar" onclick="openDrawer()">?</div>
   </div>
 
@@ -621,7 +621,7 @@ function getGrupoParaOT(ot){
   return ALLY_GROUP_TEST;
 }
 
-async function notificarAlly(ot, evento, fotoUrl=null){
+async function notificarAlly(ot, evento, fotoUrl=null, observaciones=null){
   const grupo=getGrupoParaOT(ot);
   const mensajes={
     en_transito:
@@ -652,20 +652,17 @@ ${ot.cuenta||''}
   try{
     const msg=mensajes[evento]||'';
     if(!msg)return;
+    // Una sola llamada: texto + foto + observaciones
+    // El agente maneja el delay de rate limit internamente
+    const payload={numero:grupo,mensaje:msg};
+    if(fotoUrl) payload.fotoUrl=fotoUrl;
+    if(observaciones) payload.observaciones=observaciones;
     await fetch(ALLY_URL+'/notificar',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({numero:grupo,mensaje:msg})
+      body:JSON.stringify(payload)
     });
-    // Si hay foto, enviarla como imagen adjunta
-    if(fotoUrl){
-      await fetch(ALLY_URL+'/notificar',{
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({numero:grupo,fotoUrl,caption:`📎 Evidencia — OT ${ot.ot_numero}`})
-      });
-    }
-    console.log('Ally notif OK:',evento,'→',grupo,fotoUrl?'+ foto':'');
+    console.log('Ally notif OK:',evento,'→',grupo,fotoUrl?'+ foto':'',observaciones?'+ obs':'');
   }catch(e){console.warn('Ally notif error:',e);}
 }
 
@@ -1028,7 +1025,7 @@ async function confirmarCierreOT(){
     const{data:otData}=await sb.from('envios').select('ot_numero,tipo,cuenta').eq('id',id).single();
     _otCierreActual=otData||{ot_numero:'—',tipo:'',cuenta:''};
   }
-  await notificarAlly(_otCierreActual, resultado==='Entregado'?'entregado':'fallido', fotoUrl||null);
+  await notificarAlly(_otCierreActual, resultado==='Entregado'?'entregado':'fallido', fotoUrl||null, notas||null);
   _otCierreActual=null;
   await loadEnTransito();
 }
