@@ -152,7 +152,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
       <div class="login-logo">
         <img id="loginLogo" src="" alt="Alleata">
         <div class="login-sub">Portal de Operaciones</div>
-        <div class="login-version">v2.7.2 · mobile</div>
+        <div class="login-version">v2.7.3 · mobile</div>
       </div>
       <div class="field"><label class="label">Email</label><input class="input" id="lEmail" type="email" placeholder="usuario@alleata.com" autocomplete="email"></div>
       <div class="field"><label class="label">Contraseña</label><input class="input" id="lPass" type="password" placeholder="••••••••" autocomplete="current-password"></div>
@@ -168,7 +168,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
   <div class="topbar">
     <img id="appLogo" src="" alt="Alleata">
     <div class="topbar-title" id="topbarTitle">Operaciones</div>
-    <div class="topbar-version">v2.7.2</div>
+    <div class="topbar-version">v2.7.3</div>
     <div class="topbar-avatar" id="topbarAvatar" onclick="openDrawer()">?</div>
   </div>
 
@@ -604,19 +604,60 @@ const WASENDER_KEY='';
 const ALLY_URL='https://alleata-agent-production.up.railway.app';
 const ALLY_GROUP_TEST='120363424299090366@g.us';
 
+// Mapa responsable → grupo WhatsApp
+// Completar con los Group IDs reales cuando Ally esté en los grupos
+const GRUPOS_POR_RESPONSABLE={
+  'Gonzalo Marvaldi': ALLY_GROUP_TEST,
+  'Andres Veyga':     ALLY_GROUP_TEST,
+  'Angel Flores':     ALLY_GROUP_TEST,
+};
+
+function getGrupoParaOT(ot){
+  // Buscar por responsable; si no matchea usar grupo TEST
+  const resp=ot.responsable||'';
+  for(const [nombre,gid] of Object.entries(GRUPOS_POR_RESPONSABLE)){
+    if(resp.toLowerCase().includes(nombre.split(' ')[0].toLowerCase())) return gid;
+  }
+  return ALLY_GROUP_TEST;
+}
+
 async function notificarAlly(ot, evento){
-  const grupo=ALLY_GROUP_TEST;
+  const grupo=getGrupoParaOT(ot);
   const mensajes={
-    en_transito:`📦 *Ops informa — OT en tránsito*\n\nOT ${ot.ot_numero}\n${ot.tipo||''}\n${ot.cuenta||''}\n\n🚚 En tránsito — Logística Alleata`,
-    entregado:`✅ *Ops informa — OT entregada*\n\nOT ${ot.ot_numero}\n${ot.tipo||''}\n${ot.cuenta||''}\n\n✅ Entregada con éxito`,
-    fallido:`❌ *Ops informa — OT con problema*\n\nOT ${ot.ot_numero}\n${ot.tipo||''}\n${ot.cuenta||''}\n\n❌ Entrega fallida`
+    en_transito:
+`📦 *Ops informa — OT en tránsito*
+
+OT ${ot.ot_numero}
+${ot.tipo||''}
+${ot.cuenta||''}
+
+🚚 En tránsito — Logística Alleata · Agendada para hoy`,
+
+    entregado:
+`✅ *Ops informa — OT entregada*
+
+OT ${ot.ot_numero}
+${ot.cuenta||''}
+
+✅ Entregada con éxito`,
+
+    fallido:
+`❌ *Ops informa — OT con problema*
+
+OT ${ot.ot_numero}
+${ot.cuenta||''}
+
+❌ Entrega fallida`
   };
   try{
+    const msg=mensajes[evento]||'';
+    if(!msg)return;
     await fetch(ALLY_URL+'/notificar',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({numero:grupo,mensaje:mensajes[evento]||''})
+      body:JSON.stringify({numero:grupo,mensaje:msg})
     });
+    console.log('Ally notif OK:',evento,'→',grupo);
   }catch(e){console.warn('Ally notif error:',e);}
 }
 
