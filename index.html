@@ -281,7 +281,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v1.9.4 · 19 mar 2026
+      v1.9.5 · 19 mar 2026
     </div>
   </div>
 </div>
@@ -330,7 +330,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v1.9.4 · 19 mar 2026
+      v1.9.5 · 19 mar 2026
     </div>
   </div>
 </nav>
@@ -344,7 +344,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <div class="topbar-right" id="topbar-date"></div>
     <button onclick="refreshCurrentModule()" title="Actualizar" style="background:none;border:1px solid var(--border2);color:var(--text-muted);border-radius:7px;padding:4px 10px;cursor:pointer;font-size:13px;margin-left:10px;transition:all .2s" onmouseover="this.style.color='var(--teal)';this.style.borderColor='var(--teal)'" onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border2)'">↺</button>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v1.9.4</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v1.9.5</div>
   </div>
   <div class="content">
 
@@ -513,7 +513,7 @@ tr:hover td{background:var(--surface2);}
             <select class="select" id="envFiltroEstado" onchange="renderEnvios()">
               <option value="">Todos</option>
               <option>Pre-Colecta</option><option>Despachado</option><option>En tránsito</option><option>En camino</option>
-              <option>En espera en sucursal</option><option>Entregado</option><option>Demorado</option>
+              <option>En espera en sucursal</option><option>Entregado</option><option>Fallido</option>
               <option>Perdido</option><option>Devuelto</option>
             </select>
           </div>
@@ -527,9 +527,14 @@ tr:hover td{background:var(--surface2);}
           <div class="sec-dot" style="background:var(--blue)"></div>
           <span id="envTablaLabel">Pre-Colecta Alleata</span>
         </div>
-        <button id="btnPrintSelected" onclick="printSelectedRotulos()" style="display:none;background:var(--grad);color:#fff;border:none;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;gap:6px;align-items:center">
-          🖨️ Imprimir seleccionados (<span id="selectedCount">0</span>)
-        </button>
+        <div style="display:flex;align-items:center;gap:8px">
+          <button id="btnPrintSelected" onclick="printSelectedRotulos()" style="display:none;background:var(--grad);color:#fff;border:none;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;gap:6px;align-items:center">
+            🖨️ Imprimir seleccionados (<span id="selectedCount">0</span>)
+          </button>
+          <button onclick="renderEnvios();loadBadges()" title="Actualizar tabla" style="background:var(--surface2);border:1px solid var(--border2);color:var(--teal);padding:6px 12px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:5px">
+            🔄 Actualizar
+          </button>
+        </div>
       </div>
       <div class="card"><div class="table-wrap">
         <table>
@@ -1105,7 +1110,7 @@ async function importSF(e){
     if(o.includes('CENTRO DE PROCESAMIENTO')||o.includes('CLASIFICACI'))return'En camino';
     if(o.includes('DEVUELTO')||o.includes('DEVOLUCION')||o.includes('DEVOLUCIÓN'))return'Devuelto';
     if(o.includes('PERDIDO'))return'Perdido';
-    if(o.includes('DEMORADO'))return'Demorado';
+    if(o.includes('DEMORADO'))return'Fallido';
     return'En tránsito';
   }
 
@@ -1297,7 +1302,7 @@ function renderLogisticaStats(list){
     grupos[log].total++;
     if(['En tránsito','En camino','Despachado','En espera en sucursal'].includes(e.estado))grupos[log].transito++;
     if(e.estado==='Entregado')grupos[log].entregado++;
-    if(['Demorado','Perdido','Devuelto'].includes(e.estado))grupos[log].problema++;
+    if(['Fallido','Perdido','Devuelto'].includes(e.estado))grupos[log].problema++;
   });
   const logColors={'ALLEATA':'#1dbf8e','Correo Argentino':'#1a9fd4'};
   const logIcons={'ALLEATA':'🚚','Correo Argentino':'📮'};
@@ -1348,7 +1353,7 @@ function renderEnviosTable(list){
   const empty=document.getElementById('enviosEmpty');
   empty.style.display=list.length?'none':'block';
   document.getElementById('enviosTable').innerHTML=list.map(e=>{
-    const estadoClass={'En tránsito':'badge-yellow','En camino':'badge-blue','Entregado':'badge-green','Demorado':'badge-orange','Perdido':'badge-red','Devuelto':'badge-red','Pre-Colecta':'badge-gray'}[e.estado]||'badge-gray';
+    const estadoClass={'En tránsito':'badge-yellow','En camino':'badge-blue','Entregado':'badge-green','Fallido':'badge-orange','Perdido':'badge-red','Devuelto':'badge-red','Pre-Colecta':'badge-gray'}[e.estado]||'badge-gray';
     const z=detectarZona(e.ciudad,e.provincia,e.cp_dest);
     return`<tr>
       <td style="text-align:center">${isLogistica?'':` <input type="checkbox" class="envio-chk" data-id="${e.id}" onchange="updateSelectedCount()" style="cursor:pointer;width:15px;height:15px">`}</td>
@@ -1373,7 +1378,7 @@ function renderEnviosTable(list){
       </td>
       <td>
         <select class="select" style="width:160px;padding:4px 8px;font-size:11px" onchange="updateEnvioEstado('${e.id}',this.value)">
-          ${['Pre-Colecta','Despachado','En tránsito','En camino','En espera en sucursal','Entregado','Demorado','Perdido','Devuelto'].map(s=>`<option ${(e.estado||'Pre-Colecta')===s?'selected':''}>${s}</option>`).join('')}
+          ${['Pre-Colecta','Despachado','En tránsito','En camino','En espera en sucursal','Entregado','Fallido','Perdido','Devuelto'].map(s=>`<option ${(e.estado||'Pre-Colecta')===s?'selected':''}>${s}</option>`).join('')}
         </select>
         <div style="font-size:9px;color:var(--text-muted);margin-top:3px">${e.ultimo_evento_fecha||''}</div>
       </td>
@@ -1483,7 +1488,7 @@ function mapearEstadoCA(estadoRaw){
   if(s.includes('EN PODER DEL DISTRIBUIDOR')||s.includes('CAMINO')) return 'En camino';
   if(s.includes('EN ESPERA EN SUCURSAL')||s.includes('SUCURSAL')) return 'En espera en sucursal';
   if(s.includes('CENTRO DE PROCESAMIENTO')||s.includes('CLASIFIC')) return 'En tránsito';
-  if(s.includes('DEMORADO')||s.includes('DEMORA')) return 'Demorado';
+  if(s.includes('DEMORADO')||s.includes('DEMORA')) return 'Fallido';
   if(s.includes('PERDIDO')) return 'Perdido';
   if(s) return 'En tránsito';
   return null;
