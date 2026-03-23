@@ -990,7 +990,7 @@ function showApp(){
   document.getElementById('sideUserName').textContent=nombre;
   const rolLabel={'admin':'Administrador','logistica':'Logística','operador':'Operador'}[currentProfile.rol]||'Operador';
   document.getElementById('sideUserRole').textContent=rolLabel;
-  setTimeout(()=>{ if(window._drawQR) window._drawQR(); },100);
+  setTimeout(()=>{ if(window._drawQR) window._drawQR(); },400);
   if(isAdmin){
     document.getElementById('nav-ajustes').style.display='flex';
     document.getElementById('nav-section-config').style.display='block';
@@ -1027,13 +1027,15 @@ const MOD_INFO={home:'Dashboard',sims:'Verificador SIMs',envios:'Envíos',desins
 function goTo(mod){
   const el=document.getElementById('nav-'+mod);
   if(el&&el.classList.contains('locked'))return;
-  document.querySelectorAll('.module').forEach(m=>m.classList.remove('active'));
+  document.querySelectorAll('.module').forEach(m=>{m.classList.remove('active');m.style.display='none';});
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
-  document.getElementById('mod-'+mod).classList.add('active');
+  const target=document.getElementById('mod-'+mod);
+  target.classList.add('active');target.style.display='block';
   const navEl=document.querySelector(`.nav-item[data-mod="${mod}"]`);
   if(navEl)navEl.classList.add('active');
   document.getElementById('topbar-title').textContent=MOD_INFO[mod]||mod;
   if(mod==='envios'){initEnvios();renderEnvios();}
+  if(mod==='home'){setTimeout(()=>{if(window._drawQR)window._drawQR();},200);}
   if(mod==='desinstalaciones'&&!DesinModule.cargado)cargarDesinstalaciones();
   if(mod==='horas')renderHoras();
   if(mod==='ajustes'){loadUsers();loadSimsDbStats();_auditPage=0;loadAuditLog();}
