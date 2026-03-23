@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v2.0.0</title>
+<title>Alleata · Operaciones v2.0.1</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -284,7 +284,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.0.0 · 23 mar 2026
+      v2.0.1 · 23 mar 2026
     </div>
   </div>
 </div>
@@ -333,7 +333,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.0.0 · 23 mar 2026
+      v2.0.1 · 23 mar 2026
     </div>
   </div>
 </nav>
@@ -347,7 +347,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <div class="topbar-right" id="topbar-date"></div>
     <button onclick="refreshCurrentModule()" title="Actualizar" style="background:none;border:1px solid var(--border2);color:var(--text-muted);border-radius:7px;padding:4px 10px;cursor:pointer;font-size:13px;margin-left:10px;transition:all .2s" onmouseover="this.style.color='var(--teal)';this.style.borderColor='var(--teal)'" onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border2)'">↺</button>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.0.0</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.0.1</div>
   </div>
   <div class="content">
 
@@ -826,7 +826,7 @@ tr:hover td{background:var(--surface2);}
 </div>
 
 <script>
-console.log('[Alleata v2.0.0] OK');
+console.log('[Alleata v2.0.1] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -999,9 +999,9 @@ function showApp(){
     document.getElementById('nav-ajustes').style.display='flex';
     document.getElementById('nav-section-config').style.display='block';
   }
-  ['sims','envios','devoluciones','horas'].forEach(mod=>{
+  ['sims','envios','desinstalaciones','horas'].forEach(mod=>{
     const el=document.getElementById('nav-'+mod);
-    if(!modulos.includes(mod)&&!isAdmin){el.classList.add('locked');el.onclick=null;}
+    if(el&&!modulos.includes(mod)&&!isAdmin){el.classList.add('locked');el.onclick=null;}
   });
   buildDashCards(modulos,isAdmin);
   updateDate();loadBadges();
@@ -1031,10 +1031,20 @@ const MOD_INFO={home:'Dashboard',sims:'Verificador SIMs',envios:'Envíos',desins
 function goTo(mod){
   const el=document.getElementById('nav-'+mod);
   if(el&&el.classList.contains('locked'))return;
-  document.querySelectorAll('.module').forEach(m=>{m.classList.remove('active');m.style.display='none';});
+  document.querySelectorAll('.module').forEach(m=>{
+    m.classList.remove('active');
+    m.style.display='none';
+    m.style.visibility='hidden';
+    m.style.position='absolute';
+    m.style.pointerEvents='none';
+  });
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   const target=document.getElementById('mod-'+mod);
-  target.classList.add('active');target.style.display='block';
+  target.classList.add('active');
+  target.style.display='block';
+  target.style.visibility='visible';
+  target.style.position='relative';
+  target.style.pointerEvents='auto';
   const navEl=document.querySelector(`.nav-item[data-mod="${mod}"]`);
   if(navEl)navEl.classList.add('active');
   document.getElementById('topbar-title').textContent=MOD_INFO[mod]||mod;
