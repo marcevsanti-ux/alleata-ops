@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v2.1.3</title>
+<title>Alleata · Operaciones v2.1.4</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -284,7 +284,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.1.3 · 23 mar 2026
+      v2.1.4 · 23 mar 2026
     </div>
   </div>
 </div>
@@ -333,7 +333,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.1.3 · 23 mar 2026
+      v2.1.4 · 23 mar 2026
     </div>
   </div>
 </nav>
@@ -347,7 +347,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <div class="topbar-right" id="topbar-date"></div>
     <button onclick="refreshCurrentModule()" title="Actualizar" style="background:none;border:1px solid var(--border2);color:var(--text-muted);border-radius:7px;padding:4px 10px;cursor:pointer;font-size:13px;margin-left:10px;transition:all .2s" onmouseover="this.style.color='var(--teal)';this.style.borderColor='var(--teal)'" onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border2)'">↺</button>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.1.3</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.1.4</div>
   </div>
   <div class="content">
 
@@ -840,7 +840,7 @@ tr:hover td{background:var(--surface2);}
 </div>
 
 <script>
-console.log('[Alleata v2.1.3] OK');
+console.log('[Alleata v2.1.4] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -1269,6 +1269,18 @@ async function importSF(e){
     const iAsig=col('Asignación');
     const iCosto=col('Costo de envio');
     const iLogistica=col('Logística');
+    const iNombreComercio=col('Nombre del comercio');
+    const iCalle=col('Calle');
+    const iCP=col('Código postal');
+    const iContacto=col('Contacto');
+    const iHorario=col('Horario');
+    const iCUIT=col('CUIT');
+    const iEmailComercio=col('Email');
+    const iTerminal=col('N° Terminal');
+    const iSimcard=col('N° Simcard');
+    const iUsuarioCajero=col('Usuario Cajero');
+    const iPassCajero=col('Contraseña Cajero');
+    const iMotivoDes=col('Motivo de desinstalación');
 
     // Soporte para archivo "Pre-Colecta todas las Logísticas"
     // La columna Logística usa merge de celdas — propagar valor hacia abajo
@@ -1309,7 +1321,7 @@ async function importSF(e){
     for(const r of dataRows){
       const track=String(r[iTracking]||'').trim();
       const ot=String(r[iOT]||'').trim();
-      if(!track&&!ot)continue;
+      if(!ot&&!String(r[iSFId]||'').trim())continue; // solo saltear si no tiene ID
       const obs=String(r[iObs]||'').trim();
       const item={
         user_id:currentUser.id,
@@ -1328,8 +1340,23 @@ async function importSF(e){
         estado:detectEstado(obs),
         logistica:'Correo Argentino',
         ultimo_evento:obs||'Importado desde SF',
-        ultimo_evento_fecha:new Date().toISOString().slice(0,10)
+        ultimo_evento_fecha:new Date().toISOString().slice(0,10),
+        nombre_comercio:iNombreComercio>=0?String(r[iNombreComercio]||'').trim():undefined,
+        direccion_completa:iCalle>=0?String(r[iCalle]||'').trim():undefined,
+        cp_dest:iCP>=0?String(r[iCP]||'').trim():undefined,
+        contacto:iContacto>=0?String(r[iContacto]||'').trim():undefined,
+        horario:iHorario>=0?String(r[iHorario]||'').trim():undefined,
+        cuit:iCUIT>=0&&r[iCUIT]?String(r[iCUIT]).trim():undefined,
+        email_comercio:iEmailComercio>=0?String(r[iEmailComercio]||'').trim()||undefined:undefined,
+        nro_terminal:iTerminal>=0?String(r[iTerminal]||'').trim()||undefined:undefined,
+        nro_simcard:iSimcard>=0?String(r[iSimcard]||'').trim()||undefined:undefined,
+        usuario_cajero:iUsuarioCajero>=0?String(r[iUsuarioCajero]||'').trim()||undefined:undefined,
+        password_cajero:iPassCajero>=0?String(r[iPassCajero]||'').trim()||undefined:undefined,
+        motivo_desinstalacion:iMotivoDes>=0?String(r[iMotivoDes]||'').trim()||undefined:undefined,
+        propietario_cuenta:'Jose Luis Cingolani'
       };
+      // Limpiar campos undefined para no sobreescribir con null
+      Object.keys(item).forEach(k=>item[k]===undefined&&delete item[k]);
       const{error}=await sb.from('envios').upsert(item,{onConflict:'sf_id',ignoreDuplicates:false});
       if(error){
         if(error.code==='23505')duplicadas++;
@@ -2347,6 +2374,18 @@ async function importPreColecta(e){
 
     // Mapeo de columnas del reporte Pre-Colecta
     const iLogistica=col('Logística');
+    const iNombreComercio=col('Nombre del comercio');
+    const iCalle=col('Calle');
+    const iCP=col('Código postal');
+    const iContacto=col('Contacto');
+    const iHorario=col('Horario');
+    const iCUIT=col('CUIT');
+    const iEmailComercio=col('Email');
+    const iTerminal=col('N° Terminal');
+    const iSimcard=col('N° Simcard');
+    const iUsuarioCajero=col('Usuario Cajero');
+    const iPassCajero=col('Contraseña Cajero');
+    const iMotivoDes=col('Motivo de desinstalación');
     const iSFId=col('Id. de orden de trabajo');
     const iResp=col('Responsable de la OT');
     const iTipo=col('Tipo de registro');
