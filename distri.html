@@ -2,393 +2,306 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <title>Alleata · Portal Distribuidor</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
-  *{box-sizing:border-box;margin:0;padding:0}
-  :root{
-    --teal:#1dbf8e;--blue:#4a9eff;--orange:#f59e0b;--red:#ef4444;--green:#10b981;
-    --bg:#f8fafc;--surface:#fff;--border:#e2e8f0;--text:#0f172a;--muted:#64748b;
-    --radius:12px;
-  }
-  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
-  .header{background:var(--teal);color:#fff;padding:16px 20px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,.12)}
-  .header-logo{font-size:22px;font-weight:900}
-  .header-sub{font-size:12px;opacity:.85;margin-top:2px}
-  .tabs{display:flex;background:#fff;border-bottom:2px solid var(--border);position:sticky;top:64px;z-index:99}
-  .tab{flex:1;padding:14px 8px;text-align:center;font-size:12px;font-weight:700;color:var(--muted);cursor:pointer;border-bottom:3px solid transparent;transition:all .2s}
-  .tab.active{color:var(--teal);border-bottom-color:var(--teal)}
-  .container{max-width:700px;margin:0 auto;padding:16px}
-  .card{background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);padding:16px;margin-bottom:12px}
-  .card-ot{border-left:4px solid var(--border)}
-  .card-ot.pendiente{border-left-color:var(--orange)}
-  .card-ot.en-proceso{border-left-color:var(--blue)}
-  .card-ot.exitoso{border-left-color:var(--green)}
-  .ot-num{font-size:16px;font-weight:800;color:var(--teal)}
-  .ot-cuenta{font-size:12px;color:var(--muted);margin-top:2px}
-  .ot-dist{font-size:11px;color:var(--muted);margin-top:4px}
-  .badge{display:inline-block;padding:3px 10px;border-radius:99px;font-size:11px;font-weight:700}
-  .badge-pendiente{background:#fef3c7;color:#92400e}
-  .badge-proceso{background:#dbeafe;color:#1e40af}
-  .badge-exitoso{background:#d1fae5;color:#065f46}
-  .badge-contactado{background:#e0f2fe;color:#0369a1}
-  .badge-noencontrado{background:#fee2e2;color:#991b1b}
-  .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:10px 18px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;border:none;transition:all .15s}
-  .btn-teal{background:var(--teal);color:#fff}
-  .btn-ghost{background:transparent;color:var(--muted);border:1px solid var(--border)}
-  .btn-sm{padding:6px 12px;font-size:12px;border-radius:8px}
-  .btn-block{width:100%}
-  .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
-  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:flex-end;justify-content:center;z-index:1000;padding:0}
-  .modal-box{background:#fff;border-radius:20px 20px 0 0;padding:24px;width:100%;max-width:500px;max-height:90vh;overflow-y:auto}
-  .modal-title{font-size:16px;font-weight:800;margin-bottom:16px}
-  .field{margin-bottom:12px}
-  .label{display:block;font-size:11px;font-weight:700;color:var(--muted);margin-bottom:4px;letter-spacing:.5px;text-transform:uppercase}
-  .input{width:100%;padding:10px 12px;border-radius:8px;border:1.5px solid var(--border);font-size:14px;font-family:inherit;outline:none;transition:border .15s}
-  .input:focus{border-color:var(--teal)}
-  .select{width:100%;padding:10px 12px;border-radius:8px;border:1.5px solid var(--border);font-size:14px;font-family:inherit;outline:none;background:#fff}
-  .empty{text-align:center;padding:48px 20px;color:var(--muted)}
-  .empty-icon{font-size:40px;margin-bottom:12px}
-  .stat-row{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
-  .stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px;text-align:center}
-  .stat-num{font-size:24px;font-weight:900;color:var(--teal)}
-  .stat-label{font-size:10px;color:var(--muted);margin-top:2px;font-weight:700;letter-spacing:.5px}
-  .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
-  .cal-day{background:var(--bg);border-radius:6px;padding:6px 2px;text-align:center;font-size:11px;cursor:pointer;min-height:36px;position:relative}
-  .cal-day.has-ot{background:#d1fae5;font-weight:700;color:#065f46}
-  .cal-day.today{border:2px solid var(--teal)}
-  .cal-day.other-month{opacity:.3}
-  .cal-dow{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:4px}
-  .cal-dow-label{text-align:center;font-size:10px;font-weight:700;color:var(--muted)}
-  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--text);color:#fff;padding:10px 20px;border-radius:10px;font-size:13px;font-weight:700;z-index:9999;pointer-events:none;opacity:0;transition:opacity .3s}
-  .toast.show{opacity:1}
-  .foto-preview{width:100%;border-radius:10px;margin-top:8px;display:none}
-  @media(prefers-color-scheme:dark){
-    :root{--bg:#0f172a;--surface:#1e293b;--border:#334155;--text:#f1f5f9;--muted:#94a3b8}
-    .select,.input{background:var(--surface);color:var(--text)}
-  }
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{--teal:#1dbf8e;--blue:#4a9eff;--orange:#f59e0b;--red:#ef4444;--green:#10b981;--bg:#f0f4f8;--surface:#fff;--border:#e2e8f0;--text:#0f172a;--muted:#64748b;--header:#0A2540;--radius:14px}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding-bottom:80px}
+.header{background:var(--header);color:#fff;padding:0 16px;height:60px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:200;box-shadow:0 2px 12px rgba(0,0,0,.2)}
+.header-left{display:flex;align-items:center;gap:10px}
+.header-logo{font-size:20px;font-weight:900}
+.header-version{font-size:10px;color:#94a3b8;background:rgba(255,255,255,.1);padding:2px 8px;border-radius:99px}
+.header-distri{font-size:12px;font-weight:700;color:var(--teal);background:rgba(29,191,142,.15);border:1px solid rgba(29,191,142,.3);padding:4px 12px;border-radius:99px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px}
+.header-meta{font-size:10px;color:#64748b;margin-top:1px}
+.stats-bar{background:var(--header);padding:10px 16px 14px;display:flex;gap:20px}
+.stat-item{text-align:center}
+.stat-num{font-size:22px;font-weight:900;color:#fff;line-height:1}
+.stat-num.orange{color:var(--orange)}
+.stat-num.green{color:var(--green)}
+.stat-num.blue{color:var(--blue)}
+.stat-label{font-size:9px;color:#64748b;font-weight:700;letter-spacing:.5px;margin-top:2px}
+.tabs{background:var(--header);border-bottom:1px solid rgba(255,255,255,.08);display:flex;position:sticky;top:60px;z-index:199}
+.tab{flex:1;padding:12px 6px;text-align:center;font-size:11px;font-weight:700;color:#64748b;cursor:pointer;border-bottom:3px solid transparent;transition:all .2s;letter-spacing:.3px}
+.tab.active{color:var(--teal);border-bottom-color:var(--teal)}
+.container{max-width:600px;margin:0 auto;padding:14px}
+.filter-bar{display:flex;gap:8px;margin-bottom:14px;overflow-x:auto;padding-bottom:2px;scrollbar-width:none}
+.filter-bar::-webkit-scrollbar{display:none}
+.filter-chip{flex-shrink:0;padding:6px 14px;border-radius:99px;font-size:11px;font-weight:700;cursor:pointer;border:1.5px solid var(--border);background:var(--surface);color:var(--muted);transition:all .15s;white-space:nowrap}
+.filter-chip.active{background:var(--teal);color:#fff;border-color:var(--teal)}
+.ot-card{background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);margin-bottom:12px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.ot-card-header{padding:14px 14px 10px;border-bottom:1px solid var(--border)}
+.ot-num{font-size:12px;font-weight:700;color:var(--teal);margin-bottom:3px}
+.ot-comercio{font-size:16px;font-weight:800;color:var(--text);line-height:1.2}
+.ot-cuenta{font-size:12px;color:var(--muted);margin-top:3px}
+.ot-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:99px;font-size:11px;font-weight:700;margin-top:6px}
+.badge-pend{background:#fef3c7;color:#92400e}
+.badge-cont{background:#dbeafe;color:#1e40af}
+.badge-noen{background:#fee2e2;color:#991b1b}
+.badge-exit{background:#d1fae5;color:#065f46}
+.badge-reti{background:#ede9fe;color:#5b21b6}
+.badge-roll{background:#f0fdf4;color:#166534;border:1px solid #86efac}
+.ot-card-body{padding:12px 14px}
+.ot-info-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.ot-info-label{font-size:9px;font-weight:700;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;margin-bottom:2px}
+.ot-info-value{font-size:12px;font-weight:600;color:var(--text)}
+.map-wrap{border-radius:10px;overflow:hidden;height:130px;background:#e8f4f2;position:relative;margin-bottom:12px;border:1px solid var(--border)}
+.map-wrap iframe{width:100%;height:100%;border:none}
+.map-open-btn{position:absolute;top:8px;right:8px;background:var(--teal);color:#fff;border:none;border-radius:8px;padding:5px 10px;font-size:11px;font-weight:700;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,.2)}
+.ot-card-actions{padding:0 14px 14px;display:flex;gap:8px;flex-wrap:wrap}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:5px;padding:9px 14px;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;border:none;transition:all .15s;font-family:inherit;text-decoration:none}
+.btn-teal{background:var(--teal);color:#fff}
+.btn-ghost{background:transparent;color:var(--muted);border:1.5px solid var(--border)}
+.btn-wa{background:#25D366;color:#fff}
+.btn-map{background:#4285F4;color:#fff}
+.btn-sm{padding:7px 12px;font-size:11px}
+.btn-block{width:100%}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center;z-index:1000;backdrop-filter:blur(2px)}
+.modal-box{background:var(--surface);border-radius:20px 20px 0 0;padding:20px;width:100%;max-width:500px;max-height:85vh;overflow-y:auto}
+.modal-ot-num{font-size:11px;font-weight:700;color:var(--teal);margin-bottom:4px}
+.modal-ot-name{font-size:17px;font-weight:800;margin-bottom:16px}
+.modal-section-label{font-size:10px;font-weight:700;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;margin-bottom:10px}
+.estado-btns{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px}
+.estado-btn{padding:12px 8px;border-radius:12px;border:2px solid;font-size:13px;font-weight:700;cursor:pointer;text-align:center;background:transparent;font-family:inherit;transition:all .15s}
+.e-cont{border-color:#3b82f6;color:#3b82f6}.e-cont.sel{background:#3b82f6;color:#fff}
+.e-noen{border-color:#ef4444;color:#ef4444}.e-noen.sel{background:#ef4444;color:#fff}
+.e-exit{border-color:#10b981;color:#10b981}.e-exit.sel{background:#10b981;color:#fff}
+.e-reti{border-color:#8b5cf6;color:#8b5cf6}.e-reti.sel{background:#8b5cf6;color:#fff}
+.e-roll{border-color:#16a34a;color:#16a34a;grid-column:1/-1}.e-roll.sel{background:#16a34a;color:#fff}
+.field{margin-bottom:12px}
+.label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bottom:4px;letter-spacing:.5px;text-transform:uppercase}
+.input{width:100%;padding:10px 12px;border-radius:10px;border:1.5px solid var(--border);font-size:13px;font-family:inherit;outline:none;transition:border .15s}
+.input:focus{border-color:var(--teal)}
+.textarea{width:100%;padding:10px 12px;border-radius:10px;border:1.5px solid var(--border);font-size:13px;font-family:inherit;outline:none;resize:none;margin-bottom:12px}
+.textarea:focus{border-color:var(--teal)}
+.modal-footer{display:flex;gap:8px}
+.agenda-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.agenda-mes{font-size:15px;font-weight:800}
+.cal-nav{background:none;border:1.5px solid var(--border);border-radius:8px;width:32px;height:32px;cursor:pointer;font-size:14px}
+.cal-dow{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:4px}
+.cal-dow-label{text-align:center;font-size:9px;font-weight:700;color:var(--muted)}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
+.cal-day{background:var(--bg);border-radius:8px;padding:5px 2px;text-align:center;font-size:12px;cursor:pointer;min-height:36px;border:1.5px solid transparent}
+.cal-day.has-ot{background:#d1fae5;font-weight:800;color:#065f46}
+.cal-day.today{border-color:var(--teal)}
+.cal-day.other-month{opacity:.25;cursor:default}
+.cal-day-count{font-size:8px;font-weight:800}
+.ruta-card{background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);padding:12px 14px;margin-bottom:8px;display:flex;gap:12px;align-items:flex-start}
+.ruta-num{width:28px;height:28px;border-radius:50%;background:var(--teal);color:#fff;font-size:12px;font-weight:900;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.ruta-ot{font-size:11px;font-weight:700;color:var(--teal)}
+.ruta-nombre{font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ruta-ciudad{font-size:11px;color:var(--muted)}
+.ruta-dist{font-size:12px;font-weight:700;color:var(--orange);flex-shrink:0}
+.toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--text);color:#fff;padding:10px 20px;border-radius:12px;font-size:13px;font-weight:700;z-index:9999;pointer-events:none;opacity:0;transition:opacity .3s;white-space:nowrap}
+.toast.show{opacity:1}
+.empty{text-align:center;padding:48px 20px;color:var(--muted)}
+.empty-icon{font-size:44px;margin-bottom:12px}
 </style>
 </head>
 <body>
-
 <div class="header">
-  <div>
-    <div class="header-logo">🚚 Alleata</div>
-    <div class="header-sub" id="header-distri-name">Portal Distribuidor</div>
+  <div class="header-left">
+    <div>
+      <div class="header-logo">🚚 Alleata</div>
+      <div class="header-meta" id="header-meta">Portal Distribuidor</div>
+    </div>
+    <div class="header-version">v1.2.0</div>
   </div>
+  <div class="header-distri" id="header-distri">—</div>
 </div>
-
+<div class="stats-bar" id="stats-bar" style="display:none">
+  <div class="stat-item"><div class="stat-num" id="s-total">0</div><div class="stat-label">TOTAL</div></div>
+  <div class="stat-item"><div class="stat-num orange" id="s-pend">0</div><div class="stat-label">PENDIENTES</div></div>
+  <div class="stat-item"><div class="stat-num blue" id="s-cont">0</div><div class="stat-label">CONTACTADAS</div></div>
+  <div class="stat-item"><div class="stat-num green" id="s-exit">0</div><div class="stat-label">EXITOSAS</div></div>
+</div>
 <div class="tabs" id="tabs" style="display:none">
-  <div class="tab active" id="tab-ots" onclick="switchTab('ots')">📦 Mis OTs</div>
+  <div class="tab active" id="tab-ots" onclick="switchTab('ots')">📦 OTs</div>
   <div class="tab" id="tab-agenda" onclick="switchTab('agenda')">📅 Agenda</div>
+  <div class="tab" id="tab-ruta" onclick="switchTab('ruta')">🗺️ Hoja de Ruta</div>
 </div>
-
 <div class="container">
-
-  <!-- LOADING -->
-  <div id="view-loading" class="empty">
-    <div class="empty-icon">⏳</div>
-    <div>Cargando tu portal...</div>
-  </div>
-
-  <!-- ERROR -->
-  <div id="view-error" style="display:none" class="empty">
-    <div class="empty-icon">❌</div>
-    <div id="error-msg">Link inválido o distribuidor no encontrado</div>
-  </div>
-
-  <!-- OTS VIEW -->
-  <div id="view-ots" style="display:none">
-    <div class="stat-row" id="stat-row"></div>
-    <div id="ots-list"></div>
-  </div>
-
-  <!-- AGENDA VIEW -->
+  <div id="view-loading" class="empty"><div class="empty-icon">⏳</div><div style="font-weight:700">Cargando tu portal...</div></div>
+  <div id="view-error" style="display:none" class="empty"><div class="empty-icon">❌</div><div id="error-msg" style="font-weight:700">Link inválido</div></div>
+  <div id="view-ots" style="display:none"><div class="filter-bar" id="filter-bar"></div><div id="ots-list"></div></div>
   <div id="view-agenda" style="display:none">
-    <div class="card" style="margin-bottom:12px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-        <button class="btn btn-ghost btn-sm" onclick="agendaNavMes(-1)">◀</button>
-        <div style="font-weight:800;font-size:14px" id="agenda-mes-label"></div>
-        <button class="btn btn-ghost btn-sm" onclick="agendaNavMes(1)">▶</button>
+    <div style="background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);padding:16px;margin-bottom:12px">
+      <div class="agenda-header">
+        <button class="cal-nav" onclick="agendaNav(-1)">◀</button>
+        <div class="agenda-mes" id="agenda-mes"></div>
+        <button class="cal-nav" onclick="agendaNav(1)">▶</button>
       </div>
       <div class="cal-dow" id="cal-dow"></div>
       <div class="cal-grid" id="cal-grid"></div>
     </div>
-    <div id="agenda-day-detail" style="display:none"></div>
+    <div id="agenda-detail"></div>
   </div>
-
+  <div id="view-ruta" style="display:none"><div id="ruta-list"></div></div>
 </div>
-
-<!-- Modal Estado/Reporte -->
-<div id="modal-reporte" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeModal()">
+<div id="modal-estado" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeModal()">
   <div class="modal-box">
-    <div class="modal-title" id="modal-title">Reportar OT</div>
-    <div class="field">
-      <label class="label">Estado</label>
-      <select class="select" id="modal-estado">
-        <option value="Pendiente">Pendiente</option>
-        <option value="Contactado">Contactado</option>
-        <option value="No encontrado">No encontrado</option>
-        <option value="Exitoso">Exitoso — retirado</option>
-      </select>
+    <div class="modal-ot-num" id="modal-ot-num"></div>
+    <div class="modal-ot-name" id="modal-ot-name"></div>
+    <div class="modal-section-label">Marcar como</div>
+    <div class="estado-btns">
+      <button class="estado-btn e-cont" onclick="selEst('Contactado')">📞 Contactado</button>
+      <button class="estado-btn e-noen" onclick="selEst('No encontrado')">❌ No encontrado</button>
+      <button class="estado-btn e-exit" onclick="selEst('Exitoso')">✅ Exitoso</button>
+      <button class="estado-btn e-reti" onclick="selEst('Confirmado retiro')">📦 Confirmado retiro</button>
+      <button class="estado-btn e-roll" onclick="selEst('Rollout')">🔄 Rollout</button>
     </div>
-    <div class="field" id="modal-fecha-wrap">
+    <div class="field" id="fecha-wrap" style="display:none">
       <label class="label">Fecha de retiro</label>
       <input type="date" class="input" id="modal-fecha">
     </div>
-    <div class="field">
-      <label class="label">Notas</label>
-      <input type="text" class="input" id="modal-notas" placeholder="Observaciones opcionales">
-    </div>
-    <div class="field">
-      <label class="label">Foto (opcional)</label>
-      <input type="file" class="input" id="modal-foto" accept="image/*" capture="environment" onchange="previewFoto(this)">
-      <img id="foto-preview" class="foto-preview">
-    </div>
-    <div style="display:flex;gap:8px;margin-top:4px">
-      <button class="btn btn-teal btn-block" onclick="guardarReporte()">Guardar</button>
-      <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+    <textarea class="textarea" id="modal-obs" placeholder="Observación (opcional)..." rows="3"></textarea>
+    <div class="modal-footer">
+      <button class="btn btn-teal btn-block" onclick="guardarEstado()">Guardar</button>
+      <button class="btn btn-ghost" onclick="closeModal()" style="min-width:90px">Cancelar</button>
     </div>
   </div>
 </div>
-
 <div id="toast" class="toast"></div>
-
 <script>
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const{createClient}=supabase;
 const sb=createClient(SUPABASE_URL,SUPABASE_KEY);
-
-const params=new URLSearchParams(location.search);
-const TOKEN=params.get('token')||'';
-
-const CP_COORDS={1005:[-34.6037,-58.3816],1289:[-34.639,-58.378],1414:[-34.588,-58.44],1425:[-34.588,-58.42],1604:[-34.476,-58.52],1625:[-34.349,-58.797],1629:[-34.458,-58.914],1640:[-34.492,-58.509],1650:[-34.567,-58.539],1657:[-34.588,-58.658],1663:[-34.539,-58.706],1700:[-34.617,-58.557],1704:[-34.644,-58.565],1708:[-34.653,-58.62],1714:[-34.659,-58.665],1748:[-34.604,-58.937],1752:[-34.678,-58.529],1757:[-34.748,-58.597],1805:[-34.847,-58.515],1821:[-34.7,-58.405],1824:[-34.705,-58.4],1827:[-34.765,-58.423],1832:[-34.765,-58.423],1836:[-34.801,-58.454],1856:[-34.894,-58.399],1862:[-34.944,-58.47],1875:[-34.705,-58.315],1880:[-34.763,-58.208],1886:[-34.836,-58.193],1900:[-34.9205,-57.9536],1984:[-34.995,-58.006],
-// AMBA extendido
-1171:[-34.6037,-58.3816],1172:[-34.6037,-58.3816],1173:[-34.6037,-58.3816],1174:[-34.6037,-58.3816],1175:[-34.6037,-58.3816],1176:[-34.6037,-58.3816],1177:[-34.6037,-58.3816],1178:[-34.6037,-58.3816],1179:[-34.6037,-58.3816],1180:[-34.6037,-58.3816],1181:[-34.6037,-58.3816],1182:[-34.6037,-58.3816],1183:[-34.6037,-58.3816],1184:[-34.6037,-58.3816],1185:[-34.6037,-58.3816],1186:[-34.6037,-58.3816],1187:[-34.6037,-58.3816],1188:[-34.6037,-58.3816],1189:[-34.6037,-58.3816],1190:[-34.6037,-58.3816],1191:[-34.6037,-58.3816],1192:[-34.6037,-58.3816],1193:[-34.6037,-58.3816],1194:[-34.6037,-58.3816],1195:[-34.6037,-58.3816],1196:[-34.6037,-58.3816],1197:[-34.6037,-58.3816],1198:[-34.6037,-58.3816],1199:[-34.6037,-58.3816],1200:[-34.6037,-58.3816],1201:[-34.6037,-58.3816],1202:[-34.6037,-58.3816],1203:[-34.6037,-58.3816],1204:[-34.6037,-58.3816],1205:[-34.6037,-58.3816],1206:[-34.6037,-58.3816],1207:[-34.6037,-58.3816],1208:[-34.6037,-58.3816],1209:[-34.6037,-58.3816],1210:[-34.6037,-58.3816],1211:[-34.6037,-58.3816],1212:[-34.6037,-58.3816],1213:[-34.6037,-58.3816],1214:[-34.6037,-58.3816],1215:[-34.6037,-58.3816],1216:[-34.6037,-58.3816],1217:[-34.6037,-58.3816],1218:[-34.6037,-58.3816],1219:[-34.6037,-58.3816],1220:[-34.6037,-58.3816],1221:[-34.6037,-58.3816],1222:[-34.6037,-58.3816],1223:[-34.6037,-58.3816],1224:[-34.6037,-58.3816],1225:[-34.6037,-58.3816],1226:[-34.6037,-58.3816],1227:[-34.6037,-58.3816],1228:[-34.6037,-58.3816],1229:[-34.6037,-58.3816],1230:[-34.6037,-58.3816],1231:[-34.6037,-58.3816],1232:[-34.6037,-58.3816],1233:[-34.6037,-58.3816],1234:[-34.6037,-58.3816],1235:[-34.6037,-58.3816],1236:[-34.6037,-58.3816],1237:[-34.6037,-58.3816],1238:[-34.6037,-58.3816],1239:[-34.6037,-58.3816],1240:[-34.6037,-58.3816],1241:[-34.6037,-58.3816],1242:[-34.6037,-58.3816],1243:[-34.6037,-58.3816],1244:[-34.6037,-58.3816],1245:[-34.6037,-58.3816],1246:[-34.6037,-58.3816],1247:[-34.6037,-58.3816],1248:[-34.6037,-58.3816],1249:[-34.6037,-58.3816],1250:[-34.6037,-58.3816],1251:[-34.6037,-58.3816],1252:[-34.6037,-58.3816],1253:[-34.6037,-58.3816],1254:[-34.6037,-58.3816],1255:[-34.6037,-58.3816],1256:[-34.6037,-58.3816],1257:[-34.6037,-58.3816],1258:[-34.6037,-58.3816],1259:[-34.6037,-58.3816],1260:[-34.6037,-58.3816],1261:[-34.6037,-58.3816],1262:[-34.6037,-58.3816],1263:[-34.6037,-58.3816],1264:[-34.6037,-58.3816],1265:[-34.6037,-58.3816],1266:[-34.6037,-58.3816],1267:[-34.6037,-58.3816],1268:[-34.6037,-58.3816],1269:[-34.6037,-58.3816],1270:[-34.6037,-58.3816],1271:[-34.6037,-58.3816],1272:[-34.6037,-58.3816],1273:[-34.6037,-58.3816],1274:[-34.6037,-58.3816],1275:[-34.6037,-58.3816],1276:[-34.6037,-58.3816],1277:[-34.6037,-58.3816],1278:[-34.6037,-58.3816],1279:[-34.6037,-58.3816],1280:[-34.6037,-58.3816],1281:[-34.6037,-58.3816],1282:[-34.6037,-58.3816],1283:[-34.6037,-58.3816],1284:[-34.6037,-58.3816],1285:[-34.6037,-58.3816],1286:[-34.6037,-58.3816],1287:[-34.6037,-58.3816],1288:[-34.6037,-58.3816],
-// GBA
-1601:[-34.462,-58.505],1602:[-34.462,-58.505],1603:[-34.462,-58.505],1605:[-34.465,-58.52],1606:[-34.465,-58.52],1607:[-34.465,-58.52],1608:[-34.465,-58.52],1609:[-34.465,-58.52],1610:[-34.465,-58.52],1611:[-34.465,-58.52],1612:[-34.465,-58.52],1613:[-34.465,-58.52],1614:[-34.465,-58.52],1615:[-34.465,-58.52],1616:[-34.465,-58.52],1617:[-34.465,-58.52],1618:[-34.465,-58.52],1619:[-34.465,-58.52],1620:[-34.465,-58.52],1621:[-34.465,-58.52],1622:[-34.465,-58.52],1623:[-34.465,-58.52],1624:[-34.465,-58.52],1626:[-34.349,-58.797],1627:[-34.349,-58.797],1628:[-34.349,-58.797],1630:[-34.458,-58.914],1631:[-34.458,-58.914],1632:[-34.458,-58.914],1633:[-34.458,-58.914],1634:[-34.458,-58.914],1635:[-34.458,-58.914],1636:[-34.458,-58.914],1637:[-34.458,-58.914],1638:[-34.458,-58.914],1639:[-34.458,-58.914],1641:[-34.492,-58.509],1642:[-34.492,-58.509],1643:[-34.492,-58.509],1644:[-34.492,-58.509],1645:[-34.492,-58.509],1646:[-34.492,-58.509],1647:[-34.492,-58.509],1648:[-34.492,-58.509],1649:[-34.492,-58.509],1651:[-34.567,-58.539],1652:[-34.567,-58.539],1653:[-34.567,-58.539],1654:[-34.567,-58.539],1655:[-34.567,-58.539],1656:[-34.567,-58.539],1658:[-34.588,-58.658],1659:[-34.588,-58.658],1660:[-34.588,-58.658],1661:[-34.588,-58.658],1662:[-34.588,-58.658],1664:[-34.539,-58.706],1665:[-34.539,-58.706],1666:[-34.539,-58.706],1667:[-34.539,-58.706],1668:[-34.539,-58.706],1669:[-34.539,-58.706],1670:[-34.539,-58.706],1671:[-34.539,-58.706],1672:[-34.539,-58.706],1673:[-34.539,-58.706],1674:[-34.539,-58.706],1675:[-34.539,-58.706],1676:[-34.539,-58.706],1677:[-34.539,-58.706],1678:[-34.539,-58.706],1679:[-34.539,-58.706],1680:[-34.539,-58.706],1681:[-34.539,-58.706],1682:[-34.539,-58.706],1683:[-34.539,-58.706],1684:[-34.539,-58.706],1685:[-34.539,-58.706],1686:[-34.539,-58.706],1687:[-34.539,-58.706],1688:[-34.539,-58.706],1689:[-34.539,-58.706],1690:[-34.539,-58.706],1691:[-34.539,-58.706],1692:[-34.539,-58.706],1693:[-34.539,-58.706],1694:[-34.539,-58.706],1695:[-34.539,-58.706],1696:[-34.539,-58.706],1697:[-34.539,-58.706],1698:[-34.539,-58.706],1699:[-34.539,-58.706],1701:[-34.617,-58.557],1702:[-34.617,-58.557],1703:[-34.617,-58.557],1705:[-34.644,-58.565],1706:[-34.644,-58.565],1707:[-34.644,-58.565],1709:[-34.653,-58.62],1710:[-34.653,-58.62],1711:[-34.653,-58.62],1712:[-34.653,-58.62],1713:[-34.653,-58.62],1715:[-34.659,-58.665],1716:[-34.659,-58.665],1717:[-34.659,-58.665],1718:[-34.659,-58.665],1719:[-34.659,-58.665],1720:[-34.659,-58.665],1721:[-34.659,-58.665],1722:[-34.659,-58.665],1723:[-34.659,-58.665],1724:[-34.659,-58.665],1725:[-34.659,-58.665],1726:[-34.659,-58.665],1727:[-34.659,-58.665],1728:[-34.659,-58.665],1729:[-34.659,-58.665],1730:[-34.659,-58.665],1731:[-34.659,-58.665],1732:[-34.659,-58.665],1733:[-34.659,-58.665],1734:[-34.659,-58.665],1735:[-34.659,-58.665],1736:[-34.659,-58.665],1737:[-34.659,-58.665],1738:[-34.659,-58.665],1739:[-34.659,-58.665],1740:[-34.659,-58.665],1741:[-34.659,-58.665],1742:[-34.659,-58.665],1743:[-34.659,-58.665],1744:[-34.659,-58.665],1745:[-34.659,-58.665],1746:[-34.659,-58.665],1747:[-34.659,-58.665],1749:[-34.604,-58.937],1750:[-34.604,-58.937],1751:[-34.604,-58.937],1753:[-34.678,-58.529],1754:[-34.678,-58.529],1755:[-34.678,-58.529],1756:[-34.678,-58.529],1758:[-34.748,-58.597],1759:[-34.748,-58.597],1760:[-34.748,-58.597],1761:[-34.748,-58.597],1762:[-34.748,-58.597],1763:[-34.748,-58.597],1764:[-34.748,-58.597],1765:[-34.748,-58.597],1766:[-34.748,-58.597],1767:[-34.748,-58.597],1768:[-34.748,-58.597],1769:[-34.748,-58.597],1770:[-34.748,-58.597],1771:[-34.748,-58.597],1772:[-34.748,-58.597],1773:[-34.748,-58.597],1774:[-34.748,-58.597],1775:[-34.748,-58.597],1776:[-34.748,-58.597],1777:[-34.748,-58.597],1778:[-34.748,-58.597],1779:[-34.748,-58.597],1780:[-34.748,-58.597],1781:[-34.748,-58.597],1782:[-34.748,-58.597],1783:[-34.748,-58.597],1784:[-34.748,-58.597],1785:[-34.748,-58.597],1786:[-34.748,-58.597],1787:[-34.748,-58.597],1788:[-34.748,-58.597],1789:[-34.748,-58.597],1790:[-34.748,-58.597],1791:[-34.748,-58.597],1792:[-34.748,-58.597],1793:[-34.748,-58.597],1794:[-34.748,-58.597],1795:[-34.748,-58.597],1796:[-34.748,-58.597],1797:[-34.748,-58.597],1798:[-34.748,-58.597],1799:[-34.748,-58.597],1800:[-34.847,-58.515],1801:[-34.847,-58.515],1802:[-34.847,-58.515],1803:[-34.847,-58.515],1804:[-34.894,-58.399],
-2000:[-32.9468,-60.6393],2800:[-34.098,-59.027],2900:[-33.3347,-60.2117],3000:[-31.6333,-60.7],3100:[-31.7333,-60.5167],3300:[-27.3671,-55.896],3400:[-27.4806,-58.8341],3500:[-27.4514,-58.9867],3600:[-26.1775,-58.1781],4000:[-26.8083,-65.2176],4400:[-24.7821,-65.4232],4600:[-24.1857,-65.2994],5000:[-31.4135,-64.1811],5151:[-31.3456,-64.3376],5152:[-31.3456,-64.3376],5500:[-32.8908,-68.8272],5800:[-33.1232,-64.3493],5900:[-32.4072,-63.2409],6000:[-34.5667,-60.9167],6700:[-34.5696,-59.1076],7000:[-37.325,-59.1392],7174:[-37.643,-57.706],7300:[-36.7756,-59.8578],7400:[-36.8921,-60.3224],7600:[-38.0023,-57.5575],7601:[-38.0023,-57.5575],7602:[-38.0023,-57.5575],7603:[-38.0023,-57.5575],7604:[-38.0023,-57.5575],7607:[-38.272,-57.837],7608:[-38.0023,-57.5575],7609:[-37.875,-57.523],7610:[-38.0023,-57.5575],7620:[-37.754,-58.287],7630:[-38.554,-58.746],8000:[-38.7183,-62.2663],8300:[-38.9516,-68.0591],8400:[-41.1335,-71.3103],8500:[-40.8135,-62.9967],9000:[-45.8645,-67.4977]};
-
-function haversine(lat1,lon1,lat2,lon2){
-  const R=6371,toRad=x=>x*Math.PI/180;
-  const dLat=toRad(lat2-lat1),dLon=toRad(lon2-lon1);
-  const a=Math.sin(dLat/2)**2+Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
-  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
-}
-
-let _distri=null;
-let _ots=[];
-let _reportes={};
-let _modalOt=null;
-let _agendaMes=new Date();
-
-function showToast(msg,ok=true){
-  const t=document.getElementById('toast');
-  t.textContent=msg;
-  t.style.background=ok?'#0f172a':'#ef4444';
-  t.classList.add('show');
-  setTimeout(()=>t.classList.remove('show'),2500);
-}
-
+const TOKEN=new URLSearchParams(location.search).get('token')||'';
+const CP_COORDS={1005:[-34.6037,-58.3816],1171:[-34.6037,-58.3816],1172:[-34.6037,-58.3816],1173:[-34.6037,-58.3816],1174:[-34.6037,-58.3816],1175:[-34.6037,-58.3816],1176:[-34.6037,-58.3816],1177:[-34.6037,-58.3816],1178:[-34.6037,-58.3816],1179:[-34.6037,-58.3816],1180:[-34.6037,-58.3816],1181:[-34.6037,-58.3816],1182:[-34.6037,-58.3816],1183:[-34.6037,-58.3816],1184:[-34.6037,-58.3816],1185:[-34.6037,-58.3816],1186:[-34.6037,-58.3816],1187:[-34.6037,-58.3816],1188:[-34.6037,-58.3816],1189:[-34.6037,-58.3816],1190:[-34.6037,-58.3816],1191:[-34.6037,-58.3816],1192:[-34.6037,-58.3816],1193:[-34.6037,-58.3816],1194:[-34.6037,-58.3816],1195:[-34.6037,-58.3816],1196:[-34.6037,-58.3816],1197:[-34.6037,-58.3816],1198:[-34.6037,-58.3816],1199:[-34.6037,-58.3816],1200:[-34.6037,-58.3816],1201:[-34.6037,-58.3816],1202:[-34.6037,-58.3816],1203:[-34.6037,-58.3816],1204:[-34.6037,-58.3816],1205:[-34.6037,-58.3816],1206:[-34.6037,-58.3816],1207:[-34.6037,-58.3816],1208:[-34.6037,-58.3816],1209:[-34.6037,-58.3816],1210:[-34.6037,-58.3816],1211:[-34.6037,-58.3816],1212:[-34.6037,-58.3816],1213:[-34.6037,-58.3816],1214:[-34.6037,-58.3816],1215:[-34.6037,-58.3816],1216:[-34.6037,-58.3816],1217:[-34.6037,-58.3816],1218:[-34.6037,-58.3816],1219:[-34.6037,-58.3816],1220:[-34.6037,-58.3816],1221:[-34.6037,-58.3816],1222:[-34.6037,-58.3816],1223:[-34.6037,-58.3816],1224:[-34.6037,-58.3816],1225:[-34.6037,-58.3816],1226:[-34.6037,-58.3816],1227:[-34.6037,-58.3816],1228:[-34.6037,-58.3816],1229:[-34.6037,-58.3816],1230:[-34.6037,-58.3816],1231:[-34.6037,-58.3816],1232:[-34.6037,-58.3816],1233:[-34.6037,-58.3816],1234:[-34.6037,-58.3816],1235:[-34.6037,-58.3816],1236:[-34.6037,-58.3816],1237:[-34.6037,-58.3816],1238:[-34.6037,-58.3816],1239:[-34.6037,-58.3816],1240:[-34.6037,-58.3816],1241:[-34.6037,-58.3816],1242:[-34.6037,-58.3816],1243:[-34.6037,-58.3816],1244:[-34.6037,-58.3816],1245:[-34.6037,-58.3816],1246:[-34.6037,-58.3816],1247:[-34.6037,-58.3816],1248:[-34.6037,-58.3816],1249:[-34.6037,-58.3816],1250:[-34.6037,-58.3816],1251:[-34.6037,-58.3816],1252:[-34.6037,-58.3816],1253:[-34.6037,-58.3816],1254:[-34.6037,-58.3816],1255:[-34.6037,-58.3816],1256:[-34.6037,-58.3816],1257:[-34.6037,-58.3816],1258:[-34.6037,-58.3816],1259:[-34.6037,-58.3816],1260:[-34.6037,-58.3816],1261:[-34.6037,-58.3816],1262:[-34.6037,-58.3816],1263:[-34.6037,-58.3816],1264:[-34.6037,-58.3816],1265:[-34.6037,-58.3816],1266:[-34.6037,-58.3816],1267:[-34.6037,-58.3816],1268:[-34.6037,-58.3816],1269:[-34.6037,-58.3816],1270:[-34.6037,-58.3816],1271:[-34.6037,-58.3816],1272:[-34.6037,-58.3816],1273:[-34.6037,-58.3816],1274:[-34.6037,-58.3816],1275:[-34.6037,-58.3816],1276:[-34.6037,-58.3816],1277:[-34.6037,-58.3816],1278:[-34.6037,-58.3816],1279:[-34.6037,-58.3816],1280:[-34.6037,-58.3816],1281:[-34.6037,-58.3816],1282:[-34.6037,-58.3816],1283:[-34.6037,-58.3816],1284:[-34.6037,-58.3816],1285:[-34.6037,-58.3816],1286:[-34.6037,-58.3816],1287:[-34.6037,-58.3816],1288:[-34.6037,-58.3816],1289:[-34.639,-58.378],1414:[-34.588,-58.44],1425:[-34.588,-58.42],1601:[-34.462,-58.505],1602:[-34.462,-58.505],1603:[-34.462,-58.505],1604:[-34.476,-58.52],1605:[-34.465,-58.52],1606:[-34.465,-58.52],1607:[-34.465,-58.52],1608:[-34.465,-58.52],1609:[-34.465,-58.52],1610:[-34.465,-58.52],1611:[-34.465,-58.52],1612:[-34.465,-58.52],1613:[-34.465,-58.52],1614:[-34.465,-58.52],1615:[-34.465,-58.52],1616:[-34.465,-58.52],1617:[-34.465,-58.52],1618:[-34.465,-58.52],1619:[-34.465,-58.52],1620:[-34.465,-58.52],1621:[-34.465,-58.52],1622:[-34.465,-58.52],1623:[-34.465,-58.52],1624:[-34.465,-58.52],1625:[-34.349,-58.797],1626:[-34.349,-58.797],1627:[-34.349,-58.797],1628:[-34.349,-58.797],1629:[-34.458,-58.914],1630:[-34.458,-58.914],1631:[-34.458,-58.914],1632:[-34.458,-58.914],1633:[-34.458,-58.914],1634:[-34.458,-58.914],1635:[-34.458,-58.914],1636:[-34.458,-58.914],1637:[-34.458,-58.914],1638:[-34.458,-58.914],1639:[-34.458,-58.914],1640:[-34.492,-58.509],1641:[-34.492,-58.509],1642:[-34.492,-58.509],1643:[-34.492,-58.509],1644:[-34.492,-58.509],1645:[-34.492,-58.509],1646:[-34.492,-58.509],1647:[-34.492,-58.509],1648:[-34.492,-58.509],1649:[-34.492,-58.509],1650:[-34.567,-58.539],1651:[-34.567,-58.539],1652:[-34.567,-58.539],1653:[-34.567,-58.539],1654:[-34.567,-58.539],1655:[-34.567,-58.539],1656:[-34.567,-58.539],1657:[-34.588,-58.658],1658:[-34.588,-58.658],1659:[-34.588,-58.658],1660:[-34.588,-58.658],1661:[-34.588,-58.658],1662:[-34.588,-58.658],1663:[-34.539,-58.706],1664:[-34.539,-58.706],1665:[-34.539,-58.706],1666:[-34.539,-58.706],1667:[-34.539,-58.706],1668:[-34.539,-58.706],1669:[-34.539,-58.706],1670:[-34.539,-58.706],1671:[-34.539,-58.706],1672:[-34.539,-58.706],1673:[-34.539,-58.706],1674:[-34.539,-58.706],1675:[-34.539,-58.706],1676:[-34.539,-58.706],1677:[-34.539,-58.706],1678:[-34.539,-58.706],1679:[-34.539,-58.706],1680:[-34.539,-58.706],1681:[-34.539,-58.706],1682:[-34.539,-58.706],1683:[-34.539,-58.706],1684:[-34.539,-58.706],1685:[-34.539,-58.706],1686:[-34.539,-58.706],1687:[-34.539,-58.706],1688:[-34.539,-58.706],1689:[-34.539,-58.706],1690:[-34.539,-58.706],1691:[-34.539,-58.706],1692:[-34.539,-58.706],1693:[-34.539,-58.706],1694:[-34.539,-58.706],1695:[-34.539,-58.706],1696:[-34.539,-58.706],1697:[-34.539,-58.706],1698:[-34.539,-58.706],1699:[-34.539,-58.706],1700:[-34.617,-58.557],1701:[-34.617,-58.557],1702:[-34.617,-58.557],1703:[-34.617,-58.557],1704:[-34.644,-58.565],1705:[-34.644,-58.565],1706:[-34.644,-58.565],1707:[-34.644,-58.565],1708:[-34.653,-58.62],1709:[-34.653,-58.62],1710:[-34.653,-58.62],1711:[-34.653,-58.62],1712:[-34.653,-58.62],1713:[-34.653,-58.62],1714:[-34.659,-58.665],1715:[-34.659,-58.665],1716:[-34.659,-58.665],1717:[-34.659,-58.665],1718:[-34.659,-58.665],1719:[-34.659,-58.665],1720:[-34.659,-58.665],1721:[-34.659,-58.665],1722:[-34.659,-58.665],1723:[-34.659,-58.665],1724:[-34.659,-58.665],1725:[-34.659,-58.665],1726:[-34.659,-58.665],1727:[-34.659,-58.665],1728:[-34.659,-58.665],1729:[-34.659,-58.665],1730:[-34.659,-58.665],1731:[-34.659,-58.665],1732:[-34.659,-58.665],1733:[-34.659,-58.665],1734:[-34.659,-58.665],1735:[-34.659,-58.665],1736:[-34.659,-58.665],1737:[-34.659,-58.665],1738:[-34.659,-58.665],1739:[-34.659,-58.665],1740:[-34.659,-58.665],1741:[-34.659,-58.665],1742:[-34.659,-58.665],1743:[-34.659,-58.665],1744:[-34.659,-58.665],1745:[-34.659,-58.665],1746:[-34.659,-58.665],1747:[-34.659,-58.665],1748:[-34.604,-58.937],1749:[-34.604,-58.937],1750:[-34.604,-58.937],1751:[-34.604,-58.937],1752:[-34.678,-58.529],1753:[-34.678,-58.529],1754:[-34.678,-58.529],1755:[-34.678,-58.529],1756:[-34.678,-58.529],1757:[-34.748,-58.597],1758:[-34.748,-58.597],1759:[-34.748,-58.597],1760:[-34.748,-58.597],1761:[-34.748,-58.597],1762:[-34.748,-58.597],1763:[-34.748,-58.597],1764:[-34.748,-58.597],1765:[-34.748,-58.597],1766:[-34.748,-58.597],1767:[-34.748,-58.597],1768:[-34.748,-58.597],1769:[-34.748,-58.597],1770:[-34.748,-58.597],1771:[-34.748,-58.597],1772:[-34.748,-58.597],1773:[-34.748,-58.597],1774:[-34.748,-58.597],1775:[-34.748,-58.597],1776:[-34.748,-58.597],1777:[-34.748,-58.597],1778:[-34.748,-58.597],1779:[-34.748,-58.597],1780:[-34.748,-58.597],1781:[-34.748,-58.597],1782:[-34.748,-58.597],1783:[-34.748,-58.597],1784:[-34.748,-58.597],1785:[-34.748,-58.597],1786:[-34.748,-58.597],1787:[-34.748,-58.597],1788:[-34.748,-58.597],1789:[-34.748,-58.597],1790:[-34.748,-58.597],1791:[-34.748,-58.597],1792:[-34.748,-58.597],1793:[-34.748,-58.597],1794:[-34.748,-58.597],1795:[-34.748,-58.597],1796:[-34.748,-58.597],1797:[-34.748,-58.597],1798:[-34.748,-58.597],1799:[-34.748,-58.597],1800:[-34.847,-58.515],1801:[-34.847,-58.515],1802:[-34.847,-58.515],1803:[-34.847,-58.515],1804:[-34.894,-58.399],1805:[-34.847,-58.515],1821:[-34.7,-58.405],1824:[-34.705,-58.4],1827:[-34.765,-58.423],1832:[-34.765,-58.423],1836:[-34.801,-58.454],1856:[-34.894,-58.399],1862:[-34.944,-58.47],1875:[-34.705,-58.315],1880:[-34.763,-58.208],1886:[-34.836,-58.193],1900:[-34.9205,-57.9536],1984:[-34.995,-58.006],2000:[-32.9468,-60.6393],2800:[-34.098,-59.027],2900:[-33.3347,-60.2117],3000:[-31.6333,-60.7],3100:[-31.7333,-60.5167],3300:[-27.3671,-55.896],3400:[-27.4806,-58.8341],3500:[-27.4514,-58.9867],3600:[-26.1775,-58.1781],4000:[-26.8083,-65.2176],4400:[-24.7821,-65.4232],4600:[-24.1857,-65.2994],5000:[-31.4135,-64.1811],5151:[-31.3456,-64.3376],5152:[-31.3456,-64.3376],5500:[-32.8908,-68.8272],5800:[-33.1232,-64.3493],5900:[-32.4072,-63.2409],6000:[-34.5667,-60.9167],6700:[-34.5696,-59.1076],7000:[-37.325,-59.1392],7174:[-37.643,-57.706],7300:[-36.7756,-59.8578],7400:[-36.8921,-60.3224],7600:[-38.0023,-57.5575],7601:[-38.0023,-57.5575],7602:[-38.0023,-57.5575],7603:[-38.0023,-57.5575],7604:[-38.0023,-57.5575],7607:[-38.272,-57.837],7608:[-38.0023,-57.5575],7609:[-37.875,-57.523],7610:[-38.0023,-57.5575],7620:[-37.754,-58.287],7630:[-38.554,-58.746],8000:[-38.7183,-62.2663],8300:[-38.9516,-68.0591],8400:[-41.1335,-71.3103],8500:[-40.8135,-62.9967],9000:[-45.8645,-67.4977]};
+function hav(a,b,c,d){const R=6371,r=x=>x*Math.PI/180,dL=r(c-a),dl=r(d-b),q=Math.sin(dL/2)**2+Math.cos(r(a))*Math.cos(r(c))*Math.sin(dl/2)**2;return R*2*Math.atan2(Math.sqrt(q),Math.sqrt(1-q));}
+let D=null,OTS=[],REP={},MID=null,MEST=null,AMES=new Date(),FIL='Todas';
+function toast(m,ok=true){const t=document.getElementById('toast');t.textContent=m;t.style.background=ok?'#0f172a':'#ef4444';t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500);}
 async function init(){
-  if(!TOKEN){showError('Falta el token de distribuidor en la URL');return;}
-  const{data:distri,error}=await sb.from('distribuidores').select('*').eq('id',TOKEN).maybeSingle();
-  if(error||!distri){showError('Distribuidor no encontrado');return;}
-  _distri=distri;
-  document.getElementById('header-distri-name').textContent=distri.nombre+' '+distri.apellido;
-  document.title='Alleata · '+distri.nombre+' '+distri.apellido;
-
-  // Cargar OTs en radio
-  const{data:envios}=await sb.from('envios')
-    .select('id,sf_id,ot_numero,cuenta,ciudad,provincia,cp_dest,estado,responsable')
-    .not('estado','in','("Entregado","Devuelto","Fallido","Perdido")');
-
-  if(distri.lat&&distri.lon){
-    _ots=(envios||[]).map(e=>{
-      // cp_dest puede venir como "B1708", "C1265", "1900" etc
-    const cpRaw=(e.cp_dest||'').replace(/[^0-9]/g,'');
-    const cpNum=parseInt(cpRaw);
-      const coords=CP_COORDS[cpNum];
-      if(!coords)return null;
-      const dist=haversine(distri.lat,distri.lon,coords[0],coords[1]);
-      if(dist>distri.radio)return null;
-      return{...e,distKm:Math.round(dist*10)/10};
-    }).filter(Boolean).sort((a,b)=>a.distKm-b.distKm);
-  } else {
-    _ots=[];
-  }
-
-  // Cargar reportes existentes de esta distri
+  if(!TOKEN){err('Falta el token en la URL');return;}
+  const{data:d}=await sb.from('distribuidores').select('*').eq('id',TOKEN).maybeSingle();
+  if(!d){err('Distribuidor no encontrado');return;}
+  D=d;
+  document.getElementById('header-distri').textContent=d.nombre+(d.apellido&&d.apellido!==d.nombre?' '+d.apellido:'');
+  document.getElementById('header-meta').textContent='CP '+(d.cp||'—')+' · Radio '+(d.radio||50)+' km';
+  document.title='Alleata · '+d.nombre;
+  const{data:ots}=await sb.from('v_ordenes_con_sla')
+    .select('sf_id,ot,comercio,cuenta,ciudad,provincia,cp,estado,operador_id,logistica,observaciones,contacto,horario,direccion_completa,sla_estado,dias_transcurridos')
+    .eq('tipo','desinstalacion')
+    .not('estado','in','("Terminal recuperada","Extraviada")');
+  if(d.lat&&d.lon){
+    OTS=(ots||[]).map(e=>{
+      const n=parseInt((e.cp||'').replace(/[^0-9]/g,''));
+      const c=CP_COORDS[n];
+      const dist=c?Math.round(hav(d.lat,d.lon,c[0],c[1])*10)/10:null;
+      return{...e,distKm:dist};
+    }).filter(e=>e.distKm===null||e.distKm<=(d.radio||50))
+      .sort((a,b)=>(a.distKm??999)-(b.distKm??999));
+  }else{OTS=ots||[];}
   const{data:reps}=await sb.from('distri_reportes').select('*').eq('distri_id',TOKEN);
-  _reportes={};
-  (reps||[]).forEach(r=>{_reportes[r.sf_id]=r;});
-
+  REP={};(reps||[]).forEach(r=>{REP[r.sf_id]=r;});
   document.getElementById('view-loading').style.display='none';
   document.getElementById('tabs').style.display='flex';
-  switchTab('ots');
+  document.getElementById('stats-bar').style.display='flex';
+  stats();switchTab('ots');
 }
-
-function showError(msg){
-  document.getElementById('view-loading').style.display='none';
-  document.getElementById('error-msg').textContent=msg;
-  document.getElementById('view-error').style.display='block';
+function err(m){document.getElementById('view-loading').style.display='none';document.getElementById('error-msg').textContent=m;document.getElementById('view-error').style.display='block';}
+function stats(){
+  document.getElementById('s-total').textContent=OTS.length;
+  document.getElementById('s-pend').textContent=OTS.filter(e=>!REP[e.sf_id]||REP[e.sf_id].estado==='Pendiente').length;
+  document.getElementById('s-cont').textContent=OTS.filter(e=>['Contactado','Confirmado retiro'].includes(REP[e.sf_id]?.estado)).length;
+  document.getElementById('s-exit').textContent=OTS.filter(e=>['Exitoso','Rollout'].includes(REP[e.sf_id]?.estado)).length;
 }
-
-function switchTab(tab){
-  ['ots','agenda'].forEach(t=>{
-    document.getElementById('view-'+t).style.display=t===tab?'block':'none';
-    document.getElementById('tab-'+t).classList.toggle('active',t===tab);
-  });
-  if(tab==='ots')renderOts();
-  if(tab==='agenda')renderAgenda();
+function switchTab(t){
+  ['ots','agenda','ruta'].forEach(x=>{document.getElementById('view-'+x).style.display=x===t?'block':'none';document.getElementById('tab-'+x).classList.toggle('active',x===t);});
+  if(t==='ots')renderOts();if(t==='agenda')renderAgenda();if(t==='ruta')renderRuta();
 }
-
+function badge(e){const m={'Pendiente':'badge-pend ⏳ Pendiente','Contactado':'badge-cont 📞 Contactado','No encontrado':'badge-noen ❌ No encontrado','Confirmado retiro':'badge-reti 📦 Confirmado retiro','Exitoso':'badge-exit ✅ Exitoso','Rollout':'badge-roll 🔄 Rollout'};const v=(m[e]||'badge-pend '+e).split(' ');return`<span class="ot-badge ${v[0]}">${v.slice(1).join(' ')}</span>`;}
 function renderOts(){
-  const total=_ots.length;
-  const pendientes=_ots.filter(e=>!_reportes[e.sf_id]||_reportes[e.sf_id]?.estado==='Pendiente').length;
-  const exitosos=_ots.filter(e=>_reportes[e.sf_id]?.estado==='Exitoso — retirado').length;
-  document.getElementById('stat-row').innerHTML=`
-    <div class="stat"><div class="stat-num">${total}</div><div class="stat-label">Total</div></div>
-    <div class="stat"><div class="stat-num" style="color:var(--orange)">${pendientes}</div><div class="stat-label">Pendientes</div></div>
-    <div class="stat"><div class="stat-num" style="color:var(--green)">${exitosos}</div><div class="stat-label">Retirados</div></div>`;
-
-  if(!_ots.length){
-    document.getElementById('ots-list').innerHTML='<div class="empty"><div class="empty-icon">📦</div><div>No hay OTs en tu radio de cobertura</div></div>';
-    return;
-  }
-
-  document.getElementById('ots-list').innerHTML=_ots.map(e=>{
-    const rep=_reportes[e.sf_id];
-    const estadoRep=rep?.estado||'Pendiente';
-    const badgeClass=estadoRep==='Exitoso — retirado'?'badge-exitoso':estadoRep==='Contactado'?'badge-contactado':estadoRep==='No encontrado'?'badge-noencontrado':'badge-pendiente';
-    const cardClass=estadoRep==='Exitoso — retirado'?'exitoso':estadoRep==='Pendiente'?'pendiente':'en-proceso';
-    return`<div class="card card-ot ${cardClass}">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start">
-        <div>
-          <div class="ot-num">${e.ot_numero||e.sf_id}</div>
-          <div class="ot-cuenta">${e.cuenta||'—'}</div>
-          <div class="ot-dist">📍 ${e.ciudad||'—'} · ${e.distKm} km del depósito</div>
-          ${rep?.fecha_retiro?`<div style="font-size:11px;color:var(--teal);margin-top:3px;font-weight:700">📅 Retiro: ${rep.fecha_retiro}</div>`:''}
-          ${rep?.notas?`<div style="font-size:11px;color:var(--muted);margin-top:3px">${rep.notas}</div>`:''}
-        </div>
-        <span class="badge ${badgeClass}">${estadoRep==='Exitoso — retirado'?'✅ Retirado':estadoRep}</span>
-      </div>
-      <div class="actions">
-        <button class="btn btn-teal btn-sm" onclick="abrirModal('${e.sf_id}','${(e.ot_numero||e.sf_id).replace(/'/g,'&#39;')}')">📝 Reportar</button>
-        ${e.ciudad?`<a href="https://maps.google.com/?q=${encodeURIComponent(e.ciudad+' '+( e.provincia||''))}" target="_blank" class="btn btn-ghost btn-sm">🗺️ Mapa</a>`:''}
-        ${e.cuenta?`<a href="https://wa.me/?text=${encodeURIComponent('Hola, soy distribuidor de Alleata. OT '+( e.ot_numero||e.sf_id)+' - '+e.cuenta)}" target="_blank" class="btn btn-ghost btn-sm">💬 WA</a>`:''}
-      </div>
-    </div>`;
+  const cnt={};OTS.forEach(e=>{const s=REP[e.sf_id]?.estado||'Pendiente';cnt[s]=(cnt[s]||0)+1;});
+  const estados=['Todas','Pendiente','Contactado','No encontrado','Confirmado retiro','Exitoso','Rollout'];
+  document.getElementById('filter-bar').innerHTML=estados.map(s=>`<div class="filter-chip ${FIL===s?'active':''}" onclick="setF('${s}')">${s} (${s==='Todas'?OTS.length:cnt[s]||0})</div>`).join('');
+  const list=FIL==='Todas'?OTS:OTS.filter(e=>(REP[e.sf_id]?.estado||'Pendiente')===FIL);
+  if(!list.length){document.getElementById('ots-list').innerHTML='<div class="empty"><div class="empty-icon">📦</div><div style="font-weight:700">Sin OTs</div></div>';return;}
+  document.getElementById('ots-list').innerHTML=list.map(e=>{
+    const rep=REP[e.sf_id],est=rep?.estado||'Pendiente';
+    const dir=e.direccion_completa||'',city=e.ciudad||'';
+    const mq=encodeURIComponent((dir?dir+' '+city:city)+' Argentina');
+    const tel=(e.contacto||'').replace(/\D/g,'');
+    return`<div class="ot-card">
+<div class="ot-card-header">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start">
+    <div><div class="ot-num">OT #${e.ot||e.sf_id}</div><div class="ot-comercio">${e.comercio||'—'}</div><div class="ot-cuenta">${e.cuenta||'—'}</div></div>
+    ${badge(est)}
+  </div>
+  ${rep?.notas?`<div style="font-size:11px;color:var(--muted);margin-top:6px;font-style:italic">"${rep.notas}"</div>`:''}
+  ${rep?.fecha_retiro?`<div style="font-size:11px;color:var(--teal);font-weight:700;margin-top:4px">📅 Retiro: ${rep.fecha_retiro}</div>`:''}
+</div>
+<div class="ot-card-body">
+  <div class="ot-info-grid">
+    <div><div class="ot-info-label">Ciudad</div><div class="ot-info-value">${city||'—'}</div></div>
+    <div><div class="ot-info-label">CP${e.distKm!=null?' · Dist':''}}</div><div class="ot-info-value">${e.cp||'—'}${e.distKm!=null?' · '+e.distKm+'km':''}</div></div>
+    ${dir?`<div style="grid-column:1/-1"><div class="ot-info-label">Dirección</div><div class="ot-info-value">${dir}</div></div>`:''}
+    ${e.horario?`<div><div class="ot-info-label">Horario</div><div class="ot-info-value">${e.horario}</div></div>`:''}
+    ${e.sla_estado?`<div><div class="ot-info-label">SLA</div><div class="ot-info-value" style="color:${e.sla_estado==='critico'?'var(--red)':e.sla_estado==='alerta'?'var(--orange)':'var(--green)'}">${e.dias_transcurridos}d (${e.sla_estado})</div></div>`:''}
+  </div>
+  ${dir?`<div class="map-wrap"><iframe loading="lazy" src="https://maps.google.com/maps?q=${mq}&output=embed&z=15" allowfullscreen></iframe><button class="map-open-btn" onclick="window.open('https://maps.google.com/?q=${mq}','_blank')">🗺️ Abrir</button></div>`:''}
+</div>
+<div class="ot-card-actions">
+  <button class="btn btn-teal" onclick="abrirModal('${e.sf_id}','${e.ot||e.sf_id}','${(e.comercio||'').replace(/'/g,'&#39;')}')">✏️ Actualizar estado</button>
+  ${tel?`<a href="https://wa.me/${tel}" target="_blank" class="btn btn-wa btn-sm">💬 WA</a>`:''}
+  ${dir||city?`<a href="https://maps.google.com/?q=${mq}" target="_blank" class="btn btn-map btn-sm">🗺️ Maps</a>`:''}
+</div></div>`;
   }).join('');
 }
-
-function abrirModal(sfId,otNum){
-  _modalOt=sfId;
-  const rep=_reportes[sfId];
-  document.getElementById('modal-title').textContent='Reportar OT '+otNum;
-  document.getElementById('modal-estado').value=rep?.estado||'Pendiente';
-  document.getElementById('modal-fecha').value=rep?.fecha_retiro||new Date().toISOString().slice(0,10);
-  document.getElementById('modal-notas').value=rep?.notas||'';
-  document.getElementById('foto-preview').style.display='none';
-  document.getElementById('modal-foto').value='';
-  document.getElementById('modal-reporte').style.display='flex';
+function setF(f){FIL=f;renderOts();}
+function abrirModal(id,ot,nom){
+  MID=id;MEST=null;
+  const r=REP[id];
+  document.getElementById('modal-ot-num').textContent='OT #'+ot;
+  document.getElementById('modal-ot-name').textContent=nom;
+  document.getElementById('modal-fecha').value=r?.fecha_retiro||new Date().toISOString().slice(0,10);
+  document.getElementById('modal-obs').value=r?.notas||'';
+  document.querySelectorAll('.estado-btn').forEach(b=>b.classList.remove('sel'));
+  if(r?.estado)selEst(r.estado);
+  document.getElementById('modal-estado').style.display='flex';
 }
-
-function closeModal(){
-  document.getElementById('modal-reporte').style.display='none';
-  _modalOt=null;
+function selEst(e){
+  MEST=e;
+  document.querySelectorAll('.estado-btn').forEach(b=>b.classList.remove('sel'));
+  const m={'Contactado':'e-cont','No encontrado':'e-noen','Exitoso':'e-exit','Confirmado retiro':'e-reti','Rollout':'e-roll'};
+  document.querySelector('.estado-btn.'+m[e])?.classList.add('sel');
+  document.getElementById('fecha-wrap').style.display=['Confirmado retiro','Exitoso','Rollout'].includes(e)?'block':'none';
 }
-
-function previewFoto(input){
-  const file=input.files[0];
-  if(!file)return;
-  const reader=new FileReader();
-  reader.onload=e=>{const img=document.getElementById('foto-preview');img.src=e.target.result;img.style.display='block';};
-  reader.readAsDataURL(file);
-}
-
-async function guardarReporte(){
-  if(!_modalOt)return;
-  const estado=document.getElementById('modal-estado').value;
-  const fecha=document.getElementById('modal-fecha').value;
-  const notas=document.getElementById('modal-notas').value.trim();
-
-  const datos={
-    distri_id:TOKEN,
-    sf_id:_modalOt,
-    estado,
-    fecha_retiro:fecha||null,
-    notas:notas||null,
-    updated_at:new Date().toISOString()
-  };
-
-  // Upsert en distri_reportes
+function closeModal(){document.getElementById('modal-estado').style.display='none';MID=null;MEST=null;}
+async function guardarEstado(){
+  if(!MID||!MEST){toast('Seleccioná un estado',false);return;}
+  const datos={distri_id:TOKEN,sf_id:MID,estado:MEST,fecha_retiro:document.getElementById('modal-fecha').value||null,notas:document.getElementById('modal-obs').value.trim()||null,updated_at:new Date().toISOString()};
   const{error}=await sb.from('distri_reportes').upsert(datos,{onConflict:'distri_id,sf_id'});
-  if(error){showToast('Error: '+error.message,false);return;}
-
-  _reportes[_modalOt]={...datos};
-  closeModal();
-  renderOts();
-  if(document.getElementById('tab-agenda').classList.contains('active'))renderAgenda();
-  showToast('✅ Reporte guardado');
+  if(error){toast('Error: '+error.message,false);return;}
+  REP[MID]=datos;closeModal();stats();renderOts();toast('✅ Estado actualizado');
 }
-
-// ── AGENDA ──
 function renderAgenda(){
-  const year=_agendaMes.getFullYear();
-  const month=_agendaMes.getMonth();
+  const y=AMES.getFullYear(),m=AMES.getMonth();
   const meses=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-  document.getElementById('agenda-mes-label').textContent=meses[month]+' '+year;
-
-  const dias=['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
-  document.getElementById('cal-dow').innerHTML=dias.map(d=>`<div class="cal-dow-label">${d}</div>`).join('');
-
-  const firstDay=new Date(year,month,1).getDay();
-  const daysInMonth=new Date(year,month+1,0).getDate();
-  const today=new Date().toISOString().slice(0,10);
-
-  // Build map fecha -> OTs
-  const otsPerDay={};
-  Object.values(_reportes).forEach(r=>{
-    if(r.fecha_retiro&&r.estado==='Exitoso — retirado'){
-      otsPerDay[r.fecha_retiro]=(otsPerDay[r.fecha_retiro]||0)+1;
-    }
-  });
-
-  let html='';
-  for(let i=0;i<firstDay;i++)html+=`<div class="cal-day other-month"></div>`;
-  for(let d=1;d<=daysInMonth;d++){
-    const dateStr=`${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-    const count=otsPerDay[dateStr]||0;
-    html+=`<div class="cal-day${count?` has-ot`:''} ${dateStr===today?` today`:''}" onclick="agendaDayClick('${dateStr}')">
-      <div>${d}</div>${count?`<div style="font-size:9px;font-weight:800">${count}</div>`:''}
-    </div>`;
-  }
-  document.getElementById('cal-grid').innerHTML=html;
-  document.getElementById('agenda-day-detail').style.display='none';
+  document.getElementById('agenda-mes').textContent=meses[m]+' '+y;
+  document.getElementById('cal-dow').innerHTML=['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'].map(d=>`<div class="cal-dow-label">${d}</div>`).join('');
+  const fd=new Date(y,m,1).getDay(),dim=new Date(y,m+1,0).getDate(),today=new Date().toISOString().slice(0,10);
+  const opd={};Object.values(REP).forEach(r=>{if(r.fecha_retiro)opd[r.fecha_retiro]=(opd[r.fecha_retiro]||0)+1;});
+  let h='';for(let i=0;i<fd;i++)h+=`<div class="cal-day other-month"></div>`;
+  for(let d=1;d<=dim;d++){const ds=`${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;const c=opd[ds]||0;h+=`<div class="cal-day${c?' has-ot':''} ${ds===today?'today':''}" onclick="agendaDay('${ds}')">${d}${c?`<div class="cal-day-count">${c}</div>`:''}</div>`;}
+  document.getElementById('cal-grid').innerHTML=h;
+  document.getElementById('agenda-detail').innerHTML='';
 }
-
-function agendaNavMes(dir){
-  _agendaMes=new Date(_agendaMes.getFullYear(),_agendaMes.getMonth()+dir,1);
-  renderAgenda();
+function agendaNav(d){AMES=new Date(AMES.getFullYear(),AMES.getMonth()+d,1);renderAgenda();}
+function agendaDay(ds){
+  const list=OTS.filter(e=>REP[e.sf_id]?.fecha_retiro===ds);
+  const det=document.getElementById('agenda-detail');
+  if(!list.length){det.innerHTML='';return;}
+  const fecha=new Date(ds+'T12:00:00').toLocaleDateString('es-AR',{weekday:'long',day:'2-digit',month:'long'});
+  det.innerHTML=`<div style="background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);padding:14px"><div style="font-weight:800;font-size:13px;margin-bottom:10px;color:var(--teal)">📅 ${fecha}</div>${list.map(e=>`<div style="padding:8px 0;border-bottom:1px solid var(--border)"><div style="font-weight:700;color:var(--teal)">OT #${e.ot||e.sf_id}</div><div style="font-size:13px;font-weight:700">${e.comercio||'—'}</div><div style="font-size:11px;color:var(--muted)">${e.ciudad||'—'}${e.horario?' · '+e.horario:''}</div></div>`).join('')}</div>`;
 }
-
-function agendaDayClick(dateStr){
-  const otsDelDia=_ots.filter(e=>_reportes[e.sf_id]?.fecha_retiro===dateStr);
-  const detail=document.getElementById('agenda-day-detail');
-  if(!otsDelDia.length){detail.style.display='none';return;}
-  detail.style.display='block';
-  detail.innerHTML=`<div class="card">
-    <div style="font-weight:700;font-size:13px;margin-bottom:10px">📅 ${new Date(dateStr+'T12:00:00').toLocaleDateString('es-AR',{weekday:'long',day:'2-digit',month:'long'})}</div>
-    ${otsDelDia.map(e=>`<div style="padding:8px 0;border-bottom:1px solid var(--border)">
-      <div style="font-weight:700;color:var(--teal)">${e.ot_numero||e.sf_id}</div>
-      <div style="font-size:12px;color:var(--muted)">${e.cuenta||'—'} · ${e.ciudad||'—'}</div>
-    </div>`).join('')}
-  </div>`;
+function renderRuta(){
+  const list=OTS.filter(e=>e.distKm!=null&&!['Exitoso','Rollout'].includes(REP[e.sf_id]?.estado||''));
+  if(!list.length){document.getElementById('ruta-list').innerHTML='<div class="empty"><div class="empty-icon">🗺️</div><div style="font-weight:700">Sin OTs con coordenadas</div></div>';return;}
+  document.getElementById('ruta-list').innerHTML=list.map((e,i)=>`<div class="ruta-card"><div class="ruta-num">${i+1}</div><div class="ruta-info"><div class="ruta-ot">OT #${e.ot||e.sf_id}</div><div class="ruta-nombre">${e.comercio||'—'}</div><div class="ruta-ciudad">${e.ciudad||'—'}${e.direccion_completa?' · '+e.direccion_completa:''}</div>${badge(REP[e.sf_id]?.estado||'Pendiente')}</div><div class="ruta-dist">${e.distKm} km</div></div>`).join('');
 }
-
 init();
 </script>
 </body>
