@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v2.1.5</title>
+<title>Alleata · Operaciones v2.1.6</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -284,7 +284,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.1.5 · 23 mar 2026
+      v2.1.6 · 23 mar 2026
     </div>
   </div>
 </div>
@@ -333,7 +333,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.1.5 · 23 mar 2026
+      v2.1.6 · 23 mar 2026
     </div>
   </div>
 </nav>
@@ -347,7 +347,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <div class="topbar-right" id="topbar-date"></div>
     <button onclick="refreshCurrentModule()" title="Actualizar" style="background:none;border:1px solid var(--border2);color:var(--text-muted);border-radius:7px;padding:4px 10px;cursor:pointer;font-size:13px;margin-left:10px;transition:all .2s" onmouseover="this.style.color='var(--teal)';this.style.borderColor='var(--teal)'" onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border2)'">↺</button>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.1.5</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.1.6</div>
   </div>
   <div class="content">
 
@@ -840,7 +840,7 @@ tr:hover td{background:var(--surface2);}
 </div>
 
 <script>
-console.log('[Alleata v2.1.5] OK');
+console.log('[Alleata v2.1.6] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -1355,13 +1355,25 @@ async function importSF(e){
         motivo_desinstalacion:iMotivoDes>=0?String(r[iMotivoDes]||'').trim()||undefined:undefined,
         propietario_cuenta:'Jose Luis Cingolani'
       };
-      // Limpiar campos undefined para no sobreescribir con null
+      // Limpiar campos undefined para no sobreescribir con null en el upsert base
       Object.keys(item).forEach(k=>item[k]===undefined&&delete item[k]);
       const{error}=await sb.from('envios').upsert(item,{onConflict:'sf_id',ignoreDuplicates:false});
       if(error){
         if(error.code==='23505')duplicadas++;
         else{errores++;console.error(error);}
       }else importadas++;
+
+      // Si la OT tiene DATOS TERMINAL en el Excel, actualizarlos siempre (aunque la OT ya exista)
+      const terminalData={};
+      if(iTerminal>=0&&String(r[iTerminal]||'').trim()) terminalData.nro_terminal=String(r[iTerminal]).trim();
+      if(iSimcard>=0&&String(r[iSimcard]||'').trim()) terminalData.nro_simcard=String(r[iSimcard]).trim();
+      if(iUsuarioCajero>=0&&String(r[iUsuarioCajero]||'').trim()) terminalData.usuario_cajero=String(r[iUsuarioCajero]).trim();
+      if(iPassCajero>=0&&String(r[iPassCajero]||'').trim()) terminalData.password_cajero=String(r[iPassCajero]).trim();
+      if(iCUIT>=0&&r[iCUIT]) terminalData.cuit=String(r[iCUIT]).trim();
+      if(iEmailComercio>=0&&String(r[iEmailComercio]||'').trim()) terminalData.email_comercio=String(r[iEmailComercio]).trim();
+      if(Object.keys(terminalData).length>0){
+        await sb.from('envios').update(terminalData).eq('sf_id',String(r[iSFId]||'').trim());
+      }
     }
 
     fill.style.width='100%';
