@@ -181,18 +181,34 @@ async function init(){
   document.getElementById('header-distri').textContent=d.nombre+(d.apellido&&d.apellido!==d.nombre?' '+d.apellido:'');
   document.getElementById('header-meta').textContent='CP '+(d.cp||'—')+' · Radio '+(d.radio||50)+' km';
   document.title='Alleata · '+d.nombre;
-  const{data:ots}=await sb.from('v_ordenes_con_sla')
-    .select('sf_id,ot,comercio,cuenta,ciudad,provincia,cp,estado,operador_id,logistica,observaciones,contacto,horario,direccion_completa,sla_estado,dias_transcurridos')
-    .not('estado','in','("Terminal recuperada","Extraviada","Entregado","Devuelto","Fallido","Perdido")');
+  // Cargar de ambas fuentes en paralelo
+  const[{data:desin},{data:envios}]=await Promise.all([
+    sb.from('v_ordenes_con_sla')
+      .select('sf_id,ot,comercio,cuenta,ciudad,provincia,cp,estado,operador_id,logistica,observaciones,contacto,horario,direccion_completa,sla_estado,dias_transcurridos')
+      .not('estado','in','("Terminal recuperada","Extraviada")'),
+    sb.from('envios')
+      .select('sf_id,ot_numero,cuenta,ciudad,provincia,cp_dest,estado,responsable,notas')
+      .not('estado','in','("Entregado","Devuelto","Fallido","Perdido")')
+  ]);
+  // Normalizar envios al mismo formato
+  const enviosNorm=(envios||[]).map(e=>({
+    sf_id:e.sf_id, ot:e.ot_numero, comercio:e.cuenta, cuenta:e.cuenta,
+    ciudad:e.ciudad, provincia:e.provincia, cp:e.cp_dest,
+    estado:e.estado, operador_id:e.responsable,
+    logistica:null, observaciones:e.notas,
+    contacto:null, horario:null, direccion_completa:null,
+    sla_estado:null, dias_transcurridos:null
+  }));
+  const ots=[...(desin||[]),...enviosNorm];
   if(d.lat&&d.lon){
-    OTS=(ots||[]).map(e=>{
+    OTS=ots.map(e=>{
       const n=parseInt((e.cp||'').replace(/[^0-9]/g,''));
       const c=CP_COORDS[n];
       const dist=c?Math.round(hav(d.lat,d.lon,c[0],c[1])*10)/10:null;
       return{...e,distKm:dist};
     }).filter(e=>e.distKm===null||e.distKm<=(d.radio||50))
       .sort((a,b)=>(a.distKm??999)-(b.distKm??999));
-  }else{OTS=ots||[];}
+  }else{OTS=ots;}
   const{data:reps}=await sb.from('distri_reportes').select('*').eq('distri_id',TOKEN);
   REP={};(reps||[]).forEach(r=>{REP[r.sf_id]=r;});
   document.getElementById('view-loading').style.display='none';
