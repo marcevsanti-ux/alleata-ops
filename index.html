@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v2.1.7</title>
+<title>Alleata · Operaciones v2.1.9</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -284,7 +284,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.1.7 · 23 mar 2026
+      v2.1.9 · 23 mar 2026
     </div>
   </div>
 </div>
@@ -333,7 +333,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.1.7 · 23 mar 2026
+      v2.1.9 · 23 mar 2026
     </div>
   </div>
 </nav>
@@ -347,7 +347,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <div class="topbar-right" id="topbar-date"></div>
     <button onclick="refreshCurrentModule()" title="Actualizar" style="background:none;border:1px solid var(--border2);color:var(--text-muted);border-radius:7px;padding:4px 10px;cursor:pointer;font-size:13px;margin-left:10px;transition:all .2s" onmouseover="this.style.color='var(--teal)';this.style.borderColor='var(--teal)'" onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border2)'">↺</button>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.1.7</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.1.9</div>
   </div>
   <div class="content">
 
@@ -840,7 +840,7 @@ tr:hover td{background:var(--surface2);}
 </div>
 
 <script>
-console.log('[Alleata v2.1.7] OK');
+console.log('[Alleata v2.1.9] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -1229,7 +1229,7 @@ async function importSF(e){
 
   // Detect estado from observaciones text
   function detectEstado(obs){
-    if(!obs)return'En tránsito';
+    if(!obs)return'Pre-Colecta';
     const o=obs.toUpperCase();
     if(o.includes('ENTREGADO')||o.includes('ENTREGA OK'))return'Entregado';
     if(o.includes('EN ESPERA EN SUCURSAL'))return'En espera en sucursal';
@@ -1238,7 +1238,7 @@ async function importSF(e){
     if(o.includes('DEVUELTO')||o.includes('DEVOLUCION')||o.includes('DEVOLUCIÓN'))return'Devuelto';
     if(o.includes('PERDIDO'))return'Perdido';
     if(o.includes('DEMORADO'))return'Fallido';
-    return'En tránsito';
+    return'Pre-Colecta';
   }
 
   try{
@@ -1337,7 +1337,6 @@ async function importSF(e){
         asignacion:String(r[iAsig]||'').trim(),
         notas:obs,
         costo_envio:iCosto>=0&&r[iCosto]?Number(r[iCosto]):null,
-        estado:detectEstado(obs),
         logistica:'Correo Argentino',
         ultimo_evento:obs||'Importado desde SF',
         ultimo_evento_fecha:new Date().toISOString().slice(0,10),
@@ -1361,7 +1360,14 @@ async function importSF(e){
       if(error){
         if(error.code==='23505')duplicadas++;
         else{errores++;console.error(error);}
-      }else importadas++;
+      }else{
+        importadas++;
+        // Solo setear estado en OTs nuevas (sin estado previo)
+        const estadoDetectado=detectEstado(obs);
+        await sb.from('envios').update({estado:estadoDetectado})
+          .eq('sf_id',String(r[iSFId]||'').trim())
+          .is('estado',null); // solo si estado es null (OT nueva)
+      }
 
       // Si la OT tiene DATOS TERMINAL en el Excel, actualizarlos siempre (aunque la OT ya exista)
       const terminalData={};
