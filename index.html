@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v2.2.4</title>
+<title>Alleata · Operaciones v2.2.5</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -284,7 +284,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.2.4 · 23 mar 2026
+      v2.2.5 · 23 mar 2026
     </div>
   </div>
 </div>
@@ -336,7 +336,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.2.4 · 23 mar 2026
+      v2.2.5 · 23 mar 2026
     </div>
   </div>
 </nav>
@@ -350,7 +350,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <div class="topbar-right" id="topbar-date"></div>
     <button onclick="refreshCurrentModule()" title="Actualizar" style="background:none;border:1px solid var(--border2);color:var(--text-muted);border-radius:7px;padding:4px 10px;cursor:pointer;font-size:13px;margin-left:10px;transition:all .2s" onmouseover="this.style.color='var(--teal)';this.style.borderColor='var(--teal)'" onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border2)'">↺</button>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.2.4</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.2.5</div>
   </div>
   <div class="content">
 
@@ -962,7 +962,7 @@ tr:hover td{background:var(--surface2);}
 </div>
 
 <script>
-console.log('[Alleata v2.2.4] OK');
+console.log('[Alleata v2.2.5] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -1813,6 +1813,23 @@ function showTrackingToast(msg, tipo){
 async function updateEnvioEstado(id,estado){
   await sb.from('envios').update({estado,ultimo_evento_fecha:new Date().toISOString().slice(0,10)}).eq('id',id);
   loadBadges();renderEnvios();
+  // Verificar si este estado tiene regla activa en ally_reglas
+  try {
+    const {data:regla} = await sb.from('ally_reglas').select('*').eq('estado_ot',estado).eq('activo',true).maybeSingle();
+    if(!regla) return; // no hay regla activa para este estado
+    // Buscar sf_id de la OT
+    const {data:ot} = await sb.from('envios').select('sf_id').eq('id',id).maybeSingle();
+    if(!ot?.sf_id) return;
+    // Llamar a Ally para notificar al propietario con @mención
+    await fetch(`${ALLY_URL}/notificar-propietario`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({sf_id:ot.sf_id, estado})
+    });
+    console.log(`Ally notificado: OT ${ot.sf_id} -> ${estado}`);
+  } catch(e) {
+    console.warn('Error notificando Ally:', e.message);
+  }
 }
 function openUpdateEvento(id,current){
   const nuevo=prompt('Actualizar observación / evento:',current);
