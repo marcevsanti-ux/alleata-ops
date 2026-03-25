@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>Alleata · Portal Distribuidor</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --teal:#1dbf8e;--blue:#4a9eff;--orange:#f59e0b;--red:#ef4444;--green:#10b981;
+    --bg:#f8fafc;--surface:#fff;--border:#e2e8f0;--text:#0f172a;--muted:#64748b;
+    --radius:12px;
+  }
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+  .header{background:var(--teal);color:#fff;padding:16px 20px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,.12)}
+  .header-logo{font-size:22px;font-weight:900}
+  .header-sub{font-size:12px;opacity:.85;margin-top:2px}
+  .tabs{display:flex;background:#fff;border-bottom:2px solid var(--border);position:sticky;top:64px;z-index:99}
+  .tab{flex:1;padding:14px 8px;text-align:center;font-size:12px;font-weight:700;color:var(--muted);cursor:pointer;border-bottom:3px solid transparent;transition:all .2s}
+  .tab.active{color:var(--teal);border-bottom-color:var(--teal)}
+  .container{max-width:700px;margin:0 auto;padding:16px}
+  .card{background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);padding:16px;margin-bottom:12px}
+  .card-ot{border-left:4px solid var(--border)}
+  .card-ot.pendiente{border-left-color:var(--orange)}
+  .card-ot.en-proceso{border-left-color:var(--blue)}
+  .card-ot.exitoso{border-left-color:var(--green)}
+  .ot-num{font-size:16px;font-weight:800;color:var(--teal)}
+  .ot-cuenta{font-size:12px;color:var(--muted);margin-top:2px}
+  .ot-dist{font-size:11px;color:var(--muted);margin-top:4px}
+  .badge{display:inline-block;padding:3px 10px;border-radius:99px;font-size:11px;font-weight:700}
+  .badge-pendiente{background:#fef3c7;color:#92400e}
+  .badge-proceso{background:#dbeafe;color:#1e40af}
+  .badge-exitoso{background:#d1fae5;color:#065f46}
+  .badge-contactado{background:#e0f2fe;color:#0369a1}
+  .badge-noencontrado{background:#fee2e2;color:#991b1b}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:10px 18px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;border:none;transition:all .15s}
+  .btn-teal{background:var(--teal);color:#fff}
+  .btn-ghost{background:transparent;color:var(--muted);border:1px solid var(--border)}
+  .btn-sm{padding:6px 12px;font-size:12px;border-radius:8px}
+  .btn-block{width:100%}
+  .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:flex-end;justify-content:center;z-index:1000;padding:0}
+  .modal-box{background:#fff;border-radius:20px 20px 0 0;padding:24px;width:100%;max-width:500px;max-height:90vh;overflow-y:auto}
+  .modal-title{font-size:16px;font-weight:800;margin-bottom:16px}
+  .field{margin-bottom:12px}
+  .label{display:block;font-size:11px;font-weight:700;color:var(--muted);margin-bottom:4px;letter-spacing:.5px;text-transform:uppercase}
+  .input{width:100%;padding:10px 12px;border-radius:8px;border:1.5px solid var(--border);font-size:14px;font-family:inherit;outline:none;transition:border .15s}
+  .input:focus{border-color:var(--teal)}
+  .select{width:100%;padding:10px 12px;border-radius:8px;border:1.5px solid var(--border);font-size:14px;font-family:inherit;outline:none;background:#fff}
+  .empty{text-align:center;padding:48px 20px;color:var(--muted)}
+  .empty-icon{font-size:40px;margin-bottom:12px}
+  .stat-row{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
+  .stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px;text-align:center}
+  .stat-num{font-size:24px;font-weight:900;color:var(--teal)}
+  .stat-label{font-size:10px;color:var(--muted);margin-top:2px;font-weight:700;letter-spacing:.5px}
+  .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
+  .cal-day{background:var(--bg);border-radius:6px;padding:6px 2px;text-align:center;font-size:11px;cursor:pointer;min-height:36px;position:relative}
+  .cal-day.has-ot{background:#d1fae5;font-weight:700;color:#065f46}
+  .cal-day.today{border:2px solid var(--teal)}
+  .cal-day.other-month{opacity:.3}
+  .cal-dow{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:4px}
+  .cal-dow-label{text-align:center;font-size:10px;font-weight:700;color:var(--muted)}
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--text);color:#fff;padding:10px 20px;border-radius:10px;font-size:13px;font-weight:700;z-index:9999;pointer-events:none;opacity:0;transition:opacity .3s}
+  .toast.show{opacity:1}
+  .foto-preview{width:100%;border-radius:10px;margin-top:8px;display:none}
+  @media(prefers-color-scheme:dark){
+    :root{--bg:#0f172a;--surface:#1e293b;--border:#334155;--text:#f1f5f9;--muted:#94a3b8}
+    .select,.input{background:var(--surface);color:var(--text)}
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <div class="header-logo">🚚 Alleata</div>
+    <div class="header-sub" id="header-distri-name">Portal Distribuidor</div>
+  </div>
+</div>
+
+<div class="tabs" id="tabs" style="display:none">
+  <div class="tab active" id="tab-ots" onclick="switchTab('ots')">📦 Mis OTs</div>
+  <div class="tab" id="tab-agenda" onclick="switchTab('agenda')">📅 Agenda</div>
+</div>
+
+<div class="container">
+
+  <!-- LOADING -->
+  <div id="view-loading" class="empty">
+    <div class="empty-icon">⏳</div>
+    <div>Cargando tu portal...</div>
+  </div>
+
+  <!-- ERROR -->
+  <div id="view-error" style="display:none" class="empty">
+    <div class="empty-icon">❌</div>
+    <div id="error-msg">Link inválido o distribuidor no encontrado</div>
+  </div>
+
+  <!-- OTS VIEW -->
+  <div id="view-ots" style="display:none">
+    <div class="stat-row" id="stat-row"></div>
+    <div id="ots-list"></div>
+  </div>
+
+  <!-- AGENDA VIEW -->
+  <div id="view-agenda" style="display:none">
+    <div class="card" style="margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <button class="btn btn-ghost btn-sm" onclick="agendaNavMes(-1)">◀</button>
+        <div style="font-weight:800;font-size:14px" id="agenda-mes-label"></div>
+        <button class="btn btn-ghost btn-sm" onclick="agendaNavMes(1)">▶</button>
+      </div>
+      <div class="cal-dow" id="cal-dow"></div>
+      <div class="cal-grid" id="cal-grid"></div>
+    </div>
+    <div id="agenda-day-detail" style="display:none"></div>
+  </div>
+
+</div>
+
+<!-- Modal Estado/Reporte -->
+<div id="modal-reporte" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeModal()">
+  <div class="modal-box">
+    <div class="modal-title" id="modal-title">Reportar OT</div>
+    <div class="field">
+      <label class="label">Estado</label>
+      <select class="select" id="modal-estado">
+        <option value="Pendiente">Pendiente</option>
+        <option value="Contactado">Contactado</option>
+        <option value="No encontrado">No encontrado</option>
+        <option value="Exitoso">Exitoso — retirado</option>
+      </select>
+    </div>
+    <div class="field" id="modal-fecha-wrap">
+      <label class="label">Fecha de retiro</label>
+      <input type="date" class="input" id="modal-fecha">
+    </div>
+    <div class="field">
+      <label class="label">Notas</label>
+      <input type="text" class="input" id="modal-notas" placeholder="Observaciones opcionales">
+    </div>
+    <div class="field">
+      <label class="label">Foto (opcional)</label>
+      <input type="file" class="input" id="modal-foto" accept="image/*" capture="environment" onchange="previewFoto(this)">
+      <img id="foto-preview" class="foto-preview">
+    </div>
+    <div style="display:flex;gap:8px;margin-top:4px">
+      <button class="btn btn-teal btn-block" onclick="guardarReporte()">Guardar</button>
+      <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
+const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
+const{createClient}=supabase;
+const sb=createClient(SUPABASE_URL,SUPABASE_KEY);
+
+const params=new URLSearchParams(location.search);
+const TOKEN=params.get('token')||'';
+
+const CP_COORDS={1005:[-34.6037,-58.3816],1289:[-34.639,-58.378],1414:[-34.588,-58.44],1425:[-34.588,-58.42],1604:[-34.476,-58.52],1625:[-34.349,-58.797],1629:[-34.458,-58.914],1640:[-34.492,-58.509],1650:[-34.567,-58.539],1657:[-34.588,-58.658],1663:[-34.539,-58.706],1700:[-34.617,-58.557],1704:[-34.644,-58.565],1708:[-34.653,-58.62],1714:[-34.659,-58.665],1748:[-34.604,-58.937],1752:[-34.678,-58.529],1757:[-34.748,-58.597],1805:[-34.847,-58.515],1821:[-34.7,-58.405],1824:[-34.705,-58.4],1827:[-34.765,-58.423],1832:[-34.765,-58.423],1836:[-34.801,-58.454],1856:[-34.894,-58.399],1862:[-34.944,-58.47],1875:[-34.705,-58.315],1880:[-34.763,-58.208],1886:[-34.836,-58.193],1900:[-34.9205,-57.9536],1984:[-34.995,-58.006],2000:[-32.9468,-60.6393],2800:[-34.098,-59.027],2900:[-33.3347,-60.2117],3000:[-31.6333,-60.7],3100:[-31.7333,-60.5167],3300:[-27.3671,-55.896],3400:[-27.4806,-58.8341],3500:[-27.4514,-58.9867],3600:[-26.1775,-58.1781],4000:[-26.8083,-65.2176],4400:[-24.7821,-65.4232],4600:[-24.1857,-65.2994],5000:[-31.4135,-64.1811],5151:[-31.3456,-64.3376],5152:[-31.3456,-64.3376],5500:[-32.8908,-68.8272],5800:[-33.1232,-64.3493],5900:[-32.4072,-63.2409],6000:[-34.5667,-60.9167],6700:[-34.5696,-59.1076],7000:[-37.325,-59.1392],7174:[-37.643,-57.706],7300:[-36.7756,-59.8578],7400:[-36.8921,-60.3224],7600:[-38.0023,-57.5575],7601:[-38.0023,-57.5575],7602:[-38.0023,-57.5575],7603:[-38.0023,-57.5575],7604:[-38.0023,-57.5575],7607:[-38.272,-57.837],7608:[-38.0023,-57.5575],7609:[-37.875,-57.523],7610:[-38.0023,-57.5575],7620:[-37.754,-58.287],7630:[-38.554,-58.746],8000:[-38.7183,-62.2663],8300:[-38.9516,-68.0591],8400:[-41.1335,-71.3103],8500:[-40.8135,-62.9967],9000:[-45.8645,-67.4977]};
+
+function haversine(lat1,lon1,lat2,lon2){
+  const R=6371,toRad=x=>x*Math.PI/180;
+  const dLat=toRad(lat2-lat1),dLon=toRad(lon2-lon1);
+  const a=Math.sin(dLat/2)**2+Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+
+let _distri=null;
+let _ots=[];
+let _reportes={};
+let _modalOt=null;
+let _agendaMes=new Date();
+
+function showToast(msg,ok=true){
+  const t=document.getElementById('toast');
+  t.textContent=msg;
+  t.style.background=ok?'#0f172a':'#ef4444';
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2500);
+}
+
+async function init(){
+  if(!TOKEN){showError('Falta el token de distribuidor en la URL');return;}
+  const{data:distri,error}=await sb.from('distribuidores').select('*').eq('id',TOKEN).maybeSingle();
+  if(error||!distri){showError('Distribuidor no encontrado');return;}
+  _distri=distri;
+  document.getElementById('header-distri-name').textContent=distri.nombre+' '+distri.apellido;
+  document.title='Alleata · '+distri.nombre+' '+distri.apellido;
+
+  // Cargar OTs en radio
+  const{data:envios}=await sb.from('envios')
+    .select('id,sf_id,ot_numero,cuenta,ciudad,provincia,cp_dest,estado,responsable,direccion_dest')
+    .not('estado','in','("Entregado","Devuelto","Fallido","Perdido")');
+
+  if(distri.lat&&distri.lon){
+    _ots=(envios||[]).map(e=>{
+      const cpNum=parseInt((e.cp_dest||'').replace(/\D/g,''));
+      const coords=CP_COORDS[cpNum];
+      if(!coords)return null;
+      const dist=haversine(distri.lat,distri.lon,coords[0],coords[1]);
+      if(dist>distri.radio)return null;
+      return{...e,distKm:Math.round(dist*10)/10};
+    }).filter(Boolean).sort((a,b)=>a.distKm-b.distKm);
+  } else {
+    _ots=[];
+  }
+
+  // Cargar reportes existentes de esta distri
+  const{data:reps}=await sb.from('distri_reportes').select('*').eq('distri_id',TOKEN);
+  _reportes={};
+  (reps||[]).forEach(r=>{_reportes[r.sf_id]=r;});
+
+  document.getElementById('view-loading').style.display='none';
+  document.getElementById('tabs').style.display='flex';
+  switchTab('ots');
+}
+
+function showError(msg){
+  document.getElementById('view-loading').style.display='none';
+  document.getElementById('error-msg').textContent=msg;
+  document.getElementById('view-error').style.display='block';
+}
+
+function switchTab(tab){
+  ['ots','agenda'].forEach(t=>{
+    document.getElementById('view-'+t).style.display=t===tab?'block':'none';
+    document.getElementById('tab-'+t).classList.toggle('active',t===tab);
+  });
+  if(tab==='ots')renderOts();
+  if(tab==='agenda')renderAgenda();
+}
+
+function renderOts(){
+  const total=_ots.length;
+  const pendientes=_ots.filter(e=>!_reportes[e.sf_id]||_reportes[e.sf_id]?.estado==='Pendiente').length;
+  const exitosos=_ots.filter(e=>_reportes[e.sf_id]?.estado==='Exitoso — retirado').length;
+  document.getElementById('stat-row').innerHTML=`
+    <div class="stat"><div class="stat-num">${total}</div><div class="stat-label">Total</div></div>
+    <div class="stat"><div class="stat-num" style="color:var(--orange)">${pendientes}</div><div class="stat-label">Pendientes</div></div>
+    <div class="stat"><div class="stat-num" style="color:var(--green)">${exitosos}</div><div class="stat-label">Retirados</div></div>`;
+
+  if(!_ots.length){
+    document.getElementById('ots-list').innerHTML='<div class="empty"><div class="empty-icon">📦</div><div>No hay OTs en tu radio de cobertura</div></div>';
+    return;
+  }
+
+  document.getElementById('ots-list').innerHTML=_ots.map(e=>{
+    const rep=_reportes[e.sf_id];
+    const estadoRep=rep?.estado||'Pendiente';
+    const badgeClass=estadoRep==='Exitoso — retirado'?'badge-exitoso':estadoRep==='Contactado'?'badge-contactado':estadoRep==='No encontrado'?'badge-noencontrado':'badge-pendiente';
+    const cardClass=estadoRep==='Exitoso — retirado'?'exitoso':estadoRep==='Pendiente'?'pendiente':'en-proceso';
+    return`<div class="card card-ot ${cardClass}">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div>
+          <div class="ot-num">${e.ot_numero||e.sf_id}</div>
+          <div class="ot-cuenta">${e.cuenta||'—'}</div>
+          <div class="ot-dist">📍 ${e.ciudad||'—'} · ${e.distKm} km del depósito</div>
+          ${rep?.fecha_retiro?`<div style="font-size:11px;color:var(--teal);margin-top:3px;font-weight:700">📅 Retiro: ${rep.fecha_retiro}</div>`:''}
+          ${rep?.notas?`<div style="font-size:11px;color:var(--muted);margin-top:3px">${rep.notas}</div>`:''}
+        </div>
+        <span class="badge ${badgeClass}">${estadoRep==='Exitoso — retirado'?'✅ Retirado':estadoRep}</span>
+      </div>
+      <div class="actions">
+        <button class="btn btn-teal btn-sm" onclick="abrirModal('${e.sf_id}','${(e.ot_numero||e.sf_id).replace(/'/g,'&#39;')}')">📝 Reportar</button>
+        ${e.direccion_dest?`<a href="https://maps.google.com/?q=${encodeURIComponent(e.direccion_dest+' '+e.ciudad)}" target="_blank" class="btn btn-ghost btn-sm">🗺️ Mapa</a>`:''}
+        ${e.cuenta?`<a href="https://wa.me/?text=${encodeURIComponent('Hola, soy distribuidor de Alleata. OT '+( e.ot_numero||e.sf_id)+' - '+e.cuenta)}" target="_blank" class="btn btn-ghost btn-sm">💬 WA</a>`:''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function abrirModal(sfId,otNum){
+  _modalOt=sfId;
+  const rep=_reportes[sfId];
+  document.getElementById('modal-title').textContent='Reportar OT '+otNum;
+  document.getElementById('modal-estado').value=rep?.estado||'Pendiente';
+  document.getElementById('modal-fecha').value=rep?.fecha_retiro||new Date().toISOString().slice(0,10);
+  document.getElementById('modal-notas').value=rep?.notas||'';
+  document.getElementById('foto-preview').style.display='none';
+  document.getElementById('modal-foto').value='';
+  document.getElementById('modal-reporte').style.display='flex';
+}
+
+function closeModal(){
+  document.getElementById('modal-reporte').style.display='none';
+  _modalOt=null;
+}
+
+function previewFoto(input){
+  const file=input.files[0];
+  if(!file)return;
+  const reader=new FileReader();
+  reader.onload=e=>{const img=document.getElementById('foto-preview');img.src=e.target.result;img.style.display='block';};
+  reader.readAsDataURL(file);
+}
+
+async function guardarReporte(){
+  if(!_modalOt)return;
+  const estado=document.getElementById('modal-estado').value;
+  const fecha=document.getElementById('modal-fecha').value;
+  const notas=document.getElementById('modal-notas').value.trim();
+
+  const datos={
+    distri_id:TOKEN,
+    sf_id:_modalOt,
+    estado,
+    fecha_retiro:fecha||null,
+    notas:notas||null,
+    updated_at:new Date().toISOString()
+  };
+
+  // Upsert en distri_reportes
+  const{error}=await sb.from('distri_reportes').upsert(datos,{onConflict:'distri_id,sf_id'});
+  if(error){showToast('Error: '+error.message,false);return;}
+
+  _reportes[_modalOt]={...datos};
+  closeModal();
+  renderOts();
+  if(document.getElementById('tab-agenda').classList.contains('active'))renderAgenda();
+  showToast('✅ Reporte guardado');
+}
+
+// ── AGENDA ──
+function renderAgenda(){
+  const year=_agendaMes.getFullYear();
+  const month=_agendaMes.getMonth();
+  const meses=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  document.getElementById('agenda-mes-label').textContent=meses[month]+' '+year;
+
+  const dias=['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+  document.getElementById('cal-dow').innerHTML=dias.map(d=>`<div class="cal-dow-label">${d}</div>`).join('');
+
+  const firstDay=new Date(year,month,1).getDay();
+  const daysInMonth=new Date(year,month+1,0).getDate();
+  const today=new Date().toISOString().slice(0,10);
+
+  // Build map fecha -> OTs
+  const otsPerDay={};
+  Object.values(_reportes).forEach(r=>{
+    if(r.fecha_retiro&&r.estado==='Exitoso — retirado'){
+      otsPerDay[r.fecha_retiro]=(otsPerDay[r.fecha_retiro]||0)+1;
+    }
+  });
+
+  let html='';
+  for(let i=0;i<firstDay;i++)html+=`<div class="cal-day other-month"></div>`;
+  for(let d=1;d<=daysInMonth;d++){
+    const dateStr=`${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const count=otsPerDay[dateStr]||0;
+    html+=`<div class="cal-day${count?` has-ot`:''} ${dateStr===today?` today`:''}" onclick="agendaDayClick('${dateStr}')">
+      <div>${d}</div>${count?`<div style="font-size:9px;font-weight:800">${count}</div>`:''}
+    </div>`;
+  }
+  document.getElementById('cal-grid').innerHTML=html;
+  document.getElementById('agenda-day-detail').style.display='none';
+}
+
+function agendaNavMes(dir){
+  _agendaMes=new Date(_agendaMes.getFullYear(),_agendaMes.getMonth()+dir,1);
+  renderAgenda();
+}
+
+function agendaDayClick(dateStr){
+  const otsDelDia=_ots.filter(e=>_reportes[e.sf_id]?.fecha_retiro===dateStr);
+  const detail=document.getElementById('agenda-day-detail');
+  if(!otsDelDia.length){detail.style.display='none';return;}
+  detail.style.display='block';
+  detail.innerHTML=`<div class="card">
+    <div style="font-weight:700;font-size:13px;margin-bottom:10px">📅 ${new Date(dateStr+'T12:00:00').toLocaleDateString('es-AR',{weekday:'long',day:'2-digit',month:'long'})}</div>
+    ${otsDelDia.map(e=>`<div style="padding:8px 0;border-bottom:1px solid var(--border)">
+      <div style="font-weight:700;color:var(--teal)">${e.ot_numero||e.sf_id}</div>
+      <div style="font-size:12px;color:var(--muted)">${e.cuenta||'—'} · ${e.ciudad||'—'}</div>
+    </div>`).join('')}
+  </div>`;
+}
+
+init();
+</script>
+</body>
+</html>
