@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v2.2.5</title>
+<title>Alleata · Operaciones v2.2.6</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -284,7 +284,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.2.5 · 23 mar 2026
+      v2.2.6 · 23 mar 2026
     </div>
   </div>
 </div>
@@ -322,6 +322,9 @@ tr:hover td{background:var(--surface2);}
     <div class="nav-item" data-mod="ajustes" id="nav-ajustes" style="display:none" onclick="goTo('ajustes')">
       <div class="active-bar"></div><span class="nav-icon-wrap">⚙️</span> Ajustes
     </div>
+    <div class="nav-item" data-mod="distri" id="nav-distri" onclick="goTo('distri')" style="display:none">
+      <div class="active-bar"></div><span class="nav-icon-wrap">🚚</span> Distribuidores
+    </div>
   </div>
   <div class="nav-item" data-mod="ally" id="nav-ally" onclick="goTo('ally')" style="display:none">
     <div class="active-bar"></div><span class="nav-icon-wrap">🤖</span> Config. Ally
@@ -336,7 +339,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.2.5 · 23 mar 2026
+      v2.2.6 · 23 mar 2026
     </div>
   </div>
 </nav>
@@ -350,7 +353,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <div class="topbar-right" id="topbar-date"></div>
     <button onclick="refreshCurrentModule()" title="Actualizar" style="background:none;border:1px solid var(--border2);color:var(--text-muted);border-radius:7px;padding:4px 10px;cursor:pointer;font-size:13px;margin-left:10px;transition:all .2s" onmouseover="this.style.color='var(--teal)';this.style.borderColor='var(--teal)'" onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border2)'">↺</button>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.2.5</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.2.6</div>
   </div>
   <div class="content">
 
@@ -858,7 +861,49 @@ tr:hover td{background:var(--surface2);}
 </div>
 </div>
 
-<!-- Modal Nuevo Contacto Ally -->
+<!-- ══ MÓDULO DISTRIBUIDORES ══════════════════════════════════════════════════════ -->
+<div class="module" id="mod-distri">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+    <div>
+      <div style="font-size:16px;font-weight:900;color:var(--text)">🚚 Distribuidores</div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:2px">Gestión de distribuidores y sus radios de cobertura</div>
+    </div>
+    <button class="btn btn-sm" onclick="distri_nuevoModal()">+ Nuevo distribuidor</button>
+  </div>
+  <div id="distri-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px">
+    <div style="text-align:center;padding:60px;color:var(--text-muted);grid-column:1/-1">
+      <div style="font-size:32px;margin-bottom:8px">⏳</div>Cargando...
+    </div>
+  </div>
+</div>
+
+<!-- Modal Nuevo/Edit Distribuidor -->
+<div id="modalDistri" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeModal('modalDistri')">
+  <div class="modal-box">
+    <div class="modal-title">🚚 Distribuidor</div>
+    <input type="hidden" id="distri-id">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div class="field"><label class="label">Nombre</label><input class="input" id="distri-nombre" placeholder="Nombre"></div>
+      <div class="field"><label class="label">Apellido</label><input class="input" id="distri-apellido" placeholder="Apellido"></div>
+    </div>
+    <div class="field"><label class="label">Dirección</label><input class="input" id="distri-dir" placeholder="Av. Siempre Viva 123"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+      <div class="field"><label class="label">CP</label><input class="input" id="distri-cp" placeholder="1234" maxlength="5"></div>
+      <div class="field"><label class="label">Localidad</label><input class="input" id="distri-loc" placeholder="Localidad"></div>
+      <div class="field"><label class="label">Provincia</label><input class="input" id="distri-prov" placeholder="Buenos Aires"></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+      <div class="field"><label class="label">Radio (km)</label><input class="input" id="distri-radio" type="number" min="5" max="500" placeholder="50"></div>
+      <div class="field"><label class="label">WhatsApp</label><input class="input" id="distri-wa" placeholder="5491123456789"></div>
+      <div class="field"><label class="label">Email</label><input class="input" id="distri-email" placeholder="email@ejemplo.com"></div>
+    </div>
+    <div id="distri-msg"></div>
+    <div style="display:flex;gap:10px;margin-top:6px">
+      <button class="btn btn-sm" onclick="distri_guardar()">Guardar</button>
+      <button class="btn-ghost btn-sm" onclick="closeModal('modalDistri')">Cancelar</button>
+    </div>
+  </div>
+</div>
 <div id="modalAllyContacto" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeModal('modalAllyContacto')">
   <div class="modal-box">
     <div class="modal-title">👥 Contacto</div>
@@ -962,7 +1007,7 @@ tr:hover td{background:var(--surface2);}
 </div>
 
 <script>
-console.log('[Alleata v2.2.5] OK');
+console.log('[Alleata v2.2.6] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -1134,6 +1179,8 @@ function showApp(){
   if(isAdmin){
     const navAlly=document.getElementById('nav-ally');
     if(navAlly) navAlly.style.display='flex';
+    const navDistri=document.getElementById('nav-distri');
+    if(navDistri) navDistri.style.display='flex';
     document.getElementById('nav-ajustes').style.display='flex';
     document.getElementById('nav-section-config').style.display='block';
   }
@@ -1165,7 +1212,7 @@ function buildDashCards(modulos,isAdmin){
   }).join('');
 }
 
-const MOD_INFO={home:'Dashboard',sims:'Verificador SIMs',envios:'Envíos',desinstalaciones:'Desinstalaciones',horas:'Control de Horas',ajustes:'Ajustes',ally:'Configuración Ally'};
+const MOD_INFO={home:'Dashboard',sims:'Verificador SIMs',envios:'Envíos',desinstalaciones:'Desinstalaciones',horas:'Control de Horas',ajustes:'Ajustes',ally:'Configuración Ally',distri:'Distribuidores'};
 function goTo(mod){
   const el=document.getElementById('nav-'+mod);
   if(el&&el.classList.contains('locked'))return;
@@ -1183,6 +1230,7 @@ function goTo(mod){
   if(mod==='home'){setTimeout(()=>{if(window._drawQR)window._drawQR();},200);}
   if(mod==='desinstalaciones'&&!DesinModule.cargado)cargarDesinstalaciones();
   if(mod==='ally')cargarAlly();
+  if(mod==='distri')cargarDistri();
   if(mod==='horas')renderHoras();
   if(mod==='ajustes'){loadUsers();loadSimsDbStats();_auditPage=0;loadAuditLog();}
 }
@@ -1813,23 +1861,6 @@ function showTrackingToast(msg, tipo){
 async function updateEnvioEstado(id,estado){
   await sb.from('envios').update({estado,ultimo_evento_fecha:new Date().toISOString().slice(0,10)}).eq('id',id);
   loadBadges();renderEnvios();
-  // Verificar si este estado tiene regla activa en ally_reglas
-  try {
-    const {data:regla} = await sb.from('ally_reglas').select('*').eq('estado_ot',estado).eq('activo',true).maybeSingle();
-    if(!regla) return; // no hay regla activa para este estado
-    // Buscar sf_id de la OT
-    const {data:ot} = await sb.from('envios').select('sf_id').eq('id',id).maybeSingle();
-    if(!ot?.sf_id) return;
-    // Llamar a Ally para notificar al propietario con @mención
-    await fetch(`${ALLY_URL}/notificar-propietario`,{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({sf_id:ot.sf_id, estado})
-    });
-    console.log(`Ally notificado: OT ${ot.sf_id} -> ${estado}`);
-  } catch(e) {
-    console.warn('Error notificando Ally:', e.message);
-  }
 }
 function openUpdateEvento(id,current){
   const nuevo=prompt('Actualizar observación / evento:',current);
@@ -2357,6 +2388,212 @@ async function allyToggleRegla(id, activo) {
   await sb.from('ally_reglas').update({activo}).eq('id',id);
   cargarAllyReglas();
 }
+
+// ══ MÓDULO DISTRIBUIDORES ════════════════════════════════════════════════════════
+const CP_COORDS={1005:[-34.6037,-58.3816],1289:[-34.639,-58.378],1414:[-34.588,-58.44],1425:[-34.588,-58.42],1604:[-34.476,-58.52],1625:[-34.349,-58.797],1629:[-34.458,-58.914],1640:[-34.492,-58.509],1650:[-34.567,-58.539],1657:[-34.588,-58.658],1663:[-34.539,-58.706],1700:[-34.617,-58.557],1704:[-34.644,-58.565],1708:[-34.653,-58.62],1714:[-34.659,-58.665],1748:[-34.604,-58.937],1752:[-34.678,-58.529],1757:[-34.748,-58.597],1805:[-34.847,-58.515],1821:[-34.7,-58.405],1824:[-34.705,-58.4],1827:[-34.765,-58.423],1832:[-34.765,-58.423],1836:[-34.801,-58.454],1856:[-34.894,-58.399],1862:[-34.944,-58.47],1875:[-34.705,-58.315],1880:[-34.763,-58.208],1886:[-34.836,-58.193],1900:[-34.9205,-57.9536],1984:[-34.995,-58.006],2000:[-32.9468,-60.6393],2800:[-34.098,-59.027],2900:[-33.3347,-60.2117],3000:[-31.6333,-60.7],3100:[-31.7333,-60.5167],3300:[-27.3671,-55.896],3400:[-27.4806,-58.8341],3500:[-27.4514,-58.9867],3600:[-26.1775,-58.1781],4000:[-26.8083,-65.2176],4400:[-24.7821,-65.4232],4600:[-24.1857,-65.2994],5000:[-31.4135,-64.1811],5151:[-31.3456,-64.3376],5152:[-31.3456,-64.3376],5500:[-32.8908,-68.8272],5800:[-33.1232,-64.3493],5900:[-32.4072,-63.2409],6000:[-34.5667,-60.9167],6700:[-34.5696,-59.1076],7000:[-37.325,-59.1392],7174:[-37.643,-57.706],7300:[-36.7756,-59.8578],7400:[-36.8921,-60.3224],7600:[-38.0023,-57.5575],7601:[-38.0023,-57.5575],7602:[-38.0023,-57.5575],7603:[-38.0023,-57.5575],7604:[-38.0023,-57.5575],7607:[-38.272,-57.837],7608:[-38.0023,-57.5575],7609:[-37.875,-57.523],7610:[-38.0023,-57.5575],7620:[-37.754,-58.287],7630:[-38.554,-58.746],8000:[-38.7183,-62.2663],8300:[-38.9516,-68.0591],8400:[-41.1335,-71.3103],8500:[-40.8135,-62.9967],9000:[-45.8645,-67.4977]};
+
+function haversineDistri(lat1,lon1,lat2,lon2){
+  const R=6371,toRad=x=>x*Math.PI/180;
+  const dLat=toRad(lat2-lat1),dLon=toRad(lon2-lon1);
+  const a=Math.sin(dLat/2)**2+Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+
+let _distri_data=[];
+let _distri_envios=[];
+
+async function cargarDistri(){
+  const grid=document.getElementById('distri-grid');
+  grid.innerHTML='<div style="text-align:center;padding:60px;color:var(--text-muted);grid-column:1/-1"><div style="font-size:32px;margin-bottom:8px">⏳</div>Cargando...</div>';
+  // Cargar distribuidores y envíos en paralelo
+  const [{data:distris},{data:envios}]=await Promise.all([
+    sb.from('distribuidores').select('*').eq('activo',true).order('nombre'),
+    sb.from('envios').select('sf_id,ot_numero,cuenta,ciudad,provincia,cp_dest,estado,responsable').not('estado','in','("Entregado","Devuelto","Fallido","Perdido")')
+  ]);
+  _distri_data=distris||[];
+  _distri_envios=envios||[];
+  distri_render();
+}
+
+function distri_getOts(d){
+  if(!d.lat||!d.lon)return[];
+  return _distri_envios.map(e=>{
+    const cpNum=parseInt((e.cp_dest||'').replace(/\D/g,''));
+    const coords=CP_COORDS[cpNum];
+    if(!coords)return null;
+    const dist=haversineDistri(d.lat,d.lon,coords[0],coords[1]);
+    if(dist>d.radio)return null;
+    return{...e,distKm:Math.round(dist*10)/10};
+  }).filter(Boolean).sort((a,b)=>a.distKm-b.distKm);
+}
+
+function distri_render(){
+  const grid=document.getElementById('distri-grid');
+  if(!_distri_data.length){
+    grid.innerHTML='<div style="text-align:center;padding:60px;color:var(--text-muted);grid-column:1/-1"><div style="font-size:40px;margin-bottom:12px">🚚</div><div style="font-weight:700">No hay distribuidores cargados</div><div style="font-size:12px;margin-top:6px">Agregá el primero con el botón de arriba</div></div>';
+    return;
+  }
+  grid.innerHTML=_distri_data.map(d=>{
+    const ots=distri_getOts(d);
+    const hasCoords=!!(d.lat&&d.lon);
+    const estadoCount={};
+    ots.forEach(e=>{estadoCount[e.estado]=(estadoCount[e.estado]||0)+1;});
+    const estadoPills=Object.entries(estadoCount).map(([s,n])=>`<span style="background:var(--surface2);border:1px solid var(--border2);border-radius:99px;padding:2px 8px;font-size:10px;font-weight:700;color:var(--text-muted);white-space:nowrap">${s.split(' ')[0]}: ${n}</span>`).join('');
+    const link=`${location.origin}${location.pathname.replace(/\/[^/]*$/,'')}/distri.html?token=${d.id}`;
+    return `<div style="background:var(--surface);border:1px solid var(--border2);border-radius:16px;padding:18px;display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;gap:12px;align-items:flex-start">
+        <div style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,var(--teal),#00BFA5);display:flex;align-items:center;justify-content:center;font-size:20px;color:#fff;font-weight:900;flex-shrink:0">${(d.nombre[0]||'?').toUpperCase()}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:800;font-size:15px;color:var(--text)">${d.nombre} ${d.apellido}</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">📍 ${[d.direccion,d.localidad,d.provincia].filter(Boolean).join(', ')}</div>
+          ${d.cp?`<div style="font-size:11px;color:var(--text-muted)">CP: ${d.cp}</div>`:''}
+        </div>
+        <button onclick="distri_editModal('${d.id}')" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:16px;padding:4px" title="Editar">✏️</button>
+      </div>
+      ${d.whatsapp||d.email?`<div style="background:var(--surface2);border-radius:8px;padding:8px 12px;display:flex;gap:12px;flex-wrap:wrap">
+        ${d.whatsapp?`<a href="https://wa.me/${d.whatsapp}" target="_blank" style="color:var(--teal);text-decoration:none;font-size:12px;font-weight:700">📱 ${d.whatsapp}</a>`:''}
+        ${d.email?`<a href="mailto:${d.email}" style="color:var(--blue);text-decoration:none;font-size:12px;font-weight:700">✉️ ${d.email}</a>`:''}
+      </div>`:''}
+      <div style="background:var(--surface2);border-radius:8px;padding:8px 14px;display:flex;align-items:center;justify-content:space-between">
+        <div style="font-size:10px;font-weight:700;color:var(--teal);letter-spacing:.5px">RADIO DE COBERTURA</div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:20px;font-weight:900;color:var(--teal)">${d.radio} km</span>
+          <button onclick="distri_editRadio('${d.id}',${d.radio})" style="background:var(--surface);border:1px solid var(--border2);border-radius:7px;padding:3px 8px;font-size:11px;color:var(--teal);cursor:pointer;font-weight:700">✏️</button>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;align-items:center">
+        <div style="font-size:32px;font-weight:900;color:${hasCoords?'var(--teal)':'var(--text-muted)'};line-height:1">${hasCoords?ots.length:'—'}</div>
+        <div style="font-size:11px;color:var(--text-muted);line-height:1.4">OTs<br>a retirar</div>
+        <div style="flex:1;display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end">${estadoPills}</div>
+      </div>
+      ${!hasCoords?`<div style="font-size:11px;color:#ef4444;background:rgba(239,68,68,.1);border-radius:8px;padding:6px 10px;font-weight:600">⚠️ CP ${d.cp||'vacío'} sin coordenadas — editá lat/lon manualmente</div>`:''}
+      <button onclick="distri_verOts('${d.id}')" ${!hasCoords||!ots.length?'disabled':''} style="width:100%;background:${hasCoords&&ots.length?'var(--teal)':'var(--surface2)'};color:${hasCoords&&ots.length?'#fff':'var(--text-muted)'};border:none;border-radius:10px;padding:10px;font-size:13px;font-weight:700;cursor:${hasCoords&&ots.length?'pointer':'default'}">
+        ${!hasCoords?'Sin coordenadas':ots.length===0?'Sin OTs en el radio':'Ver listado de OTs →'}
+      </button>
+      <button onclick="distri_copiarLink('${d.id}','${d.nombre} ${d.apellido}','${link}')" style="width:100%;background:var(--surface2);color:var(--teal);border:1px solid var(--border2);border-radius:10px;padding:8px;font-size:12px;font-weight:700;cursor:pointer">
+        🔗 Copiar link del distribuidor
+      </button>
+    </div>`;
+  }).join('');
+}
+
+function distri_copiarLink(id,nombre,link){
+  navigator.clipboard.writeText(link).then(()=>{
+    // Toast
+    const t=document.createElement('div');
+    t.textContent='✅ Link copiado para '+nombre;
+    t.style.cssText='position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--teal);color:#fff;padding:10px 20px;border-radius:10px;font-size:13px;font-weight:700;z-index:9999;pointer-events:none';
+    document.body.appendChild(t);
+    setTimeout(()=>t.remove(),2500);
+  });
+}
+
+let _distri_verOtsId=null;
+function distri_verOts(id){
+  const d=_distri_data.find(x=>x.id===id);
+  if(!d)return;
+  const ots=distri_getOts(d);
+  // Reutilizamos el modal de notas con tabla custom
+  const contenido=`<div class="modal-title">📦 OTs de ${d.nombre} ${d.apellido}</div>
+  <div style="font-size:11px;color:var(--text-muted);margin-bottom:12px">${ots.length} OTs dentro del radio de ${d.radio} km</div>
+  <div style="overflow-x:auto;max-height:400px;overflow-y:auto">
+    <table class="table">
+      <thead><tr><th>Dist.</th><th>OT</th><th>Cuenta</th><th>Ciudad</th><th>Estado</th></tr></thead>
+      <tbody>${ots.map(e=>`<tr>
+        <td style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--teal)">${e.distKm} km</td>
+        <td style="font-weight:700;color:var(--teal)">${e.ot_numero||e.sf_id}</td>
+        <td style="font-size:11px">${e.cuenta||'—'}</td>
+        <td style="font-size:11px">${e.ciudad||'—'}</td>
+        <td style="font-size:11px">${e.estado||'—'}</td>
+      </tr>`).join('')}</tbody>
+    </table>
+  </div>`;
+  const m=document.getElementById('modalDistri');
+  m.querySelector('.modal-box').innerHTML=contenido+'<div style="margin-top:14px"><button class="btn-ghost btn-sm" onclick="closeModal(\'modalDistri\');cargarDistri()">Cerrar</button></div>';
+  m.style.display='flex';
+}
+
+async function distri_editRadio(id,radioActual){
+  const nuevo=prompt('Nuevo radio de cobertura (km):',radioActual);
+  if(nuevo===null||isNaN(parseInt(nuevo)))return;
+  await sb.from('distribuidores').update({radio:parseInt(nuevo)}).eq('id',id);
+  cargarDistri();
+}
+
+function distri_nuevoModal(){
+  ['distri-id','distri-nombre','distri-apellido','distri-dir','distri-cp','distri-loc','distri-prov','distri-wa','distri-email'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  document.getElementById('distri-radio').value='50';
+  document.getElementById('distri-msg').innerHTML='';
+  // Restore form if it was replaced by OTs view
+  const box=document.getElementById('modalDistri').querySelector('.modal-box');
+  if(!document.getElementById('distri-nombre')){
+    box.innerHTML=`<div class="modal-title">🚚 Distribuidor</div>
+    <input type="hidden" id="distri-id">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div class="field"><label class="label">Nombre</label><input class="input" id="distri-nombre" placeholder="Nombre"></div>
+      <div class="field"><label class="label">Apellido</label><input class="input" id="distri-apellido" placeholder="Apellido"></div>
+    </div>
+    <div class="field"><label class="label">Dirección</label><input class="input" id="distri-dir" placeholder="Av. Siempre Viva 123"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+      <div class="field"><label class="label">CP</label><input class="input" id="distri-cp" placeholder="1234" maxlength="5"></div>
+      <div class="field"><label class="label">Localidad</label><input class="input" id="distri-loc" placeholder="Localidad"></div>
+      <div class="field"><label class="label">Provincia</label><input class="input" id="distri-prov" placeholder="Buenos Aires"></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+      <div class="field"><label class="label">Radio (km)</label><input class="input" id="distri-radio" type="number" min="5" max="500" placeholder="50"></div>
+      <div class="field"><label class="label">WhatsApp</label><input class="input" id="distri-wa" placeholder="5491123456789"></div>
+      <div class="field"><label class="label">Email</label><input class="input" id="distri-email" placeholder="email@ejemplo.com"></div>
+    </div>
+    <div id="distri-msg"></div>
+    <div style="display:flex;gap:10px;margin-top:6px">
+      <button class="btn btn-sm" onclick="distri_guardar()">Guardar</button>
+      <button class="btn-ghost btn-sm" onclick="closeModal('modalDistri')">Cancelar</button>
+    </div>`;
+  }
+  document.getElementById('modalDistri').style.display='flex';
+}
+
+function distri_editModal(id){
+  const d=_distri_data.find(x=>x.id===id);
+  if(!d)return;
+  distri_nuevoModal();
+  document.getElementById('distri-id').value=d.id;
+  document.getElementById('distri-nombre').value=d.nombre||'';
+  document.getElementById('distri-apellido').value=d.apellido||'';
+  document.getElementById('distri-dir').value=d.direccion||'';
+  document.getElementById('distri-cp').value=d.cp||'';
+  document.getElementById('distri-loc').value=d.localidad||'';
+  document.getElementById('distri-prov').value=d.provincia||'';
+  document.getElementById('distri-radio').value=d.radio||50;
+  document.getElementById('distri-wa').value=d.whatsapp||'';
+  document.getElementById('distri-email').value=d.email||'';
+}
+
+async function distri_guardar(){
+  const id=document.getElementById('distri-id').value;
+  const cp=(document.getElementById('distri-cp').value||'').trim();
+  const cpNum=parseInt(cp);
+  const coords=CP_COORDS[cpNum]||null;
+  const datos={
+    nombre:document.getElementById('distri-nombre').value.trim(),
+    apellido:document.getElementById('distri-apellido').value.trim(),
+    direccion:document.getElementById('distri-dir').value.trim()||null,
+    cp:cp||null,
+    localidad:document.getElementById('distri-loc').value.trim()||null,
+    provincia:document.getElementById('distri-prov').value.trim()||null,
+    radio:parseInt(document.getElementById('distri-radio').value)||50,
+    whatsapp:document.getElementById('distri-wa').value.trim()||null,
+    email:document.getElementById('distri-email').value.trim()||null,
+    lat:coords?coords[0]:null,
+    lon:coords?coords[1]:null,
+  };
+  if(!datos.nombre){document.getElementById('distri-msg').innerHTML='<div style="color:#ef4444;font-size:12px;margin-top:6px">El nombre es obligatorio</div>';return;}
+  const {error}=id?await sb.from('distribuidores').update(datos).eq('id',id):await sb.from('distribuidores').insert(datos);
+  if(error){document.getElementById('distri-msg').innerHTML=`<div style="color:#ef4444;font-size:12px;margin-top:6px">Error: ${error.message}</div>`;return;}
+  closeModal('modalDistri');
+  cargarDistri();
+}
+// ══ FIN MÓDULO DISTRIBUIDORES ════════════════════════════════════════════════════
 
 // CSS para ally tabs
 (function(){
