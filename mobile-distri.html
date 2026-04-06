@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0a0f1a">
+<title>Alleata · Distribuidores</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+:root{
+  --bg:#0a0f1a;--surface:#111827;--surface2:#1a2236;--border:rgba(255,255,255,.08);
+  --teal:#1dbf8e;--blue:#1a9fd4;--red:#ef4444;--orange:#f59e0b;--green:#10b981;--purple:#8b5cf6;
+  --text:#f1f5f9;--muted:#64748b;--grad:linear-gradient(135deg,#1dbf8e,#1a9fd4);
+}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',sans-serif;overflow:hidden;}
+
+/* LOGIN */
+#loginScreen{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 24px;background:var(--bg);z-index:100;background-image:radial-gradient(ellipse at 50% 0%,rgba(29,191,142,.12) 0%,transparent 60%);}
+.login-logo{font-size:34px;font-weight:900;letter-spacing:-2px;color:var(--teal);margin-bottom:4px;}
+.login-sub{font-size:13px;color:var(--muted);margin-bottom:36px;}
+.login-card{width:100%;max-width:340px;background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:28px 24px;}
+.lbl{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;display:block;}
+.inp{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:14px 16px;font-size:16px;color:var(--text);outline:none;font-family:inherit;margin-bottom:14px;-webkit-appearance:none;}
+.inp:focus{border-color:var(--teal);}
+.login-btn{width:100%;background:var(--grad);border:none;border-radius:12px;padding:16px;font-size:16px;font-weight:700;color:#fff;cursor:pointer;font-family:inherit;}
+.login-err{font-size:12px;color:var(--red);text-align:center;margin-top:10px;min-height:16px;}
+
+/* SHELL */
+#appShell{display:none;height:100dvh;flex-direction:column;}
+.topbar{flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:14px 20px;padding-top:calc(env(safe-area-inset-top,0px)+14px);background:var(--surface);border-bottom:1px solid var(--border);}
+.tbar-logo{font-size:18px;font-weight:900;letter-spacing:-1px;color:var(--teal);}
+.tbar-mid{font-size:13px;font-weight:600;}
+.tbar-out{font-size:12px;color:var(--muted);background:none;border:none;cursor:pointer;font-family:inherit;padding:4px 8px;}
+.content{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:16px;padding-bottom:calc(env(safe-area-inset-bottom,0px)+84px);}
+.bottom-nav{flex-shrink:0;display:flex;background:var(--surface);border-top:1px solid var(--border);padding-bottom:env(safe-area-inset-bottom,0px);}
+.nbtn{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:10px 0;border:none;background:none;cursor:pointer;color:var(--muted);font-family:inherit;font-size:10px;font-weight:600;}
+.nbtn.active{color:var(--teal);}
+.nicon{font-size:22px;line-height:1;}
+
+/* CARDS */
+.kpi-strip{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px;}
+.kpi-box{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px;text-align:center;}
+.kpi-num{font-size:26px;font-weight:900;font-family:'SF Mono',monospace;line-height:1;}
+.kpi-lbl{font-size:10px;color:var(--muted);margin-top:3px;font-weight:600;}
+.chip-row{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;margin-bottom:14px;scrollbar-width:none;}
+.chip-row::-webkit-scrollbar{display:none;}
+.chip{flex-shrink:0;font-size:11px;font-weight:700;padding:6px 14px;border-radius:20px;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer;white-space:nowrap;}
+.chip.on{background:var(--teal);color:#fff;border-color:var(--teal);}
+.ot-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:16px;margin-bottom:12px;}
+.ot-card.done{opacity:.6;}
+.ot-head{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px;}
+.ot-num{font-size:17px;font-weight:800;color:var(--teal);font-family:'SF Mono',monospace;}
+.ot-tag{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-top:2px;}
+.bdg{display:inline-block;font-size:10px;font-weight:700;padding:3px 10px;border-radius:20px;}
+.b-ok{background:rgba(16,185,129,.15);color:#6ee7b7;}
+.b-pend{background:rgba(100,116,139,.15);color:#94a3b8;}
+.b-desp{background:rgba(139,92,246,.15);color:#a78bfa;}
+.b-tr{background:rgba(245,158,11,.15);color:#fcd34d;}
+.b-ret{background:rgba(239,68,68,.15);color:#fca5a5;}
+.b-proc{background:rgba(26,159,212,.15);color:#7dd3fc;}
+
+/* PROGRESO DE ESTADOS */
+.prog-wrap{margin:12px 0;overflow-x:auto;padding-bottom:4px;scrollbar-width:none;}
+.prog-wrap::-webkit-scrollbar{display:none;}
+.prog-row{display:flex;align-items:center;gap:0;min-width:max-content;}
+.prog-step{display:flex;align-items:center;gap:4px;}
+.prog-dot{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;flex-shrink:0;}
+.prog-dot.done{background:var(--green);color:#fff;}
+.prog-dot.active{background:var(--teal);color:#fff;box-shadow:0 0 0 3px rgba(29,191,142,.25);}
+.prog-dot.next{background:var(--surface2);color:var(--muted);border:1px dashed var(--teal);}
+.prog-dot.todo{background:var(--surface2);color:var(--muted);border:1px solid var(--border);}
+.prog-line{width:20px;height:2px;background:var(--border);flex-shrink:0;}
+.prog-line.done{background:var(--green);}
+
+.ot-obs{font-size:11px;color:var(--muted);background:var(--surface2);border-radius:8px;padding:8px;margin-top:8px;line-height:1.4;}
+.btn-next{width:100%;border:none;border-radius:12px;padding:14px;font-size:14px;font-weight:700;color:#fff;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:12px;}
+.btn-maps{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:11px;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px;margin-top:8px;}
+
+/* MODAL */
+#modal{position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:200;display:none;flex-direction:column;justify-content:flex-end;backdrop-filter:blur(8px);}
+#modal.show{display:flex;}
+.sheet{background:var(--surface);border-radius:24px 24px 0 0;padding:20px 20px calc(env(safe-area-inset-bottom,0px)+20px);max-height:88dvh;overflow-y:auto;}
+.handle{width:40px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 20px;}
+.mtitle{font-size:18px;font-weight:800;margin-bottom:2px;}
+.msub{font-size:12px;color:var(--muted);margin-bottom:6px;}
+.mnext-label{font-size:13px;font-weight:700;padding:10px 14px;border-radius:10px;margin-bottom:16px;border-left:3px solid var(--teal);}
+.slbl{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;margin-top:14px;display:block;}
+.fzone{border:2px dashed var(--border);border-radius:14px;min-height:120px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;gap:6px;overflow:hidden;position:relative;background:var(--surface2);}
+.fzone img{width:100%;height:170px;object-fit:cover;}
+.fok{position:absolute;top:8px;right:8px;background:var(--green);color:#fff;font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;}
+.btn-confirm{width:100%;background:var(--grad);border:none;border-radius:14px;padding:16px;font-size:16px;font-weight:700;color:#fff;cursor:pointer;font-family:inherit;margin-top:16px;}
+.btn-cancel{width:100%;background:none;border:none;color:var(--muted);font-size:14px;cursor:pointer;padding:12px;font-family:inherit;}
+
+/* BUSCAR */
+.search-row{display:flex;gap:8px;margin-bottom:16px;}
+.sinp{flex:1;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:13px 16px;font-size:15px;color:var(--text);outline:none;font-family:inherit;}
+.sinp:focus{border-color:var(--teal);}
+.sbtn{background:var(--teal);border:none;border-radius:12px;padding:13px 16px;color:#fff;font-size:15px;cursor:pointer;}
+
+.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:50px 20px;text-align:center;color:var(--muted);}
+.eicon{font-size:44px;margin-bottom:12px;}
+.etitle{font-size:16px;font-weight:700;color:var(--text);margin-bottom:6px;}
+.spin{display:inline-block;width:22px;height:22px;border:2px solid rgba(255,255,255,.2);border-top-color:#fff;border-radius:50%;animation:sp .7s linear infinite;}
+@keyframes sp{to{transform:rotate(360deg);}}
+.lc{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px;gap:14px;color:var(--muted);font-size:13px;}
+.lc .spin{width:28px;height:28px;border-width:3px;}
+#toast{position:fixed;bottom:calc(env(safe-area-inset-bottom,0px)+90px);left:50%;transform:translateX(-50%) translateY(20px);background:var(--green);color:#fff;padding:12px 24px;border-radius:40px;font-size:14px;font-weight:700;opacity:0;transition:all .3s;z-index:300;white-space:nowrap;pointer-events:none;}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+#toast.err{background:var(--red);}
+.sec{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;}
+</style>
+</head>
+<body>
+
+<div id="loginScreen">
+  <div class="login-logo">alleata</div>
+  <div class="login-sub">App de Distribuidores · v1.1</div>
+  <div class="login-card">
+    <label class="lbl">Email</label>
+    <input class="inp" id="lEmail" type="email" autocomplete="username" placeholder="tu@email.com">
+    <label class="lbl">Contraseña</label>
+    <input class="inp" id="lPass" type="password" autocomplete="current-password" placeholder="••••••••">
+    <button class="login-btn" onclick="doLogin()">Ingresar</button>
+    <div class="login-err" id="lErr"></div>
+  </div>
+</div>
+
+<div id="appShell">
+  <div class="topbar">
+    <div class="tbar-logo">alleata</div>
+    <div class="tbar-mid" id="tbarTitle">Mis OTs</div>
+    <button class="tbar-out" onclick="doLogout()">Salir</button>
+  </div>
+  <div class="content" id="content"></div>
+  <div class="bottom-nav">
+    <button class="nbtn active" id="nav-mis" onclick="goTab('mis')"><div class="nicon">🚚</div><span>Mis OTs</span></button>
+    <button class="nbtn" id="nav-buscar" onclick="goTab('buscar')"><div class="nicon">🔍</div><span>Buscar</span></button>
+    <button class="nbtn" id="nav-hist" onclick="goTab('hist')"><div class="nicon">📋</div><span>Historial</span></button>
+  </div>
+</div>
+
+<div id="modal"><div class="sheet" id="sheetInner"></div></div>
+<div id="toast"></div>
+
+<script>
+const SB_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
+const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
+const sb=supabase.createClient(SB_URL,SB_KEY);
+
+let me=null, tab='mis', misOTs=[], filtroTipo='todos', otModal=null, fotoB64=null;
+
+// ── FLUJOS DE ESTADO POR TIPO ──
+// Solo estados en los que el DISTRI puede actuar (desde Despachado en adelante)
+const FLUJOS={
+  entrega:    ['Despachado','En camino','En espera en sucursal','Entregado'],
+  desins:     ['Despachado','En camino','En espera en sucursal','Terminal recuperada'],
+  cambio:     ['Despachado','En camino','En espera en sucursal','Entregado','Retirar Terminal','En camino retorno','Recibido ✅'],
+  rollout:    ['Despachado','En camino','En espera en sucursal','Entregado','Retirar Terminal','En camino retorno','Recibido ✅'],
+};
+const ESTADOS_FINALES=['Entregado','Terminal recuperada','Recibido ✅','Fallido','Perdido'];
+const PASO_LABELS={
+  'Despachado':'Despachado',
+  'En camino':'En camino 🚗',
+  'En espera en sucursal':'En sucursal 📦',
+  'Entregado':'Entregado ✅',
+  'Retirar Terminal':'Retirar Terminal ⏳',
+  'En camino retorno':'Retorno en camino ↩️',
+  'Recibido ✅':'Recibido ✅',
+  'Terminal recuperada':'Terminal recuperada ✅',
+  'Fallido':'Fallido ❌',
+};
+// Necesita foto y/o receptor en estos estados destino
+const NECESITA_FOTO=['Entregado','Terminal recuperada','Recibido ✅'];
+const NECESITA_RECEPTOR=['Entregado','Terminal recuperada'];
+
+function opType(tipo){
+  const t=(tipo||'').toUpperCase();
+  if(t.includes('DESINS'))return'desins';
+  if(t.includes('ROLLOUT'))return'rollout';
+  if(t.includes('CAMBIO'))return'cambio';
+  return'entrega';
+}
+function siguienteEstado(op,estadoActual){
+  const flujo=FLUJOS[op]||FLUJOS.entrega;
+  const idx=flujo.indexOf(estadoActual);
+  if(idx===-1||idx>=flujo.length-1)return null;
+  return flujo[idx+1];
+}
+function opLabel(op){return{entrega:'Entrega',desins:'Desinstalación',cambio:'Cambio Terminal',rollout:'Rollout'}[op]||op;}
+function opColor(op){return{entrega:'var(--teal)',desins:'var(--orange)',cambio:'var(--blue)',rollout:'var(--purple)'}[op]||'var(--muted)';}
+function bdgClass(estado){
+  return({'Despachado':'b-desp','Entregado':'b-ok','Terminal recuperada':'b-ok','Recibido ✅':'b-ok',
+    'Retirar Terminal':'b-ret','En tránsito':'b-tr','En camino':'b-tr','En espera en sucursal':'b-proc',
+    'En camino retorno':'b-tr','Pendiente':'b-pend','Pre-Colecta':'b-pend'})[estado]||'b-pend';
+}
+
+// ── AUTH ──
+async function doLogin(){
+  const e=document.getElementById('lEmail').value.trim(),p=document.getElementById('lPass').value;
+  const err=document.getElementById('lErr'),btn=document.querySelector('.login-btn');
+  if(!e||!p){err.textContent='Completá email y contraseña';return;}
+  btn.innerHTML='<div class="spin"></div>';err.textContent='';
+  const{data,error}=await sb.auth.signInWithPassword({email:e,password:p});
+  if(error){err.textContent=error.message;btn.textContent='Ingresar';return;}
+  me=data.user;showApp();
+}
+async function doLogout(){
+  await sb.auth.signOut();me=null;
+  document.getElementById('appShell').style.display='none';
+  document.getElementById('loginScreen').style.display='flex';
+  document.getElementById('lPass').value='';
+}
+sb.auth.getSession().then(({data:{session}})=>{if(session){me=session.user;showApp();}});
+
+function showApp(){
+  document.getElementById('loginScreen').style.display='none';
+  document.getElementById('appShell').style.display='flex';
+  goTab('mis');
+}
+
+function goTab(t){
+  tab=t;
+  document.querySelectorAll('.nbtn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('nav-'+t)?.classList.add('active');
+  document.getElementById('tbarTitle').textContent={mis:'Mis OTs',buscar:'Buscar OT',hist:'Historial'}[t]||t;
+  if(t==='mis')renderMis();else if(t==='buscar')renderBuscar();else renderHist();
+}
+
+// ── TAB: MIS OTs ──
+async function renderMis(){
+  const c=document.getElementById('content');
+  c.innerHTML='<div class="lc"><div class="spin"></div>Cargando OTs ALLEATA...</div>';
+
+  // Trae todas las OTs de logística ALLEATA que no están cerradas
+  const EXCLUIR_ENV=['Entregado','Fallido','Perdido','Recibido ✅'];
+  const EXCLUIR_OT=['Terminal recuperada','Fallido','Cancelada'];
+
+  const[r1,r2]=await Promise.all([
+    sb.from('envios')
+      .select('id,ot_numero,tipo,cuenta,estado,estado_devolucion,ciudad,provincia,direccion_completa,contacto,notas,fecha,foto_evidencia,notas_cierre')
+      .eq('logistica','ALLEATA')
+      .not('estado','in',`(${EXCLUIR_ENV.map(s=>`"${s}"`).join(',')})`),
+    sb.from('ordenes_trabajo')
+      .select('id,ot,tipo,cuenta,estado,ciudad,provincia,direccion_completa,contacto,observaciones')
+      .not('estado','in',`(${EXCLUIR_OT.map(s=>`"${s}"`).join(',')})`),
+  ]);
+
+  const env=(r1.data||[]).map(o=>({...o,_t:'envios',_op:opType(o.tipo),_n:o.ot_numero}));
+  const ots=(r2.data||[]).map(o=>({...o,_t:'ordenes_trabajo',_op:opType(o.tipo),_n:o.ot}));
+  misOTs=[...env,...ots].sort((a,b)=>(a._n||'').localeCompare(b._n||''));
+
+  if(!misOTs.length){
+    c.innerHTML='<div class="empty"><div class="eicon">📦</div><div class="etitle">Sin OTs activas</div><div style="font-size:13px">No hay OTs de logística Alleata en curso.</div></div>';return;
+  }
+
+  const cnt={todos:misOTs.length};
+  misOTs.forEach(o=>{cnt[o._op]=(cnt[o._op]||0)+1;});
+  const tipos=Object.keys(cnt).filter(k=>k!=='todos'&&cnt[k]>0);
+  const urgentes=misOTs.filter(o=>['Retirar Terminal','Pendiente'].includes(o.estado)).length;
+
+  let html=`<div class="kpi-strip">
+    <div class="kpi-box"><div class="kpi-num" style="color:var(--blue)">${misOTs.length}</div><div class="kpi-lbl">En curso</div></div>
+    <div class="kpi-box"><div class="kpi-num" style="color:${urgentes?'var(--red)':'var(--muted)'}">${urgentes}</div><div class="kpi-lbl">Urgentes</div></div>
+    <div class="kpi-box"><div class="kpi-num" style="color:var(--teal)">${cnt.entrega||0}</div><div class="kpi-lbl">Entregas</div></div>
+  </div>`;
+
+  if(tipos.length>1){
+    html+=`<div class="chip-row">
+      <div class="chip ${filtroTipo==='todos'?'on':''}" onclick="setF('todos')">Todos (${cnt.todos})</div>
+      ${tipos.map(t=>`<div class="chip ${filtroTipo===t?'on':''}" style="${filtroTipo===t?'':'border-color:'+opColor(t)+';color:'+opColor(t)}" onclick="setF('${t}')">${opLabel(t)} (${cnt[t]})</div>`).join('')}
+    </div>`;
+  }
+
+  const lista=filtroTipo==='todos'?misOTs:misOTs.filter(o=>o._op===filtroTipo);
+  html+=lista.map(o=>cardHTML(o)).join('');
+  c.innerHTML=html;
+}
+
+function setF(t){filtroTipo=t;renderMis();}
+
+function progresoHTML(op, estadoActual){
+  const flujo=FLUJOS[op]||FLUJOS.entrega;
+  const idxActual=flujo.indexOf(estadoActual);
+  return`<div class="prog-wrap"><div class="prog-row">
+    ${flujo.map((s,i)=>{
+      const isDone=i<idxActual;
+      const isActive=i===idxActual;
+      const isNext=i===idxActual+1;
+      const cls=isDone?'done':isActive?'active':isNext?'next':'todo';
+      const line=i<flujo.length-1?`<div class="prog-line${isDone?' done':''}"></div>`:'';
+      return`<div class="prog-step">
+        <div class="prog-dot ${cls}" title="${s}">${isDone?'✓':i+1}</div>
+        ${line}
+      </div>`;
+    }).join('')}
+  </div></div>
+  <div style="font-size:10px;color:var(--muted);margin-top:-4px;margin-bottom:8px">
+    ${flujo.slice(0,idxActual+2).map((s,i)=>i===idxActual?`<b style="color:var(--teal)">${PASO_LABELS[s]||s}</b>`:PASO_LABELS[s]||s).join(' → ')}
+    ${idxActual<flujo.length-2?'<span style="color:var(--border)"> → ...</span>':''}
+  </div>`;
+}
+
+function cardHTML(o){
+  const sig=siguienteEstado(o._op,o.estado);
+  const dirs=[o.direccion_completa,o.ciudad,o.provincia].filter(Boolean).join(', ');
+  const obs=o.notas||o.observaciones||'';
+  const esFinal=ESTADOS_FINALES.includes(o.estado);
+  const nextColor=sig&&NECESITA_FOTO.includes(sig)?'#ef4444':'var(--teal)';
+  return`<div class="ot-card ${esFinal?'done':''}">
+    <div class="ot-head">
+      <div><div class="ot-num">${o._n||'—'}</div><div class="ot-tag" style="color:${opColor(o._op)}">${opLabel(o._op)}</div></div>
+      <span class="bdg ${bdgClass(o.estado)}">${o.estado}</span>
+    </div>
+    <div style="font-size:13px;font-weight:600;margin-bottom:3px">${o.cuenta||'—'}</div>
+    ${dirs?`<div style="font-size:12px;color:var(--muted);margin-top:5px;line-height:1.4">📍 ${dirs}</div>`:''}
+    ${o.contacto?`<div style="font-size:12px;color:var(--muted);margin-top:4px">📞 ${o.contacto}</div>`:''}
+    ${obs?`<div class="ot-obs">${obs}</div>`:''}
+    ${progresoHTML(o._op,o.estado)}
+    ${sig?`<button class="btn-next" style="background:linear-gradient(135deg,${nextColor},${nextColor==='var(--teal)'?'#1a9fd4':'#f97316'})" onclick="openModal('${o.id}','${o._t}')">
+      → ${PASO_LABELS[sig]||sig}
+    </button>`:''}
+    ${dirs?`<button class="btn-maps" onclick="window.open('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent('${dirs.replace(/'/g,' ')} Argentina'),'_blank')">🗺️ Ver en Maps</button>`:''}
+  </div>`;
+}
+
+// ── MODAL ──
+async function openModal(id,tabla){
+  fotoB64=null;
+  let o=misOTs.find(x=>x.id===id&&x._t===tabla);
+  if(!o){
+    const{data}=await sb.from(tabla==='envios'?'envios':'ordenes_trabajo').select('*').eq('id',id).single();
+    if(!data)return;
+    o=tabla==='envios'?{...data,_t:'envios',_op:opType(data.tipo),_n:data.ot_numero}
+                      :{...data,_t:'ordenes_trabajo',_op:opType(data.tipo),_n:data.ot};
+  }
+  otModal=o;
+  const sig=siguienteEstado(o._op,o.estado);
+  if(!sig)return;
+  const needFoto=NECESITA_FOTO.includes(sig);
+  const needRec=NECESITA_RECEPTOR.includes(sig);
+
+  let html=`<div class="handle"></div>
+    <div class="mtitle">OT ${o._n||'—'}</div>
+    <div class="msub">${o.cuenta||''}${o.ciudad?' · '+o.ciudad:''}</div>
+    <div class="mnext-label" style="background:var(--surface2);color:var(--text)">
+      Siguiente estado: <strong style="color:var(--teal)">${PASO_LABELS[sig]||sig}</strong>
+    </div>`;
+
+  if(needFoto){
+    html+=`<label class="slbl">📷 Foto de evidencia *</label>
+    <div class="fzone" onclick="document.getElementById('fInp').click()">
+      ${fotoB64?`<img src="${fotoB64}"><div class="fok">✓ foto ok</div>`:'<div style="font-size:32px">📷</div><div style="font-size:12px;color:var(--muted)">Tocá para sacar foto</div>'}
+    </div>
+    <input type="file" id="fInp" accept="image/*" capture="environment" style="display:none" onchange="handleFoto(event)">`;
+  }
+  if(needRec){
+    html+=`<label class="slbl">${sig==='Terminal recuperada'?'Nombre del contacto *':'Nombre del receptor *'}</label>
+    <input class="inp" id="recInp" type="text" placeholder="Nombre y apellido" style="margin-bottom:0">`;
+  }
+
+  html+=`<button class="btn-confirm" id="btnC" onclick="confirmar()">✅ Confirmar avance</button>
+    <button class="btn-cancel" onclick="closeModal()">Cancelar</button>`;
+
+  document.getElementById('sheetInner').innerHTML=html;
+  document.getElementById('modal').classList.add('show');
+}
+
+function closeModal(){document.getElementById('modal').classList.remove('show');otModal=null;fotoB64=null;}
+
+function handleFoto(e){
+  const file=e.target.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    const img=new Image();img.onload=()=>{
+      const c=document.createElement('canvas');
+      const MAX=900;let w=img.width,h=img.height;
+      if(w>h&&w>MAX){h=h*(MAX/w);w=MAX;}else if(h>MAX){w=w*(MAX/h);h=MAX;}
+      c.width=w;c.height=h;c.getContext('2d').drawImage(img,0,0,w,h);
+      fotoB64=c.toDataURL('image/jpeg',.78);
+      // Re-draw foto zone
+      const zone=document.querySelector('.fzone');
+      if(zone)zone.innerHTML=`<img src="${fotoB64}"><div class="fok">✓ foto ok</div>`;
+    };img.src=ev.target.result;
+  };reader.readAsDataURL(file);e.target.value='';
+}
+
+async function confirmar(){
+  if(!otModal)return;
+  const sig=siguienteEstado(otModal._op,otModal.estado);
+  if(!sig)return;
+  const needFoto=NECESITA_FOTO.includes(sig);
+  const needRec=NECESITA_RECEPTOR.includes(sig);
+  if(needFoto&&!fotoB64){toast('Sacá una foto de evidencia','err');return;}
+  const rec=document.getElementById('recInp')?.value.trim();
+  if(needRec&&!rec){toast('Ingresá el nombre de contacto','err');return;}
+
+  const btn=document.getElementById('btnC');
+  if(btn){btn.innerHTML='<div class="spin"></div>';btn.disabled=true;}
+
+  try{
+    let fotoUrl=null;
+    if(fotoB64){
+      const blob=await(await fetch(fotoB64)).blob();
+      const path=`evidencias/${otModal._t}_${otModal.id}_${sig.replace(/\s/g,'_')}_${Date.now()}.jpg`;
+      const{error}=await sb.storage.from('evidencias').upload(path,blob,{contentType:'image/jpeg',upsert:true});
+      if(!error)fotoUrl=sb.storage.from('evidencias').getPublicUrl(path).data?.publicUrl||null;
+    }
+
+    const today=new Date().toISOString().slice(0,10);
+    const upd={estado:sig,ultimo_evento_fecha:today};
+    if(fotoUrl)upd.foto_evidencia=fotoUrl;
+    if(rec)upd.notas_cierre=rec;
+    if(rec)upd.ultimo_evento=`${sig} — ${rec}`;
+    if(sig==='Entregado'||sig==='Terminal recuperada')upd.fecha=today;
+
+    if(otModal._t==='envios'){
+      await sb.from('envios').update(upd).eq('id',otModal.id);
+    }else{
+      const upd2={estado:sig};
+      if(fotoUrl)upd2.foto_evidencia=fotoUrl;
+      if(rec)upd2.nombre_receptor=rec;
+      if(sig==='Terminal recuperada')upd2.fecha_cierre=new Date().toISOString();
+      await sb.from('ordenes_trabajo').update(upd2).eq('id',otModal.id);
+    }
+
+    closeModal();toast('✅ Estado actualizado: '+sig);
+    await renderMis();
+  }catch(e){
+    toast('Error: '+e.message,'err');
+    if(btn){btn.innerHTML='✅ Confirmar avance';btn.disabled=false;}
+  }
+}
+
+// ── TAB: BUSCAR ──
+function renderBuscar(){
+  document.getElementById('content').innerHTML=`
+    <div class="search-row">
+      <input class="sinp" id="sInp" type="text" placeholder="Nro de OT (ej: 00019902)" inputmode="numeric" onkeydown="if(event.key==='Enter')buscar()">
+      <button class="sbtn" onclick="buscar()">🔍</button>
+    </div><div id="sRes"></div>`;
+  document.getElementById('sInp')?.focus();
+}
+async function buscar(){
+  const val=(document.getElementById('sInp')?.value||'').trim();if(!val)return;
+  const res=document.getElementById('sRes');
+  res.innerHTML='<div class="lc" style="padding:24px"><div class="spin"></div></div>';
+  const pad=val.padStart(8,'0');
+  const[r1,r2]=await Promise.all([
+    sb.from('envios').select('*').or(`ot_numero.eq.${val},ot_numero.eq.${pad}`).limit(1),
+    sb.from('ordenes_trabajo').select('*').or(`ot.eq.${val},ot.eq.${pad}`).limit(1),
+  ]);
+  const e=r1.data?.[0],d=r2.data?.[0];
+  if(!e&&!d){res.innerHTML='<div class="empty"><div class="eicon">🔎</div><div class="etitle">No encontrada</div></div>';return;}
+  const o=e?{...e,_op:opType(e.tipo),_n:e.ot_numero}:{...d,_op:opType(d.tipo),_n:d.ot};
+  const dirs=[o.direccion_completa,o.ciudad,o.provincia].filter(Boolean).join(', ');
+  res.innerHTML=`<div class="ot-card">
+    <div class="ot-head">
+      <div><div class="ot-num">${o._n}</div><div class="ot-tag" style="color:${opColor(o._op)}">${opLabel(o._op)}</div></div>
+      <span class="bdg ${bdgClass(o.estado)}">${o.estado}</span>
+    </div>
+    <div style="font-size:13px;font-weight:600">${o.cuenta||'—'}</div>
+    ${dirs?`<div style="font-size:12px;color:var(--muted);margin-top:5px;line-height:1.4">📍 ${dirs}</div>`:''}
+    ${o.contacto?`<div style="font-size:12px;color:var(--muted);margin-top:4px">📞 ${o.contacto}</div>`:''}
+    ${o.responsable?`<div style="font-size:11px;color:var(--muted);margin-top:5px">👤 ${o.responsable}</div>`:''}
+    ${o.track?`<div style="font-size:11px;color:var(--muted);margin-top:3px">📮 ${o.track}</div>`:''}
+    ${(o.notas||o.observaciones)?`<div class="ot-obs">${o.notas||o.observaciones}</div>`:''}
+    ${o.foto_evidencia?`<img src="${o.foto_evidencia}" style="width:100%;border-radius:12px;margin-top:10px;max-height:200px;object-fit:cover">`:''}
+    ${dirs?`<button class="btn-maps" style="margin-top:10px" onclick="window.open('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent('${dirs.replace(/'/g,' ')} Argentina'),'_blank')">🗺️ Ver en Maps</button>`:''}
+  </div>`;
+}
+
+// ── TAB: HISTORIAL ──
+async function renderHist(){
+  const c=document.getElementById('content');
+  c.innerHTML='<div class="lc"><div class="spin"></div>Cargando...</div>';
+  const[r1,r2]=await Promise.all([
+    sb.from('envios').select('ot_numero,tipo,cuenta,estado,fecha,notas_cierre').eq('logistica','ALLEATA')
+      .in('estado',['Entregado','Recibido ✅']).order('fecha',{ascending:false}).limit(50),
+    sb.from('ordenes_trabajo').select('ot,tipo,cuenta,estado,fecha_cierre,nombre_receptor')
+      .in('estado',['Terminal recuperada']).order('fecha_cierre',{ascending:false}).limit(30),
+  ]);
+  const hist=[
+    ...(r1.data||[]).map(o=>({n:o.ot_numero,tipo:o.tipo,cuenta:o.cuenta,fecha:o.fecha,rec:o.notas_cierre})),
+    ...(r2.data||[]).map(o=>({n:o.ot,tipo:o.tipo,cuenta:o.cuenta,fecha:(o.fecha_cierre||'').slice(0,10),rec:o.nombre_receptor})),
+  ].sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''));
+
+  if(!hist.length){c.innerHTML='<div class="empty"><div class="eicon">📋</div><div class="etitle">Sin historial</div></div>';return;}
+  c.innerHTML='<div class="sec">Operaciones completadas</div>'+hist.map(o=>`
+    <div class="ot-card done" style="margin-bottom:10px">
+      <div class="ot-head">
+        <div><div class="ot-num" style="font-size:14px">${o.n}</div><div class="ot-tag" style="color:${opColor(opType(o.tipo))}">${opLabel(opType(o.tipo))}</div></div>
+        <span class="bdg b-ok">✓</span>
+      </div>
+      <div style="font-size:13px;font-weight:600">${o.cuenta||'—'}</div>
+      ${o.rec?`<div style="font-size:11px;color:var(--green);margin-top:5px">👤 ${o.rec}</div>`:''}
+      ${o.fecha?`<div style="font-size:10px;color:var(--muted);margin-top:3px">${o.fecha}</div>`:''}
+    </div>`).join('');
+}
+
+function toast(msg,type='ok'){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.className='show'+(type==='err'?' err':'');
+  setTimeout(()=>t.className='',3200);
+}
+</script>
+</body>
+</html>
