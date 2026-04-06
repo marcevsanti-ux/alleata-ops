@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v2.3.5</title>
+<title>Alleata · Operaciones v2.3.6</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -288,7 +288,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.3.5 · 31 mar 2026
+      v2.3.6 · 31 mar 2026
     </div>
   </div>
 </div>
@@ -343,7 +343,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.3.5 · 31 mar 2026
+      v2.3.6 · 31 mar 2026
     </div>
   </div>
 </nav>
@@ -357,7 +357,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <div class="topbar-right" id="topbar-date"></div>
     <button onclick="refreshCurrentModule()" title="Actualizar" style="background:none;border:1px solid var(--border2);color:var(--text-muted);border-radius:7px;padding:4px 10px;cursor:pointer;font-size:13px;margin-left:10px;transition:all .2s" onmouseover="this.style.color='var(--teal)';this.style.borderColor='var(--teal)'" onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border2)'">↺</button>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.3.5</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.3.6</div>
   </div>
   <div class="content">
 
@@ -1047,7 +1047,7 @@ tr:hover td{background:var(--surface2);}
 </div>
 
 <script>
-console.log('[Alleata v2.3.5] OK');
+console.log('[Alleata v2.3.6] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -2076,6 +2076,9 @@ function renderEnviosTable(list){
   const isLogistica=currentProfile?.rol==='logistica';
   const empty=document.getElementById('enviosEmpty');
   empty.style.display=list.length?'none':'block';
+
+  const renderConDistri=(names)=>{
+    const distriNames=names||{};
   document.getElementById('enviosTable').innerHTML=list.map(e=>{
     const z=detectarZona(e.ciudad,e.provincia,e.cp_dest);
     const tieneRetorno=esOTConRetorno(e.tipo);
@@ -2136,10 +2139,23 @@ function renderEnviosTable(list){
           <button title="Actualizar observación" style="background:var(--surface2);border:1px solid var(--border2);color:var(--text-muted);font-size:11px;padding:4px 7px;border-radius:6px;cursor:pointer" onclick="openUpdateEvento('${e.id}','${(e.ultimo_evento||'').replace(/'/g,'&#39;')}')">✏️</button>
           ${e.track?`<button id="track-btn-${e.id}" title="Consultar CA" style="background:var(--surface2);border:1px solid var(--border2);color:var(--blue);font-size:11px;padding:4px 7px;border-radius:6px;cursor:pointer" onclick="consultarTracking('${e.id}','${e.track}')">🔍</button>`:''}
           ${tieneRetorno?`<button title="Imprimir rótulo RETORNO" style="background:rgba(245,158,11,.15);border:1px solid #f59e0b;color:#f59e0b;font-size:11px;padding:4px 7px;border-radius:6px;cursor:pointer" onclick="printRotuloDevolucion('${e.id}')">↩️🖨️</button>`:''}
+          <button title="${distriNames[e.asignado_a]?'👤 Asignado: '+distriNames[e.asignado_a]:'Asignar a distribuidor'}" style="background:${e.asignado_a?'rgba(139,92,246,.15)':'var(--surface2)'};border:1px solid ${e.asignado_a?'#8b5cf6':'var(--border2)'};color:${e.asignado_a?'#a78bfa':'var(--text-muted)'};font-size:11px;padding:4px 7px;border-radius:6px;cursor:pointer" onclick="openAsignarDistri('${e.id}','${e.asignado_a||''}')">👤</button>
         </div>
       </td>
     </tr>`;
   }).join('');
+  }; // fin renderConDistri
+
+  // Cargar nombres de distribuidores asignados
+  const ids=[...new Set(list.filter(e=>e.asignado_a).map(e=>e.asignado_a))];
+  if(ids.length){
+    sb.from('profiles').select('id,nombre,email').in('id',ids).then(({data})=>{
+      const names={};(data||[]).forEach(p=>{names[p.id]=p.nombre||p.email;});
+      renderConDistri(names);
+    });
+  } else {
+    renderConDistri({});
+  }
 }
 
 function esOTConRetorno(tipo){
@@ -2403,6 +2419,84 @@ async function printRotuloDevolucion(id){
   <script>window.onafterprint=()=>window.close();<\/script>
   </body></html>`);
   w.document.close();
+}
+
+// ── ASIGNACIÓN A DISTRIBUIDOR ──
+async function openAsignarDistri(envioId, asignadoActual){
+  // Cargar lista de distribuidores
+  const{data:distris}=await sb.from('profiles').select('id,nombre,email').eq('rol','distri').order('nombre');
+  if(!distris||!distris.length){
+    alert('No hay distribuidores dados de alta. Creá un usuario con rol "distri" en Ajustes.');return;
+  }
+
+  let m=document.getElementById('modalAsignarDistri');
+  if(!m){
+    m=document.createElement('div');m.id='modalAsignarDistri';
+    m.className='modal-overlay';
+    m.onclick=function(ev){if(ev.target===m)m.classList.remove('show');};
+    document.body.appendChild(m);
+  }
+
+  const opts=distris.map(d=>`
+    <div onclick="selectDistri('${d.id}','${(d.nombre||d.email).replace(/'/g,"'")}',this)"
+      style="display:flex;align-items:center;gap:10px;padding:12px;border-radius:10px;cursor:pointer;border:1px solid ${d.id===asignadoActual?'var(--teal)':'var(--border)'};background:${d.id===asignadoActual?'rgba(29,191,142,.08)':'var(--surface2)'};margin-bottom:8px;transition:all .15s">
+      <div style="width:32px;height:32px;border-radius:50%;background:var(--teal);display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff;flex-shrink:0">${(d.nombre||d.email)[0].toUpperCase()}</div>
+      <div>
+        <div style="font-size:13px;font-weight:600;color:#fff">${d.nombre||d.email}</div>
+        <div style="font-size:11px;color:var(--text-muted)">${d.email}</div>
+      </div>
+      ${d.id===asignadoActual?`<div style="margin-left:auto;font-size:11px;color:var(--teal);font-weight:700">✓ Asignado</div>`:''}
+    </div>`).join('');
+
+  m.innerHTML=`<div class="modal-box" style="max-width:400px;width:100%">
+    <div style="font-size:15px;font-weight:700;color:#fff;margin-bottom:4px">👤 Asignar distribuidor</div>
+    <div style="font-size:12px;color:var(--text-muted);margin-bottom:16px">La OT aparecerá en la app del distribuidor seleccionado.</div>
+    <div id="distri-opts">${opts}</div>
+    ${asignadoActual?`<button onclick="quitarDistri('${envioId}')" style="width:100%;background:none;border:1px solid var(--red);color:var(--red);padding:10px;border-radius:8px;cursor:pointer;font-family:'Inter',sans-serif;font-size:12px;margin-top:4px;font-weight:600">🗑 Quitar asignación</button>`:''}
+    <button onclick="document.getElementById('modalAsignarDistri').classList.remove('show')" style="width:100%;background:none;border:none;color:var(--text-muted);padding:10px;cursor:pointer;font-family:'Inter',sans-serif;font-size:13px;margin-top:4px">Cancelar</button>
+  </div>`;
+  m._envioId=envioId;
+  m.classList.add('show');
+}
+
+function selectDistri(distribId,nombre,el){
+  const m=document.getElementById('modalAsignarDistri');
+  if(!m)return;
+  const envioId=m._envioId;
+  // Highlight selected
+  m.querySelectorAll('[onclick^="selectDistri"]').forEach(d=>{
+    d.style.border='1px solid var(--border)';d.style.background='var(--surface2)';
+  });
+  el.style.border='1px solid var(--teal)';el.style.background='rgba(29,191,142,.08)';
+
+  if(!confirm(`¿Asignar esta OT a ${nombre}?`))return;
+  sb.from('envios').update({asignado_a:distribId}).eq('id',envioId).then(({error})=>{
+    if(error){alert('Error: '+error.message);return;}
+    auditLog({tabla:'envios',registro_id:envioId,accion:'ASIGNACION_DISTRI',campo:'asignado_a',valor_antes:null,valor_despues:nombre});
+    m.classList.remove('show');
+    showToastPortal(`👤 OT asignada a ${nombre}`);
+    renderEnvios();
+  });
+}
+
+async function quitarDistri(envioId){
+  if(!confirm('¿Quitar la asignación de distribuidor?'))return;
+  await sb.from('envios').update({asignado_a:null}).eq('id',envioId);
+  auditLog({tabla:'envios',registro_id:envioId,accion:'QUITAR_DISTRI',campo:'asignado_a',valor_antes:'asignado',valor_despues:null});
+  document.getElementById('modalAsignarDistri')?.classList.remove('show');
+  showToastPortal('Asignación eliminada');
+  renderEnvios();
+}
+
+function showToastPortal(msg){
+  let t=document.getElementById('portalToast');
+  if(!t){
+    t=document.createElement('div');t.id='portalToast';
+    t.style.cssText='position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--teal);color:#fff;padding:10px 22px;border-radius:30px;font-size:13px;font-weight:700;opacity:0;transition:all .3s;z-index:9999;white-space:nowrap;pointer-events:none;';
+    document.body.appendChild(t);
+  }
+  t.textContent=msg;t.style.opacity='1';t.style.transform='translateX(-50%) translateY(0)';
+  setTimeout(()=>{t.style.opacity='0';t.style.transform='translateX(-50%) translateY(20px)';},3000);
 }
 
 function openUpdateEvento(id,current){
