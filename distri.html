@@ -98,6 +98,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .empty{text-align:center;padding:48px 20px;color:var(--muted)}
 .empty-icon{font-size:44px;margin-bottom:12px}
 </style>
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 </head>
 <body>
 <div class="header">
@@ -106,9 +107,24 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
       <div class="header-logo">🚚 Alleata</div>
       <div class="header-meta" id="header-meta">Portal Distribuidor</div>
     </div>
-    <div class="header-version">v1.2.0</div>
+    <div class="header-version">v1.2.1</div>
   </div>
-  <div class="header-distri" id="header-distri">—</div>
+  <div style="display:flex;align-items:center;gap:10px">
+    <div class="header-distri" id="header-distri">—</div>
+    <!-- Botón QR mobile -->
+    <div style="position:relative">
+      <button id="btnQRMobile" onclick="toggleQRPanel()" style="background:rgba(29,191,142,.15);border:1px solid rgba(29,191,142,.3);color:var(--teal);border-radius:10px;padding:6px 10px;cursor:pointer;font-size:18px;line-height:1;display:flex;align-items:center;gap:5px" title="App Mobile">
+        📱
+      </button>
+      <!-- Panel QR -->
+      <div id="qrPanel" style="display:none;position:absolute;top:44px;right:0;background:#0A2540;border:1px solid rgba(255,255,255,.15);border-radius:14px;padding:16px;z-index:500;width:200px;box-shadow:0 8px 32px rgba(0,0,0,.4);text-align:center">
+        <div style="font-size:11px;font-weight:700;color:rgba(255,255,255,.6);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">App Mobile</div>
+        <div id="qrMobileCanvas" style="background:#fff;border-radius:8px;padding:6px;display:inline-block;margin-bottom:10px"></div>
+        <div style="font-size:10px;color:rgba(255,255,255,.5);line-height:1.4;margin-bottom:10px">Escaneá para abrir la versión mobile optimizada</div>
+        <button onclick="copyMobileLink()" style="width:100%;background:rgba(29,191,142,.2);border:1px solid rgba(29,191,142,.4);color:var(--teal);border-radius:8px;padding:7px;font-size:11px;font-weight:700;cursor:pointer">🔗 Copiar link</button>
+      </div>
+    </div>
+  </div>
 </div>
 <div class="stats-bar" id="stats-bar" style="display:none">
   <div class="stat-item"><div class="stat-num" id="s-total">0</div><div class="stat-label">TOTAL</div></div>
@@ -317,6 +333,39 @@ function renderRuta(){
   if(!list.length){document.getElementById('ruta-list').innerHTML='<div class="empty"><div class="empty-icon">🗺️</div><div style="font-weight:700">Sin OTs con coordenadas</div></div>';return;}
   document.getElementById('ruta-list').innerHTML=list.map((e,i)=>`<div class="ruta-card"><div class="ruta-num">${i+1}</div><div class="ruta-info"><div class="ruta-ot">OT #${e.ot||e.sf_id}</div><div class="ruta-nombre">${e.comercio||'—'}</div><div class="ruta-ciudad">${e.ciudad||'—'}${e.direccion_completa?' · '+e.direccion_completa:''}</div>${badge(REP[e.sf_id]?.estado||'Pendiente')}</div><div class="ruta-dist">${e.distKm} km</div></div>`).join('');
 }
+// ── QR MOBILE ──
+let _qrMobileGenerated=false;
+function getMobileUrl(){
+  return `${location.origin}${location.pathname.replace(/\/[^/]*$/,'')}/mobile-distri.html?token=${TOKEN}`;
+}
+function toggleQRPanel(){
+  const panel=document.getElementById('qrPanel');
+  const isOpen=panel.style.display!=='none';
+  panel.style.display=isOpen?'none':'block';
+  if(!isOpen&&!_qrMobileGenerated&&TOKEN){
+    const canvas=document.getElementById('qrMobileCanvas');
+    canvas.innerHTML='';
+    try{
+      new QRCode(canvas,{text:getMobileUrl(),width:150,height:150,colorDark:'#000',colorLight:'#fff',correctLevel:QRCode.CorrectLevel.M});
+      _qrMobileGenerated=true;
+    }catch(e){canvas.innerHTML='<div style="font-size:11px;color:#888;padding:8px">QR no disponible</div>';}
+  }
+}
+function copyMobileLink(){
+  navigator.clipboard.writeText(getMobileUrl()).then(()=>{
+    toast('✅ Link mobile copiado');
+    document.getElementById('qrPanel').style.display='none';
+  });
+}
+// Cerrar panel al click fuera
+document.addEventListener('click',e=>{
+  const panel=document.getElementById('qrPanel');
+  const btn=document.getElementById('btnQRMobile');
+  if(panel&&btn&&!panel.contains(e.target)&&!btn.contains(e.target)){
+    panel.style.display='none';
+  }
+});
+
 init();
 </script>
 </body>
