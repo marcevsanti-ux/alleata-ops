@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v2.3.0</title>
+<title>Alleata · Operaciones v2.3.1</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -284,7 +284,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.3.0 · 31 mar 2026
+      v2.3.1 · 31 mar 2026
     </div>
   </div>
 </div>
@@ -339,7 +339,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.3.0 · 31 mar 2026
+      v2.3.1 · 31 mar 2026
     </div>
   </div>
 </nav>
@@ -353,7 +353,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <div class="topbar-right" id="topbar-date"></div>
     <button onclick="refreshCurrentModule()" title="Actualizar" style="background:none;border:1px solid var(--border2);color:var(--text-muted);border-radius:7px;padding:4px 10px;cursor:pointer;font-size:13px;margin-left:10px;transition:all .2s" onmouseover="this.style.color='var(--teal)';this.style.borderColor='var(--teal)'" onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border2)'">↺</button>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.3.0</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.3.1</div>
   </div>
   <div class="content">
 
@@ -1044,7 +1044,7 @@ tr:hover td{background:var(--surface2);}
 </div>
 
 <script>
-console.log('[Alleata v2.3.0] OK');
+console.log('[Alleata v2.3.1] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -1768,6 +1768,9 @@ async function importSF(e){
       ✅ <strong>${importadas}</strong> OTs importadas/actualizadas · 
       <strong>${errores}</strong> errores
     </div>`;
+    auditLog({tabla:'envios', registro_id:'BATCH', accion:'IMPORTACION_SF',
+      campo:'lote', valor_antes:null,
+      valor_despues:`${importadas} OTs importadas, ${errores} errores`});
     await loadFiltroResponsables();
     renderEnvios();loadBadges();
   }catch(err){
@@ -1981,11 +1984,18 @@ function openCargarTrackRetorno(id){
   sb.from('envios').update({
     track_devolucion:track.trim(),
     estado_devolucion:'Rótulo generado'
-  }).eq('id',id).then(()=>renderEnvios());
+  }).eq('id',id).then(()=>{
+    auditLog({tabla:'envios', registro_id:id, accion:'UPDATE_TRACKING_RETORNO', campo:'track_devolucion',
+      valor_antes:null, valor_despues:track.trim()});
+    renderEnvios();
+  });
 }
 
 async function updateEstadoDevolucion(id,estado){
+  const {data:prev}=await sb.from('envios').select('estado_devolucion').eq('id',id).single();
   await sb.from('envios').update({estado_devolucion:estado}).eq('id',id);
+  auditLog({tabla:'envios', registro_id:id, accion:'CAMBIO_ESTADO_RETORNO', campo:'estado_devolucion',
+    valor_antes:prev?.estado_devolucion||null, valor_despues:estado});
 }
 
 
@@ -2095,9 +2105,29 @@ function showTrackingToast(msg, tipo){
   toast._t=setTimeout(()=>{toast.style.opacity='0';},4000);
 }
 
-async function updateEnvioEstado(id,estado){
-  await sb.from('envios').update({estado,ultimo_evento_fecha:new Date().toISOString().slice(0,10)}).eq('id',id);
-  loadBadges();renderEnvios();
+// ── AUDIT LOG ──
+async function auditLog({tabla, registro_id, accion, campo, valor_antes, valor_despues}){
+  try{
+    await sb.from('audit_log').insert({
+      tabla,
+      registro_id: String(registro_id),
+      accion,
+      campo: campo||null,
+      valor_antes: valor_antes!=null ? String(valor_antes) : null,
+      valor_despues: valor_despues!=null ? String(valor_despues) : null,
+      usuario_id: currentUser?.id||null,
+      usuario_email: currentUser?.email||null,
+    });
+  }catch(e){ console.warn('[auditLog]',e.message); }
+}
+
+async function updateEnvioEstado(id, estado){
+  // Leer estado anterior para el log
+  const {data:prev} = await sb.from('envios').select('estado,ot_numero').eq('id',id).single();
+  await sb.from('envios').update({estado, ultimo_evento_fecha:new Date().toISOString().slice(0,10)}).eq('id',id);
+  auditLog({tabla:'envios', registro_id:id, accion:'CAMBIO_ESTADO', campo:'estado',
+    valor_antes: prev?.estado||null, valor_despues: estado});
+  loadBadges(); renderEnvios();
 }
 async function printRotuloDevolucion(id){
   const{data:e}=await sb.from('envios').select('*').eq('id',id).single();
@@ -2208,7 +2238,11 @@ async function printRotuloDevolucion(id){
 function openUpdateEvento(id,current){
   const nuevo=prompt('Actualizar observación / evento:',current);
   if(nuevo===null)return;
-  sb.from('envios').update({ultimo_evento:nuevo,ultimo_evento_fecha:new Date().toISOString().slice(0,10)}).eq('id',id).then(()=>renderEnvios());
+  sb.from('envios').update({ultimo_evento:nuevo,ultimo_evento_fecha:new Date().toISOString().slice(0,10)}).eq('id',id).then(()=>{
+    auditLog({tabla:'envios', registro_id:id, accion:'UPDATE_OBSERVACION', campo:'ultimo_evento',
+      valor_antes:current||null, valor_despues:nuevo});
+    renderEnvios();
+  });
 }
 
 // ── FILTRO ZONA LOGÍSTICA ──
@@ -2571,7 +2605,10 @@ async function printRotulo(id){
 
 async function deleteEnvio(id){
   if(!confirm('¿Eliminar esta OT?'))return;
+  const {data:prev}=await sb.from('envios').select('ot_numero,estado').eq('id',id).single();
   await sb.from('envios').delete().eq('id',id);
+  auditLog({tabla:'envios', registro_id:id, accion:'ELIMINACION',
+    campo:'ot_numero', valor_antes:prev?.ot_numero||id, valor_despues:null});
   renderEnvios();loadBadges();
 }
 // legacy - not used but keep for safety
@@ -3377,6 +3414,8 @@ async function importPreColecta(e){
     result.innerHTML=`<div class="alert alert-ok" style="margin-top:8px">
       ✅ <strong>${records.length}</strong> OTs procesadas — solo se insertaron las <strong>nuevas</strong>, las existentes no fueron modificadas.
     </div>`;
+    auditLog({tabla:'envios', registro_id:'BATCH', accion:'IMPORTACION_PRECOLECTA',
+      campo:'lote', valor_antes:null, valor_despues:`${records.length} OTs procesadas (Alleata)`});
     loadBadges();
   }catch(err){
     prog.style.display='none';
@@ -3760,6 +3799,11 @@ async function dsGuardar(){
     const{error:e1}=await sb.from('ordenes_trabajo').update(upd).eq('ot',ot.ot);
     if(e1)throw e1;
     await sb.from('eventos_ot').insert({ot_id:ot.id,ot:ot.ot,tipo_evento:nuevoEstado?'cambio_estado':'observacion',estado_anterior:nuevoEstado?ot.estado:null,estado_nuevo:nuevoEstado||null,descripcion:nuevaObs||null,actor:ot.operador_id||'portal'});
+    // Audit log
+    if(nuevoEstado) auditLog({tabla:'ordenes_trabajo', registro_id:ot.id||ot.ot, accion:'CAMBIO_ESTADO',
+      campo:'estado', valor_antes:ot.estado||null, valor_despues:nuevoEstado});
+    if(nuevaObs) auditLog({tabla:'ordenes_trabajo', registro_id:ot.id||ot.ot, accion:'UPDATE_OBSERVACION',
+      campo:'observaciones', valor_antes:null, valor_despues:nuevaObs});
     dsModalClose();await cargarDesinstalaciones();
   }catch(e){console.error(e);alert('Error: '+e.message);btn.disabled=false;btn.textContent='Guardar cambios';}
 }
