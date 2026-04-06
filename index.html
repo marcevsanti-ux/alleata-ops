@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v2.3.2</title>
+<title>Alleata · Operaciones v2.3.4</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -288,7 +288,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.3.2 · 31 mar 2026
+      v2.3.4 · 31 mar 2026
     </div>
   </div>
 </div>
@@ -343,7 +343,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.3.2 · 31 mar 2026
+      v2.3.4 · 31 mar 2026
     </div>
   </div>
 </nav>
@@ -357,7 +357,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <div class="topbar-right" id="topbar-date"></div>
     <button onclick="refreshCurrentModule()" title="Actualizar" style="background:none;border:1px solid var(--border2);color:var(--text-muted);border-radius:7px;padding:4px 10px;cursor:pointer;font-size:13px;margin-left:10px;transition:all .2s" onmouseover="this.style.color='var(--teal)';this.style.borderColor='var(--teal)'" onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border2)'">↺</button>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.3.2</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.3.4</div>
   </div>
   <div class="content">
 
@@ -365,26 +365,32 @@ tr:hover td{background:var(--surface2);}
     <div class="module active" id="mod-home">
 
       <!-- HEADER BIENVENIDA -->
-      <div id="ops-header" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+      <div id="ops-header" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
         <div>
           <h2 id="welcomeMsg" style="font-size:20px;font-weight:800;color:#fff;margin:0"></h2>
           <div style="font-size:12px;color:var(--text-muted);margin-top:3px" id="ops-timestamp">Panel de Operaciones</div>
         </div>
         <div style="display:flex;align-items:center;gap:12px">
+
           <div id="qrCanvas" style="background:#fff;border-radius:10px;padding:6px;width:68px;height:68px;display:flex;align-items:center;justify-content:center;"></div>
-          <div style="text-align:right">
-            <div style="font-size:10px;color:var(--teal);letter-spacing:1px;text-transform:uppercase;font-weight:700">APP MOBILE</div>
-          </div>
         </div>
       </div>
 
-      <!-- GRÁFICOS TOP (como SF) -->
+      <!-- GRÁFICOS TOP -->
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;margin-bottom:20px" id="ops-charts-grid">
-        <!-- 4 cards de gráficos, llenados por JS -->
         <div class="ops-chart-card" id="chart-instaladas"></div>
         <div class="ops-chart-card" id="chart-precolecta"></div>
         <div class="ops-chart-card" id="chart-entregas"></div>
         <div class="ops-chart-card" id="chart-desins"></div>
+      </div>
+
+      <!-- BREAKDOWN POR OPERADOR (solo admin, vista equipo) -->
+      <div id="ops-breakdown" style="display:none;margin-bottom:20px">
+        <div class="sec-title" style="margin-bottom:12px">
+          <div class="sec-dot" style="background:#f59e0b"></div>
+          <span>Resumen por operador</span>
+        </div>
+        <div id="ops-breakdown-table"></div>
       </div>
 
       <!-- KPIs ABAJO -->
@@ -1041,7 +1047,7 @@ tr:hover td{background:var(--surface2);}
 </div>
 
 <script>
-console.log('[Alleata v2.3.2] OK');
+console.log('[Alleata v2.3.4] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -1255,15 +1261,13 @@ async function loadOpsPanel(isAdmin){
   const primerNombre=nombre.split(' ')[0];
   const today=new Date().toISOString().slice(0,10);
 
-  // Timestamp
+  // Timestamp y bienvenida
   const ts=document.getElementById('ops-timestamp');
   if(ts) ts.textContent='Como '+new Date().toLocaleString('es-AR',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
-
-  // Bienvenida
   const wm=document.getElementById('welcomeMsg');
-  if(wm) wm.textContent='Hola, '+nombre+' 👋';
+  if(wm) wm.textContent= isAdmin ? '👥 Panel del Equipo' : 'Hola, '+nombre+' 👋';
 
-  // QUERIES
+  // QUERIES — admin ve todo, operador filtra por su nombre
   let envQ=sb.from('envios').select('id,ot_numero,tipo,responsable,estado,estado_devolucion,fecha,created_at,track,track_devolucion,logistica').not('estado','eq','null');
   let desQ=sb.from('v_ordenes_con_sla').select('ot,operador_id,estado,sla_estado,tipo,dias_transcurridos').eq('tipo','desinstalacion');
   if(!isAdmin){
@@ -1376,6 +1380,92 @@ async function loadOpsPanel(isAdmin){
   // Actualizar badges sidebar
   if(document.getElementById('dc-envios'))document.getElementById('dc-envios').textContent=totalActivos+' activos';
   if(document.getElementById('dc-desinstalaciones'))document.getElementById('dc-desinstalaciones').textContent=desinsActivas+' activas';
+
+  // ── BREAKDOWN POR OPERADOR (solo admin) ──
+  const breakdownEl=document.getElementById('ops-breakdown');
+  const breakdownTable=document.getElementById('ops-breakdown-table');
+  if(breakdownEl && breakdownTable){
+    breakdownEl.style.display = isAdmin ? 'block' : 'none';
+    if(isAdmin){
+      // Agrupar por primer nombre del responsable
+      const porOp={};
+      envios.forEach(e=>{
+        const op=(e.responsable||'Sin asignar').split(' ')[0];
+        if(!porOp[op])porOp[op]={activas:0,entregadasHoy:0,retirar:0,precolecta:0,despachado:0,transito:0};
+        if(!ESTADOS_CERRADOS.includes(e.estado))porOp[op].activas++;
+        if(e.estado==='Entregado'&&(e.fecha||'').startsWith(today))porOp[op].entregadasHoy++;
+        if(e.estado==='Retirar Terminal')porOp[op].retirar++;
+        if(e.estado==='Pre-Colecta')porOp[op].precolecta++;
+        if(e.estado==='Despachado')porOp[op].despachado++;
+        if(['En tránsito','En camino','En espera en sucursal'].includes(e.estado))porOp[op].transito++;
+      });
+      const slaOp={};
+      desins.forEach(d=>{
+        const op=(d.operador_id||'Sin asignar').split(' ')[0];
+        if(!slaOp[op])slaOp[op]=0;
+        if(d.sla_estado==='critico')slaOp[op]++;
+      });
+
+      const ops=Object.entries(porOp).sort(([,a],[,b])=>b.activas-a.activas);
+
+      // CARDS por operador
+      const cards=ops.map(([op,d])=>{
+        const sla=slaOp[op]||0;
+        const borderCol=sla>0?'#ef4444':d.retirar>0?'#f59e0b':'var(--border)';
+        return`<div style="background:var(--surface);border:1px solid ${borderCol};border-radius:14px;padding:16px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
+            <div style="width:36px;height:36px;background:var(--teal);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#fff;flex-shrink:0">${op[0]}</div>
+            <div>
+              <div style="font-size:14px;font-weight:700;color:#fff">${op}</div>
+              <div style="font-size:10px;color:var(--text-muted)">Operador</div>
+            </div>
+            ${sla>0?`<span style="margin-left:auto;background:rgba(239,68,68,.15);color:#fca5a5;font-size:10px;padding:2px 8px;border-radius:20px;font-weight:700">🔴 ${sla} crítico${sla>1?'s':''}</span>`:''}
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            ${[
+              {label:'Activas',val:d.activas,color:'var(--blue)'},
+              {label:'Entregadas hoy',val:d.entregadasHoy,color:'var(--teal)'},
+              {label:'Pre-Colecta',val:d.precolecta,color:'#8b5cf6'},
+              {label:'Retirar Term.',val:d.retirar,color:d.retirar>0?'#ef4444':'var(--text-muted)'},
+              {label:'Despachado',val:d.despachado,color:'#8b5cf6'},
+              {label:'En tránsito',val:d.transito,color:'#f59e0b'},
+            ].map(k=>`<div style="background:var(--surface2);border-radius:8px;padding:8px 10px;text-align:center">
+              <div style="font-size:18px;font-weight:800;color:${k.color};font-family:'JetBrains Mono',monospace">${k.val}</div>
+              <div style="font-size:9px;color:var(--text-muted);margin-top:2px">${k.label}</div>
+            </div>`).join('')}
+          </div>
+        </div>`;
+      }).join('');
+
+      // TABLA resumen
+      const filas=ops.map(([op,d])=>`
+        <tr style="border-bottom:1px solid var(--border)">
+          <td style="padding:9px 12px;font-size:13px;font-weight:700;color:#fff">${op}</td>
+          <td style="padding:9px 12px;text-align:center;font-size:15px;font-weight:800;color:var(--blue);font-family:'JetBrains Mono',monospace">${d.activas}</td>
+          <td style="padding:9px 12px;text-align:center;font-size:15px;font-weight:800;color:var(--teal);font-family:'JetBrains Mono',monospace">${d.entregadasHoy}</td>
+          <td style="padding:9px 12px;text-align:center;font-size:15px;font-weight:800;color:#8b5cf6;font-family:'JetBrains Mono',monospace">${d.precolecta}</td>
+          <td style="padding:9px 12px;text-align:center;font-size:15px;font-weight:800;color:${d.retirar>0?'#ef4444':'var(--text-muted)'};font-family:'JetBrains Mono',monospace">${d.retirar}</td>
+          <td style="padding:9px 12px;text-align:center;font-size:15px;font-weight:800;color:${(slaOp[op]||0)>0?'#ef4444':'#10b981'};font-family:'JetBrains Mono',monospace">${slaOp[op]||0}</td>
+        </tr>`).join('');
+
+      breakdownTable.innerHTML=`
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;margin-bottom:16px">
+          ${cards||'<div style="color:var(--text-muted);font-size:12px">Sin datos</div>'}
+        </div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden">
+          <table style="width:100%;border-collapse:collapse">
+            <thead>
+              <tr style="background:var(--surface2)">
+                ${['Operador','Activas','Entregadas hoy','Pre-Colecta','Retirar Terminal','SLA Crítico 🔴']
+                  .map(h=>`<th style="padding:9px 12px;text-align:${h==='Operador'?'left':'center'};font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em">${h}</th>`)
+                  .join('')}
+              </tr>
+            </thead>
+            <tbody>${filas||'<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text-muted)">Sin datos</td></tr>'}</tbody>
+          </table>
+        </div>`;
+    }
+  }
 }
 
 // ── FUNCIONES DE GRÁFICO SVG ──
