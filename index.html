@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v2.3.1</title>
+<title>Alleata · Operaciones v2.3.2</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -127,6 +127,10 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;min-h
 
 /* DASH CARDS */
 .dash-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(195px,1fr));gap:12px;}
+.ops-chart-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;display:flex;flex-direction:column;min-height:200px;}
+.ops-chart-title{font-size:11px;font-weight:600;color:var(--text-muted);margin-bottom:10px;letter-spacing:.02em;}
+.ops-chart-kpi{font-size:36px;font-weight:900;font-family:'JetBrains Mono',monospace;line-height:1;margin-bottom:4px;}
+.ops-chart-sub{font-size:10px;color:var(--text-muted);margin-top:4px;}
 .dash-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px;cursor:pointer;transition:all .2s;position:relative;overflow:hidden;}
 .dash-card:hover{border-color:var(--border2);background:var(--surface2);transform:translateY(-2px);box-shadow:var(--shadow);}
 .dash-card::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;border-radius:0 0 12px 12px;}
@@ -284,7 +288,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.3.1 · 31 mar 2026
+      v2.3.2 · 31 mar 2026
     </div>
   </div>
 </div>
@@ -339,7 +343,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.3.1 · 31 mar 2026
+      v2.3.2 · 31 mar 2026
     </div>
   </div>
 </nav>
@@ -353,7 +357,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <div class="topbar-right" id="topbar-date"></div>
     <button onclick="refreshCurrentModule()" title="Actualizar" style="background:none;border:1px solid var(--border2);color:var(--text-muted);border-radius:7px;padding:4px 10px;cursor:pointer;font-size:13px;margin-left:10px;transition:all .2s" onmouseover="this.style.color='var(--teal)';this.style.borderColor='var(--teal)'" onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border2)'">↺</button>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.3.1</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.3.2</div>
   </div>
   <div class="content">
 
@@ -364,7 +368,7 @@ tr:hover td{background:var(--surface2);}
       <div id="ops-header" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
         <div>
           <h2 id="welcomeMsg" style="font-size:20px;font-weight:800;color:#fff;margin:0"></h2>
-          <div style="font-size:12px;color:var(--text-muted);margin-top:3px">Panel de Operaciones</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:3px" id="ops-timestamp">Panel de Operaciones</div>
         </div>
         <div style="display:flex;align-items:center;gap:12px">
           <div id="qrCanvas" style="background:#fff;border-radius:10px;padding:6px;width:68px;height:68px;display:flex;align-items:center;justify-content:center;"></div>
@@ -374,24 +378,17 @@ tr:hover td{background:var(--surface2);}
         </div>
       </div>
 
-      <!-- KPIs TOP -->
-      <div id="ops-kpis" class="stats-row" style="flex-wrap:wrap;margin-bottom:20px;gap:10px"></div>
-
-      <!-- DOS COLUMNAS: DIRECTA + INVERSA -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px">
-
-        <!-- LOGÍSTICA DIRECTA -->
-        <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px">
-          <div style="font-size:11px;font-weight:700;color:var(--teal);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px">🚚 Logística Directa</div>
-          <div id="ops-directa-estados" style="display:flex;flex-direction:column;gap:6px"></div>
-        </div>
-
-        <!-- LOGÍSTICA INVERSA -->
-        <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px">
-          <div style="font-size:11px;font-weight:700;color:#f59e0b;text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px">↩️ Logística Inversa</div>
-          <div id="ops-inversa-estados" style="display:flex;flex-direction:column;gap:6px"></div>
-        </div>
+      <!-- GRÁFICOS TOP (como SF) -->
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;margin-bottom:20px" id="ops-charts-grid">
+        <!-- 4 cards de gráficos, llenados por JS -->
+        <div class="ops-chart-card" id="chart-instaladas"></div>
+        <div class="ops-chart-card" id="chart-precolecta"></div>
+        <div class="ops-chart-card" id="chart-entregas"></div>
+        <div class="ops-chart-card" id="chart-desins"></div>
       </div>
+
+      <!-- KPIs ABAJO -->
+      <div id="ops-kpis" class="stats-row" style="flex-wrap:wrap;margin-bottom:20px;gap:10px"></div>
 
       <!-- SLA POR TIPO -->
       <div class="sec-title" style="margin-bottom:12px">
@@ -1044,7 +1041,7 @@ tr:hover td{background:var(--surface2);}
 </div>
 
 <script>
-console.log('[Alleata v2.3.1] OK');
+console.log('[Alleata v2.3.2] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -1258,12 +1255,16 @@ async function loadOpsPanel(isAdmin){
   const primerNombre=nombre.split(' ')[0];
   const today=new Date().toISOString().slice(0,10);
 
-  // Actualizar bienvenida
+  // Timestamp
+  const ts=document.getElementById('ops-timestamp');
+  if(ts) ts.textContent='Como '+new Date().toLocaleString('es-AR',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+
+  // Bienvenida
   const wm=document.getElementById('welcomeMsg');
   if(wm) wm.textContent='Hola, '+nombre+' 👋';
 
   // QUERIES
-  let envQ=sb.from('envios').select('id,ot_numero,tipo,responsable,estado,estado_devolucion,fecha,created_at,track,track_devolucion').not('estado','eq','null');
+  let envQ=sb.from('envios').select('id,ot_numero,tipo,responsable,estado,estado_devolucion,fecha,created_at,track,track_devolucion,logistica').not('estado','eq','null');
   let desQ=sb.from('v_ordenes_con_sla').select('ot,operador_id,estado,sla_estado,tipo,dias_transcurridos').eq('tipo','desinstalacion');
   if(!isAdmin){
     envQ=envQ.ilike('responsable','%'+primerNombre+'%');
@@ -1273,96 +1274,71 @@ async function loadOpsPanel(isAdmin){
   const envios=envData||[];
   const desins=desData||[];
 
-  // Filtrar solo OTs con logística directa (no retornos: es_retorno no existe, identificamos por tipo)
   const directas=envios.filter(e=>e.estado&&!['Recibido ✅','Pendiente rótulo','Rótulo generado','En camino retorno'].includes(e.estado));
-  const today_dt=new Date(today);
+  const ESTADOS_CERRADOS=['Entregado','Fallido','Devuelto','Perdido'];
 
-  // KPIs
-  const instaladas=envios.filter(e=>
-    e.estado==='Entregado'&&(e.fecha||'').startsWith(today)
-  ).length;
-  const cambios=directas.filter(e=>!['Entregado','Fallido','Devuelto','Perdido','Retirar Terminal'].includes(e.estado)&&(e.tipo||'').toUpperCase().includes('CAMBIO')).length;
-  const rollouts=directas.filter(e=>!['Entregado','Fallido','Devuelto','Perdido'].includes(e.estado)&&(e.tipo||'').toUpperCase().includes('ROLLOUT')).length;
+  // ── GRÁFICO 1: Instaladas hoy (KPI grande) ──
+  const instaladas=envios.filter(e=>e.estado==='Entregado'&&(e.fecha||'').startsWith(today)).length;
+  renderChartKPI('chart-instaladas','Instaladas hoy',instaladas,'var(--teal)',
+    'OTs entregadas en el día');
+
+  // ── GRÁFICO 2: Pre-Colecta por logística (dona) ──
+  const preColecta=directas.filter(e=>e.estado==='Pre-Colecta');
+  const byLog={};
+  preColecta.forEach(e=>{const l=e.logistica||'Sin asignar';byLog[l]=(byLog[l]||0)+1;});
+  const LOG_COLORS={'ALLEATA':'#1dbf8e','Correo Argentino':'#E30613','CABIFY':'#7C3AED','EPSA':'#0EA5E9','Sin asignar':'#6b7280'};
+  renderChartDona('chart-precolecta','Pre-Colecta x Logística',byLog,LOG_COLORS,preColecta.length);
+
+  // ── GRÁFICO 3: Entregas pendientes por estado (barras horizontales) ──
+  const ESTADOS_PEND=[
+    {key:'Pre-Colecta',color:'#6b7280'},
+    {key:'Despachado',color:'#8b5cf6'},
+    {key:'En tránsito',color:'#f59e0b'},
+    {key:'En camino',color:'#1a9fd4'},
+    {key:'Retirar Terminal',color:'#ef4444'},
+    {key:'En espera en sucursal',color:'#f59e0b'},
+    {key:'Reprogramar',color:'#f97316'},
+    {key:'Fallido-Dirección Inválida',color:'#ef4444'},
+  ];
+  const estadosData=ESTADOS_PEND.map(s=>({...s,val:directas.filter(e=>e.estado===s.key).length}))
+    .filter(s=>s.val>0);
+  renderChartBarras('chart-entregas','Entregas pendientes',estadosData);
+
+  // ── GRÁFICO 4: Desinstalaciones por estado (dona) ──
+  const desByEst={};
+  desins.forEach(d=>{const s=d.estado||'Sin estado';desByEst[s]=(desByEst[s]||0)+1;});
+  const DES_COLORS={'Pendiente':'#f59e0b','En Proceso':'#1a9fd4','Despachado':'#8b5cf6','Terminal recuperada':'#10b981','Extraviada':'#ef4444','Retira Cliente':'#f97316'};
+  renderChartDona('chart-desins','Desinstalaciones',desByEst,DES_COLORS,desins.length);
+
+  // ── KPIs ABAJO ──
+  const cambios=directas.filter(e=>!ESTADOS_CERRADOS.includes(e.estado)&&(e.tipo||'').toUpperCase().includes('CAMBIO')).length;
+  const rollouts=directas.filter(e=>!ESTADOS_CERRADOS.includes(e.estado)&&(e.tipo||'').toUpperCase().includes('ROLLOUT')).length;
   const desinsActivas=desins.filter(d=>!['Terminal recuperada','Extraviada'].includes(d.estado)).length;
-  const totalActivos=directas.filter(e=>!['Entregado','Fallido','Devuelto','Perdido'].includes(e.estado)).length;
+  const totalActivos=directas.filter(e=>!ESTADOS_CERRADOS.includes(e.estado)).length;
   const slaRojo=desins.filter(d=>d.sla_estado==='critico').length;
+  const retirarTerminal=directas.filter(e=>e.estado==='Retirar Terminal').length;
 
   const kpiDefs=[
     {label:'OTs activas',val:totalActivos,color:'var(--blue)',icon:'📋'},
-    {label:'Instaladas hoy',val:instaladas,color:'var(--teal)',icon:'✅'},
     {label:'Cambios activos',val:cambios,color:'#1a9fd4',icon:'🔄'},
     {label:'Rollouts activos',val:rollouts,color:'#8b5cf6',icon:'📦'},
+    {label:'Retirar Terminal',val:retirarTerminal,color:'#ef4444',icon:'⏳'},
     {label:'Desins. activas',val:desinsActivas,color:'#f59e0b',icon:'↩️'},
     {label:'SLA Crítico 🔴',val:slaRojo,color:'#ef4444',icon:'⚠️'},
   ];
   const kpiEl=document.getElementById('ops-kpis');
   if(kpiEl) kpiEl.innerHTML=kpiDefs.map(k=>`
-    <div class="stat-box" style="flex:1;min-width:110px;cursor:default">
-      <div style="font-size:18px;margin-bottom:4px">${k.icon}</div>
+    <div class="stat-box" style="flex:1;min-width:110px">
+      <div style="font-size:16px;margin-bottom:4px">${k.icon}</div>
       <div class="stat-num" style="color:${k.color};font-size:24px;font-weight:800">${k.val}</div>
       <div class="stat-label">${k.label}</div>
     </div>`).join('');
 
-  // LOGÍSTICA DIRECTA — estados
-  const estadosDirecta=[
-    {key:'Pre-Colecta',label:'Pre-Colecta',color:'#6b7280'},
-    {key:'Despachado',label:'Despachado',color:'#8b5cf6'},
-    {key:'En tránsito',label:'En tránsito',color:'#f59e0b'},
-    {key:'En camino',label:'En camino',color:'#1a9fd4'},
-    {key:'En espera en sucursal',label:'En sucursal',color:'#f59e0b'},
-    {key:'Retirar Terminal',label:'Retirar Terminal',color:'#ef4444'},
-    {key:'Entregado',label:'Entregado hoy',color:'var(--teal)',filterFn:e=>e.estado==='Entregado'&&(e.fecha||'').startsWith(today)},
-    {key:'Fallido',label:'Fallidos',color:'#ef4444'},
-  ];
-  const dirEl=document.getElementById('ops-directa-estados');
-  if(dirEl) dirEl.innerHTML=estadosDirecta.map(s=>{
-    const count=s.filterFn
-      ? envios.filter(s.filterFn).length
-      : directas.filter(e=>e.estado===s.key).length;
-    if(count===0)return'';
-    return`<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border)">
-      <span style="font-size:12px;color:var(--text-muted)">${s.label}</span>
-      <span style="font-size:16px;font-weight:800;color:${s.color};font-family:'JetBrains Mono',monospace">${count}</span>
-    </div>`;
-  }).join('')||'<div style="font-size:12px;color:var(--text-muted);text-align:center;padding:12px">Sin OTs activas</div>';
-
-  // LOGÍSTICA INVERSA — estados
-  const estadosInversa=[
-    {key:'Pendiente rótulo',label:'Pendiente rótulo',color:'#6b7280',src:'env'},
-    {key:'Rótulo generado',label:'Rótulo generado',color:'#1a9fd4',src:'env'},
-    {key:'En camino retorno',label:'En camino retorno',color:'#f59e0b',src:'env'},
-    {key:'Recibido ✅',label:'Recibido',color:'var(--teal)',src:'env'},
-    {key:'Pendiente',label:'Desins. Pendiente',color:'#f59e0b',src:'des'},
-    {key:'En Proceso',label:'Desins. En Proceso',color:'#1a9fd4',src:'des'},
-    {key:'Despachado',label:'Desins. Despachada',color:'#8b5cf6',src:'des'},
-    {key:'Terminal recuperada',label:'Terminales recuperadas',color:'var(--teal)',src:'des'},
-  ];
-  const invEl=document.getElementById('ops-inversa-estados');
-  if(invEl) invEl.innerHTML=estadosInversa.map(s=>{
-    let count=0;
-    if(s.src==='env'){
-      // estados de retorno: usar estado_devolucion de OTs con retorno
-      const otsCambioRollout=envios.filter(e=>{
-        const t=(e.tipo||'').toUpperCase();
-        return t.includes('CAMBIO')||t.includes('ROLLOUT');
-      });
-      count=otsCambioRollout.filter(e=>(e.estado_devolucion||'Pendiente rótulo')===s.key).length;
-    } else {
-      count=desins.filter(d=>d.estado===s.key).length;
-    }
-    if(count===0)return'';
-    return`<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border)">
-      <span style="font-size:12px;color:var(--text-muted)">${s.label}</span>
-      <span style="font-size:16px;font-weight:800;color:${s.color};font-family:'JetBrains Mono',monospace">${count}</span>
-    </div>`;
-  }).join('')||'<div style="font-size:12px;color:var(--text-muted);text-align:center;padding:12px">Sin retornos activos</div>';
-
-  // SLA POR TIPO
+  // ── SLA POR TIPO ──
   const slaEl=document.getElementById('ops-sla-grid');
   if(slaEl){
-    // Calcular antigüedad de OTs activas en envíos (desde created_at)
     const tiposActivos={};
-    directas.filter(e=>!['Entregado','Fallido','Devuelto','Perdido'].includes(e.estado)).forEach(e=>{
+    directas.filter(e=>!ESTADOS_CERRADOS.includes(e.estado)).forEach(e=>{
       const tipo=simplificarTipo(e.tipo||'Otros');
       const dias=Math.floor((Date.now()-new Date(e.created_at).getTime())/(1000*86400));
       if(!tiposActivos[tipo])tiposActivos[tipo]={total:0,sumDias:0,critico:0,alerta:0,verde:0};
@@ -1372,17 +1348,15 @@ async function loadOpsPanel(isAdmin){
       else if(dias>=3)tiposActivos[tipo].alerta++;
       else tiposActivos[tipo].verde++;
     });
-    // SLA desins
     desins.filter(d=>!['Terminal recuperada','Extraviada'].includes(d.estado)).forEach(d=>{
       const tipo='Desinstalación';
-      const sla=d.sla_estado||'verde';
       if(!tiposActivos[tipo])tiposActivos[tipo]={total:0,sumDias:0,critico:0,alerta:0,verde:0};
       tiposActivos[tipo].total++;
+      const sla=d.sla_estado||'verde';
       if(sla==='critico')tiposActivos[tipo].critico++;
       else if(sla==='alerta')tiposActivos[tipo].alerta++;
       else tiposActivos[tipo].verde++;
     });
-
     slaEl.innerHTML=Object.entries(tiposActivos).map(([tipo,d])=>{
       const avg=d.total>0?Math.round(d.sumDias/d.total):0;
       const borderCol=d.critico>0?'#ef4444':d.alerta>0?'#f59e0b':'#10b981';
@@ -1400,8 +1374,99 @@ async function loadOpsPanel(isAdmin){
   }
 
   // Actualizar badges sidebar
-  if(document.getElementById('dc-envios'))document.getElementById('dc-envios').textContent=directas.filter(e=>!['Entregado','Fallido','Devuelto','Perdido'].includes(e.estado)).length+' activos';
+  if(document.getElementById('dc-envios'))document.getElementById('dc-envios').textContent=totalActivos+' activos';
   if(document.getElementById('dc-desinstalaciones'))document.getElementById('dc-desinstalaciones').textContent=desinsActivas+' activas';
+}
+
+// ── FUNCIONES DE GRÁFICO SVG ──
+
+function renderChartKPI(containerId, titulo, valor, color, subtitulo){
+  const el=document.getElementById(containerId);
+  if(!el)return;
+  el.innerHTML=`
+    <div class="ops-chart-title">${titulo}</div>
+    <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center">
+      <div class="ops-chart-kpi" style="color:${color}">${valor}</div>
+      <div class="ops-chart-sub">${subtitulo}</div>
+    </div>
+    <div style="font-size:10px;color:var(--text-muted);margin-top:8px">Como hoy</div>`;
+}
+
+function renderChartDona(containerId, titulo, data, colorMap, total){
+  const el=document.getElementById(containerId);
+  if(!el)return;
+  const entries=Object.entries(data).filter(([,v])=>v>0);
+  if(!entries.length){
+    el.innerHTML=`<div class="ops-chart-title">${titulo}</div><div style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:12px">Sin datos</div>`;
+    return;
+  }
+  // Calcular segmentos
+  const cx=70,cy=70,r=52,ri=34;
+  const COLORS=['#1dbf8e','#E30613','#7C3AED','#0EA5E9','#f59e0b','#ef4444','#10b981','#6b7280'];
+  let angle=-Math.PI/2;
+  let paths='';
+  entries.forEach(([key,val],i)=>{
+    const sweep=(val/total)*2*Math.PI;
+    const color=colorMap[key]||COLORS[i%COLORS.length];
+    const x1=cx+r*Math.cos(angle);
+    const y1=cy+r*Math.sin(angle);
+    const x2=cx+r*Math.cos(angle+sweep);
+    const y2=cy+r*Math.sin(angle+sweep);
+    const xi1=cx+ri*Math.cos(angle);
+    const yi1=cy+ri*Math.sin(angle);
+    const xi2=cx+ri*Math.cos(angle+sweep);
+    const yi2=cy+ri*Math.sin(angle+sweep);
+    const large=sweep>Math.PI?1:0;
+    paths+=`<path d="M${x1.toFixed(1)},${y1.toFixed(1)} A${r},${r} 0 ${large},1 ${x2.toFixed(1)},${y2.toFixed(1)} L${xi2.toFixed(1)},${yi2.toFixed(1)} A${ri},${ri} 0 ${large},0 ${xi1.toFixed(1)},${yi1.toFixed(1)} Z" fill="${color}" opacity="0.9"/>`;
+    angle+=sweep;
+  });
+  // Leyenda
+  const leyenda=entries.map(([key,val],i)=>{
+    const color=colorMap[key]||COLORS[i%COLORS.length];
+    const pct=Math.round(val/total*100);
+    return`<div style="display:flex;align-items:center;gap:5px;margin-bottom:3px">
+      <div style="width:8px;height:8px;border-radius:50%;background:${color};flex-shrink:0"></div>
+      <span style="font-size:9px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:70px" title="${key}">${key.length>10?key.slice(0,10)+'…':key}</span>
+      <span style="font-size:9px;font-weight:700;color:#fff;margin-left:auto">${val}</span>
+    </div>`;
+  }).join('');
+
+  el.innerHTML=`
+    <div class="ops-chart-title">${titulo}</div>
+    <div style="display:flex;align-items:center;gap:8px;flex:1">
+      <div style="position:relative;flex-shrink:0">
+        <svg width="140" height="140" viewBox="0 0 140 140">
+          ${paths}
+          <text x="70" y="66" text-anchor="middle" fill="#fff" font-size="20" font-weight="900" font-family="JetBrains Mono,monospace">${total}</text>
+          <text x="70" y="80" text-anchor="middle" fill="#888" font-size="9">total</text>
+        </svg>
+      </div>
+      <div style="flex:1;min-width:0">${leyenda}</div>
+    </div>`;
+}
+
+function renderChartBarras(containerId, titulo, data){
+  const el=document.getElementById(containerId);
+  if(!el)return;
+  if(!data.length){
+    el.innerHTML=`<div class="ops-chart-title">${titulo}</div><div style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:12px">Sin datos</div>`;
+    return;
+  }
+  const maxVal=Math.max(...data.map(d=>d.val),1);
+  const barras=data.map(d=>{
+    const pct=Math.round((d.val/maxVal)*100);
+    return`<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px">
+      <div style="font-size:9px;color:var(--text-muted);width:90px;text-align:right;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${d.key}">${d.key}</div>
+      <div style="flex:1;background:var(--surface2);border-radius:4px;height:14px;overflow:hidden">
+        <div style="width:${pct}%;height:100%;background:${d.color};border-radius:4px;transition:width .4s"></div>
+      </div>
+      <div style="font-size:10px;font-weight:700;color:#fff;width:24px;text-align:right;flex-shrink:0">${d.val}</div>
+    </div>`;
+  }).join('');
+
+  el.innerHTML=`
+    <div class="ops-chart-title">${titulo}</div>
+    <div style="flex:1;display:flex;flex-direction:column;justify-content:center">${barras}</div>`;
 }
 
 function simplificarTipo(tipo){
@@ -1414,28 +1479,6 @@ function simplificarTipo(tipo){
   return tipo;
 }
 
-const MOD_INFO={home:'Dashboard',sims:'Verificador SIMs',envios:'Envíos',desinstalaciones:'Desinstalaciones',horas:'Control de Horas',ajustes:'Ajustes',ally:'Configuración Ally',distri:'Distribuidores'};
-function goTo(mod){
-  const el=document.getElementById('nav-'+mod);
-  if(el&&el.classList.contains('locked'))return;
-  document.querySelectorAll('.module').forEach(m=>{
-    m.classList.remove('active');
-    m.removeAttribute('style');
-  });
-  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
-  const target=document.getElementById('mod-'+mod);
-  target.classList.add('active');
-  const navEl=document.querySelector(`.nav-item[data-mod="${mod}"]`);
-  if(navEl)navEl.classList.add('active');
-  document.getElementById('topbar-title').textContent=MOD_INFO[mod]||mod;
-  if(mod==='envios'){initEnvios();renderEnvios();}
-  if(mod==='home'){setTimeout(()=>{if(window._drawQR)window._drawQR();},200);loadOpsPanel(currentProfile?.rol==='admin');}
-  if(mod==='desinstalaciones'&&!DesinModule.cargado)cargarDesinstalaciones();
-  if(mod==='ally')cargarAlly();
-  if(mod==='distri')cargarDistri();
-  if(mod==='horas')renderHoras();
-  if(mod==='ajustes'){loadUsers();loadSimsDbStats();_auditPage=0;loadAuditLog();}
-}
 function refreshCurrentModule(){
   const active=document.querySelector('.module.active');
   if(!active)return;
