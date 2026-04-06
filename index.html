@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v2.3.4</title>
+<title>Alleata · Operaciones v2.3.5</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -288,7 +288,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.3.4 · 31 mar 2026
+      v2.3.5 · 31 mar 2026
     </div>
   </div>
 </div>
@@ -343,7 +343,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.3.4 · 31 mar 2026
+      v2.3.5 · 31 mar 2026
     </div>
   </div>
 </nav>
@@ -357,7 +357,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <div class="topbar-right" id="topbar-date"></div>
     <button onclick="refreshCurrentModule()" title="Actualizar" style="background:none;border:1px solid var(--border2);color:var(--text-muted);border-radius:7px;padding:4px 10px;cursor:pointer;font-size:13px;margin-left:10px;transition:all .2s" onmouseover="this.style.color='var(--teal)';this.style.borderColor='var(--teal)'" onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border2)'">↺</button>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.3.4</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.3.5</div>
   </div>
   <div class="content">
 
@@ -1047,7 +1047,7 @@ tr:hover td{background:var(--surface2);}
 </div>
 
 <script>
-console.log('[Alleata v2.3.4] OK');
+console.log('[Alleata v2.3.5] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -1254,6 +1254,79 @@ function buildDashCards(modulos,isAdmin){
     </div>`;
   }).join('');
   loadOpsPanel(isAdmin);
+}
+
+const MOD_INFO={home:'Dashboard',sims:'Verificador SIMs',envios:'Envíos',desinstalaciones:'Desinstalaciones',horas:'Control de Horas',ajustes:'Ajustes',ally:'Configuración Ally',distri:'Distribuidores'};
+
+function goTo(mod){
+  const el=document.getElementById('nav-'+mod);
+  if(el&&el.classList.contains('locked'))return;
+  document.querySelectorAll('.module').forEach(m=>{
+    m.classList.remove('active');
+    m.removeAttribute('style');
+  });
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  const target=document.getElementById('mod-'+mod);
+  if(!target)return;
+  target.classList.add('active');
+  const navEl=document.querySelector(`.nav-item[data-mod="${mod}"]`);
+  if(navEl)navEl.classList.add('active');
+  document.getElementById('topbar-title').textContent=MOD_INFO[mod]||mod;
+  if(mod==='envios'){initEnvios();renderEnvios();}
+  if(mod==='home'){setTimeout(()=>{if(window._drawQR)window._drawQR();},200);loadOpsPanel(currentProfile?.rol==='admin');}
+  if(mod==='desinstalaciones'&&!DesinModule.cargado)cargarDesinstalaciones();
+  if(mod==='ally')cargarAlly();
+  if(mod==='distri')cargarDistri();
+  if(mod==='horas')renderHoras();
+  if(mod==='ajustes'){loadUsers();loadSimsDbStats();_auditPage=0;loadAuditLog();}
+}
+
+function refreshCurrentModule(){
+  const active=document.querySelector('.module.active');
+  if(!active)return;
+  const mod=active.id.replace('mod-','');
+  const btn=document.querySelector('[onclick="refreshCurrentModule()"]');
+  if(btn){btn.textContent='↻';btn.style.color='var(--teal)';}
+  setTimeout(()=>{if(btn){btn.textContent='↺';btn.style.color='var(--text-muted)';}},600);
+  if(mod==='envios'){renderEnvios();loadBadges();}
+  else if(mod==='desinstalaciones'){cargarDesinstalaciones();}
+  else if(mod==='horas'){renderHoras();loadBadges();}
+  else if(mod==='sims'){loadSimsDbStats();}
+  else if(mod==='ajustes'){loadUsers();loadSimsDbStats();}
+  else{loadBadges();}
+}
+
+function updateDate(){
+  const el=document.getElementById('topbar-date');
+  if(el)el.textContent=new Date().toLocaleDateString('es-AR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
+}
+setInterval(updateDate,60000);updateDate();
+
+async function loadBadges(){
+  const uid=currentUser?.id;
+  if(!uid)return;
+  const isAdmin=currentProfile?.rol==='admin';
+  let envQ=sb.from('envios').select('id,estado');
+  let desQ=sb.from('v_ordenes_con_sla').select('ot,estado').eq('tipo','desinstalacion');
+  const nombre=currentProfile?.nombre||'';
+  if(!isAdmin){
+    const pn=nombre.split(' ')[0];
+    envQ=envQ.ilike('responsable','%'+pn+'%');
+    desQ=desQ.ilike('operador_id','%'+pn+'%');
+  }
+  const [{data:env},{data:des}]=await Promise.all([envQ,desQ]);
+  const envCount=(env||[]).filter(e=>!['Entregado','Fallido','Devuelto','Perdido'].includes(e.estado)).length;
+  const desCount=(des||[]).filter(d=>!['Terminal recuperada','Extraviada'].includes(d.estado)).length;
+  const nbEnv=document.getElementById('nb-envios');if(nbEnv)nbEnv.textContent=envCount;
+  const nbDes=document.getElementById('nb-desins');if(nbDes)nbDes.textContent=desCount;
+  if(document.getElementById('dc-envios'))document.getElementById('dc-envios').textContent=envCount+' activos';
+  if(document.getElementById('dc-desinstalaciones'))document.getElementById('dc-desinstalaciones').textContent=desCount+' activas';
+  // Horas hoy
+  const today=new Date().toISOString().slice(0,10);
+  const {data:hrs}=await sb.from('horas').select('horas,fecha').eq('user_id',uid);
+  const todayHs=(hrs||[]).filter(h=>h.fecha===today).reduce((a,b)=>a+Number(b.horas),0)||0;
+  const nbHoras=document.getElementById('nb-horas');if(nbHoras)nbHoras.textContent=todayHs+'h';
+  if(document.getElementById('dc-horas'))document.getElementById('dc-horas').textContent=todayHs+' hs hoy';
 }
 
 async function loadOpsPanel(isAdmin){
@@ -1569,43 +1642,7 @@ function simplificarTipo(tipo){
   return tipo;
 }
 
-function refreshCurrentModule(){
-  const active=document.querySelector('.module.active');
-  if(!active)return;
-  const mod=active.id.replace('mod-','');
-  const btn=document.querySelector('[onclick="refreshCurrentModule()"]');
-  if(btn){btn.textContent='↻';btn.style.color='var(--teal)';}
-  setTimeout(()=>{if(btn){btn.textContent='↺';btn.style.color='var(--text-muted)';}},600);
-  if(mod==='envios'){renderEnvios();loadBadges();}
-  else if(mod==='devoluciones'){renderDevs();loadBadges();}
-  else if(mod==='horas'){renderHoras();loadBadges();}
-  else if(mod==='sims'){loadSimsDbStats();}
-  else if(mod==='ajustes'){loadUsers();loadSimsDbStats();}
-  else{loadBadges();}
-}
 
-function updateDate(){
-  document.getElementById('topbar-date').textContent=new Date().toLocaleDateString('es-AR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
-}
-setInterval(updateDate,60000);updateDate();
-
-async function loadBadges(){
-  const uid=currentUser.id;
-  const[{data:env},{data:devs},{data:hrs}]=await Promise.all([
-    sb.from('envios').select('id,estado').eq('user_id',uid),
-    sb.from('devoluciones').select('id,estado').eq('user_id',uid),
-    sb.from('horas').select('id,horas,fecha').eq('user_id',uid),
-  ]);
-  const envCount=env?.length||0,devPend=devs?.filter(d=>d.estado!=='Resuelta').length||0;
-  const today=new Date().toISOString().slice(0,10);
-  const todayHs=hrs?.filter(h=>h.fecha===today).reduce((a,b)=>a+Number(b.horas),0)||0;
-  document.getElementById('nb-envios').textContent=envCount;
-  const nbDevs=document.getElementById('nb-devs');if(nbDevs)nbDevs.textContent=devPend;
-  document.getElementById('nb-horas').textContent=todayHs+'h';
-  if(document.getElementById('dc-envios'))document.getElementById('dc-envios').textContent=envCount+' activos';
-  if(document.getElementById('dc-devoluciones'))document.getElementById('dc-devoluciones').textContent=devPend+' pendientes';
-  if(document.getElementById('dc-horas'))document.getElementById('dc-horas').textContent=todayHs+' hs hoy';
-}
 
 // ── SIM ──
 async function lookupSIM(number){
