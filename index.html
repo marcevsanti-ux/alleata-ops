@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v2.3.9</title>
+<title>Alleata · Operaciones v2.3.10</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -288,7 +288,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.3.9 · 31 mar 2026
+      v2.3.10 · 31 mar 2026
     </div>
   </div>
 </div>
@@ -343,7 +343,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.3.9 · 31 mar 2026
+      v2.3.10 · 31 mar 2026
     </div>
   </div>
 </nav>
@@ -357,7 +357,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <div class="topbar-right" id="topbar-date"></div>
     <button onclick="refreshCurrentModule()" title="Actualizar" style="background:none;border:1px solid var(--border2);color:var(--text-muted);border-radius:7px;padding:4px 10px;cursor:pointer;font-size:13px;margin-left:10px;transition:all .2s" onmouseover="this.style.color='var(--teal)';this.style.borderColor='var(--teal)'" onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border2)'">↺</button>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.3.9</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.3.10</div>
   </div>
   <div class="content">
 
@@ -1047,7 +1047,7 @@ tr:hover td{background:var(--surface2);}
 </div>
 
 <script>
-console.log('[Alleata v2.3.9] OK');
+console.log('[Alleata v2.3.10] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -3063,24 +3063,32 @@ async function cargarDistri(){
 
 function distri_getOts(d){
   if(!d.lat||!d.lon)return[];
-  // Envíos directos
+  const CIUDAD_COORDS={'cordoba':[-31.4135,-64.1811],'córdoba':[-31.4135,-64.1811],'rosario':[-32.9468,-60.6393],'mendoza':[-32.8908,-68.8272],'tucuman':[-26.8083,-65.2176],'tucumán':[-26.8083,-65.2176],'salta':[-24.7821,-65.4232],'mar del plata':[-38.0023,-57.5575],'la plata':[-34.9205,-57.9536],'bahia blanca':[-38.7183,-62.2663],'bahía blanca':[-38.7183,-62.2663],'santa fe':[-31.6333,-60.7],'resistencia':[-27.4806,-58.8341],'corrientes':[-27.4514,-58.9867],'posadas':[-27.3671,-55.896],'neuquen':[-38.9516,-68.0591],'neuquén':[-38.9516,-68.0591],'san juan':[-31.5375,-68.5364],'formosa':[-26.1775,-58.1781],'san luis':[-33.3,-66.3167],'viedma':[-40.8135,-62.9967],'parana':[-31.7333,-60.5167],'paraná':[-31.7333,-60.5167],'puerto iguazu':[-25.5972,-54.5781],'puerto iguazú':[-25.5972,-54.5781],'mina clavero':[-31.7217,-65.0044],'la calera':[-31.3456,-64.3376],'villa maria':[-32.4072,-63.2409],'villa maría':[-32.4072,-63.2409],'rio cuarto':[-33.1232,-64.3493],'río cuarto':[-33.1232,-64.3493],'berisso':[-34.8734,-57.8862],'las lomitas':[-24.6998,-60.5933],'eduardo castex':[-35.9189,-64.2936],'almafuerte':[-32.1833,-64.2667],'tanti':[-31.3539,-64.5881],'santiago del estero':[-27.7951,-64.2615],'jujuy':[-24.1857,-65.2994],'catamarca':[-28.4696,-65.7852],'la rioja':[-29.4,-66.85],'rawson':[-43.3002,-65.1023],'santa rosa':[-36.6167,-64.2833]};
+
+  function calcDist(cpStr, ciudadStr){
+    const cpNum=parseInt((cpStr||'').replace(/[^0-9]/g,''));
+    const c=CP_COORDS[cpNum];
+    if(c)return Math.round(haversineDistri(d.lat,d.lon,c[0],c[1])*10)/10;
+    const ck=(ciudadStr||'').toLowerCase().trim();
+    const cc=CIUDAD_COORDS[ck];
+    if(cc)return Math.round(haversineDistri(d.lat,d.lon,cc[0],cc[1])*10)/10;
+    return null;
+  }
+
+  // Envíos
   const env=_distri_envios.map(e=>{
-    const cpNum=parseInt((e.cp_dest||'').replace(/[^0-9]/g,''));
-    const coords=CP_COORDS[cpNum];
-    if(!coords)return{...e,distKm:null}; // Sin coords → incluir siempre
-    const dist=haversineDistri(d.lat,d.lon,coords[0],coords[1]);
-    if(dist>d.radio)return null;
-    return{...e,distKm:Math.round(dist*10)/10};
-  }).filter(e=>e!==null);
+    const dist=calcDist(e.cp_dest,e.ciudad);
+    if(dist===null||dist>d.radio)return null;
+    return{...e,distKm:dist};
+  }).filter(Boolean);
+
   // Desinstalaciones
   const des=_distri_desins.map(e=>{
-    const cpNum=parseInt((e.cp||'').replace(/[^0-9]/g,''));
-    const coords=CP_COORDS[cpNum];
-    if(!coords)return{...e,ot_numero:e.ot,cp_dest:e.cp,distKm:null}; // Sin coords → incluir
-    const dist=haversineDistri(d.lat,d.lon,coords[0],coords[1]);
-    if(dist>d.radio)return null;
-    return{...e,ot_numero:e.ot,cp_dest:e.cp,distKm:Math.round(dist*10)/10};
-  }).filter(e=>e!==null);
+    const dist=calcDist(e.cp,e.ciudad);
+    if(dist===null||dist>d.radio)return null;
+    return{...e,ot_numero:e.ot,cp_dest:e.cp,distKm:dist};
+  }).filter(Boolean);
+
   return[...env,...des].sort((a,b)=>(a.distKm??999)-(b.distKm??999));
 }
 
