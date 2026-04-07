@@ -641,6 +641,7 @@ function toast(m,ok=true){
 }
 
 async function init(){
+  try{
   if(!TOKEN){showError('Falta el token en la URL');return;}
   
   const {data:d}=await sb.from('distribuidores').select('*').eq('id',TOKEN).maybeSingle();
@@ -697,16 +698,27 @@ async function init(){
   const {data:reps}=await sb.from('distri_reportes').select('*').eq('distri_id',TOKEN);
   estados={};agenda={};
   (reps||[]).forEach(r=>{
-    estados[String(r.sf_id)]={
+    const estadoObj={
       estado:r.estado||'',
       obs:r.notas||'',
       fecha:r.updated_at?new Date(r.updated_at).toLocaleString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}):'',
     };
+    // Indexar por sf_id Y por ot (número de OT) para compatibilidad con getEstado(r.OT)
+    estados[String(r.sf_id)]=estadoObj;
+    // Buscar el número de OT correspondiente en allOts
+    const otObj=allOts.find(o=>o.sf_id===r.sf_id);
+    if(otObj) estados[String(otObj.OT)]=estadoObj;
+    const agObj={};
     if(r.fecha_retiro){
-      agenda[String(r.sf_id)]={fecha:r.fecha_retiro,fechaRetiro:r.fecha_retiro,tipo:'retiro'};
+      agObj.fecha=r.fecha_retiro;agObj.fechaRetiro=r.fecha_retiro;agObj.tipo='retiro';
     }
     if(r.fecha_llamado){
-      agenda[String(r.sf_id)]={...agenda[String(r.sf_id)],fecha:r.fecha_llamado,fechaLlamado:r.fecha_llamado,tipo:'llamado'};
+      agObj.fecha=r.fecha_llamado;agObj.fechaLlamado=r.fecha_llamado;
+      agObj.tipo=agObj.tipo||'llamado';
+    }
+    if(Object.keys(agObj).length){
+      agenda[String(r.sf_id)]=agObj;
+      if(otObj)agenda[String(otObj.OT)]=agObj;
     }
   });
 
@@ -716,6 +728,7 @@ async function init(){
   
   // QR mobile
   _qrGenerated=false;
+  }catch(err){showError('Error al cargar: '+err.message);console.error(err);}
 }
 
 // ── GUARDAR ESTADO EN SUPABASE ──
@@ -1016,7 +1029,7 @@ async function saveModal(){
   
   let fechaRetiro=null;
   if(modalEstado==='Confirmado retiro'){
-    fechaRetiro=document.getElementById('modal-fecha')?.value||null;
+    fechaRetiro=document.getElementById('modal-fecha-input')?.value||null;
     if(!fechaRetiro){toast('⚠️ Elegí la fecha de retiro');return;}
     agenda[String(modalOt)]={fecha:fechaRetiro,fechaRetiro,tipo:'retiro'};
   }
