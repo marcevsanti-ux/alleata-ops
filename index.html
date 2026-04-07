@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v2.3.7</title>
+<title>Alleata · Operaciones v2.3.9</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -288,7 +288,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.3.7 · 31 mar 2026
+      v2.3.9 · 31 mar 2026
     </div>
   </div>
 </div>
@@ -343,7 +343,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.3.7 · 31 mar 2026
+      v2.3.9 · 31 mar 2026
     </div>
   </div>
 </nav>
@@ -357,7 +357,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <div class="topbar-right" id="topbar-date"></div>
     <button onclick="refreshCurrentModule()" title="Actualizar" style="background:none;border:1px solid var(--border2);color:var(--text-muted);border-radius:7px;padding:4px 10px;cursor:pointer;font-size:13px;margin-left:10px;transition:all .2s" onmouseover="this.style.color='var(--teal)';this.style.borderColor='var(--teal)'" onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border2)'">↺</button>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.3.7</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.3.9</div>
   </div>
   <div class="content">
 
@@ -1047,7 +1047,7 @@ tr:hover td{background:var(--surface2);}
 </div>
 
 <script>
-console.log('[Alleata v2.3.7] OK');
+console.log('[Alleata v2.3.9] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -3045,30 +3045,43 @@ function haversineDistri(lat1,lon1,lat2,lon2){
 
 let _distri_data=[];
 let _distri_envios=[];
+let _distri_desins=[];
 
 async function cargarDistri(){
   const grid=document.getElementById('distri-grid');
   grid.innerHTML='<div style="text-align:center;padding:60px;color:var(--text-muted);grid-column:1/-1"><div style="font-size:32px;margin-bottom:8px">⏳</div>Cargando...</div>';
-  // Cargar distribuidores y envíos en paralelo
-  const [{data:distris},{data:envios}]=await Promise.all([
+  const [{data:distris},{data:envios},{data:desins}]=await Promise.all([
     sb.from('distribuidores').select('*').eq('activo',true).order('nombre'),
-    sb.from('envios').select('sf_id,ot_numero,cuenta,ciudad,provincia,cp_dest,estado,responsable').not('estado','in','("Entregado","Devuelto","Fallido","Perdido")')
+    sb.from('envios').select('sf_id,ot_numero,cuenta,ciudad,provincia,cp_dest,estado,responsable').not('estado','in','("Entregado","Devuelto","Fallido","Perdido")'),
+    sb.from('v_ordenes_con_sla').select('sf_id,ot,comercio,cuenta,ciudad,provincia,cp,estado').not('estado','in','("Terminal recuperada","Extraviada")')
   ]);
   _distri_data=distris||[];
   _distri_envios=envios||[];
+  _distri_desins=desins||[];
   distri_render();
 }
 
 function distri_getOts(d){
   if(!d.lat||!d.lon)return[];
-  return _distri_envios.map(e=>{
+  // Envíos directos
+  const env=_distri_envios.map(e=>{
     const cpNum=parseInt((e.cp_dest||'').replace(/[^0-9]/g,''));
     const coords=CP_COORDS[cpNum];
-    if(!coords)return null;
+    if(!coords)return{...e,distKm:null}; // Sin coords → incluir siempre
     const dist=haversineDistri(d.lat,d.lon,coords[0],coords[1]);
     if(dist>d.radio)return null;
     return{...e,distKm:Math.round(dist*10)/10};
-  }).filter(Boolean).sort((a,b)=>a.distKm-b.distKm);
+  }).filter(e=>e!==null);
+  // Desinstalaciones
+  const des=_distri_desins.map(e=>{
+    const cpNum=parseInt((e.cp||'').replace(/[^0-9]/g,''));
+    const coords=CP_COORDS[cpNum];
+    if(!coords)return{...e,ot_numero:e.ot,cp_dest:e.cp,distKm:null}; // Sin coords → incluir
+    const dist=haversineDistri(d.lat,d.lon,coords[0],coords[1]);
+    if(dist>d.radio)return null;
+    return{...e,ot_numero:e.ot,cp_dest:e.cp,distKm:Math.round(dist*10)/10};
+  }).filter(e=>e!==null);
+  return[...env,...des].sort((a,b)=>(a.distKm??999)-(b.distKm??999));
 }
 
 function distri_render(){
