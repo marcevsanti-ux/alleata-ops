@@ -114,7 +114,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
 <div class="header" id="header" style="display:none">
   <div>
     <div class="h-logo">🚚 alleata</div>
-    <div style="font-size:9px;color:rgba(255,255,255,.3);margin-top:1px">v1.0.4</div>
+    <div style="font-size:9px;color:rgba(255,255,255,.3);margin-top:1px">v1.0.5</div>
   </div>
   <div class="h-name" id="h-name">—</div>
 </div>
@@ -222,10 +222,12 @@ async function init(){
   const{data:reps}=await sb.from('distri_reportes').select('*').eq('distri_id',TOKEN);
   REP={};(reps||[]).forEach(r=>{
     REP[r.sf_id]=r;
-    // También indexar por OT para compatibilidad con el cache
-    const otObj=OTS.find(o=>o.sf_id===r.sf_id);
-    if(otObj)REP[otObj.ot]=r;
+    const otObj=OTS.find(o=>o.sf_id===r.sf_id||String(o.ot)===String(r.sf_id));
+    if(otObj){REP[otObj.ot]=r;REP[otObj.sf_id]=r;}
   });
+
+  // Helper para buscar reporte por cualquier clave
+  window.getRep=e=>REP[e.sf_id]||REP[e.ot]||REP[String(e.ot)]||null;
 
   document.getElementById('view-loading').style.display='none';
   document.getElementById('header').style.display='flex';
@@ -243,14 +245,11 @@ function err(m){
 
 function stats(){
   const today=new Date().toISOString().slice(0,10);
-  const deHoy=OTS.filter(e=>{
-    const rep=REP[e.sf_id]||REP[e.ot];
-    return rep?.estado==='Confirmado retiro'&&rep?.fecha_retiro===today;
-  });
-  const exitosos=OTS.filter(e=>['Exitoso','Rollout'].includes(REP[e.sf_id]?.estado||REP[e.ot]?.estado||''));
-  const contactados=OTS.filter(e=>['Contactado','Confirmado retiro'].includes(REP[e.sf_id]?.estado||REP[e.ot]?.estado||''));
+  const deHoy=OTS.filter(e=>{const r=getRep(e);return r?.estado==='Confirmado retiro'&&r?.fecha_retiro===today;});
+  const exitosos=OTS.filter(e=>['Exitoso','Rollout'].includes(getRep(e)?.estado||''));
+  const contactados=OTS.filter(e=>['Contactado','Confirmado retiro'].includes(getRep(e)?.estado||''));
   document.getElementById('s-total').textContent=deHoy.length;
-  document.getElementById('s-pend').textContent=deHoy.filter(e=>!['Exitoso','Rollout'].includes(REP[e.sf_id]?.estado||REP[e.ot]?.estado||'')).length;
+  document.getElementById('s-pend').textContent=deHoy.filter(e=>!['Exitoso','Rollout'].includes(getRep(e)?.estado||'')).length;
   document.getElementById('s-cont').textContent=contactados.length;
   document.getElementById('s-exit').textContent=exitosos.length;
 }
@@ -284,11 +283,11 @@ function renderOts(){
   
   // Filtros disponibles
   const confirmadas=OTS.filter(e=>{
-    const rep=REP[e.sf_id]||REP[e.ot];
+    const rep=getRep(e);
     return rep?.estado==='Confirmado retiro';
   });
   const deHoy=confirmadas.filter(e=>{
-    const rep=REP[e.sf_id]||REP[e.ot];
+    const rep=getRep(e);
     return rep?.fecha_retiro===today;
   });
 
