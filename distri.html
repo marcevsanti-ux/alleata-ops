@@ -422,7 +422,7 @@
     <img class="header-logo" src="https://alleata.com.ar/images/Alleata-logo.svg" alt="Alleata" onerror="this.style.display='none'"/>
     <div class="header-divider"></div>
     <div>
-      <div class="header-title">Portal Distribuidor <span style="font-size:10px;font-weight:600;background:rgba(255,255,255,.15);border-radius:6px;padding:2px 7px;margin-left:4px;letter-spacing:.3px">v1.3.2</span></div>
+      <div class="header-title">Portal Distribuidor <span style="font-size:10px;font-weight:600;background:rgba(255,255,255,.15);border-radius:6px;padding:2px 7px;margin-left:4px;letter-spacing:.3px">v1.3.3</span></div>
       <div class="header-sub" id="header-sub">Cargando...</div>
     </div>
     <div class="distri-badge" id="distri-badge">...</div>
@@ -689,14 +689,53 @@ async function init(){
       Estado:e.estado,CP:otCp,Dist:dist,sf_id:e.sf_id};
   });
 
+  // Diccionario ciudad → coords para fallback cuando no hay CP
+  const CIUDAD_COORDS={
+    'cordoba':[-31.4135,-64.1811],'córdoba':[-31.4135,-64.1811],
+    'rosario':[-32.9468,-60.6393],'mendoza':[-32.8908,-68.8272],
+    'tucuman':[-26.8083,-65.2176],'tucumán':[-26.8083,-65.2176],
+    'salta':[-24.7821,-65.4232],'mar del plata':[-38.0023,-57.5575],
+    'la plata':[-34.9205,-57.9536],'bahia blanca':[-38.7183,-62.2663],
+    'bahía blanca':[-38.7183,-62.2663],'santa fe':[-31.6333,-60.7],
+    'resistencia':[-27.4806,-58.8341],'corrientes':[-27.4514,-58.9867],
+    'posadas':[-27.3671,-55.896],'neuquen':[-38.9516,-68.0591],
+    'neuquén':[-38.9516,-68.0591],'san juan':[-31.5375,-68.5364],
+    'formosa':[-26.1775,-58.1781],'san luis':[-33.3,-66.3167],
+    'la rioja':[-29.4,-66.85],'catamarca':[-28.4696,-65.7852],
+    'jujuy':[-24.1857,-65.2994],'santiago del estero':[-27.7951,-64.2615],
+    'viedma':[-40.8135,-62.9967],'rawson':[-43.3002,-65.1023],
+    'santa rosa':[-36.6167,-64.2833],'rio gallegos':[-51.6226,-69.2181],
+    'ushuaia':[-54.8,-68.3],'rio grande':[-53.7878,-67.7067],
+    'parana':[-31.7333,-60.5167],'paraná':[-31.7333,-60.5167],
+    'entre rios':[-31.7333,-60.5167],'san miguel de tucuman':[-26.8083,-65.2176],
+    'puerto iguazu':[-25.5972,-54.5781],'puerto iguazú':[-25.5972,-54.5781],
+    'mina clavero':[-31.7217,-65.0044],'la calera':[-31.3456,-64.3376],
+    'villa maria':[-32.4072,-63.2409],'villa maría':[-32.4072,-63.2409],
+    'rio cuarto':[-33.1232,-64.3493],'río cuarto':[-33.1232,-64.3493],
+    'berisso':[-34.8734,-57.8862],'la lomita':[-35.6833,-60.5833],
+    'las lomitas':[-24.6998,-60.5933],'eduardo castex':[-35.9189,-64.2936],
+    'almafuerte':[-32.1833,-64.2667],'tanti':[-31.3539,-64.5881],
+  };
+
   const ots=[...desinNorm,...enviosNorm];
   
   if(d.lat&&d.lon){
-    allOts=ots.filter(e=>{
+    allOts=ots.map(e=>{
       const c=CP_COORDS[parseInt(e.CP)];
-      if(!c)return true; // Sin coords conocidas → incluir siempre
-      return hav(d.lat,d.lon,c[0],c[1])<=(d.radio||50);
-    }).sort((a,b)=>(a.Dist??999)-(b.Dist??999));
+      if(c){
+        const dist=Math.round(hav(d.lat,d.lon,c[0],c[1])*10)/10;
+        return dist<=(d.radio||50)?{...e,Dist:dist}:null;
+      }
+      // Fallback: buscar por ciudad
+      const ciudadKey=(e.Ciudad||'').toLowerCase().trim();
+      const cc=CIUDAD_COORDS[ciudadKey];
+      if(cc){
+        const dist=Math.round(hav(d.lat,d.lon,cc[0],cc[1])*10)/10;
+        return dist<=(d.radio||50)?{...e,Dist:dist}:null;
+      }
+      // Sin coords conocidas → excluir (evita mostrar OTs fuera del radio)
+      return null;
+    }).filter(Boolean).sort((a,b)=>(a.Dist??999)-(b.Dist??999));
   }else{
     allOts=ots;
   }
