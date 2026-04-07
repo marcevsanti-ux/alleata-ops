@@ -114,7 +114,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
 <div class="header" id="header" style="display:none">
   <div>
     <div class="h-logo">🚚 alleata</div>
-    <div style="font-size:9px;color:rgba(255,255,255,.3);margin-top:1px">v1.0.1</div>
+    <div style="font-size:9px;color:rgba(255,255,255,.3);margin-top:1px">v1.0.2</div>
   </div>
   <div class="h-name" id="h-name">—</div>
 </div>
@@ -198,41 +198,34 @@ async function init(){
   document.getElementById('h-name').textContent=d.nombre+(d.apellido&&d.apellido!==d.nombre?' '+d.apellido:'');
   document.title='Alleata · '+d.nombre;
 
-  // Mismas queries que distri.html
-  const[{data:desin},{data:envios}]=await Promise.all([
-    sb.from('v_ordenes_con_sla')
-      .select('sf_id,ot,comercio,cuenta,ciudad,provincia,cp,estado,operador_id,logistica,observaciones,contacto,horario,direccion_completa,sla_estado')
-      .not('estado','in','("Terminal recuperada","Extraviada")'),
-    sb.from('envios')
-      .select('sf_id,ot_numero,cuenta,ciudad,provincia,cp_dest,estado,responsable,notas')
-      .not('estado','in','("Entregado","Devuelto","Fallido","Perdido")')
-  ]);
-
-  const enviosNorm=(envios||[]).map(e=>({
-    sf_id:e.sf_id,ot:e.ot_numero,comercio:e.cuenta,cuenta:e.cuenta,
-    ciudad:e.ciudad,provincia:e.provincia,cp:e.cp_dest,
-    estado:e.estado,operador_id:e.responsable,
-    observaciones:e.notas,contacto:null,horario:null,direccion_completa:null
-  }));
-
-  const ots=[...(desin||[]),...enviosNorm];
-
-  if(d.lat&&d.lon){
-
-  const CIUDAD_COORDS={'cordoba':[-31.4135,-64.1811],'córdoba':[-31.4135,-64.1811],'rosario':[-32.9468,-60.6393],'mendoza':[-32.8908,-68.8272],'tucuman':[-26.8083,-65.2176],'tucumán':[-26.8083,-65.2176],'salta':[-24.7821,-65.4232],'mar del plata':[-38.0023,-57.5575],'la plata':[-34.9205,-57.9536],'bahia blanca':[-38.7183,-62.2663],'bahía blanca':[-38.7183,-62.2663],'santa fe':[-31.6333,-60.7],'resistencia':[-27.4806,-58.8341],'corrientes':[-27.4514,-58.9867],'posadas':[-27.3671,-55.896],'neuquen':[-38.9516,-68.0591],'neuquén':[-38.9516,-68.0591],'san juan':[-31.5375,-68.5364],'formosa':[-26.1775,-58.1781],'san luis':[-33.3,-66.3167],'la rioja':[-29.4,-66.85],'catamarca':[-28.4696,-65.7852],'jujuy':[-24.1857,-65.2994],'santiago del estero':[-27.7951,-64.2615],'viedma':[-40.8135,-62.9967],'rawson':[-43.3002,-65.1023],'santa rosa':[-36.6167,-64.2833],'rio gallegos':[-51.6226,-69.2181],'ushuaia':[-54.8,-68.3],'rio grande':[-53.7878,-67.7067],'parana':[-31.7333,-60.5167],'paraná':[-31.7333,-60.5167],'puerto iguazu':[-25.5972,-54.5781],'puerto iguazú':[-25.5972,-54.5781],'mina clavero':[-31.7217,-65.0044],'la calera':[-31.3456,-64.3376],'villa maria':[-32.4072,-63.2409],'villa maría':[-32.4072,-63.2409],'rio cuarto':[-33.1232,-64.3493],'río cuarto':[-33.1232,-64.3493],'berisso':[-34.8734,-57.8862],'las lomitas':[-24.6998,-60.5933],'eduardo castex':[-35.9189,-64.2936],'almafuerte':[-32.1833,-64.2667],'tanti':[-31.3539,-64.5881]};
-    OTS=ots.map(e=>{
-      const n=parseInt((e.cp||'').replace(/[^0-9]/g,''));
-      const c=CP_COORDS[n];
-      if(c){const dist=Math.round(hav(d.lat,d.lon,c[0],c[1])*10)/10;return dist<=(d.radio||50)?{...e,distKm:dist}:null;}
-      const ck=(e.ciudad||'').toLowerCase().trim();
-      const cc=CIUDAD_COORDS[ck];
-      if(cc){const dist=Math.round(hav(d.lat,d.lon,cc[0],cc[1])*10)/10;return dist<=(d.radio||50)?{...e,distKm:dist}:null;}
-      return null;
-    }).filter(Boolean).sort((a,b)=>(a.distKm??999)-(b.distKm??999));
-  }else{OTS=ots;}
+  // Leer OTs del cache calculado por el portal OPS
+  const{data:distriData}=await sb.from('distribuidores').select('ots_cache,ots_cache_at').eq('id',TOKEN).single();
+  const cache=distriData?.ots_cache||[];
+  
+  // Normalizar cache al formato que usa mobile-distri (campos en minúscula)
+  OTS=cache.map(e=>({
+    sf_id:e.sf_id||e.OT||'',
+    ot:e.OT||'',
+    comercio:e.Comercio||e.Cuenta||'',
+    cuenta:e.Cuenta||'',
+    ciudad:e.Ciudad||'',
+    provincia:e.Provincia||'',
+    cp:e.CP||'',
+    estado:e.Estado||'',
+    contacto:e.Contacto||'',
+    horario:e.Horario||'',
+    direccion_completa:e.Calle||'',
+    observaciones:e.Obs||'',
+    distKm:e.Dist||null,
+  })).sort((a,b)=>(a.distKm??9999)-(b.distKm??9999));
 
   const{data:reps}=await sb.from('distri_reportes').select('*').eq('distri_id',TOKEN);
-  REP={};(reps||[]).forEach(r=>{REP[r.sf_id]=r;});
+  REP={};(reps||[]).forEach(r=>{
+    REP[r.sf_id]=r;
+    // También indexar por OT para compatibilidad con el cache
+    const otObj=OTS.find(o=>o.sf_id===r.sf_id);
+    if(otObj)REP[otObj.ot]=r;
+  });
 
   document.getElementById('view-loading').style.display='none';
   document.getElementById('header').style.display='flex';
