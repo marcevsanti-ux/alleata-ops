@@ -422,7 +422,7 @@
     <img class="header-logo" src="https://alleata.com.ar/images/Alleata-logo.svg" alt="Alleata" onerror="this.style.display='none'"/>
     <div class="header-divider"></div>
     <div>
-      <div class="header-title">Portal Distribuidor <span style="font-size:10px;font-weight:600;background:rgba(255,255,255,.15);border-radius:6px;padding:2px 7px;margin-left:4px;letter-spacing:.3px">v1.3.0</span></div>
+      <div class="header-title">Portal Distribuidor <span style="font-size:10px;font-weight:600;background:rgba(255,255,255,.15);border-radius:6px;padding:2px 7px;margin-left:4px;letter-spacing:.3px">v1.3.1</span></div>
       <div class="header-sub" id="header-sub">Cargando...</div>
     </div>
     <div class="distri-badge" id="distri-badge">...</div>
@@ -633,6 +633,9 @@ const CP_COORDS={1005:[-34.6037,-58.3816],1171:[-34.6037,-58.3816],1172:[-34.603
 function hav(a,b,c,d){const R=6371,r=x=>x*Math.PI/180,dL=r(c-a),dl=r(d-b),q=Math.sin(dL/2)**2+Math.cos(r(a))*Math.cos(r(c))*Math.sin(dl/2)**2;return R*2*Math.atan2(Math.sqrt(q),Math.sqrt(1-q));}
 
 let D=null,OTS=[],REP={},MID=null,MEST=null,FIL='Todas',TAB='ots';
+// Variables del sistema de render original
+let allOts=[],estados={},agenda={},currentFilter='todos',searchQ='',modalOt=null,modalEstado=null,DISTRI_NAME='',agendaDetailOt=null;
+let fotoBase64=null,fotoMime='image/jpeg';
 
 function toast(m,ok=true){
   const t=document.getElementById('toast');
@@ -764,8 +767,6 @@ function estadoClass(est){
 }
 
 // ─── FOTO ─────────────────────────────────────────────────────
-let fotoBase64 = null;
-let fotoMime = 'image/jpeg';
 
 function onFotoSelected(input) {
   const file = input.files[0];
@@ -1066,10 +1067,8 @@ function switchTab(tab){
 }
 
 // ─── AGENDA ───────────────────────────────────────────────────
-let agenda = {}; // {[OT]: {fecha:'YYYY-MM-DD'}}
 let calYear = new Date().getFullYear();
 let calMonth = new Date().getMonth(); // 0-indexed
-let agendaDetailOt = null;
 
 // Load from localStorage
 try{
