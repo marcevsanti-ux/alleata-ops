@@ -422,7 +422,7 @@
     <img class="header-logo" src="https://alleata.com.ar/images/Alleata-logo.svg" alt="Alleata" onerror="this.style.display='none'"/>
     <div class="header-divider"></div>
     <div>
-      <div class="header-title">Portal Distribuidor <span style="font-size:10px;font-weight:600;background:rgba(255,255,255,.15);border-radius:6px;padding:2px 7px;margin-left:4px;letter-spacing:.3px">v1.4.0</span></div>
+      <div class="header-title">Portal Distribuidor <span style="font-size:10px;font-weight:600;background:rgba(255,255,255,.15);border-radius:6px;padding:2px 7px;margin-left:4px;letter-spacing:.3px">v1.4.1</span></div>
       <div class="header-sub" id="header-sub">Cargando...</div>
     </div>
     <div class="distri-badge" id="distri-badge">...</div>
@@ -664,14 +664,14 @@ async function init(){
   const [{data:desin},{data:envios}]=await Promise.all([
     sb.from('v_ordenes_con_sla')
       .select('sf_id,ot,comercio,cuenta,ciudad,provincia,cp,estado,observaciones,contacto,horario,direccion_completa')
-      .neq('estado','Terminal recuperada')
+      .not('estado','in','("Terminal recuperada","Extraviada","Fallido")')
       .limit(500),
     sb.from('envios')
       .select('sf_id,ot_numero,cuenta,ciudad,provincia,cp_dest,estado,responsable,notas')
       .not('estado','in','("Entregado","Devuelto","Fallido","Perdido")')
       .limit(500)
   ]);
-  console.log('desin result:', desin?.length, '| error esperado si 0');
+  console.log('desin:', desin?.length, 'envios:', envios?.length);
 
   const enviosNorm=(envios||[]).map(e=>{
     const otCp=(e.cp_dest||'').replace(/[^0-9]/g,'').slice(0,5);
