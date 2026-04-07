@@ -94,6 +94,31 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .ruta-nombre{font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ruta-ciudad{font-size:11px;color:var(--muted)}
 .ruta-dist{font-size:12px;font-weight:700;color:var(--orange);flex-shrink:0}
+/* Calendario de ruta */
+.ruta-cal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+.ruta-cal-nav{background:none;border:1px solid var(--border);border-radius:8px;padding:4px 12px;cursor:pointer;font-size:14px;font-weight:700;color:var(--muted);}
+.ruta-cal-mes{font-size:14px;font-weight:800;color:var(--text);}
+.ruta-cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:16px;}
+.ruta-cal-dow{font-size:9px;font-weight:700;color:var(--muted);text-align:center;padding:4px 0;text-transform:uppercase;}
+.ruta-cal-day{aspect-ratio:1;display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:8px;font-size:12px;font-weight:600;cursor:default;color:var(--muted);border:1px solid transparent;}
+.ruta-cal-day.has-ots{background:#d1fae5;color:#065f46;font-weight:800;cursor:pointer;border-color:#6ee7b7;}
+.ruta-cal-day.selected{background:var(--teal);color:#fff;border-color:var(--teal);}
+.ruta-cal-day.today{border-color:var(--teal);}
+.ruta-cal-day.other-month{opacity:.2;}
+.ruta-cal-day .dot{font-size:8px;font-weight:900;margin-top:1px;}
+/* Panel ruta del día */
+.ruta-dia-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding:10px 14px;background:#f8fafc;border-radius:10px;border:1px solid var(--border);}
+.ruta-dia-titulo{font-size:14px;font-weight:800;color:var(--text);}
+.ruta-dia-count{font-size:12px;color:var(--muted);}
+.btn-imprimir{background:var(--header);color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:5px;}
+/* Print */
+@media print{
+  .header,.stats,.tabs,.ruta-cal-header,.ruta-cal-grid,.ruta-dia-header .btn-imprimir,.filter-bar,#modal{display:none!important;}
+  .ruta-dia-header{background:none;border:none;padding:0;margin-bottom:8px;}
+  .ruta-dia-titulo{font-size:18px;}
+  body{background:#fff;}
+  .ruta-card{break-inside:avoid;border:1px solid #ccc;border-radius:0;}
+}
 .toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--text);color:#fff;padding:10px 20px;border-radius:12px;font-size:13px;font-weight:700;z-index:9999;pointer-events:none;opacity:0;transition:opacity .3s;white-space:nowrap}
 .toast.show{opacity:1}
 .empty{text-align:center;padding:48px 20px;color:var(--muted)}
@@ -108,7 +133,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
       <div class="header-logo">🚚 Alleata</div>
       <div class="header-meta" id="header-meta">Portal Distribuidor</div>
     </div>
-    <div class="header-version">v1.2.1</div>
+    <div class="header-version">v1.2.2</div>
   </div>
   <div style="display:flex;align-items:center;gap:10px">
     <div class="header-distri" id="header-distri">—</div>
@@ -329,10 +354,113 @@ function agendaDay(ds){
   const fecha=new Date(ds+'T12:00:00').toLocaleDateString('es-AR',{weekday:'long',day:'2-digit',month:'long'});
   det.innerHTML=`<div style="background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);padding:14px"><div style="font-weight:800;font-size:13px;margin-bottom:10px;color:var(--teal)">📅 ${fecha}</div>${list.map(e=>`<div style="padding:8px 0;border-bottom:1px solid var(--border)"><div style="font-weight:700;color:var(--teal)">OT #${e.ot||e.sf_id}</div><div style="font-size:13px;font-weight:700">${e.comercio||'—'}</div><div style="font-size:11px;color:var(--muted)">${e.ciudad||'—'}${e.horario?' · '+e.horario:''}</div></div>`).join('')}</div>`;
 }
+// ── HOJA DE RUTA ──
+let RUTA_MES=new Date();
+let RUTA_DIA_SEL=null;
+
 function renderRuta(){
-  const list=OTS.filter(e=>e.distKm!=null&&!['Exitoso','Rollout'].includes(REP[e.sf_id]?.estado||''));
-  if(!list.length){document.getElementById('ruta-list').innerHTML='<div class="empty"><div class="empty-icon">🗺️</div><div style="font-weight:700">Sin OTs con coordenadas</div></div>';return;}
-  document.getElementById('ruta-list').innerHTML=list.map((e,i)=>`<div class="ruta-card"><div class="ruta-num">${i+1}</div><div class="ruta-info"><div class="ruta-ot">OT #${e.ot||e.sf_id}</div><div class="ruta-nombre">${e.comercio||'—'}</div><div class="ruta-ciudad">${e.ciudad||'—'}${e.direccion_completa?' · '+e.direccion_completa:''}</div>${badge(REP[e.sf_id]?.estado||'Pendiente')}</div><div class="ruta-dist">${e.distKm} km</div></div>`).join('');
+  // Agrupar OTs confirmadas por fecha_retiro
+  const porFecha={};
+  OTS.forEach(e=>{
+    const rep=REP[e.sf_id];
+    if(rep?.estado==='Confirmado retiro'&&rep?.fecha_retiro){
+      if(!porFecha[rep.fecha_retiro])porFecha[rep.fecha_retiro]=[];
+      porFecha[rep.fecha_retiro].push(e);
+    }
+  });
+
+  const today=new Date().toISOString().slice(0,10);
+  // Auto-seleccionar hoy si tiene OTs, sino primer día con OTs
+  if(!RUTA_DIA_SEL){
+    if(porFecha[today])RUTA_DIA_SEL=today;
+    else{const primer=Object.keys(porFecha).sort()[0];if(primer)RUTA_DIA_SEL=primer;}
+  }
+
+  const y=RUTA_MES.getFullYear(),m=RUTA_MES.getMonth();
+  const meses=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const dias=['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+  const fd=new Date(y,m,1).getDay();
+  const dim=new Date(y,m+1,0).getDate();
+
+  // Calendario
+  let calHTML=`
+    <div class="ruta-cal-header">
+      <button class="ruta-cal-nav" onclick="rutaNavMes(-1)">‹</button>
+      <div class="ruta-cal-mes">${meses[m]} ${y}</div>
+      <button class="ruta-cal-nav" onclick="rutaNavMes(1)">›</button>
+    </div>
+    <div class="ruta-cal-grid">
+      ${dias.map(d=>`<div class="ruta-cal-dow">${d}</div>`).join('')}`;
+
+  // Celdas vacías antes del primer día
+  for(let i=0;i<fd;i++)calHTML+=`<div class="ruta-cal-day other-month"></div>`;
+
+  for(let d=1;d<=dim;d++){
+    const ds=`${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const hasOts=!!porFecha[ds];
+    const isToday=ds===today;
+    const isSel=ds===RUTA_DIA_SEL;
+    const n=hasOts?porFecha[ds].length:0;
+    let cls='ruta-cal-day';
+    if(isSel)cls+=' selected';
+    else if(hasOts)cls+=' has-ots';
+    if(isToday&&!isSel)cls+=' today';
+    calHTML+=`<div class="${cls}" ${hasOts?`onclick="rutaSelDia('${ds}')"`:''}>${d}${hasOts?`<div class="dot">${n}✓</div>`:''}`;
+    calHTML+=`</div>`;
+  }
+  calHTML+=`</div>`;
+
+  // Panel del día seleccionado
+  let panelHTML='';
+  if(RUTA_DIA_SEL&&porFecha[RUTA_DIA_SEL]){
+    const lista=porFecha[RUTA_DIA_SEL].sort((a,b)=>(a.distKm??999)-(b.distKm??999));
+    const fechaLabel=new Date(RUTA_DIA_SEL+'T12:00:00').toLocaleDateString('es-AR',{weekday:'long',day:'2-digit',month:'long'});
+    panelHTML=`
+      <div class="ruta-dia-header" id="ruta-dia-header">
+        <div>
+          <div class="ruta-dia-titulo">📋 ${fechaLabel}</div>
+          <div class="ruta-dia-count">${lista.length} OT${lista.length!==1?'s':''} confirmada${lista.length!==1?'s':''}</div>
+        </div>
+        <button class="btn-imprimir" onclick="window.print()">🖨️ Imprimir</button>
+      </div>
+      <div id="ruta-dia-lista">
+        ${lista.map((e,i)=>{
+          const rep=REP[e.sf_id];
+          const dir=e.direccion_completa||'';
+          const city=e.ciudad||'';
+          const mq=encodeURIComponent((dir?dir+' '+city:city)+' Argentina');
+          return`<div class="ruta-card">
+            <div class="ruta-num">${i+1}</div>
+            <div class="ruta-info" style="flex:1;min-width:0">
+              <div class="ruta-ot">OT #${e.ot||e.sf_id}</div>
+              <div class="ruta-nombre">${e.comercio||'—'}</div>
+              <div class="ruta-ciudad">${city}${dir?' · '+dir:''}</div>
+              ${e.contacto?`<div style="font-size:11px;color:var(--muted);margin-top:2px">📞 ${e.contacto}</div>`:''}
+              ${rep?.notas?`<div style="font-size:11px;color:var(--muted);font-style:italic;margin-top:2px">"${rep.notas}"</div>`:''}
+            </div>
+            <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end;flex-shrink:0">
+              ${e.distKm!=null?`<div class="ruta-dist">${e.distKm} km</div>`:''}
+              ${city?`<a href="https://www.google.com/maps/search/?api=1&query=${mq}" target="_blank" style="background:#4285F4;color:#fff;text-decoration:none;padding:4px 10px;border-radius:8px;font-size:11px;font-weight:700">🗺️ Maps</a>`:''}
+            </div>
+          </div>`;
+        }).join('')}
+      </div>`;
+  } else if(Object.keys(porFecha).length===0){
+    panelHTML=`<div class="empty"><div class="empty-icon">🗺️</div><div style="font-weight:700">Sin retiros confirmados</div><div style="font-size:12px;margin-top:6px">Confirmá retiros desde la pestaña OTs para verlos aquí.</div></div>`;
+  } else {
+    panelHTML=`<div class="empty" style="padding:24px"><div style="font-size:13px;color:var(--muted)">Seleccioná un día del calendario</div></div>`;
+  }
+
+  document.getElementById('ruta-list').innerHTML=calHTML+panelHTML;
+}
+
+function rutaNavMes(d){
+  RUTA_MES=new Date(RUTA_MES.getFullYear(),RUTA_MES.getMonth()+d,1);
+  renderRuta();
+}
+function rutaSelDia(ds){
+  RUTA_DIA_SEL=ds;
+  renderRuta();
 }
 // ── QR MOBILE ──
 let _qrMobileGenerated=false;
