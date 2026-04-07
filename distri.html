@@ -422,7 +422,7 @@
     <img class="header-logo" src="https://alleata.com.ar/images/Alleata-logo.svg" alt="Alleata" onerror="this.style.display='none'"/>
     <div class="header-divider"></div>
     <div>
-      <div class="header-title">Portal Distribuidor <span style="font-size:10px;font-weight:600;background:rgba(255,255,255,.15);border-radius:6px;padding:2px 7px;margin-left:4px;letter-spacing:.3px">v1.3.7</span></div>
+      <div class="header-title">Portal Distribuidor <span style="font-size:10px;font-weight:600;background:rgba(255,255,255,.15);border-radius:6px;padding:2px 7px;margin-left:4px;letter-spacing:.3px">v1.3.9</span></div>
       <div class="header-sub" id="header-sub">Cargando...</div>
     </div>
     <div class="distri-badge" id="distri-badge">...</div>
@@ -664,7 +664,8 @@ async function init(){
   const [{data:desin},{data:envios}]=await Promise.all([
     sb.from('v_ordenes_con_sla')
       .select('sf_id,ot,comercio,cuenta,ciudad,provincia,cp,estado,operador_id,logistica,observaciones,contacto,horario,direccion_completa')
-      .not('estado','in','("Terminal recuperada","Extraviada")')
+      .neq('estado','Terminal recuperada')
+      .neq('estado','Extraviada')
       .limit(500),
     sb.from('envios')
       .select('sf_id,ot_numero,cuenta,ciudad,provincia,cp_dest,estado,responsable,notas')
@@ -735,6 +736,10 @@ async function init(){
     return null; // Sin coords → excluir
   }).filter(Boolean).sort((a,b)=>(a.Dist??9999)-(b.Dist??9999));
   console.log('✅ OTs dentro del radio:', allOts.length);
+  // Debug: mostrar OTs excluidas
+  const excluidas=ots.filter(e=>!allOts.find(a=>a.OT===e.OT));
+  console.log('❌ OTs excluidas:', excluidas.length);
+  excluidas.slice(0,10).forEach(e=>console.log('  excluida OT',e.OT,'CP:',JSON.stringify(e.CP),'Ciudad:',JSON.stringify(e.Ciudad)));
 
 
 
