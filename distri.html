@@ -422,7 +422,7 @@
     <img class="header-logo" src="https://alleata.com.ar/images/Alleata-logo.svg" alt="Alleata" onerror="this.style.display='none'"/>
     <div class="header-divider"></div>
     <div>
-      <div class="header-title">Portal Distribuidor <span style="font-size:10px;font-weight:600;background:rgba(255,255,255,.15);border-radius:6px;padding:2px 7px;margin-left:4px;letter-spacing:.3px">v1.3.5</span></div>
+      <div class="header-title">Portal Distribuidor <span style="font-size:10px;font-weight:600;background:rgba(255,255,255,.15);border-radius:6px;padding:2px 7px;margin-left:4px;letter-spacing:.3px">v1.3.6</span></div>
       <div class="header-sub" id="header-sub">Cargando...</div>
     </div>
     <div class="distri-badge" id="distri-badge">...</div>
@@ -715,32 +715,21 @@ async function init(){
     'almafuerte':[-32.1833,-64.2667],'tanti':[-31.3539,-64.5881],
   };
 
+
   const ots=[...desinNorm,...enviosNorm];
-  console.log('📦 Total OTs antes de filtro:', ots.length, '| desin:', desinNorm.length, '| envios:', enviosNorm.length);
-  console.log('📍 Distri coords:', d.lat, d.lon, '| radio:', d.radio);
-  // Muestra las primeras 5 para debug
-  ots.slice(0,5).forEach(e=>console.log('OT',e.OT,'CP:',e.CP,'Ciudad:',e.Ciudad));
-  
-  if(d.lat&&d.lon){
-    allOts=ots.map(e=>{
-      const c=CP_COORDS[parseInt(e.CP)];
-      if(c){
-        const dist=Math.round(hav(d.lat,d.lon,c[0],c[1])*10)/10;
-        return dist<=(d.radio||50)?{...e,Dist:dist}:null;
-      }
-      // Fallback: buscar por ciudad
-      const ciudadKey=(e.Ciudad||'').toLowerCase().trim();
-      const cc=CIUDAD_COORDS[ciudadKey];
-      if(cc){
-        const dist=Math.round(hav(d.lat,d.lon,cc[0],cc[1])*10)/10;
-        return dist<=(d.radio||50)?{...e,Dist:dist}:null;
-      }
-      // Sin coords conocidas → excluir (evita mostrar OTs fuera del radio)
-      return null;
-    }).filter(Boolean).sort((a,b)=>(a.Dist??999)-(b.Dist??999));
-  }else{
-    allOts=ots;
-  }
+  console.log('📦 Total OTs:', ots.length, '| desin:', desinNorm.length, '| envios:', enviosNorm.length);
+
+  // Sin filtro de radio — calculamos distancia solo para mostrarla en la card
+  allOts=ots.map(e=>{
+    const c=CP_COORDS[parseInt(e.CP)];
+    if(c&&d.lat&&d.lon) return{...e,Dist:Math.round(hav(d.lat,d.lon,c[0],c[1])*10)/10};
+    const ck=(e.Ciudad||'').toLowerCase().trim();
+    const cc=CIUDAD_COORDS[ck];
+    if(cc&&d.lat&&d.lon) return{...e,Dist:Math.round(hav(d.lat,d.lon,cc[0],cc[1])*10)/10};
+    return{...e,Dist:null};
+  }).sort((a,b)=>(a.Dist??9999)-(b.Dist??9999));
+
+
 
   // Cargar reportes desde Supabase
   const {data:reps}=await sb.from('distri_reportes').select('*').eq('distri_id',TOKEN);
