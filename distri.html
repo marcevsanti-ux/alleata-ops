@@ -422,7 +422,7 @@
     <img class="header-logo" src="https://alleata.com.ar/images/Alleata-logo.svg" alt="Alleata" onerror="this.style.display='none'"/>
     <div class="header-divider"></div>
     <div>
-      <div class="header-title">Portal Distribuidor <span style="font-size:10px;font-weight:600;background:rgba(255,255,255,.15);border-radius:6px;padding:2px 7px;margin-left:4px;letter-spacing:.3px">v1.3.6</span></div>
+      <div class="header-title">Portal Distribuidor <span style="font-size:10px;font-weight:600;background:rgba(255,255,255,.15);border-radius:6px;padding:2px 7px;margin-left:4px;letter-spacing:.3px">v1.3.7</span></div>
       <div class="header-sub" id="header-sub">Cargando...</div>
     </div>
     <div class="distri-badge" id="distri-badge">...</div>
@@ -716,18 +716,26 @@ async function init(){
   };
 
 
-  const ots=[...desinNorm,...enviosNorm];
-  console.log('📦 Total OTs:', ots.length, '| desin:', desinNorm.length, '| envios:', enviosNorm.length);
 
-  // Sin filtro de radio — calculamos distancia solo para mostrarla en la card
+  const ots=[...desinNorm,...enviosNorm];
+
+  // Filtrar por radio — igual lógica que el portal (distri_getOts)
   allOts=ots.map(e=>{
     const c=CP_COORDS[parseInt(e.CP)];
-    if(c&&d.lat&&d.lon) return{...e,Dist:Math.round(hav(d.lat,d.lon,c[0],c[1])*10)/10};
+    if(c&&d.lat&&d.lon){
+      const dist=Math.round(hav(d.lat,d.lon,c[0],c[1])*10)/10;
+      return dist<=(d.radio||50)?{...e,Dist:dist}:null;
+    }
     const ck=(e.Ciudad||'').toLowerCase().trim();
     const cc=CIUDAD_COORDS[ck];
-    if(cc&&d.lat&&d.lon) return{...e,Dist:Math.round(hav(d.lat,d.lon,cc[0],cc[1])*10)/10};
-    return{...e,Dist:null};
-  }).sort((a,b)=>(a.Dist??9999)-(b.Dist??9999));
+    if(cc&&d.lat&&d.lon){
+      const dist=Math.round(hav(d.lat,d.lon,cc[0],cc[1])*10)/10;
+      return dist<=(d.radio||50)?{...e,Dist:dist}:null;
+    }
+    return null; // Sin coords → excluir
+  }).filter(Boolean).sort((a,b)=>(a.Dist??9999)-(b.Dist??9999));
+  console.log('✅ OTs dentro del radio:', allOts.length);
+
 
 
 
