@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v2.3.10</title>
+<title>Alleata · Operaciones v2.3.11</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -288,7 +288,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.3.10 · 31 mar 2026
+      v2.3.11 · 31 mar 2026
     </div>
   </div>
 </div>
@@ -343,7 +343,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.3.10 · 31 mar 2026
+      v2.3.11 · 31 mar 2026
     </div>
   </div>
 </nav>
@@ -357,7 +357,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <div class="topbar-right" id="topbar-date"></div>
     <button onclick="refreshCurrentModule()" title="Actualizar" style="background:none;border:1px solid var(--border2);color:var(--text-muted);border-radius:7px;padding:4px 10px;cursor:pointer;font-size:13px;margin-left:10px;transition:all .2s" onmouseover="this.style.color='var(--teal)';this.style.borderColor='var(--teal)'" onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border2)'">↺</button>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.3.10</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.3.11</div>
   </div>
   <div class="content">
 
@@ -1047,7 +1047,7 @@ tr:hover td{background:var(--surface2);}
 </div>
 
 <script>
-console.log('[Alleata v2.3.10] OK');
+console.log('[Alleata v2.3.11] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -3105,6 +3105,15 @@ function distri_render(){
     ots.forEach(e=>{estadoCount[e.estado]=(estadoCount[e.estado]||0)+1;});
     const estadoPills=Object.entries(estadoCount).map(([s,n])=>`<span style="background:var(--surface2);border:1px solid var(--border2);border-radius:99px;padding:2px 8px;font-size:10px;font-weight:700;color:var(--text-muted);white-space:nowrap">${s.split(' ')[0]}: ${n}</span>`).join('');
     const link=`${location.origin}${location.pathname.replace(/\/[^/]*$/,'')}/distri.html?token=${d.id}`;
+    // Guardar cache de OTs para que el dash distri las lea directamente
+    const cacheData=ots.map(e=>({
+      OT:e.ot_numero||e.ot||'',sf_id:e.sf_id||'',
+      Comercio:e.cuenta||e.comercio||'',Cuenta:e.cuenta||'',
+      Ciudad:e.ciudad||'',Calle:e.direccion_completa||'',
+      Contacto:e.contacto||'',Horario:e.horario||'',
+      CP:e.cp_dest||e.cp||'',Estado:e.estado||'',Dist:e.distKm||null
+    }));
+    sb.from('distribuidores').update({ots_cache:cacheData,ots_cache_at:new Date().toISOString()}).eq('id',d.id).then(()=>{});
     return `<div style="background:var(--surface);border:1px solid var(--border2);border-radius:16px;padding:18px;display:flex;flex-direction:column;gap:12px">
       <div style="display:flex;gap:12px;align-items:flex-start">
         <div style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,var(--teal),#00BFA5);display:flex;align-items:center;justify-content:center;font-size:20px;color:#fff;font-weight:900;flex-shrink:0">${(d.nombre[0]||'?').toUpperCase()}</div>
