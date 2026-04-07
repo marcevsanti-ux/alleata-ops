@@ -422,7 +422,7 @@
     <img class="header-logo" src="https://alleata.com.ar/images/Alleata-logo.svg" alt="Alleata" onerror="this.style.display='none'"/>
     <div class="header-divider"></div>
     <div>
-      <div class="header-title">Portal Distribuidor <span style="font-size:10px;font-weight:600;background:rgba(255,255,255,.15);border-radius:6px;padding:2px 7px;margin-left:4px;letter-spacing:.3px">v1.3.4</span></div>
+      <div class="header-title">Portal Distribuidor <span style="font-size:10px;font-weight:600;background:rgba(255,255,255,.15);border-radius:6px;padding:2px 7px;margin-left:4px;letter-spacing:.3px">v1.3.5</span></div>
       <div class="header-sub" id="header-sub">Cargando...</div>
     </div>
     <div class="distri-badge" id="distri-badge">...</div>
@@ -664,10 +664,12 @@ async function init(){
   const [{data:desin},{data:envios}]=await Promise.all([
     sb.from('v_ordenes_con_sla')
       .select('sf_id,ot,comercio,cuenta,ciudad,provincia,cp,estado,operador_id,logistica,observaciones,contacto,horario,direccion_completa')
-      .not('estado','in','("Terminal recuperada","Extraviada")'),
+      .not('estado','in','("Terminal recuperada","Extraviada")')
+      .limit(500),
     sb.from('envios')
       .select('sf_id,ot_numero,cuenta,ciudad,provincia,cp_dest,estado,responsable,notas')
       .not('estado','in','("Entregado","Devuelto","Fallido","Perdido")')
+      .limit(500)
   ]);
 
   const enviosNorm=(envios||[]).map(e=>{
@@ -714,6 +716,10 @@ async function init(){
   };
 
   const ots=[...desinNorm,...enviosNorm];
+  console.log('📦 Total OTs antes de filtro:', ots.length, '| desin:', desinNorm.length, '| envios:', enviosNorm.length);
+  console.log('📍 Distri coords:', d.lat, d.lon, '| radio:', d.radio);
+  // Muestra las primeras 5 para debug
+  ots.slice(0,5).forEach(e=>console.log('OT',e.OT,'CP:',e.CP,'Ciudad:',e.Ciudad));
   
   if(d.lat&&d.lon){
     allOts=ots.map(e=>{
@@ -893,7 +899,10 @@ function renderCard(r){
   const fecha = getFecha(r.OT);
   const ec = estadoClass(est);
   const estBadge = est ? `<span style="background:${est==='Exitoso'?'#d1fae5':est==='Contactado'?'#dbeafe':'#fee2e2'};color:${est==='Exitoso'?'#059669':est==='Contactado'?'#1d4ed8':'#dc2626'};border-radius:99px;padding:2px 10px;font-size:11px;font-weight:700;margin-left:6px">${est}</span>${fecha?`<span style="display:inline-flex;align-items:center;gap:4px;font-size:10px;color:#94a3b8;margin-left:8px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:1px 7px">🕐 <b style='color:#475569'>Últ. modificación:</b> ${fecha}</span>`:''}` : '';
-  const mapsUrl = encodeURIComponent((r.Calle||'')+(r.Ciudad?', '+r.Ciudad:'')+', Argentina');
+  const mapsUrl = encodeURIComponent((r.Calle||r.Ciudad||r.Comercio||'')+', Argentina');
+  const mapsQuery = r.Calle
+    ? encodeURIComponent(r.Calle+(r.Ciudad?', '+r.Ciudad:'')+', Argentina')
+    : encodeURIComponent((r.Ciudad||r.Comercio||'')+', Argentina');
 
   return `
   <div class="ot-card ${ec}" id="card-${r.OT}">
@@ -908,20 +917,20 @@ function renderCard(r){
     <div class="ot-info">
       ${r.Ciudad?`<div class="ot-info-item"><div class="ot-info-lbl">CIUDAD</div><div class="ot-info-val">📍 ${r.Ciudad}</div></div>`:''}
       ${r.CP?`<div class="ot-info-item"><div class="ot-info-lbl">CP</div><div class="ot-info-val">${r.CP}</div></div>`:''}
-      ${r.Calle?`
+      ${(r.Calle||r.Ciudad)?`
       <div class="ot-info-item" style="grid-column:1/-1">
-        <div class="ot-info-lbl">DIRECCIÓN</div>
+        ${r.Calle?`<div class="ot-info-lbl">DIRECCIÓN</div>
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">
           <span class="ot-info-val">${r.Calle}${r.Ciudad?', '+r.Ciudad:''}</span>
-          <a href="https://www.google.com/maps/search/?api=1&query=${mapsUrl}" target="_blank" 
+          <a href="https://www.google.com/maps/search/?api=1&query=${mapsQuery}" target="_blank" 
              style="display:inline-flex;align-items:center;gap:4px;background:#4285F4;color:#fff;text-decoration:none;padding:4px 10px;border-radius:99px;font-size:11px;font-weight:700;white-space:nowrap">
             📍 Abrir Maps
           </a>
-        </div>
-        <a href="https://www.google.com/maps/search/?api=1&query=${mapsUrl}" target="_blank" style="display:block;text-decoration:none">
+        </div>`:''}
+        <a href="https://www.google.com/maps/search/?api=1&query=${mapsQuery}" target="_blank" style="display:block;text-decoration:none">
           <div style="border-radius:12px;overflow:hidden;height:140px;background:#e8f4f2;position:relative;border:2px solid #e2e8f0">
             <iframe 
-              src="https://maps.google.com/maps?q=${mapsUrl}&z=15&output=embed&hl=es"
+              src="https://maps.google.com/maps?q=${mapsQuery}&z=15&output=embed&hl=es"
               style="width:100%;height:100%;border:none;pointer-events:none"
               loading="lazy"
               referrerpolicy="no-referrer-when-downgrade">
