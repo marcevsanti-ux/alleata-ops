@@ -114,7 +114,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
 <div class="header" id="header" style="display:none">
   <div>
     <div class="h-logo">🚚 alleata</div>
-    <div style="font-size:9px;color:rgba(255,255,255,.3);margin-top:1px">v1.0.2</div>
+    <div style="font-size:9px;color:rgba(255,255,255,.3);margin-top:1px">v1.0.4</div>
   </div>
   <div class="h-name" id="h-name">—</div>
 </div>
@@ -182,7 +182,7 @@ const CP_COORDS={1005:[-34.6037,-58.3816],1171:[-34.6037,-58.3816],1172:[-34.603
 
 function hav(a,b,c,d){const R=6371,r=x=>x*Math.PI/180,dL=r(c-a),dl=r(d-b),q=Math.sin(dL/2)**2+Math.cos(r(a))*Math.cos(r(c))*Math.sin(dl/2)**2;return R*2*Math.atan2(Math.sqrt(q),Math.sqrt(1-q));}
 
-let D=null,OTS=[],REP={},MID=null,MEST=null,FIL='Todas',TAB='ots';
+let D=null,OTS=[],REP={},MID=null,MEST=null,FIL='hoy',TAB='ots';
 
 function toast(m,ok=true){
   const t=document.getElementById('toast');
@@ -242,10 +242,17 @@ function err(m){
 }
 
 function stats(){
-  document.getElementById('s-total').textContent=OTS.length;
-  document.getElementById('s-pend').textContent=OTS.filter(e=>!REP[e.sf_id]||REP[e.sf_id].estado==='Pendiente').length;
-  document.getElementById('s-cont').textContent=OTS.filter(e=>['Contactado','Confirmado retiro'].includes(REP[e.sf_id]?.estado)).length;
-  document.getElementById('s-exit').textContent=OTS.filter(e=>['Exitoso','Rollout'].includes(REP[e.sf_id]?.estado)).length;
+  const today=new Date().toISOString().slice(0,10);
+  const deHoy=OTS.filter(e=>{
+    const rep=REP[e.sf_id]||REP[e.ot];
+    return rep?.estado==='Confirmado retiro'&&rep?.fecha_retiro===today;
+  });
+  const exitosos=OTS.filter(e=>['Exitoso','Rollout'].includes(REP[e.sf_id]?.estado||REP[e.ot]?.estado||''));
+  const contactados=OTS.filter(e=>['Contactado','Confirmado retiro'].includes(REP[e.sf_id]?.estado||REP[e.ot]?.estado||''));
+  document.getElementById('s-total').textContent=deHoy.length;
+  document.getElementById('s-pend').textContent=deHoy.filter(e=>!['Exitoso','Rollout'].includes(REP[e.sf_id]?.estado||REP[e.ot]?.estado||'')).length;
+  document.getElementById('s-cont').textContent=contactados.length;
+  document.getElementById('s-exit').textContent=exitosos.length;
 }
 
 function switchTab(t){
@@ -273,17 +280,35 @@ function cardClass(e){return{'Exitoso':'c-ok','Rollout':'c-ok','Contactado':'c-c
 
 // ── RENDER OTs ──
 function renderOts(){
-  const cnt={};
-  OTS.forEach(e=>{const s=REP[e.sf_id]?.estado||'Pendiente';cnt[s]=(cnt[s]||0)+1;});
-  const estados=['Todas','Pendiente','Contactado','No encontrado','Confirmado retiro','Exitoso','Rollout'];
-  const filtros=estados.filter(s=>s==='Todas'||cnt[s]>0);
+  const today=new Date().toISOString().slice(0,10);
+  
+  // Filtros disponibles
+  const confirmadas=OTS.filter(e=>{
+    const rep=REP[e.sf_id]||REP[e.ot];
+    return rep?.estado==='Confirmado retiro';
+  });
+  const deHoy=confirmadas.filter(e=>{
+    const rep=REP[e.sf_id]||REP[e.ot];
+    return rep?.fecha_retiro===today;
+  });
 
-  const list=FIL==='Todas'?OTS:OTS.filter(e=>(REP[e.sf_id]?.estado||'Pendiente')===FIL);
+  const list=FIL==='hoy'?deHoy:FIL==='confirmadas'?confirmadas:OTS;
 
-  let html=`<div class="filter-bar">${filtros.map(s=>`<div class="fc ${FIL===s?'active':''}" onclick="setF('${s}')">${s} (${s==='Todas'?OTS.length:cnt[s]||0})</div>`).join('')}</div>`;
+  const todayLabel=new Date().toLocaleDateString('es-AR',{weekday:'long',day:'2-digit',month:'long'});
+
+  let html=`<div class="filter-bar">
+    <div class="fc ${FIL==='hoy'?'active':''}" onclick="setF('hoy')" style="${FIL!=='hoy'?'border-color:#1dbf8e;color:#1dbf8e':''}">🗓️ Hoja de Ruta hoy (${deHoy.length})</div>
+    <div class="fc ${FIL==='confirmadas'?'active':''}" onclick="setF('confirmadas')" style="${FIL!=='confirmadas'?'border-color:#f59e0b;color:#f59e0b':''}">📦 Confirmadas (${confirmadas.length})</div>
+    <div class="fc ${FIL==='todas'?'active':''}" onclick="setF('todas')">Todas (${OTS.length})</div>
+  </div>`;
+
+  if(FIL==='hoy'){
+    html+=`<div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:10px">📅 ${todayLabel}</div>`;
+  }
 
   if(!list.length){
-    html+='<div class="empty"><div class="empty-icon">📦</div><div style="font-weight:700">Sin OTs</div></div>';
+    const msg=FIL==='hoy'?'Sin retiros para hoy':FIL==='confirmadas'?'Sin retiros confirmados':'Sin OTs';
+    html+=`<div class="empty"><div class="empty-icon">${FIL==='hoy'?'✅':'📦'}</div><div style="font-weight:700">${msg}</div></div>`;
   } else {
     html+=list.map(e=>{
       const rep=REP[e.sf_id],est=rep?.estado||'Pendiente';
