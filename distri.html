@@ -422,7 +422,7 @@
     <img class="header-logo" src="https://alleata.com.ar/images/Alleata-logo.svg" alt="Alleata" onerror="this.style.display='none'"/>
     <div class="header-divider"></div>
     <div>
-      <div class="header-title">Portal Distribuidor <span style="font-size:10px;font-weight:600;background:rgba(255,255,255,.15);border-radius:6px;padding:2px 7px;margin-left:4px;letter-spacing:.3px">v1.4.5</span></div>
+      <div class="header-title">Portal Distribuidor <span style="font-size:10px;font-weight:600;background:rgba(255,255,255,.15);border-radius:6px;padding:2px 7px;margin-left:4px;letter-spacing:.3px">v1.4.6</span></div>
       <div class="header-sub" id="header-sub">Cargando...</div>
     </div>
     <div class="distri-badge" id="distri-badge">...</div>
@@ -1018,12 +1018,17 @@ async function saveModal(){
   const fechaMod=new Date().toLocaleString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
   estados[String(modalOt)]={estado:modalEstado,obs:motivo||obs,fecha:fechaMod};
 
+  // Capturar valores ANTES de closeModal (que resetea las variables)
+  const sfIdGuardar=String(modalOt);
+  const estadoGuardar=modalEstado;
+  const obsGuardar=motivo||obs;
+  const fechaRetiroGuardar=fechaRetiro;
+
   const fotoParaSubir=fotoBase64;
   closeModal();
   
-  const sfId=String(modalOt)||allOts.find(o=>String(o.OT)===String(modalOt))?.sf_id;
-  if(!sfId){toast('❌ No se pudo identificar la OT');return;}
-  const ok=await saveEstado(sfId,modalEstado,motivo||obs,null,fechaRetiro);
+  if(!sfIdGuardar||sfIdGuardar==='null'){toast('❌ Error: OT sin identificar');return;}
+  const ok=await saveEstado(sfIdGuardar,estadoGuardar,obsGuardar,null,fechaRetiroGuardar);
   if(ok)toast('✅ Estado guardado');
   
   renderAll();
