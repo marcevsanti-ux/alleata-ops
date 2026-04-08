@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v2.3.14</title>
+<title>Alleata · Operaciones v2.3.15</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -288,7 +288,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.3.14 · 31 mar 2026
+      v2.3.15 · 08 abr 2026
     </div>
   </div>
 </div>
@@ -343,7 +343,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.3.14 · 31 mar 2026
+      v2.3.15 · 08 abr 2026
     </div>
   </div>
 </nav>
@@ -357,7 +357,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <div class="topbar-right" id="topbar-date"></div>
     <button onclick="refreshCurrentModule()" title="Actualizar" style="background:none;border:1px solid var(--border2);color:var(--text-muted);border-radius:7px;padding:4px 10px;cursor:pointer;font-size:13px;margin-left:10px;transition:all .2s" onmouseover="this.style.color='var(--teal)';this.style.borderColor='var(--teal)'" onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border2)'">↺</button>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.3.14</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.3.15</div>
   </div>
   <div class="content">
 
@@ -1046,7 +1046,7 @@ tr:hover td{background:var(--surface2);}
 </div>
 
 <script>
-console.log('[Alleata v2.3.14] OK');
+console.log('[Alleata v2.3.15] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -2219,46 +2219,173 @@ function setCanalEnvios(canal){
 // ── TRACKING CORREO ARGENTINO ──
 const ALLY_URL='https://alleata-agent-production.up.railway.app';
 
+// ── CORREO ARGENTINO — TRACKING VIA SUPABASE EDGE FUNCTION ──
+const CA_PROXY_URL = "https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/ca-proxy";
+
+const CA_EVENTOS_MAP = {
+  "PREIMPOSICION":    "Pre-imposición registrada",
+  "EN_CAMINO":        "En camino",
+  "EN_DISTRIBUCION":  "En distribución",
+  "ENTREGADO":        "Entregado ✅",
+  "DEVUELTO":         "Devuelto al remitente",
+  "EN_SUCURSAL":      "En sucursal",
+  "CADUCA":           "Envío caduco",
+  "PROCESAMIENTO":    "En centro de procesamiento",
+  "RETENIDO":         "Retenido",
+};
+
+function caEventoLabel(event){
+  return CA_EVENTOS_MAP[(event||'').toUpperCase()] || event || '—';
+}
+
 async function consultarTracking(id, trackNum){
+  if(!trackNum){ showTrackingToast('⚠️ Sin número de tracking','yellow'); return; }
   const btn=document.getElementById(`track-btn-${id}`);
   if(btn){ btn.textContent='⏳'; btn.disabled=true; }
 
+  // Mostrar modal con spinner mientras carga
+  mostrarModalTrackingCA(trackNum, null, 'loading');
+
   try {
-    // Llama al proxy en Railway → Railway llama a CA API con certificado
-    const res = await fetch(`${ALLY_URL}/correo-tracking?numero=${encodeURIComponent(trackNum)}`, {
-      headers:{ 'Content-Type':'application/json' }
+    const { data:{ session } } = await sb.auth.getSession();
+    const res = await fetch(CA_PROXY_URL, {
+      method: 'POST',
+      headers:{
+        'Content-Type':'application/json',
+        'Authorization':`Bearer ${session?.access_token}`
+      },
+      body: JSON.stringify({ action:'tracking', shippingId: trackNum })
     });
 
-    if(!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
+    const json = await res.json();
 
-    // Mapear respuesta de CA a nuestros estados
-    const estadoCA = data.estado || data.status || data.descripcion || '';
-    const eventoCA = data.ultimo_evento || data.evento || data.descripcion || estadoCA;
-    const fechaCA  = data.fecha || data.fecha_evento || new Date().toISOString().slice(0,10);
+    // Error de la Edge Function
+    if(json.error){ mostrarModalTrackingCA(trackNum, null, 'error', json.error); return; }
 
-    const estadoMapeado = mapearEstadoCA(estadoCA);
+    const caData = json.data;
 
-    // Actualizar en Supabase
-    await sb.from('envios').update({
-      estado: estadoMapeado,
-      ultimo_evento: eventoCA,
-      ultimo_evento_fecha: fechaCA.slice(0,10)
-    }).eq('id', id);
-
-    loadBadges(); renderEnvios();
-    showTrackingToast(`✅ ${trackNum}: ${estadoMapeado} — ${eventoCA}`,'teal');
-
-  } catch(err) {
-    // Si Railway aún no tiene el endpoint o CA no responde, mostramos info
-    console.warn('Tracking error:', err.message);
-    if(err.message.includes('404') || err.message.includes('Failed to fetch')){
-      showTrackingToast(`⚠️ Proxy de CA aún no configurado en Railway. Endpoint: /correo-tracking`,'yellow');
-    } else {
-      showTrackingToast(`❌ Error consultando tracking: ${err.message}`,'red');
+    // CA devuelve error embebido en 200
+    if(caData?.error || caData?.code === '0'){
+      mostrarModalTrackingCA(trackNum, null, 'error', caData.error || 'No existe el cliente o pedido');
+      return;
     }
+
+    // Puede venir como array o como objeto
+    const resultado = Array.isArray(caData) ? caData[0] : caData;
+    mostrarModalTrackingCA(trackNum, resultado, 'ok');
+
+    // Si hay eventos, actualizar estado en Supabase automáticamente
+    const eventos = resultado?.events || [];
+    if(eventos.length > 0){
+      const ultimo = eventos[0];
+      const estadoMapeado = mapearEstadoCA(ultimo.event);
+      if(estadoMapeado){
+        await sb.from('envios').update({
+          estado: estadoMapeado,
+          ultimo_evento: caEventoLabel(ultimo.event),
+          ultimo_evento_fecha: (ultimo.date||'').slice(0,10)
+        }).eq('id', id);
+        loadBadges(); renderEnvios();
+      }
+    }
+
+  } catch(err){
+    console.error('Tracking CA error:', err);
+    mostrarModalTrackingCA(trackNum, null, 'error', err.message);
+  } finally {
     if(btn){ btn.textContent='🔍'; btn.disabled=false; }
   }
+}
+
+function mostrarModalTrackingCA(trackNum, caData, estado, errorMsg=''){
+  document.getElementById('modal-tracking-ca')?.remove();
+
+  let contenido='';
+  if(estado==='loading'){
+    contenido=`
+      <div style="text-align:center;padding:40px 20px;">
+        <div style="margin:0 auto 16px;width:36px;height:36px;border:3px solid rgba(255,255,255,.1);border-top-color:var(--teal);border-radius:50%;animation:spin 0.8s linear infinite;"></div>
+        <p style="color:var(--text-secondary);margin:0;">Consultando Correo Argentino...</p>
+      </div>`;
+  } else if(estado==='error'){
+    contenido=`
+      <div style="text-align:center;padding:32px 20px;">
+        <div style="font-size:40px;margin-bottom:12px;">⚠️</div>
+        <p style="color:#f87171;margin:0 0 8px;font-weight:600;">No se pudo obtener el tracking</p>
+        <p style="color:var(--text-secondary);font-size:13px;margin:0;">${errorMsg||'Verificá el número de seguimiento'}</p>
+      </div>`;
+  } else {
+    const eventos = caData?.events || [];
+    const ultimoEvento = eventos[0];
+    const esEntregado = (ultimoEvento?.event||'').toUpperCase().includes('ENTREGADO');
+
+    const estadoBadge = ultimoEvento
+      ? `<span style="background:${esEntregado?'rgba(29,191,142,.15)':'rgba(26,159,212,.12)'};color:${esEntregado?'var(--teal)':'var(--blue)'};padding:4px 12px;border-radius:20px;font-size:13px;font-weight:600;">${caEventoLabel(ultimoEvento.event)}</span>`
+      : `<span style="background:rgba(255,255,255,.08);color:var(--text-secondary);padding:4px 12px;border-radius:20px;font-size:13px;">Sin eventos</span>`;
+
+    const filas = eventos.length > 0
+      ? eventos.map(ev=>`
+          <tr style="border-bottom:1px solid rgba(255,255,255,.04);">
+            <td style="padding:10px 12px;color:var(--text-secondary);font-size:12px;white-space:nowrap;font-family:'JetBrains Mono',monospace;">${ev.date||'—'}</td>
+            <td style="padding:10px 12px;font-weight:500;font-size:13px;">${caEventoLabel(ev.event)}</td>
+            <td style="padding:10px 12px;color:var(--text-secondary);font-size:12px;">${ev.branch||'—'}</td>
+            <td style="padding:10px 12px;color:var(--text-secondary);font-size:12px;">${ev.status||''}</td>
+          </tr>`).join('')
+      : `<tr><td colspan="4" style="text-align:center;padding:24px;color:var(--text-secondary);font-size:13px;">Sin movimientos registrados aún</td></tr>`;
+
+    contenido=`
+      <div style="margin-bottom:20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+        <div>
+          <p style="margin:0 0 2px;font-size:11px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;">N° de seguimiento</p>
+          <p style="margin:0;font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:600;">${caData?.trackingNumber||trackNum}</p>
+        </div>
+        <div style="margin-left:auto;">${estadoBadge}</div>
+      </div>
+      <div style="background:var(--navy-900);border-radius:10px;overflow:hidden;">
+        <table style="width:100%;border-collapse:collapse;">
+          <thead>
+            <tr style="border-bottom:1px solid rgba(255,255,255,.06);">
+              <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;">Fecha</th>
+              <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;">Estado</th>
+              <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;">Sucursal</th>
+              <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;">Detalle</th>
+            </tr>
+          </thead>
+          <tbody>${filas}</tbody>
+        </table>
+      </div>
+      <p style="margin:12px 0 0;font-size:11px;color:var(--text-secondary);text-align:right;">
+        Fuente: API MiCorreo CA · ${new Date().toLocaleString('es-AR')}
+      </p>`;
+  }
+
+  const modal=document.createElement('div');
+  modal.id='modal-tracking-ca';
+  modal.style.cssText='position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.65);backdrop-filter:blur(4px);animation:fadeIn .15s ease;';
+  modal.innerHTML=`
+    <div style="background:var(--navy-800);border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:24px;width:92%;max-width:680px;max-height:85vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.5);animation:slideUp .2s ease;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+        <h3 style="margin:0;font-size:17px;font-weight:700;">🚚 Seguimiento Correo Argentino</h3>
+        <button onclick="document.getElementById('modal-tracking-ca').remove()" style="background:rgba(255,255,255,.06);border:none;color:var(--text-primary);width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;">×</button>
+      </div>
+      ${contenido}
+    </div>`;
+  modal.addEventListener('click', e=>{ if(e.target===modal) modal.remove(); });
+  document.body.appendChild(modal);
+}
+
+async function pingCAProxy(){
+  try{
+    const { data:{ session } } = await sb.auth.getSession();
+    const res = await fetch(CA_PROXY_URL,{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':`Bearer ${session?.access_token}`},
+      body: JSON.stringify({ action:'ping' })
+    });
+    const json = await res.json();
+    console.log('CA Proxy ping:', json);
+    return json;
+  } catch(err){ console.error('CA Proxy ping failed:', err); }
 }
 
 function mapearEstadoCA(estadoRaw){
