@@ -152,7 +152,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
       <div class="login-logo">
         <img id="loginLogo" src="" alt="Alleata">
         <div class="login-sub">Portal de Operaciones</div>
-        <div class="login-version">v2.7.5 · mobile</div>
+        <div class="login-version">v2.7.6 · mobile</div>
       </div>
       <div class="field"><label class="label">Email</label><input class="input" id="lEmail" type="email" placeholder="usuario@alleata.com" autocomplete="email"></div>
       <div class="field"><label class="label">Contraseña</label><input class="input" id="lPass" type="password" placeholder="••••••••" autocomplete="current-password"></div>
@@ -168,7 +168,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
   <div class="topbar">
     <img id="appLogo" src="" alt="Alleata">
     <div class="topbar-title" id="topbarTitle">Operaciones</div>
-    <div class="topbar-version">v2.7.5</div>
+    <div class="topbar-version">v2.7.6</div>
     <div class="topbar-avatar" id="topbarAvatar" onclick="openDrawer()">?</div>
   </div>
 
@@ -689,7 +689,7 @@ async function loadEnTransito(){
   el.innerHTML='<div class="empty"><div class="empty-icon">⏳</div><p>Cargando...</p></div>';
   const{data:ots}=await sb.from('envios').select('*')
     .eq('logistica','ALLEATA')
-    .in('estado',['En Tránsito','En tránsito'])
+    .in('estado',['En Tránsito','En tránsito','Despachado'])
     .order('ultimo_evento_fecha',{ascending:true});
   const list=ots||[];
   count.textContent=list.length;
@@ -734,7 +734,7 @@ async function mostrarOTScaneada(sfId){
     showScanFeedback('OT no encontrada: '+sfId,'error');
     return;
   }
-  if(['En Tránsito','En tránsito','Entregado'].includes(ot.estado)){
+  if(['En Tránsito','En tránsito','Despachado','Entregado'].includes(ot.estado)){
     showScanFeedback('OT '+ot.ot_numero+' ya está en '+ot.estado,'warn');
     return;
   }
@@ -773,8 +773,8 @@ async function aceptarOT(){
   const btn=document.querySelector('#otScaneadaCard button');
   btn.disabled=true;btn.textContent='⏳ Aceptando...';
   const{error}=await sb.from('envios').update({
-    estado:'En tránsito',
-    ultimo_evento:'Aceptado por logística Alleata',
+    estado:'Despachado',
+    ultimo_evento:'Despachado por logística Alleata',
     ultimo_evento_fecha:new Date().toISOString().slice(0,10)
   }).eq('id',otScaneadaActual.id);
   if(error){btn.disabled=false;btn.textContent='✅ Aceptar OT';alert('Error: '+error.message);return;}
@@ -786,7 +786,7 @@ async function aceptarOT(){
   const otParaNotif={...otScaneadaActual};
   cancelarOTScaneada();
   await loadEnTransito();
-  showScanFeedback('✅ OT '+otParaNotif.ot_numero+' aceptada — en tránsito','ok');
+  showScanFeedback('✅ OT '+otParaNotif.ot_numero+' despachada — Logística Alleata','ok');
   await notificarAlly(otParaNotif, 'en_transito');
   otScaneadaActual=null;
 }
