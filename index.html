@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v2.3.16</title>
+<title>Alleata · Operaciones v2.3.17</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -288,7 +288,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.3.16 · 08 abr 2026
+      v2.3.17 · 10 abr 2026
     </div>
   </div>
 </div>
@@ -313,6 +313,10 @@ tr:hover td{background:var(--surface2);}
     <div class="nav-item" data-mod="envios" id="nav-envios" onclick="goTo('envios')">
       <div class="active-bar"></div><span class="nav-icon-wrap">🚚</span> Envíos
       <span class="nav-badge" id="nb-envios">0</span>
+    </div>
+    <div class="nav-item" data-mod="rollout" id="nav-rollout" onclick="goTo('rollout')">
+      <div class="active-bar"></div><span class="nav-icon-wrap">🔄</span> Rollout
+      <span class="nav-badge" id="nb-rollout">0</span>
     </div>
     <div class="nav-item" data-mod="desinstalaciones" id="nav-desinstalaciones" onclick="goTo('desinstalaciones')">
       <div class="active-bar"></div><span class="nav-icon-wrap">📦</span> Desinstalaciones
@@ -343,7 +347,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.3.16 · 08 abr 2026
+      v2.3.17 · 10 abr 2026
     </div>
   </div>
 </nav>
@@ -357,7 +361,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <div class="topbar-right" id="topbar-date"></div>
     <button onclick="refreshCurrentModule()" title="Actualizar" style="background:none;border:1px solid var(--border2);color:var(--text-muted);border-radius:7px;padding:4px 10px;cursor:pointer;font-size:13px;margin-left:10px;transition:all .2s" onmouseover="this.style.color='var(--teal)';this.style.borderColor='var(--teal)'" onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border2)'">↺</button>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.3.16</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.3.17</div>
   </div>
   <div class="content">
 
@@ -748,6 +752,62 @@ tr:hover td{background:var(--surface2);}
 <!-- ═══════════════════════════════════════════════════════════
      MÓDULO DESINSTALACIONES
 ═══════════════════════════════════════════════════════════ -->
+
+<!-- ══ MÓDULO ROLLOUT ══════════════════════════════════════════════════════════════ -->
+<div class="module" id="mod-rollout">
+  <div class="stats-row" style="margin-bottom:16px">
+    <div class="stat-box" onclick="rlFiltrarEstado('')" style="cursor:pointer">
+      <div class="stat-num" id="rl-num-total" style="color:var(--teal)">—</div>
+      <div class="stat-label">TOTAL</div>
+    </div>
+    <div class="stat-box" onclick="rlFiltrarEstado('Pre-Colecta')" style="cursor:pointer;border-left:3px solid #6b7280">
+      <div class="stat-num" id="rl-num-precolecta" style="color:#6b7280">—</div>
+      <div class="stat-label">PRE-COLECTA</div>
+    </div>
+    <div class="stat-box" onclick="rlFiltrarEstado('Despachado')" style="cursor:pointer;border-left:3px solid #8b5cf6">
+      <div class="stat-num" id="rl-num-despachado" style="color:#8b5cf6">—</div>
+      <div class="stat-label">DESPACHADOS</div>
+    </div>
+    <div class="stat-box" onclick="rlFiltrarEstado('En tránsito')" style="cursor:pointer;border-left:3px solid #f59e0b">
+      <div class="stat-num" id="rl-num-transito" style="color:#f59e0b">—</div>
+      <div class="stat-label">EN TRÁNSITO</div>
+    </div>
+    <div class="stat-box s-green" onclick="rlFiltrarEstado('Entregado')" style="cursor:pointer">
+      <div class="stat-num" id="rl-num-entregado" style="color:var(--teal)">—</div>
+      <div class="stat-label">ENTREGADOS</div>
+    </div>
+    <div class="stat-box s-red" onclick="rlFiltrarEstado('Fallido')" style="cursor:pointer">
+      <div class="stat-num" id="rl-num-fallido">—</div>
+      <div class="stat-label">PROBLEMA</div>
+    </div>
+  </div>
+  <div class="card">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px">
+      <input class="input" id="rl-buscar" placeholder="🔍 OT, cuenta, ciudad..." style="width:200px;font-size:12px;padding:6px 10px" oninput="rlRenderTabla()">
+      <select class="select" id="rl-f-resp" onchange="rlRenderTabla()" style="font-size:12px;padding:6px 8px">
+        <option value="">Todos los responsables</option>
+      </select>
+      <select class="select" id="rl-f-estado" onchange="rlFiltrarEstado(this.value)" style="font-size:12px;padding:6px 8px">
+        <option value="">Todos los estados</option>
+        <option>Pre-Colecta</option><option>Despachado</option><option>En tránsito</option>
+        <option>En camino</option><option>Entregado</option><option>Retirar Terminal</option>
+        <option>Fallido</option><option>Devuelto</option>
+      </select>
+    </div>
+    <div class="table-wrap">
+      <table class="table">
+        <thead><tr>
+          <th>OT / Cuenta</th><th>Responsable</th><th>Destino</th>
+          <th>Tracking</th><th>Estado</th><th>Retorno</th><th>Obs.</th><th></th>
+        </tr></thead>
+        <tbody id="rl-tbody">
+          <tr><td colspan="8" style="text-align:center;padding:30px;color:var(--text-muted)">Cargando...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
 <div class="module" id="mod-desinstalaciones">
   <div class="stats-row" style="margin-bottom:16px">
     <div class="stat-box" onclick="dsFiltroPorEstado('')" style="cursor:pointer">
@@ -1046,7 +1106,7 @@ tr:hover td{background:var(--surface2);}
 </div>
 
 <script>
-console.log('[Alleata v2.3.16] OK');
+console.log('[Alleata v2.3.17] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -1237,6 +1297,7 @@ function buildDashCards(modulos,isAdmin){
   const all=[
     {mod:'sims',icon:'📡',title:'SIMs',desc:'Verificá chips contra base CLARO',stat:'6.878 SIMs'},
     {mod:'envios',icon:'🚚',title:'Envíos',desc:'Logística directa',stat:'cargando...'},
+    {mod:'rollout',icon:'🔄',title:'Rollout',desc:'Cambio tecnológico',stat:'cargando...'},
     {mod:'desinstalaciones',icon:'📦',title:'Desinstalaciones',desc:'Logística inversa',stat:'cargando...'},
     {mod:'horas',icon:'⏱',title:'Horas',desc:'Registro diario',stat:'cargando...'},
   ];
@@ -1255,7 +1316,7 @@ function buildDashCards(modulos,isAdmin){
   loadOpsPanel(isAdmin);
 }
 
-const MOD_INFO={home:'Dashboard',sims:'Verificador SIMs',envios:'Envíos',desinstalaciones:'Desinstalaciones',horas:'Control de Horas',ajustes:'Ajustes',ally:'Configuración Ally',distri:'Distribuidores'};
+const MOD_INFO={home:'Dashboard',sims:'Verificador SIMs',envios:'Envíos',rollout:'Rollout',desinstalaciones:'Desinstalaciones',horas:'Control de Horas',ajustes:'Ajustes',ally:'Configuración Ally',distri:'Distribuidores'};
 
 function goTo(mod){
   const el=document.getElementById('nav-'+mod);
@@ -1273,6 +1334,7 @@ function goTo(mod){
   document.getElementById('topbar-title').textContent=MOD_INFO[mod]||mod;
   if(mod==='envios'){initEnvios();renderEnvios();}
   if(mod==='home'){setTimeout(()=>{if(window._drawQR)window._drawQR();},200);loadOpsPanel(currentProfile?.rol==='admin');}
+  if(mod==='rollout')initRollout();
   if(mod==='desinstalaciones'&&!DesinModule.cargado)cargarDesinstalaciones();
   if(mod==='ally')cargarAlly();
   if(mod==='distri')cargarDistri();
@@ -1301,6 +1363,101 @@ function updateDate(){
 }
 setInterval(updateDate,60000);updateDate();
 
+
+// ══════════════════════════════════════════════════════════════
+// MÓDULO ROLLOUT
+// ══════════════════════════════════════════════════════════════
+let _rlData=[];
+let _rlEstadoFiltro='';
+
+async function initRollout(){
+  const{data,error}=await sb.from('envios').select('*').ilike('tipo','%rollout%').order('created_at',{ascending:false});
+  if(error){console.error('Rollout load error:',error);return;}
+  _rlData=data||[];
+  rlActualizarKPIs();
+  rlPopularFiltroResp();
+  rlRenderTabla();
+}
+
+function rlActualizarKPIs(){
+  const total=_rlData.length;
+  const precolecta=_rlData.filter(e=>e.estado==='Pre-Colecta').length;
+  const despachado=_rlData.filter(e=>e.estado==='Despachado').length;
+  const transito=_rlData.filter(e=>['En tránsito','En camino','En espera en sucursal'].includes(e.estado)).length;
+  const entregado=_rlData.filter(e=>e.estado==='Entregado').length;
+  const fallido=_rlData.filter(e=>['Fallido','Perdido','Devuelto'].includes(e.estado)).length;
+  const set=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v;};
+  set('rl-num-total',total);set('rl-num-precolecta',precolecta);set('rl-num-despachado',despachado);
+  set('rl-num-transito',transito);set('rl-num-entregado',entregado);set('rl-num-fallido',fallido);
+  const nbRo=document.getElementById('nb-rollout');if(nbRo)nbRo.textContent=total;
+}
+
+function rlPopularFiltroResp(){
+  const sel=document.getElementById('rl-f-resp');
+  if(!sel)return;
+  const resps=[...new Set(_rlData.map(e=>e.responsable).filter(Boolean))].sort();
+  sel.innerHTML='<option value="">Todos los responsables</option>'+resps.map(r=>`<option>${r}</option>`).join('');
+}
+
+function rlFiltrarEstado(estado){
+  _rlEstadoFiltro=estado;
+  const sel=document.getElementById('rl-f-estado');
+  if(sel)sel.value=estado;
+  rlRenderTabla();
+}
+
+function rlRenderTabla(){
+  const buscar=(document.getElementById('rl-buscar')?.value||'').toLowerCase();
+  const resp=document.getElementById('rl-f-resp')?.value||'';
+  const tbody=document.getElementById('rl-tbody');
+  if(!tbody)return;
+  let list=_rlData.filter(e=>{
+    if(_rlEstadoFiltro&&e.estado!==_rlEstadoFiltro)return false;
+    if(resp&&e.responsable!==resp)return false;
+    if(buscar){const hay=[e.ot_numero,e.cuenta,e.ciudad,e.provincia,e.track].join(' ').toLowerCase();if(!hay.includes(buscar))return false;}
+    return true;
+  });
+  if(!list.length){tbody.innerHTML='<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--text-muted)">Sin resultados</td></tr>';return;}
+  const estados=['Pre-Colecta','Despachado','En tránsito','En camino','En espera en sucursal','Entregado','Retirar Terminal','Fallido','Perdido','Devuelto'];
+  tbody.innerHTML=list.map(e=>{
+    const tieneRetorno=esOTConRetorno(e.tipo);
+    return`<tr>
+      <td><div style="font-size:12px;font-weight:700;color:var(--teal)">${e.ot_numero||'—'}</div>
+          <div style="font-size:11px;color:var(--text-muted)">${e.tipo||''}</div>
+          <div style="font-size:11px;color:var(--text-secondary)">${e.cuenta||''}</div></td>
+      <td style="font-size:12px">${e.responsable||'—'}</td>
+      <td><div style="font-size:12px">${e.ciudad||'—'}</div>
+          <div style="font-size:11px;color:var(--text-muted)">${e.provincia||''}</div></td>
+      <td>${e.track?`<div style="font-size:10px;font-family:'JetBrains Mono',monospace">${e.track}</div>
+          <button id="rl-track-btn-${e.id}" style="background:var(--surface2);border:1px solid var(--border2);color:var(--blue);font-size:10px;padding:2px 6px;border-radius:5px;cursor:pointer;margin-top:3px" onclick="consultarTracking('${e.id}','${e.track}')">🔍</button>`:'—'}</td>
+      <td><select class="select" style="font-size:11px;padding:3px 6px" onchange="rlCambiarEstado('${e.id}',this.value,'${(e.estado||'').replace(/'/g,"\'")}')">
+          ${estados.map(s=>`<option ${e.estado===s?'selected':''}>${s}</option>`).join('')}</select>
+          <div style="font-size:10px;color:var(--text-muted);margin-top:2px">${e.ultimo_evento_fecha||''}</div></td>
+      <td>${tieneRetorno?`<div style="font-size:10px;color:var(--text-muted)">${e.track_devolucion||'Sin tracking'}</div>
+          <select class="select" style="font-size:10px;padding:2px 5px;margin-top:3px" onchange="updateEstadoDevolucion('${e.id}',this.value)">
+          ${['Pendiente rótulo','Rótulo generado','En camino retorno','Recibido ✅'].map(s=>`<option ${(e.estado_devolucion||'Pendiente rótulo')===s?'selected':''}>${s}</option>`).join('')}</select>`:'—'}</td>
+      <td style="max-width:150px;font-size:11px;color:var(--text-muted)">
+          ${e.notas||''}
+          ${e.ultimo_evento&&e.ultimo_evento!=='Importado desde SF'?`<div style="font-size:10px;color:var(--teal);margin-top:2px">${e.ultimo_evento}</div>`:''}
+          ${e.foto_evidencia?`<a href="${e.foto_evidencia}" target="_blank"><img src="${e.foto_evidencia}" style="width:50px;height:38px;object-fit:cover;border-radius:5px;border:1px solid var(--border2);margin-top:4px" title="Ver evidencia"></a>`:''}</td>
+      <td><div style="display:flex;gap:4px;flex-wrap:wrap">
+          <button title="Imprimir rótulo" style="background:var(--surface2);border:1px solid var(--border2);color:var(--teal);font-size:11px;padding:3px 6px;border-radius:5px;cursor:pointer" onclick="printRotulo('${e.id}')">🖨️</button>
+          <button title="Editar OT" style="background:var(--surface2);border:1px solid var(--border2);color:var(--text-muted);font-size:11px;padding:3px 6px;border-radius:5px;cursor:pointer" onclick="openUpdateEvento('${e.id}','${(e.ultimo_evento||'').replace(/'/g,"\'")}')">✏️</button>
+          ${tieneRetorno&&e.track_devolucion?`<button title="Rótulo retorno" style="background:rgba(245,158,11,.15);border:1px solid #f59e0b;color:#f59e0b;font-size:11px;padding:3px 6px;border-radius:5px;cursor:pointer" onclick="printRotuloDevolucion('${e.id}')">↩️🖨️</button>`:''}
+      </div></td>
+    </tr>`;
+  }).join('');
+}
+
+async function rlCambiarEstado(id,nuevoEstado,estadoAntes){
+  await sb.from('envios').update({estado:nuevoEstado,ultimo_evento_fecha:new Date().toISOString().slice(0,10)}).eq('id',id);
+  auditLog({tabla:'envios',registro_id:id,accion:'CAMBIO_ESTADO',campo:'estado',valor_antes:estadoAntes,valor_despues:nuevoEstado});
+  const idx=_rlData.findIndex(e=>e.id===id);
+  if(idx>=0)_rlData[idx].estado=nuevoEstado;
+  rlActualizarKPIs();
+  loadBadges();
+}
+// ══════════════════════════════════════════════════════════════
 async function loadBadges(){
   const uid=currentUser?.id;
   if(!uid)return;
@@ -1318,6 +1475,10 @@ async function loadBadges(){
   const desCount=(des||[]).filter(d=>!['Terminal recuperada','Extraviada'].includes(d.estado)).length;
   const nbEnv=document.getElementById('nb-envios');if(nbEnv)nbEnv.textContent=envCount;
   const nbDes=document.getElementById('nb-desins');if(nbDes)nbDes.textContent=desCount;
+  sb.from('envios').select('id',{count:'exact',head:true}).ilike('tipo','%rollout%').then(({count})=>{
+    const nbRo=document.getElementById('nb-rollout');if(nbRo)nbRo.textContent=count||0;
+    const dc=document.querySelector('[data-mod="rollout"] .dash-card-stat');if(dc)dc.textContent=(count||0)+' OTs';
+  });
   if(document.getElementById('dc-envios'))document.getElementById('dc-envios').textContent=envCount+' activos';
   if(document.getElementById('dc-desinstalaciones'))document.getElementById('dc-desinstalaciones').textContent=desCount+' activas';
   // Horas hoy
