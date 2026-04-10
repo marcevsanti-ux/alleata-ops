@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v2.3.15</title>
+<title>Alleata · Operaciones v2.3.16</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -288,7 +288,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.3.15 · 08 abr 2026
+      v2.3.16 · 08 abr 2026
     </div>
   </div>
 </div>
@@ -343,7 +343,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.3.15 · 08 abr 2026
+      v2.3.16 · 08 abr 2026
     </div>
   </div>
 </nav>
@@ -357,7 +357,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <div class="topbar-right" id="topbar-date"></div>
     <button onclick="refreshCurrentModule()" title="Actualizar" style="background:none;border:1px solid var(--border2);color:var(--text-muted);border-radius:7px;padding:4px 10px;cursor:pointer;font-size:13px;margin-left:10px;transition:all .2s" onmouseover="this.style.color='var(--teal)';this.style.borderColor='var(--teal)'" onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border2)'">↺</button>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.3.15</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.3.16</div>
   </div>
   <div class="content">
 
@@ -1046,7 +1046,7 @@ tr:hover td{background:var(--surface2);}
 </div>
 
 <script>
-console.log('[Alleata v2.3.15] OK');
+console.log('[Alleata v2.3.16] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -2550,9 +2550,9 @@ async function printRotuloDevolucion(id){
 // ── ASIGNACIÓN A DISTRIBUIDOR ──
 async function openAsignarDistri(envioId, asignadoActual){
   // Cargar lista de distribuidores
-  const{data:distris}=await sb.from('profiles').select('id,nombre,email').eq('rol','distri').order('nombre');
+  const{data:distris}=await sb.from('distribuidores').select('id,nombre,apellido,whatsapp').eq('activo',true).order('nombre');
   if(!distris||!distris.length){
-    alert('No hay distribuidores dados de alta. Creá un usuario con rol "distri" en Ajustes.');return;
+    alert('No hay distribuidores dados de alta. Creá uno desde el módulo Distribuidores.');return;
   }
 
   let m=document.getElementById('modalAsignarDistri');
@@ -2563,16 +2563,17 @@ async function openAsignarDistri(envioId, asignadoActual){
     document.body.appendChild(m);
   }
 
-  const opts=distris.map(d=>`
-    <div onclick="selectDistri('${d.id}','${(d.nombre||d.email).replace(/'/g,"'")}',this)"
+  const opts=distris.map(d=>{
+    const nombreCompleto=((d.nombre||'')+' '+(d.apellido||'')).trim();
+    return `<div onclick="selectDistri('${d.id}','${nombreCompleto.replace(/'/g,"\'")}',this)"
       style="display:flex;align-items:center;gap:10px;padding:12px;border-radius:10px;cursor:pointer;border:1px solid ${d.id===asignadoActual?'var(--teal)':'var(--border)'};background:${d.id===asignadoActual?'rgba(29,191,142,.08)':'var(--surface2)'};margin-bottom:8px;transition:all .15s">
-      <div style="width:32px;height:32px;border-radius:50%;background:var(--teal);display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff;flex-shrink:0">${(d.nombre||d.email)[0].toUpperCase()}</div>
+      <div style="width:32px;height:32px;border-radius:50%;background:var(--teal);display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff;flex-shrink:0">${nombreCompleto[0]?.toUpperCase()||'D'}</div>
       <div>
-        <div style="font-size:13px;font-weight:600;color:#fff">${d.nombre||d.email}</div>
-        <div style="font-size:11px;color:var(--text-muted)">${d.email}</div>
+        <div style="font-size:13px;font-weight:600;color:#fff">${nombreCompleto}</div>
+        <div style="font-size:11px;color:var(--text-muted)">${d.whatsapp||''}</div>
       </div>
-      ${d.id===asignadoActual?`<div style="margin-left:auto;font-size:11px;color:var(--teal);font-weight:700">✓ Asignado</div>`:''}
-    </div>`).join('');
+      ${d.id===asignadoActual?'<div style="margin-left:auto;font-size:11px;color:var(--teal);font-weight:700">✓ Asignado</div>':''}
+    </div>`;}).join('');
 
   m.innerHTML=`<div class="modal-box" style="max-width:400px;width:100%">
     <div style="font-size:15px;font-weight:700;color:#fff;margin-bottom:4px">👤 Asignar distribuidor</div>
@@ -2625,14 +2626,101 @@ function showToastPortal(msg){
   setTimeout(()=>{t.style.opacity='0';t.style.transform='translateX(-50%) translateY(20px)';},3000);
 }
 
-function openUpdateEvento(id,current){
-  const nuevo=prompt('Actualizar observación / evento:',current);
-  if(nuevo===null)return;
-  sb.from('envios').update({ultimo_evento:nuevo,ultimo_evento_fecha:new Date().toISOString().slice(0,10)}).eq('id',id).then(()=>{
-    auditLog({tabla:'envios', registro_id:id, accion:'UPDATE_OBSERVACION', campo:'ultimo_evento',
-      valor_antes:current||null, valor_despues:nuevo});
-    renderEnvios();
-  });
+async function openUpdateEvento(id, current){
+  // Cargar datos completos de la OT
+  const{data:e}=await sb.from('envios').select('*').eq('id',id).single();
+  if(!e)return;
+
+  let m=document.getElementById('modalDetalleOT');
+  if(!m){ m=document.createElement('div'); m.id='modalDetalleOT'; m.className='modal-overlay'; m.onclick=ev=>{if(ev.target===m)m.classList.remove('show');}; document.body.appendChild(m); }
+
+  const estados=['Pre-Colecta','Despachado','En tránsito','En camino','En espera en sucursal','Entregado','Retirar Terminal','Fallido','Perdido','Devuelto'];
+  const estadoOpts=estados.map(s=>`<option value="${s}" ${e.estado===s?'selected':''}>${s}</option>`).join('');
+
+  m.innerHTML=`<div class="modal-box" style="max-width:520px;width:100%">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+      <div>
+        <div style="font-size:11px;font-weight:700;letter-spacing:1.5px;color:var(--teal);text-transform:uppercase">Detalle OT</div>
+        <div style="font-size:20px;font-weight:800;font-family:'JetBrains Mono',monospace;color:#fff">${e.ot_numero||'—'}</div>
+      </div>
+      <button onclick="document.getElementById('modalDetalleOT').classList.remove('show')" style="background:rgba(255,255,255,.06);border:none;color:var(--text-muted);width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:18px">×</button>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
+      <div style="background:var(--navy-900);border-radius:10px;padding:12px">
+        <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Responsable</div>
+        <div style="font-size:13px;font-weight:600">${e.responsable||'—'}</div>
+      </div>
+      <div style="background:var(--navy-900);border-radius:10px;padding:12px">
+        <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Cuenta</div>
+        <div style="font-size:13px;font-weight:600">${e.cuenta||'—'}</div>
+      </div>
+      <div style="background:var(--navy-900);border-radius:10px;padding:12px">
+        <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Tipo</div>
+        <div style="font-size:12px">${e.tipo||'—'}</div>
+      </div>
+      <div style="background:var(--navy-900);border-radius:10px;padding:12px">
+        <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Logística</div>
+        <div style="font-size:12px">${e.logistica||'—'}</div>
+      </div>
+      <div style="background:var(--navy-900);border-radius:10px;padding:12px;grid-column:1/-1">
+        <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Dirección</div>
+        <div style="font-size:12px">${[e.ciudad,e.provincia].filter(Boolean).join(', ')||'—'}</div>
+        ${e.cp_dest?`<div style="font-size:11px;color:var(--text-muted)">CP: ${e.cp_dest}</div>`:''}
+      </div>
+      ${e.track?`<div style="background:var(--navy-900);border-radius:10px;padding:12px;grid-column:1/-1">
+        <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Tracking</div>
+        <div style="font-size:12px;font-family:'JetBrains Mono',monospace">${e.track}</div>
+      </div>`:''}
+      ${e.notas?`<div style="background:var(--navy-900);border-radius:10px;padding:12px;grid-column:1/-1">
+        <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Observaciones SF</div>
+        <div style="font-size:12px">${e.notas}</div>
+      </div>`:''}
+    </div>
+
+    <div style="margin-bottom:12px">
+      <label style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:6px">Estado</label>
+      <select id="detalleOT-estado" class="select" style="width:100%">${estadoOpts}</select>
+    </div>
+
+    <div style="margin-bottom:16px">
+      <label style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:6px">Observación / Evento</label>
+      <textarea id="detalleOT-obs" class="input" style="width:100%;min-height:70px;resize:vertical;font-family:'Inter',sans-serif">${e.ultimo_evento&&e.ultimo_evento!=='Importado desde SF'?e.ultimo_evento:''}</textarea>
+    </div>
+
+    <div style="display:flex;gap:8px">
+      <button onclick="guardarDetalleOT('${e.id}','${(e.estado||'').replace(/'/g,"\'")}','${(e.ultimo_evento||'').replace(/'/g,"\'")}');document.getElementById('modalDetalleOT').classList.remove('show')"
+        style="flex:1;background:var(--grad);color:#fff;border:none;padding:11px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:'Inter',sans-serif">
+        💾 Guardar
+      </button>
+      <button onclick="document.getElementById('modalDetalleOT').classList.remove('show')"
+        style="background:var(--surface2);border:1px solid var(--border2);color:var(--text-muted);padding:11px 18px;border-radius:10px;cursor:pointer;font-family:'Inter',sans-serif">
+        Cancelar
+      </button>
+    </div>
+  </div>`;
+  m.classList.add('show');
+}
+
+async function guardarDetalleOT(id, estadoAntes, obsAntes){
+  const nuevoEstado = document.getElementById('detalleOT-estado').value;
+  const nuevaObs = document.getElementById('detalleOT-obs').value.trim();
+  const updates = {
+    ultimo_evento_fecha: new Date().toISOString().slice(0,10)
+  };
+  if(nuevoEstado !== estadoAntes) updates.estado = nuevoEstado;
+  if(nuevaObs !== obsAntes) updates.ultimo_evento = nuevaObs || null;
+
+  const{error} = await sb.from('envios').update(updates).eq('id',id);
+  if(error){ alert('Error: '+error.message); return; }
+
+  if(nuevoEstado !== estadoAntes)
+    auditLog({tabla:'envios',registro_id:id,accion:'CAMBIO_ESTADO',campo:'estado',valor_antes:estadoAntes,valor_despues:nuevoEstado});
+  if(nuevaObs !== obsAntes)
+    auditLog({tabla:'envios',registro_id:id,accion:'UPDATE_OBSERVACION',campo:'ultimo_evento',valor_antes:obsAntes||null,valor_despues:nuevaObs||null});
+
+  loadBadges(); renderEnvios();
+  showToastPortal('✅ OT actualizada');
 }
 
 // ── FILTRO ZONA LOGÍSTICA ──
