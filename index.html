@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v2.3.23</title>
+<title>Alleata · Operaciones v2.3.24</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -288,7 +288,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.3.23 · 16 abr 2026
+      v2.3.24 · 16 abr 2026
     </div>
   </div>
 </div>
@@ -347,7 +347,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.3.23 · 16 abr 2026
+      v2.3.24 · 16 abr 2026
     </div>
   </div>
 </nav>
@@ -361,7 +361,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <div class="topbar-right" id="topbar-date"></div>
     <button onclick="refreshCurrentModule()" title="Actualizar" style="background:none;border:1px solid var(--border2);color:var(--text-muted);border-radius:7px;padding:4px 10px;cursor:pointer;font-size:13px;margin-left:10px;transition:all .2s" onmouseover="this.style.color='var(--teal)';this.style.borderColor='var(--teal)'" onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border2)'">↺</button>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.3.23</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.3.24</div>
   </div>
   <div class="content">
 
@@ -1117,7 +1117,7 @@ tr:hover td{background:var(--surface2);}
 </div>
 
 <script>
-console.log('[Alleata v2.3.23] OK');
+console.log('[Alleata v2.3.24] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -2468,11 +2468,11 @@ async function consultarTracking(id, trackNum){
     const { data: envData } = await sb.from('envios').select('tipo').eq('id', id).single();
     const tipoOT = envData?.tipo || '';
     const ultimo = eventos[0];
-    const estadoMapeado = mapearEstadoCA(ultimo.historia, ultimo.estado, tipoOT);
+    const estadoMapeado = mapearEstadoCA(ultimo.historia, ultimo.estadoCA, tipoOT);
     if(estadoMapeado && id){
       await sb.from('envios').update({
         estado: estadoMapeado,
-        ultimo_evento: ultimo.estado ? `${ultimo.historia} — ${ultimo.estado}` : ultimo.historia,
+        ultimo_evento: ultimo.estadoCA ? `${ultimo.historia} — ${ultimo.estadoCA}` : ultimo.historia,
         ultimo_evento_fecha: ultimo.fecha
       }).eq('id', id);
       loadBadges(); renderEnvios();
@@ -2512,11 +2512,11 @@ async function autoActualizarTracking(){
       const { eventos } = await fetchTrackingCA(envio.track);
       if(eventos && eventos.length > 0){
         const ultimo = eventos[0];
-        const estadoMapeado = mapearEstadoCA(ultimo.historia, ultimo.estado, envio.tipo);
+        const estadoMapeado = mapearEstadoCA(ultimo.historia, ultimo.estadoCA, envio.tipo);
         if(estadoMapeado && estadoMapeado !== envio.estado){
           await sb.from('envios').update({
             estado: estadoMapeado,
-            ultimo_evento: ultimo.estado ? `${ultimo.historia} — ${ultimo.estado}` : ultimo.historia,
+            ultimo_evento: ultimo.estadoCA ? `${ultimo.historia} — ${ultimo.estadoCA}` : ultimo.historia,
             ultimo_evento_fecha: ultimo.fecha
           }).eq('id', envio.id);
           actualizados++;
