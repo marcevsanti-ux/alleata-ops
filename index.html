@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v2.3.27</title>
+<title>Alleata · Operaciones v2.3.29</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -288,7 +288,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.3.27 · 16 abr 2026
+      v2.3.29 · 16 abr 2026
     </div>
   </div>
 </div>
@@ -347,7 +347,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.3.27 · 16 abr 2026
+      v2.3.29 · 16 abr 2026
     </div>
   </div>
 </nav>
@@ -361,7 +361,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <div class="topbar-right" id="topbar-date"></div>
     <button onclick="refreshCurrentModule()" title="Actualizar" style="background:none;border:1px solid var(--border2);color:var(--text-muted);border-radius:7px;padding:4px 10px;cursor:pointer;font-size:13px;margin-left:10px;transition:all .2s" onmouseover="this.style.color='var(--teal)';this.style.borderColor='var(--teal)'" onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border2)'">↺</button>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.3.27</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.3.29</div>
   </div>
   <div class="content">
 
@@ -1118,7 +1118,7 @@ tr:hover td{background:var(--surface2);}
 </div>
 
 <script>
-console.log('[Alleata v2.3.27] OK');
+console.log('[Alleata v2.3.29] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -2569,13 +2569,25 @@ function mostrarModalTrackingCA(trackNum, caData, estado, errorMsg=''){
       : `<span style="background:rgba(255,255,255,.08);color:var(--text-secondary);padding:4px 12px;border-radius:20px;font-size:13px;">Sin eventos</span>`;
 
     const filas = eventos.length > 0
-      ? eventos.map(ev=>`
-          <tr style="border-bottom:1px solid rgba(255,255,255,.04);">
-            <td style="padding:10px 12px;color:var(--text-secondary);font-size:12px;white-space:nowrap;font-family:'JetBrains Mono',monospace;">${ev.fecha||'—'}</td>
+      ? eventos.map(ev=>{
+          const esDomCerrado = (ev.estadoCA||'').toUpperCase().includes('DOMICILIO CERRADO')
+            || (ev.estadoCA||'').toUpperCase().includes('DIRECCIÓN INSUFICIENTE')
+            || (ev.estadoCA||'').toUpperCase().includes('DIRECCION INSUFICIENTE');
+          const rowBg = esDomCerrado ? 'background:rgba(248,113,113,.08);' : '';
+          const fechaStyle = esDomCerrado
+            ? 'padding:10px 12px;font-size:12px;white-space:nowrap;font-family:\'JetBrains Mono\',monospace;color:#f87171;font-weight:700;'
+            : 'padding:10px 12px;color:var(--text-secondary);font-size:12px;white-space:nowrap;font-family:\'JetBrains Mono\',monospace;';
+          const estadoCAStyle = esDomCerrado
+            ? 'padding:10px 12px;font-size:12px;font-weight:700;color:#f87171;'
+            : 'padding:10px 12px;font-size:12px;font-weight:600;color:var(--teal);';
+          return `
+          <tr style="border-bottom:1px solid rgba(255,255,255,.04);${rowBg}">
+            <td style="${fechaStyle}">${esDomCerrado?'⚠️ ':''} ${ev.fecha||'—'}</td>
             <td style="padding:10px 12px;font-weight:500;font-size:13px;">${caEventoLabel(ev.historia)}</td>
             <td style="padding:10px 12px;color:var(--text-secondary);font-size:12px;">${ev.planta||'—'}</td>
-            ${ev.estadoCA ? `<td style="padding:10px 12px;font-size:12px;font-weight:600;color:var(--teal);">${ev.estadoCA}</td>` : '<td></td>'}
-          </tr>`).join('')
+            ${ev.estadoCA ? `<td style="${estadoCAStyle}">${ev.estadoCA}</td>` : '<td></td>'}
+          </tr>`;
+        }).join('')
       : `<tr><td colspan="4" style="text-align:center;padding:24px;color:var(--text-secondary);font-size:13px;">Sin movimientos registrados aún</td></tr>`;
 
     contenido=`
@@ -2647,6 +2659,9 @@ function mapearEstadoCA(historia, estadoCA='', tipoOT=''){
   if(h.includes('INGRESO AL CORREO')||h.includes('REPESAJE')||h.includes('PREIMPOSICION')) return 'En tránsito';
   if(h.includes('DEMORADO')||h.includes('DEMORA')) return 'Fallido';
   if(h.includes('PERDIDO')) return 'Perdido';
+  // Estado CA especiales
+  const eCA = (estadoCA||'').toUpperCase();
+  if(eCA.includes('RETORNANDO')) return 'Fallido';
   if(h) return 'En tránsito';
   return null;
 }
