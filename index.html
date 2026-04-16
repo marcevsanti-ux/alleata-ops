@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v2.3.20</title>
+<title>Alleata · Operaciones v2.3.21</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -288,7 +288,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.3.20 · 16 abr 2026
+      v2.3.21 · 16 abr 2026
     </div>
   </div>
 </div>
@@ -347,7 +347,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.3.20 · 16 abr 2026
+      v2.3.21 · 16 abr 2026
     </div>
   </div>
 </nav>
@@ -361,7 +361,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <div class="topbar-right" id="topbar-date"></div>
     <button onclick="refreshCurrentModule()" title="Actualizar" style="background:none;border:1px solid var(--border2);color:var(--text-muted);border-radius:7px;padding:4px 10px;cursor:pointer;font-size:13px;margin-left:10px;transition:all .2s" onmouseover="this.style.color='var(--teal)';this.style.borderColor='var(--teal)'" onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border2)'">↺</button>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.3.20</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.3.21</div>
   </div>
   <div class="content">
 
@@ -1109,7 +1109,7 @@ tr:hover td{background:var(--surface2);}
 </div>
 
 <script>
-console.log('[Alleata v2.3.20] OK');
+console.log('[Alleata v2.3.21] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -2428,7 +2428,7 @@ async function fetchTrackingCA(trackNum) {
       fecha:    tds[0]?.textContent?.trim()||'',
       planta:   tds[1]?.textContent?.trim()||'',
       historia: tds[2]?.textContent?.trim()||'',
-      estado:   tds[3]?.textContent?.trim()||'',
+      estadoCA: tds[3]?.textContent?.trim()||'',
     });
   });
   // Obtener pieza (HC-XXXXXX-AR)
@@ -2450,11 +2450,13 @@ async function consultarTracking(id, trackNum){
     mostrarModalTrackingCA(trackNum, { eventos, pieza }, 'ok');
     // Actualizar estado en Supabase automáticamente
     const ultimo = eventos[0];
-    const estadoMapeado = mapearEstadoCA(ultimo.historia);
+    // Usar estadoCA si existe, sino historia
+    const textoParaMapear = ultimo.estadoCA || ultimo.historia;
+    const estadoMapeado = mapearEstadoCA(textoParaMapear);
     if(estadoMapeado && id){
       await sb.from('envios').update({
         estado: estadoMapeado,
-        ultimo_evento: ultimo.historia,
+        ultimo_evento: ultimo.estadoCA ? `${ultimo.historia} — ${ultimo.estadoCA}` : ultimo.historia,
         ultimo_evento_fecha: ultimo.fecha
       }).eq('id', id);
       loadBadges(); renderEnvios();
@@ -2533,13 +2535,15 @@ function mostrarModalTrackingCA(trackNum, caData, estado, errorMsg=''){
   } else {
     const eventos = caData?.eventos || [];
     const ultimo = eventos[0];
-    const esEntregado = (ultimo?.historia||'').toUpperCase().includes('ENTREGADO');
-    const esDevuelto = (ultimo?.historia||'').toUpperCase().includes('DEVUELTO');
+    // Priorizar estadoCA (campo Estado de CA) sobre historia para el badge
+    const estadoTexto = ultimo?.estadoCA || ultimo?.historia || '';
+    const esEntregado = estadoTexto.toUpperCase().includes('ENTREGADO');
+    const esDevuelto = estadoTexto.toUpperCase().includes('DEVUELTO');
     const colorBadge = esEntregado ? 'rgba(29,191,142,.15)' : esDevuelto ? 'rgba(248,113,113,.15)' : 'rgba(26,159,212,.12)';
     const textBadge = esEntregado ? 'var(--teal)' : esDevuelto ? '#f87171' : 'var(--blue)';
 
     const estadoBadge = ultimo
-      ? `<span style="background:${colorBadge};color:${textBadge};padding:4px 12px;border-radius:20px;font-size:13px;font-weight:600;">${caEventoLabel(ultimo.historia)}</span>`
+      ? `<span style="background:${colorBadge};color:${textBadge};padding:4px 12px;border-radius:20px;font-size:13px;font-weight:600;">${estadoTexto || caEventoLabel(ultimo.historia)}</span>`
       : `<span style="background:rgba(255,255,255,.08);color:var(--text-secondary);padding:4px 12px;border-radius:20px;font-size:13px;">Sin eventos</span>`;
 
     const filas = eventos.length > 0
@@ -2548,8 +2552,9 @@ function mostrarModalTrackingCA(trackNum, caData, estado, errorMsg=''){
             <td style="padding:10px 12px;color:var(--text-secondary);font-size:12px;white-space:nowrap;font-family:'JetBrains Mono',monospace;">${ev.fecha||'—'}</td>
             <td style="padding:10px 12px;font-weight:500;font-size:13px;">${caEventoLabel(ev.historia)}</td>
             <td style="padding:10px 12px;color:var(--text-secondary);font-size:12px;">${ev.planta||'—'}</td>
+            ${ev.estadoCA ? `<td style="padding:10px 12px;font-size:12px;font-weight:600;color:var(--teal);">${ev.estadoCA}</td>` : '<td></td>'}
           </tr>`).join('')
-      : `<tr><td colspan="3" style="text-align:center;padding:24px;color:var(--text-secondary);font-size:13px;">Sin movimientos registrados aún</td></tr>`;
+      : `<tr><td colspan="4" style="text-align:center;padding:24px;color:var(--text-secondary);font-size:13px;">Sin movimientos registrados aún</td></tr>`;
 
     contenido=`
       <div style="margin-bottom:20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
@@ -2565,8 +2570,9 @@ function mostrarModalTrackingCA(trackNum, caData, estado, errorMsg=''){
           <thead>
             <tr style="border-bottom:1px solid rgba(255,255,255,.06);">
               <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;">Fecha</th>
-              <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;">Estado</th>
+              <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;">Historia</th>
               <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;">Planta</th>
+              <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;color:var(--teal);text-transform:uppercase;letter-spacing:.5px;">Estado CA</th>
             </tr>
           </thead>
           <tbody>${filas}</tbody>
