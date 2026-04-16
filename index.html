@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v2.3.18</title>
+<title>Alleata · Operaciones v2.3.19</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -288,7 +288,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.3.18 · 10 abr 2026
+      v2.3.19 · 16 abr 2026
     </div>
   </div>
 </div>
@@ -347,7 +347,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.3.18 · 10 abr 2026
+      v2.3.19 · 16 abr 2026
     </div>
   </div>
 </nav>
@@ -361,7 +361,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <div class="topbar-right" id="topbar-date"></div>
     <button onclick="refreshCurrentModule()" title="Actualizar" style="background:none;border:1px solid var(--border2);color:var(--text-muted);border-radius:7px;padding:4px 10px;cursor:pointer;font-size:13px;margin-left:10px;transition:all .2s" onmouseover="this.style.color='var(--teal)';this.style.borderColor='var(--teal)'" onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border2)'">↺</button>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.3.18</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.3.19</div>
   </div>
   <div class="content">
 
@@ -583,6 +583,9 @@ tr:hover td{background:var(--surface2);}
         <div style="display:flex;align-items:center;gap:8px">
           <button id="btnPrintSelected" onclick="printSelectedRotulos()" style="display:none;background:var(--grad);color:#fff;border:none;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;gap:6px;align-items:center">
             🖨️ Imprimir seleccionados (<span id="selectedCount">0</span>)
+          </button>
+          <button id="btnAutoTracking" onclick="autoActualizarTracking()" title="Actualizar estados de todos los envíos activos desde Correo Argentino" style="background:rgba(26,159,212,.15);border:1px solid rgba(26,159,212,.4);color:var(--blue);padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;transition:all .2s" onmouseover="this.style.background='rgba(26,159,212,.25)'" onmouseout="this.style.background='rgba(26,159,212,.15)'">
+            🔄 Auto-tracking
           </button>
 
         </div>
@@ -1106,7 +1109,7 @@ tr:hover td{background:var(--surface2);}
 </div>
 
 <script>
-console.log('[Alleata v2.3.18] OK');
+console.log('[Alleata v2.3.19] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -2380,82 +2383,127 @@ function setCanalEnvios(canal){
 // ── TRACKING CORREO ARGENTINO ──
 const ALLY_URL='https://alleata-agent-production.up.railway.app';
 
-// ── CORREO ARGENTINO — TRACKING VIA SUPABASE EDGE FUNCTION ──
-const CA_PROXY_URL = "https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/ca-proxy";
-
-const CA_EVENTOS_MAP = {
-  "PREIMPOSICION":    "Pre-imposición registrada",
-  "EN_CAMINO":        "En camino",
-  "EN_DISTRIBUCION":  "En distribución",
-  "ENTREGADO":        "Entregado ✅",
-  "DEVUELTO":         "Devuelto al remitente",
-  "EN_SUCURSAL":      "En sucursal",
-  "CADUCA":           "Envío caduco",
-  "PROCESAMIENTO":    "En centro de procesamiento",
-  "RETENIDO":         "Retenido",
-};
+// ── CORREO ARGENTINO — TRACKING DIRECTO via wsFacade.php ──
+const CA_WSFACADE_URL = "https://www.correoargentino.com.ar/sites/all/modules/custom/ca_forms/api/wsFacade.php";
 
 function caEventoLabel(event){
-  return CA_EVENTOS_MAP[(event||'').toUpperCase()] || event || '—';
+  const e = (event||'').toUpperCase();
+  if(e.includes('ENTREGADO')||e.includes('ENTREGA OK')||e.includes('ENTREGA EFECTUADA')) return 'Entregado ✅';
+  if(e.includes('DEVUELTO')||e.includes('DEVOLUCION')) return 'Devuelto al remitente';
+  if(e.includes('EN PODER DEL DISTRIBUIDOR')) return 'En poder del distribuidor';
+  if(e.includes('EN PROCESO DE CLASIFICACIÓN')||e.includes('EN PROCESO DE CLASIFICACION')) return 'En proceso de clasificación';
+  if(e.includes('LLEGADA AL CENTRO')) return 'Llegada al centro de procesamiento';
+  if(e.includes('CENTRO DE PROCESAMIENTO')) return 'En centro de procesamiento';
+  if(e.includes('EN ESPERA EN SUCURSAL')) return 'En espera en sucursal';
+  if(e.includes('INGRESO AL CORREO')) return 'Ingreso al correo';
+  if(e.includes('PREIMPOSICION')||e.includes('PREIMPOSICIÓN')) return 'Pre-imposición registrada';
+  if(e.includes('REPESAJE')) return 'Repesaje';
+  if(e.includes('INTENTO DE ENTREGA')) return 'Intento de entrega';
+  if(e.includes('CADUCA')) return 'Envío caduco';
+  return event || '—';
+}
+
+// Llama directo a wsFacade.php y devuelve { eventos[], ultimoEvento, ultimoEventoFecha, estado }
+async function fetchTrackingCA(trackNum) {
+  const fd = new FormData();
+  fd.append('action', 'ecommerce');
+  fd.append('id', trackNum.trim());
+  const resp = await fetch(CA_WSFACADE_URL, { method:'POST', body:fd });
+  if(!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  const html = await resp.text();
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html, 'text/html');
+  const rows = doc.querySelectorAll('tbody tr');
+  const eventos = [];
+  rows.forEach(row => {
+    const tds = row.querySelectorAll('td');
+    if(tds.length >= 3) eventos.push({
+      fecha:    tds[0]?.textContent?.trim()||'',
+      planta:   tds[1]?.textContent?.trim()||'',
+      historia: tds[2]?.textContent?.trim()||'',
+      estado:   tds[3]?.textContent?.trim()||'',
+    });
+  });
+  // Obtener pieza (HC-XXXXXX-AR)
+  const pieza = doc.querySelector('.badge')?.textContent?.trim()||'';
+  return { eventos, pieza };
 }
 
 async function consultarTracking(id, trackNum){
   if(!trackNum){ showTrackingToast('⚠️ Sin número de tracking','yellow'); return; }
   const btn=document.getElementById(`track-btn-${id}`);
   if(btn){ btn.textContent='⏳'; btn.disabled=true; }
-
-  // Mostrar modal con spinner mientras carga
   mostrarModalTrackingCA(trackNum, null, 'loading');
-
   try {
-    const { data:{ session } } = await sb.auth.getSession();
-    const res = await fetch(CA_PROXY_URL, {
-      method: 'POST',
-      headers:{
-        'Content-Type':'application/json',
-        'Authorization':`Bearer ${session?.access_token}`
-      },
-      body: JSON.stringify({ action:'tracking', shippingId: trackNum })
-    });
-
-    const json = await res.json();
-
-    // Error de la Edge Function
-    if(json.error){ mostrarModalTrackingCA(trackNum, null, 'error', json.error); return; }
-
-    const caData = json.data;
-
-    // CA devuelve error embebido en 200
-    if(caData?.error || caData?.code === '0'){
-      mostrarModalTrackingCA(trackNum, null, 'error', caData.error || 'No existe el cliente o pedido');
+    const { eventos, pieza } = await fetchTrackingCA(trackNum);
+    if(!eventos || eventos.length === 0){
+      mostrarModalTrackingCA(trackNum, null, 'error', 'Sin eventos registrados para este número');
       return;
     }
-
-    // Puede venir como array o como objeto
-    const resultado = Array.isArray(caData) ? caData[0] : caData;
-    mostrarModalTrackingCA(trackNum, resultado, 'ok');
-
-    // Si hay eventos, actualizar estado en Supabase automáticamente
-    const eventos = resultado?.events || [];
-    if(eventos.length > 0){
-      const ultimo = eventos[0];
-      const estadoMapeado = mapearEstadoCA(ultimo.event);
-      if(estadoMapeado){
-        await sb.from('envios').update({
-          estado: estadoMapeado,
-          ultimo_evento: caEventoLabel(ultimo.event),
-          ultimo_evento_fecha: (ultimo.date||'').slice(0,10)
-        }).eq('id', id);
-        loadBadges(); renderEnvios();
-      }
+    mostrarModalTrackingCA(trackNum, { eventos, pieza }, 'ok');
+    // Actualizar estado en Supabase automáticamente
+    const ultimo = eventos[0];
+    const estadoMapeado = mapearEstadoCA(ultimo.historia);
+    if(estadoMapeado && id){
+      await sb.from('envios').update({
+        estado: estadoMapeado,
+        ultimo_evento: ultimo.historia,
+        ultimo_evento_fecha: ultimo.fecha
+      }).eq('id', id);
+      loadBadges(); renderEnvios();
     }
-
   } catch(err){
     console.error('Tracking CA error:', err);
     mostrarModalTrackingCA(trackNum, null, 'error', err.message);
   } finally {
     if(btn){ btn.textContent='🔍'; btn.disabled=false; }
   }
+}
+
+// ── AUTO-TRACKING MASIVO ──
+async function autoActualizarTracking(){
+  const btn = document.getElementById('btnAutoTracking');
+  if(btn){ btn.disabled=true; btn.innerHTML='⏳ <span id="autoTrackProgress">0</span>'; }
+  showNotification('Consultando estados en Correo Argentino...','info');
+
+  const { data:envios, error } = await sb.from('envios')
+    .select('id,track,estado,responsable,cuenta')
+    .not('track','is',null)
+    .neq('track','')
+    .not('estado','in','("Entregado","Devuelto","Perdido")');
+
+  if(error || !envios || envios.length === 0){
+    showNotification('No hay envíos activos para actualizar','warning');
+    if(btn){ btn.disabled=false; btn.innerHTML='🔄 Auto-tracking'; }
+    return;
+  }
+
+  let actualizados=0, errores=0;
+  for(let i=0; i<envios.length; i++){
+    const envio = envios[i];
+    const prog = document.getElementById('autoTrackProgress');
+    if(prog) prog.textContent = `${i+1}/${envios.length}`;
+    try {
+      const { eventos } = await fetchTrackingCA(envio.track);
+      if(eventos && eventos.length > 0){
+        const ultimo = eventos[0];
+        const estadoMapeado = mapearEstadoCA(ultimo.historia);
+        if(estadoMapeado && estadoMapeado !== envio.estado){
+          await sb.from('envios').update({
+            estado: estadoMapeado,
+            ultimo_evento: ultimo.historia,
+            ultimo_evento_fecha: ultimo.fecha
+          }).eq('id', envio.id);
+          actualizados++;
+        }
+      }
+    } catch(e){ errores++; }
+    await new Promise(r=>setTimeout(r,600));
+  }
+
+  if(btn){ btn.disabled=false; btn.innerHTML='🔄 Auto-tracking'; }
+  showNotification(`✅ ${actualizados} actualizados de ${envios.length} envíos${errores>0?` (${errores} errores)`:''}`, actualizados>0?'success':'info');
+  renderEnvios(); loadBadges();
 }
 
 function mostrarModalTrackingCA(trackNum, caData, estado, errorMsg=''){
@@ -2476,29 +2524,32 @@ function mostrarModalTrackingCA(trackNum, caData, estado, errorMsg=''){
         <p style="color:var(--text-secondary);font-size:13px;margin:0;">${errorMsg||'Verificá el número de seguimiento'}</p>
       </div>`;
   } else {
-    const eventos = caData?.events || [];
-    const ultimoEvento = eventos[0];
-    const esEntregado = (ultimoEvento?.event||'').toUpperCase().includes('ENTREGADO');
+    const eventos = caData?.eventos || [];
+    const ultimo = eventos[0];
+    const esEntregado = (ultimo?.historia||'').toUpperCase().includes('ENTREGADO');
+    const esDevuelto = (ultimo?.historia||'').toUpperCase().includes('DEVUELTO');
+    const colorBadge = esEntregado ? 'rgba(29,191,142,.15)' : esDevuelto ? 'rgba(248,113,113,.15)' : 'rgba(26,159,212,.12)';
+    const textBadge = esEntregado ? 'var(--teal)' : esDevuelto ? '#f87171' : 'var(--blue)';
 
-    const estadoBadge = ultimoEvento
-      ? `<span style="background:${esEntregado?'rgba(29,191,142,.15)':'rgba(26,159,212,.12)'};color:${esEntregado?'var(--teal)':'var(--blue)'};padding:4px 12px;border-radius:20px;font-size:13px;font-weight:600;">${caEventoLabel(ultimoEvento.event)}</span>`
+    const estadoBadge = ultimo
+      ? `<span style="background:${colorBadge};color:${textBadge};padding:4px 12px;border-radius:20px;font-size:13px;font-weight:600;">${caEventoLabel(ultimo.historia)}</span>`
       : `<span style="background:rgba(255,255,255,.08);color:var(--text-secondary);padding:4px 12px;border-radius:20px;font-size:13px;">Sin eventos</span>`;
 
     const filas = eventos.length > 0
       ? eventos.map(ev=>`
           <tr style="border-bottom:1px solid rgba(255,255,255,.04);">
-            <td style="padding:10px 12px;color:var(--text-secondary);font-size:12px;white-space:nowrap;font-family:'JetBrains Mono',monospace;">${ev.date||'—'}</td>
-            <td style="padding:10px 12px;font-weight:500;font-size:13px;">${caEventoLabel(ev.event)}</td>
-            <td style="padding:10px 12px;color:var(--text-secondary);font-size:12px;">${ev.branch||'—'}</td>
-            <td style="padding:10px 12px;color:var(--text-secondary);font-size:12px;">${ev.status||''}</td>
+            <td style="padding:10px 12px;color:var(--text-secondary);font-size:12px;white-space:nowrap;font-family:'JetBrains Mono',monospace;">${ev.fecha||'—'}</td>
+            <td style="padding:10px 12px;font-weight:500;font-size:13px;">${caEventoLabel(ev.historia)}</td>
+            <td style="padding:10px 12px;color:var(--text-secondary);font-size:12px;">${ev.planta||'—'}</td>
           </tr>`).join('')
-      : `<tr><td colspan="4" style="text-align:center;padding:24px;color:var(--text-secondary);font-size:13px;">Sin movimientos registrados aún</td></tr>`;
+      : `<tr><td colspan="3" style="text-align:center;padding:24px;color:var(--text-secondary);font-size:13px;">Sin movimientos registrados aún</td></tr>`;
 
     contenido=`
       <div style="margin-bottom:20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
         <div>
           <p style="margin:0 0 2px;font-size:11px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;">N° de seguimiento</p>
-          <p style="margin:0;font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:600;">${caData?.trackingNumber||trackNum}</p>
+          <p style="margin:0;font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:600;">${trackNum}</p>
+          ${caData?.pieza?`<p style="margin:4px 0 0;font-size:11px;color:var(--text-secondary);">Pieza: ${caData.pieza}</p>`:''}
         </div>
         <div style="margin-left:auto;">${estadoBadge}</div>
       </div>
@@ -2508,16 +2559,16 @@ function mostrarModalTrackingCA(trackNum, caData, estado, errorMsg=''){
             <tr style="border-bottom:1px solid rgba(255,255,255,.06);">
               <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;">Fecha</th>
               <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;">Estado</th>
-              <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;">Sucursal</th>
-              <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;">Detalle</th>
+              <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;">Planta</th>
             </tr>
           </thead>
           <tbody>${filas}</tbody>
         </table>
       </div>
       <p style="margin:12px 0 0;font-size:11px;color:var(--text-secondary);text-align:right;">
-        Fuente: API MiCorreo CA · ${new Date().toLocaleString('es-AR')}
+        Fuente: Correo Argentino · ${new Date().toLocaleString('es-AR')}
       </p>`;
+  }
   }
 
   const modal=document.createElement('div');
@@ -2535,27 +2586,14 @@ function mostrarModalTrackingCA(trackNum, caData, estado, errorMsg=''){
   document.body.appendChild(modal);
 }
 
-async function pingCAProxy(){
-  try{
-    const { data:{ session } } = await sb.auth.getSession();
-    const res = await fetch(CA_PROXY_URL,{
-      method:'POST',
-      headers:{'Content-Type':'application/json','Authorization':`Bearer ${session?.access_token}`},
-      body: JSON.stringify({ action:'ping' })
-    });
-    const json = await res.json();
-    console.log('CA Proxy ping:', json);
-    return json;
-  } catch(err){ console.error('CA Proxy ping failed:', err); }
-}
-
-function mapearEstadoCA(estadoRaw){
-  const s=(estadoRaw||'').toUpperCase();
-  if(s.includes('ENTREGADO')||s.includes('ENTREGA OK')) return 'Entregado';
+function mapearEstadoCA(historia){
+  const s=(historia||'').toUpperCase();
+  if(s.includes('ENTREGADO')||s.includes('ENTREGA OK')||s.includes('ENTREGA EFECTUADA')) return 'Entregado';
   if(s.includes('DEVUELTO')||s.includes('DEVOLUCION')) return 'Devuelto';
-  if(s.includes('EN PODER DEL DISTRIBUIDOR')||s.includes('CAMINO')) return 'En camino';
-  if(s.includes('EN ESPERA EN SUCURSAL')||s.includes('SUCURSAL')) return 'En espera en sucursal';
-  if(s.includes('CENTRO DE PROCESAMIENTO')||s.includes('CLASIFIC')) return 'En tránsito';
+  if(s.includes('EN PODER DEL DISTRIBUIDOR')||s.includes('INTENTO DE ENTREGA')) return 'En camino';
+  if(s.includes('EN ESPERA EN SUCURSAL')) return 'En espera en sucursal';
+  if(s.includes('CENTRO DE PROCESAMIENTO')||s.includes('CLASIFIC')||s.includes('LLEGADA AL CENTRO')) return 'En tránsito';
+  if(s.includes('INGRESO AL CORREO')||s.includes('REPESAJE')||s.includes('PREIMPOSICION')) return 'En tránsito';
   if(s.includes('DEMORADO')||s.includes('DEMORA')) return 'Fallido';
   if(s.includes('PERDIDO')) return 'Perdido';
   if(s) return 'En tránsito';
