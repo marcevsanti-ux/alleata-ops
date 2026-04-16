@@ -2403,14 +2403,21 @@ function caEventoLabel(event){
   return event || '—';
 }
 
-// Llama directo a wsFacade.php y devuelve { eventos[], ultimoEvento, ultimoEventoFecha, estado }
+// Llama via Supabase Edge Function (proxy) y devuelve { eventos[], pieza }
 async function fetchTrackingCA(trackNum) {
-  const fd = new FormData();
-  fd.append('action', 'ecommerce');
-  fd.append('id', trackNum.trim());
-  const resp = await fetch(CA_WSFACADE_URL, { method:'POST', body:fd });
+  const { data:{ session } } = await sb.auth.getSession();
+  const resp = await fetch('https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/ca-proxy', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${session?.access_token}`
+    },
+    body: JSON.stringify({ shippingId: trackNum.trim() })
+  });
   if(!resp.ok) throw new Error(`HTTP ${resp.status}`);
-  const html = await resp.text();
+  const json = await resp.json();
+  if(json.error) throw new Error(json.error);
+  const html = json.html;
   const parser = new DOMParser();
   const doc = parser.parseFromString(html, 'text/html');
   const rows = doc.querySelectorAll('tbody tr');
