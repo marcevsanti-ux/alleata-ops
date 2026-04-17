@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v2.3.33</title>
+<title>Alleata · Operaciones v2.3.34</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -288,7 +288,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.3.33 · 17 abr 2026
+      v2.3.34 · 17 abr 2026
     </div>
   </div>
 </div>
@@ -347,7 +347,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.3.33 · 17 abr 2026
+      v2.3.34 · 17 abr 2026
     </div>
   </div>
 </nav>
@@ -361,7 +361,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <div class="topbar-right" id="topbar-date"></div>
     <button onclick="refreshCurrentModule()" title="Actualizar" style="background:none;border:1px solid var(--border2);color:var(--text-muted);border-radius:7px;padding:4px 10px;cursor:pointer;font-size:13px;margin-left:10px;transition:all .2s" onmouseover="this.style.color='var(--teal)';this.style.borderColor='var(--teal)'" onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border2)'">↺</button>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.3.33</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.3.34</div>
   </div>
   <div class="content">
 
@@ -751,6 +751,25 @@ tr:hover td{background:var(--surface2);}
         </div>
         <div id="simsImportResult" style="margin-top:10px"></div>
       </div>
+      <!-- Backfill SLA CA -->
+      <div class="card" style="margin-bottom:16px;border:1px solid rgba(227,6,19,.2)">
+        <div class="card-title">📊 Backfill SLA Correo Argentino</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px;line-height:1.6;">
+          Consulta el historial de tracking en CA para todas las OTs que aún no tienen datos de SLA (<code style="background:var(--navy-700);padding:1px 5px;border-radius:4px">sla_ca_dias = null</code>). 
+          Ejecutar una sola vez para poblar los datos históricos. Delay de 800ms por OT para no saturar CA.
+        </div>
+        <div id="backfillSLAStats" style="font-size:12px;color:var(--text-muted);margin-bottom:12px"></div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <button onclick="backfillSLACA()" id="btnBackfillSLA" style="background:rgba(227,6,19,.15);border:1px solid rgba(227,6,19,.4);color:#ff6b6b;padding:9px 18px;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;cursor:pointer;border-radius:8px;display:inline-flex;align-items:center;gap:8px;">
+            🔄 Iniciar Backfill SLA
+          </button>
+          <div id="backfillSLAMsg" style="font-size:12px;color:var(--text-muted)"></div>
+        </div>
+        <!-- Log en tiempo real -->
+        <div id="backfillSLALog" style="display:none;margin-top:14px;background:var(--navy-900);border:1px solid var(--border);border-radius:8px;padding:10px 14px;max-height:280px;overflow-y:auto;font-family:'JetBrains Mono',monospace;font-size:11px;line-height:1.7"></div>
+        <div id="backfillSLAResumen" style="display:none;margin-top:10px"></div>
+      </div>
+
       <!-- Nuevo usuario -->
       <div class="card" style="margin-bottom:16px">
         <div class="card-title">👤 Crear nuevo usuario</div>
@@ -1175,7 +1194,7 @@ tr:hover td{background:var(--surface2);}
 </div>
 
 <script>
-console.log('[Alleata v2.3.33] OK');
+console.log('[Alleata v2.3.34] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -2426,6 +2445,109 @@ function formatFechaCA(str){
   const m2 = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
   if(m2) return `${m2[3]}/${m2[2]}/${m2[1]}`;
   return str;
+}
+
+// ── BACKFILL SLA CA ──
+async function backfillSLACA(){
+  const btn = document.getElementById('btnBackfillSLA');
+  const msg = document.getElementById('backfillSLAMsg');
+  const log = document.getElementById('backfillSLALog');
+  const resumen = document.getElementById('backfillSLAResumen');
+
+  // Buscar todas las OTs de CA con track y sin sla_ca_dias
+  const { data: pendientes, error } = await sb.from('envios')
+    .select('id,ot_numero,track,estado,tipo,responsable,sla_ca_dias')
+    .eq('logistica','Correo Argentino')
+    .not('track','is',null)
+    .neq('track','')
+    .is('sla_ca_dias',null);
+
+  if(error || !pendientes || pendientes.length === 0){
+    msg.textContent = pendientes?.length === 0 ? '✅ Todas las OTs ya tienen datos SLA.' : '❌ Error al consultar.';
+    return;
+  }
+
+  // Mostrar stats antes de arrancar
+  const statsEl = document.getElementById('backfillSLAStats');
+  if(statsEl) statsEl.innerHTML = `<span style="color:var(--yellow)">⚠️ ${pendientes.length} OTs sin datos SLA encontradas. Tiempo estimado: ~${Math.ceil(pendientes.length*0.8/60)} minutos.</span>`;
+
+  btn.disabled = true;
+  btn.innerHTML = '⏳ Procesando...';
+  log.style.display = 'block';
+  log.innerHTML = '';
+  resumen.style.display = 'none';
+
+  const DELAY = 800;
+  let ok=0, sinEventos=0, errores=0;
+
+  const addLog = (icon, text, color='var(--text-muted)') => {
+    log.innerHTML += `<div style="color:${color}">${icon} ${text}</div>`;
+    log.scrollTop = log.scrollHeight;
+  };
+
+  for(let i=0; i<pendientes.length; i++){
+    const ot = pendientes[i];
+    const label = ot.ot_numero || ot.id.slice(0,8);
+    msg.textContent = `⏳ ${i+1}/${pendientes.length} — ~${Math.ceil((pendientes.length-i-1)*DELAY/1000)}s restantes`;
+
+    try {
+      const { eventos } = await fetchTrackingCA(ot.track);
+      if(!eventos || eventos.length === 0){
+        addLog('⚪', `${label} — Sin eventos en CA`);
+        sinEventos++;
+      } else {
+        const ultimo = eventos[0];
+        const sla = calcularSLA(eventos);
+        const updateData = {
+          ultimo_evento: ultimo.estadoCA ? `${ultimo.historia} — ${ultimo.estadoCA}` : ultimo.historia,
+          ultimo_evento_fecha: ultimo.fecha
+        };
+        if(sla.fecha_repesaje)       updateData.fecha_repesaje       = sla.fecha_repesaje;
+        if(sla.fecha_primer_intento) updateData.fecha_primer_intento = sla.fecha_primer_intento;
+        if(sla.cant_intentos)        updateData.cant_intentos         = sla.cant_intentos;
+        if(sla.sla_ca_dias !== null)  updateData.sla_ca_dias          = sla.sla_ca_dias;
+        if(sla.sla_total_dias !== null) updateData.sla_total_dias     = sla.sla_total_dias;
+
+        await sb.from('envios').update(updateData).eq('id', ot.id);
+
+        const slaText = sla.sla_ca_dias !== null ? `SLA: ${sla.sla_ca_dias}d` : 'sin repesaje';
+        const slaColor = sla.sla_ca_dias === null ? 'var(--text-muted)' : sla.sla_ca_dias <= 7 ? 'var(--green)' : 'var(--red)';
+        addLog('✅', `${label} — ${ot.responsable?.split(' ')[0]||''} — <span style="color:${slaColor}">${slaText}</span> — ${sla.cant_intentos||0} intento(s)`);
+        ok++;
+      }
+    } catch(e) {
+      addLog('❌', `${label} — Error: ${e.message}`, 'var(--red)');
+      errores++;
+    }
+    await new Promise(r => setTimeout(r, DELAY));
+  }
+
+  // Finalizado
+  btn.disabled = false;
+  btn.innerHTML = '✅ Backfill completado';
+  msg.textContent = '';
+
+  resumen.style.display = 'block';
+  resumen.innerHTML = `
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:6px">
+      <div style="background:rgba(16,185,129,.1);border-radius:8px;padding:8px 14px;text-align:center">
+        <div style="font-size:20px;font-weight:800;color:var(--green);font-family:'JetBrains Mono',monospace">${ok}</div>
+        <div style="font-size:10px;color:var(--green);text-transform:uppercase;letter-spacing:.8px">Actualizadas</div>
+      </div>
+      <div style="background:rgba(107,142,170,.1);border-radius:8px;padding:8px 14px;text-align:center">
+        <div style="font-size:20px;font-weight:800;color:var(--text-muted);font-family:'JetBrains Mono',monospace">${sinEventos}</div>
+        <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.8px">Sin eventos</div>
+      </div>
+      <div style="background:rgba(239,68,68,.1);border-radius:8px;padding:8px 14px;text-align:center">
+        <div style="font-size:20px;font-weight:800;color:var(--red);font-family:'JetBrains Mono',monospace">${errores}</div>
+        <div style="font-size:10px;color:var(--red);text-transform:uppercase;letter-spacing:.8px">Errores</div>
+      </div>
+    </div>
+    <div style="font-size:11px;color:var(--text-muted);margin-top:8px">Recargá el Dashboard para ver los KPIs actualizados.</div>
+  `;
+
+  // Recargar KPIs del dashboard
+  await loadCAKPIs();
 }
 
 // ── KPIs CORREO ARGENTINO ──
