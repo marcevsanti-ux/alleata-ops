@@ -552,10 +552,39 @@ tr:hover td{background:var(--surface2);}
         </div>
       </div>
 
-      <!-- Filtros (solo admin) -->
+      <!-- Stats card para operador (no-admin) -->
+      <div id="envStatsOperador" style="display:none;margin-bottom:14px">
+        <div style="background:var(--navy-800);border:1px solid var(--border2);border-radius:12px;padding:16px 20px;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+            <span style="font-size:14px;">📦</span>
+            <span style="font-size:13px;font-weight:700;color:var(--text)">Mis envíos</span>
+            <span id="opNombreLabel" style="font-size:11px;color:var(--text-muted);margin-left:4px;"></span>
+          </div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;">
+            <div onclick="document.getElementById('envFiltroEstado').value='';renderEnvios()" style="background:var(--navy-700);border-radius:8px;padding:10px 16px;text-align:center;cursor:pointer;min-width:70px;transition:all .15s;" onmouseover="this.style.background='var(--navy-600)'" onmouseout="this.style.background='var(--navy-700)'">
+              <div id="opStatTotal" style="font-size:20px;font-weight:800;font-family:'JetBrains Mono',monospace;color:var(--text)">0</div>
+              <div style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-top:2px">Total</div>
+            </div>
+            <div onclick="document.getElementById('envFiltroEstado').value='En tránsito';renderEnvios()" style="background:rgba(245,158,11,.1);border-radius:8px;padding:10px 16px;text-align:center;cursor:pointer;min-width:70px;transition:all .15s;" onmouseover="this.style.opacity='.8'" onmouseout="this.style.opacity='1'">
+              <div id="opStatTransito" style="font-size:20px;font-weight:800;font-family:'JetBrains Mono',monospace;color:var(--yellow)">0</div>
+              <div style="font-size:9px;color:var(--yellow);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-top:2px;opacity:.8">Tránsito</div>
+            </div>
+            <div onclick="document.getElementById('envFiltroEstado').value='Entregado';renderEnvios()" style="background:rgba(16,185,129,.1);border-radius:8px;padding:10px 16px;text-align:center;cursor:pointer;min-width:70px;transition:all .15s;" onmouseover="this.style.opacity='.8'" onmouseout="this.style.opacity='1'">
+              <div id="opStatEntregado" style="font-size:20px;font-weight:800;font-family:'JetBrains Mono',monospace;color:var(--green)">0</div>
+              <div style="font-size:9px;color:var(--green);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-top:2px;opacity:.8">Entregados</div>
+            </div>
+            <div onclick="document.getElementById('envFiltroEstado').value='Fallido';renderEnvios()" style="background:rgba(239,68,68,.1);border-radius:8px;padding:10px 16px;text-align:center;cursor:pointer;min-width:70px;transition:all .15s;" onmouseover="this.style.opacity='.8'" onmouseout="this.style.opacity='1'">
+              <div id="opStatProblema" style="font-size:20px;font-weight:800;font-family:'JetBrains Mono',monospace;color:var(--red)">0</div>
+              <div style="font-size:9px;color:var(--red);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-top:2px;opacity:.8">Problema</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Filtros + Buscador (todos los roles) -->
       <div id="envFiltrosCard" style="display:none;margin-bottom:14px">
         <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
-          <div class="field" style="margin:0;min-width:180px">
+          <div id="envFiltroRespWrap" class="field" style="margin:0;min-width:180px;display:none">
             <label class="label">Filtrar por responsable</label>
             <select class="select" id="envFiltroResp" onchange="renderEnvios()">
               <option value="">Todos</option>
@@ -570,15 +599,11 @@ tr:hover td{background:var(--surface2);}
               <option>Perdido</option><option>Devuelto</option>
             </select>
           </div>
+          <div style="position:relative;min-width:260px">
+            <svg style="position:absolute;left:10px;top:50%;transform:translateY(-50%);opacity:0.4;pointer-events:none" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+            <input id="envBuscar" class="input" style="padding-left:32px" placeholder="Buscar por OT, tracking o cuenta..." oninput="renderEnvios()">
+          </div>
           <button class="btn-ghost btn-sm" onclick="limpiarFiltros()">Limpiar filtros</button>
-        </div>
-      </div>
-
-      <!-- Buscador (visible para todos) -->
-      <div style="margin-bottom:14px">
-        <div style="position:relative;max-width:360px">
-          <svg style="position:absolute;left:10px;top:50%;transform:translateY(-50%);opacity:0.4;pointer-events:none" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-          <input id="envBuscar" class="input" style="padding-left:32px" placeholder="Buscar por OT, tracking o cuenta..." oninput="renderEnvios()">
         </div>
       </div>
 
@@ -1904,19 +1929,48 @@ document.getElementById('simFileInput').addEventListener('change',e=>simProcessF
 async function initEnvios(){
   const isAdmin=currentProfile?.rol==='admin';
   const isLogistica=currentProfile?.rol==='logistica';
+
+  // Filtros + buscador visibles para TODOS
+  document.getElementById('envFiltrosCard').style.display='block';
+  document.getElementById('envTablaLabel').textContent='Pre-Colecta Alleata';
+
   if(isAdmin){
     document.getElementById('sfImportCard').style.display='block';
-    document.getElementById('envFiltrosCard').style.display='block';
-    document.getElementById('envTablaLabel').textContent='Pre-Colecta Alleata';
+    // Admin ve filtro de responsable
+    const wrap=document.getElementById('envFiltroRespWrap');
+    if(wrap) wrap.style.display='block';
     await loadFiltroResponsables();
   }
   if(isLogistica){
-    document.getElementById('envTablaLabel').textContent='Pre-Colecta Alleata';
     const banner=document.getElementById('micorreoBanner');
     if(banner)banner.style.display='none';
     const thChk=document.getElementById('thChkAll');
     if(thChk)thChk.style.display='none';
   }
+  // Operador: muestra card de stats propios
+  if(!isAdmin && !isLogistica){
+    const card = document.getElementById('envStatsOperador');
+    if(card) card.style.display='block';
+    const lbl = document.getElementById('opNombreLabel');
+    if(lbl) lbl.textContent = '— ' + (currentProfile?.nombre||'');
+    await loadStatsOperador();
+  }
+}
+
+async function loadStatsOperador(){
+  const nombre = currentProfile?.nombre||'';
+  if(!nombre) return;
+  const { data } = await sb.from('envios').select('estado').eq('responsable', nombre);
+  if(!data) return;
+  const total = data.length;
+  const transito = data.filter(e=>['En tránsito','En camino','Despachado','Pre-Colecta','En espera en sucursal'].includes(e.estado)).length;
+  const entregado = data.filter(e=>e.estado==='Entregado').length;
+  const problema = data.filter(e=>['Fallido','Devuelto','Perdido'].includes(e.estado)).length;
+  const set = (id,v)=>{ const el=document.getElementById(id); if(el) el.textContent=v; };
+  set('opStatTotal',total);
+  set('opStatTransito',transito);
+  set('opStatEntregado',entregado);
+  set('opStatProblema',problema);
 }
 
 async function loadFiltroResponsables(){
@@ -1927,8 +1981,8 @@ async function loadFiltroResponsables(){
 }
 
 function limpiarFiltros(){
-  document.getElementById('envFiltroResp').value='';
-  document.getElementById('envFiltroEstado').value='';
+  const r=document.getElementById('envFiltroResp'); if(r) r.value='';
+  const e=document.getElementById('envFiltroEstado'); if(e) e.value='';
   const b=document.getElementById('envBuscar'); if(b) b.value='';
   renderEnvios();
 }
