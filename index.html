@@ -2582,12 +2582,14 @@ async function consultarTracking(id, trackNum){
     const tipoOT = envData?.tipo || '';
     const ultimo = eventos[0];
     const estadoMapeado = mapearEstadoCA(ultimo.historia, ultimo.estadoCA, tipoOT);
-    if(estadoMapeado && id){
-      await sb.from('envios').update({
-        estado: estadoMapeado,
+    if(id){
+      // Siempre actualiza evento y fecha, aunque el estado no cambie
+      const updateData = {
         ultimo_evento: ultimo.estadoCA ? `${ultimo.historia} — ${ultimo.estadoCA}` : ultimo.historia,
         ultimo_evento_fecha: ultimo.fecha
-      }).eq('id', id);
+      };
+      if(estadoMapeado) updateData.estado = estadoMapeado;
+      await sb.from('envios').update(updateData).eq('id', id);
       loadBadges(); renderEnvios();
     }
   } catch(err){
