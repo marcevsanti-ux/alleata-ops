@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v2.3.34</title>
+<title>Alleata · Operaciones v2.3.35</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -288,7 +288,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.3.34 · 17 abr 2026
+      v2.3.35 · 17 abr 2026
     </div>
   </div>
 </div>
@@ -347,7 +347,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.3.34 · 17 abr 2026
+      v2.3.35 · 17 abr 2026
     </div>
   </div>
 </nav>
@@ -361,7 +361,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <div class="topbar-right" id="topbar-date"></div>
     <button onclick="refreshCurrentModule()" title="Actualizar" style="background:none;border:1px solid var(--border2);color:var(--text-muted);border-radius:7px;padding:4px 10px;cursor:pointer;font-size:13px;margin-left:10px;transition:all .2s" onmouseover="this.style.color='var(--teal)';this.style.borderColor='var(--teal)'" onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border2)'">↺</button>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.3.34</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.3.35</div>
   </div>
   <div class="content">
 
@@ -1194,7 +1194,7 @@ tr:hover td{background:var(--surface2);}
 </div>
 
 <script>
-console.log('[Alleata v2.3.34] OK');
+console.log('[Alleata v2.3.35] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -1660,7 +1660,12 @@ async function loadOpsPanel(isAdmin){
     </div>`).join('');
 
   // ── KPIs CORREO ARGENTINO ──
-  if(isAdmin) await loadCAKPIs();
+  // Admin ve todos; operador ve sus propias OTs
+  if(isAdmin){
+    await loadCAKPIs(null);
+  } else {
+    await loadCAKPIs(nombre); // nombre del operador
+  }
 
   // ── SLA POR TIPO ──
   const slaEl=document.getElementById('ops-sla-grid');
@@ -2551,17 +2556,26 @@ async function backfillSLACA(){
 }
 
 // ── KPIs CORREO ARGENTINO ──
-async function loadCAKPIs(){
+async function loadCAKPIs(responsable=null){
   const section = document.getElementById('ca-kpi-section');
   if(!section) return;
 
-  const { data } = await sb.from('envios')
-    .select('provincia,sla_ca_dias,sla_total_dias,cant_intentos,estado')
+  let q = sb.from('envios')
+    .select('provincia,sla_ca_dias,sla_total_dias,cant_intentos,estado,responsable')
     .eq('logistica','Correo Argentino')
     .not('sla_ca_dias','is',null);
 
+  // Operador: solo sus OTs
+  if(responsable) q = q.ilike('responsable', `%${responsable.split(' ')[0]}%`);
+
+  const { data } = await q;
+
   if(!data || data.length === 0){ section.style.display='none'; return; }
   section.style.display = 'block';
+
+  // Título dinámico
+  const titleEl = document.querySelector('#ca-kpi-section .sec-title span:first-of-type');
+  if(titleEl) titleEl.textContent = responsable ? `Mi Performance — Correo Argentino` : 'Performance Correo Argentino';
 
   const SLA_TARGET = 7;
   const entregadas = data.filter(e => e.estado === 'Entregado');
@@ -2597,7 +2611,32 @@ async function loadCAKPIs(){
       <div style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.8px;font-weight:600;margin-top:4px">${c.label}</div>
     </div>`).join('');
 
-  // ── Tabla por provincia ──
+  // ── Tabla: provincia (admin) o top OTs propias (operador) ──
+  if(responsable){
+    // Operador: tabla de sus OTs con SLA más alto
+    const top = [...conSLA]
+      .filter(e => e.sla_ca_dias !== null)
+      .sort((a,b) => (b.sla_ca_dias||0) - (a.sla_ca_dias||0))
+      .slice(0,8);
+    const tbody2 = document.getElementById('ca-kpi-tbody');
+    const thead2 = document.getElementById('ca-kpi-tabla').querySelector('thead tr');
+    if(thead2) thead2.innerHTML = `
+      <th style="padding:8px 12px;text-align:left;color:var(--text-muted);font-weight:600;font-size:10px;text-transform:uppercase;letter-spacing:.5px">Estado</th>
+      <th style="padding:8px 12px;text-align:center;color:var(--text-muted);font-weight:600;font-size:10px;text-transform:uppercase;letter-spacing:.5px">SLA CA</th>
+      <th style="padding:8px 12px;text-align:center;color:var(--text-muted);font-weight:600;font-size:10px;text-transform:uppercase;letter-spacing:.5px">Intentos</th>
+      <th style="padding:8px 12px;text-align:center;color:var(--text-muted);font-weight:600;font-size:10px;text-transform:uppercase;letter-spacing:.5px">Provincia</th>`;
+    if(tbody2) tbody2.innerHTML = top.map((e,i) => {
+      const slaColor = e.sla_ca_dias<=7?'var(--green)':e.sla_ca_dias<=10?'var(--yellow)':'var(--red)';
+      return `<tr style="border-top:1px solid var(--border);${i%2===0?'':'background:rgba(255,255,255,.02)'}">
+        <td style="padding:8px 12px"><span style="font-size:11px;color:var(--text-muted)">${e.estado||'—'}</span></td>
+        <td style="padding:8px 12px;text-align:center;font-family:'JetBrains Mono',monospace;color:${slaColor};font-weight:700">${e.sla_ca_dias}d</td>
+        <td style="padding:8px 12px;text-align:center;font-family:'JetBrains Mono',monospace">${e.cant_intentos||0}</td>
+        <td style="padding:8px 12px;text-align:center;font-size:11px;color:var(--text-muted)">${e.provincia||'—'}</td>
+      </tr>`;
+    }).join('') || '<tr><td colspan="4" style="text-align:center;padding:20px;color:var(--text-muted)">Sin datos</td></tr>';
+    return; // no renderizar tabla de provincia
+  }
+
   const porProv = {};
   conSLA.forEach(e => {
     const p = e.provincia || 'Sin datos';
