@@ -2232,9 +2232,13 @@ async function renderEnvios(){
     if(filtroResp)query=query.ilike('responsable',`%${filtroResp}%`);
     if(filtroEst)query=query.eq('estado',filtroEst);
   } else {
-    // Operador ve sus OTs por nombre
+    // Operador ve sus OTs por nombre + canal activo + filtro estado
     const nombre=currentProfile?.nombre||'';
     query=query.ilike('responsable',`%${nombre}%`);
+    const logFiltroOp = _canalActivo==='CORREO' ? 'Correo Argentino' : 'ALLEATA';
+    query=query.eq('logistica',logFiltroOp);
+    const filtroEstOp=document.getElementById('envFiltroEstado')?.value||'';
+    if(filtroEstOp) query=query.eq('estado',filtroEstOp);
   }
 
   const{data:envios}=await query;
