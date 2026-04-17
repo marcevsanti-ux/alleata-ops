@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v2.3.31</title>
+<title>Alleata · Operaciones v2.3.32</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -288,7 +288,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.3.31 · 17 abr 2026
+      v2.3.32 · 17 abr 2026
     </div>
   </div>
 </div>
@@ -347,7 +347,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.3.31 · 17 abr 2026
+      v2.3.32 · 17 abr 2026
     </div>
   </div>
 </nav>
@@ -361,7 +361,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <div class="topbar-right" id="topbar-date"></div>
     <button onclick="refreshCurrentModule()" title="Actualizar" style="background:none;border:1px solid var(--border2);color:var(--text-muted);border-radius:7px;padding:4px 10px;cursor:pointer;font-size:13px;margin-left:10px;transition:all .2s" onmouseover="this.style.color='var(--teal)';this.style.borderColor='var(--teal)'" onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border2)'">↺</button>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.3.31</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.3.32</div>
   </div>
   <div class="content">
 
@@ -1141,7 +1141,7 @@ tr:hover td{background:var(--surface2);}
 </div>
 
 <script>
-console.log('[Alleata v2.3.31] OK');
+console.log('[Alleata v2.3.32] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -2331,6 +2331,53 @@ function renderLogisticaStats(list){
   }
 }
 
+// ── SLA CORREO ARGENTINO ──
+// Parsea "DD-MM-YYYY HH:MM" → Date object
+function parseFechaCA(str){
+  if(!str) return null;
+  str = (str||'').replace(/\s+/g,' ').trim();
+  const m = str.match(/^(\d{2})-(\d{2})-(\d{4})\s+(\d{2}):(\d{2})/);
+  if(m) return new Date(+m[3], +m[2]-1, +m[1], +m[4], +m[5]);
+  const m2 = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if(m2) return new Date(+m2[1], +m2[2]-1, +m2[3]);
+  return null;
+}
+
+function diffDias(d1, d2){
+  if(!d1||!d2) return null;
+  return Math.round((d2-d1)/(1000*60*60*24));
+}
+
+function calcularSLA(eventos){
+  // eventos[0] = más reciente, eventos[last] = más antiguo
+  const result = { fecha_repesaje:null, fecha_primer_intento:null, cant_intentos:0, sla_ca_dias:null, sla_total_dias:null };
+  
+  // Buscar REPESAJE (el más antiguo = último en el array)
+  const repRow = [...eventos].reverse().find(e => /REPESAJE|INGRESO AL CORREO/i.test(e.historia));
+  if(repRow) result.fecha_repesaje = repRow.fecha;
+
+  // Contar intentos de entrega y guardar el primero (más antiguo)
+  const intentos = [...eventos].reverse().filter(e => /INTENTO DE ENTREGA/i.test(e.historia));
+  result.cant_intentos = intentos.length;
+  if(intentos.length > 0) result.fecha_primer_intento = intentos[0].fecha;
+
+  // SLA CA: repesaje → primer intento
+  if(result.fecha_repesaje && result.fecha_primer_intento){
+    const d1 = parseFechaCA(result.fecha_repesaje);
+    const d2 = parseFechaCA(result.fecha_primer_intento);
+    result.sla_ca_dias = diffDias(d1, d2);
+  }
+
+  // SLA total: repesaje → último evento (eventos[0])
+  if(result.fecha_repesaje && eventos[0]?.fecha){
+    const d1 = parseFechaCA(result.fecha_repesaje);
+    const d2 = parseFechaCA(eventos[0].fecha);
+    result.sla_total_dias = diffDias(d1, d2);
+  }
+
+  return result;
+}
+
 // Formatea fecha de CA: soporta "31-03-2026 10:47", "2026-04-10", "2026-04-10T..." 
 function formatFechaCA(str){
   if(!str) return '';
@@ -2554,10 +2601,10 @@ async function fetchTrackingCA(trackNum) {
   rows.forEach(row => {
     const tds = row.querySelectorAll('td');
     if(tds.length >= 3) eventos.push({
-      fecha:    tds[0]?.textContent?.trim()||'',
-      planta:   tds[1]?.textContent?.trim()||'',
-      historia: tds[2]?.textContent?.trim()||'',
-      estadoCA: tds[3]?.textContent?.trim()||'',
+      fecha:    (tds[0]?.textContent||'').replace(/\s+/g,' ').trim(),
+      planta:   (tds[1]?.textContent||'').replace(/\s+/g,' ').trim(),
+      historia: (tds[2]?.textContent||'').replace(/\s+/g,' ').trim(),
+      estadoCA: (tds[3]?.textContent||'').replace(/\s+/g,' ').trim(),
     });
   });
   // Obtener pieza (HC-XXXXXX-AR)
@@ -2583,12 +2630,20 @@ async function consultarTracking(id, trackNum){
     const ultimo = eventos[0];
     const estadoMapeado = mapearEstadoCA(ultimo.historia, ultimo.estadoCA, tipoOT);
     if(id){
-      // Siempre actualiza evento y fecha, aunque el estado no cambie
       const updateData = {
         ultimo_evento: ultimo.estadoCA ? `${ultimo.historia} — ${ultimo.estadoCA}` : ultimo.historia,
         ultimo_evento_fecha: ultimo.fecha
       };
       if(estadoMapeado) updateData.estado = estadoMapeado;
+
+      // ── SLA: extraer fechas clave del historial ──
+      const sla = calcularSLA(eventos);
+      if(sla.fecha_repesaje)      updateData.fecha_repesaje      = sla.fecha_repesaje;
+      if(sla.fecha_primer_intento)updateData.fecha_primer_intento= sla.fecha_primer_intento;
+      if(sla.cant_intentos)       updateData.cant_intentos        = sla.cant_intentos;
+      if(sla.sla_ca_dias !== null) updateData.sla_ca_dias         = sla.sla_ca_dias;
+      if(sla.sla_total_dias !== null) updateData.sla_total_dias   = sla.sla_total_dias;
+
       await sb.from('envios').update(updateData).eq('id', id);
       loadBadges(); renderEnvios();
     }
@@ -2740,12 +2795,20 @@ async function autoActualizarTracking(){
         // Detectar alertas especiales
         const esAlerta = /DOMICILIO CERRADO|DIRECCIÓN INSUFICIENTE|RETORNANDO/i.test(ultimo.estadoCA + ' ' + ultimo.historia);
 
+        const sla = calcularSLA(eventos);
+        const updateAT = {
+          ultimo_evento: detalle,
+          ultimo_evento_fecha: ultimo.fecha
+        };
+        if(sla.fecha_repesaje)       updateAT.fecha_repesaje       = sla.fecha_repesaje;
+        if(sla.fecha_primer_intento) updateAT.fecha_primer_intento = sla.fecha_primer_intento;
+        if(sla.cant_intentos)        updateAT.cant_intentos         = sla.cant_intentos;
+        if(sla.sla_ca_dias !== null)  updateAT.sla_ca_dias          = sla.sla_ca_dias;
+        if(sla.sla_total_dias !== null) updateAT.sla_total_dias     = sla.sla_total_dias;
+
         if(estadoMapeado && estadoMapeado !== envio.estado){
-          await sb.from('envios').update({
-            estado: estadoMapeado,
-            ultimo_evento: detalle,
-            ultimo_evento_fecha: ultimo.fecha
-          }).eq('id', envio.id);
+          updateAT.estado = estadoMapeado;
+          await sb.from('envios').update(updateAT).eq('id', envio.id);
           if(esAlerta){
             atAddLog('alerta', otLabel, envio.responsable, envio.cuenta, `⚠️ ${detalle}`);
             alertas++;
@@ -2754,6 +2817,8 @@ async function autoActualizarTracking(){
             actualizados++;
           }
         } else {
+          // Aunque no cambie el estado, actualizar SLA y evento
+          await sb.from('envios').update(updateAT).eq('id', envio.id);
           if(esAlerta){
             atAddLog('alerta', otLabel, envio.responsable, envio.cuenta, `⚠️ ${detalle}`);
             alertas++;
