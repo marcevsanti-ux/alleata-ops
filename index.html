@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v2.3.36</title>
+<title>Alleata · Operaciones v2.3.37</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -288,7 +288,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.3.36 · 17 abr 2026
+      v2.3.37 · 17 abr 2026
     </div>
   </div>
 </div>
@@ -347,7 +347,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.3.36 · 17 abr 2026
+      v2.3.37 · 17 abr 2026
     </div>
   </div>
 </nav>
@@ -361,7 +361,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <div class="topbar-right" id="topbar-date"></div>
     <button onclick="refreshCurrentModule()" title="Actualizar" style="background:none;border:1px solid var(--border2);color:var(--text-muted);border-radius:7px;padding:4px 10px;cursor:pointer;font-size:13px;margin-left:10px;transition:all .2s" onmouseover="this.style.color='var(--teal)';this.style.borderColor='var(--teal)'" onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border2)'">↺</button>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.3.36</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.3.37</div>
   </div>
   <div class="content">
 
@@ -1232,7 +1232,7 @@ tr:hover td{background:var(--surface2);}
 </div>
 
 <script>
-console.log('[Alleata v2.3.36] OK');
+console.log('[Alleata v2.3.37] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -2537,6 +2537,121 @@ async function guardarConfigSLA(){
   }
 }
 
+// ── COTIZADOR CA ──
+const CA_CUSTOMER_ID = '0001226778';
+const CA_API_BASE = 'https://api.correoargentino.com.ar/micorreo/v1';
+let _cotizadorEnvioId = null;
+let _caToken = null;
+let _caTokenExp = null;
+
+async function getCAToken(){
+  // Reusar token si no expiró (con 30s de margen)
+  if(_caToken && _caTokenExp && new Date(_caTokenExp) > new Date(Date.now() + 30000)) return _caToken;
+  const creds = btoa('MorettiAPI:Pelota22+');
+  const r = await fetch(CA_API_BASE + '/token', {
+    method:'POST',
+    headers:{ 'Authorization':'Basic ' + creds, 'Content-Type':'application/json' }
+  });
+  if(!r.ok) throw new Error('Error autenticando con CA: ' + r.status);
+  const d = await r.json();
+  _caToken = d.token;
+  _caTokenExp = d.expires;
+  return _caToken;
+}
+
+function abrirCotizador(envioId, cpDest, responsable){
+  _cotizadorEnvioId = envioId;
+  document.getElementById('cotizadorSubtitle').textContent = `OT: ${envioId.slice(-8)} · Responsable: ${responsable||'—'}`;
+  document.getElementById('cotCpDest').value = cpDest || '';
+  document.getElementById('cotizadorResultados').style.display = 'none';
+  document.getElementById('cotizadorError').style.display = 'none';
+  document.getElementById('cotizadorLoading').style.display = 'none';
+  document.getElementById('cotizadorOpciones').innerHTML = '';
+  const modal = document.getElementById('modalCotizador');
+  modal.style.display = 'flex';
+}
+
+function cerrarCotizador(){
+  document.getElementById('modalCotizador').style.display = 'none';
+  _cotizadorEnvioId = null;
+}
+
+async function ejecutarCotizacion(){
+  const cpDest = document.getElementById('cotCpDest').value.trim();
+  const cpOrig = document.getElementById('cotCpOrig').value.trim();
+  const errEl = document.getElementById('cotizadorError');
+  const loadEl = document.getElementById('cotizadorLoading');
+  const resEl = document.getElementById('cotizadorResultados');
+
+  if(!cpDest){ errEl.textContent = '⚠️ Ingresá el CP de destino'; errEl.style.display='block'; return; }
+  errEl.style.display = 'none';
+  loadEl.style.display = 'block';
+  resEl.style.display = 'none';
+
+  try {
+    const token = await getCAToken();
+    const body = {
+      customerId: CA_CUSTOMER_ID,
+      postalCodeOrigin: cpOrig,
+      postalCodeDestination: cpDest,
+      dimensions: { weight: 2000, height: 15, width: 15, length: 30 }
+    };
+    const r = await fetch(CA_API_BASE + '/rates', {
+      method:'POST',
+      headers:{ 'Authorization':'Bearer ' + token, 'Content-Type':'application/json' },
+      body: JSON.stringify(body)
+    });
+    const data = await r.json();
+    if(!r.ok) throw new Error(data.message || 'Error ' + r.status);
+
+    loadEl.style.display = 'none';
+    resEl.style.display = 'block';
+
+    const validEl = document.getElementById('cotizadorValidez');
+    if(data.validTo) validEl.textContent = 'Válido hasta: ' + new Date(data.validTo).toLocaleString('es-AR');
+
+    const opEl = document.getElementById('cotizadorOpciones');
+    opEl.innerHTML = data.rates.map(r => {
+      const tipo = r.deliveredType === 'D' ? '🏠 Domicilio' : '🏢 Sucursal';
+      const tipoLabel = r.deliveredType === 'D' ? 'Domicilio' : 'Sucursal';
+      const precio = new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS'}).format(r.price);
+      const plazo = `${r.deliveryTimeMin}–${r.deliveryTimeMax} días hábiles`;
+      const isExpreso = r.productType === 'EP';
+      return `<div onclick="seleccionarTarifa(${r.price},'${tipoLabel} ${r.productName}')"
+        style="background:var(--navy-700);border:1px solid var(--border2);border-radius:10px;padding:14px 16px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;transition:border-color .15s"
+        onmouseover="this.style.borderColor='var(--teal)'" onmouseout="this.style.borderColor='var(--border2)'">
+        <div>
+          <div style="font-size:13px;font-weight:600;color:var(--text)">${tipo} — ${r.productName}</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:3px">⏱ ${plazo}</div>
+        </div>
+        <div style="font-size:18px;font-weight:800;font-family:'JetBrains Mono',monospace;color:${isExpreso?'var(--blue)':'var(--teal)'}">
+          ${precio}
+        </div>
+      </div>`;
+    }).join('');
+
+  } catch(e){
+    loadEl.style.display = 'none';
+    errEl.textContent = '❌ ' + e.message;
+    errEl.style.display = 'block';
+  }
+}
+
+async function seleccionarTarifa(precio, descripcion){
+  if(!_cotizadorEnvioId) return;
+  const { error } = await sb.from('envios').update({ costo_envio: precio }).eq('id', _cotizadorEnvioId);
+  if(error){ alert('Error guardando: ' + error.message); return; }
+  // Actualizar en memoria
+  const idx = _enviosData.findIndex(e => e.id === _cotizadorEnvioId);
+  if(idx >= 0) _enviosData[idx].costo_envio = precio;
+  cerrarCotizador();
+  renderEnviosTable(_enviosData);
+  showToastPortal(`✅ Costo guardado: ${new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS'}).format(precio)} — ${descripcion}`);
+}
+
+// Cerrar modal con Escape
+document.addEventListener('keydown', e => { if(e.key==='Escape') cerrarCotizador(); });
+
 // ── BACKFILL SLA CA ──
 async function backfillSLACA(){
   const btn = document.getElementById('btnBackfillSLA');
@@ -2836,7 +2951,11 @@ function renderEnviosTable(list){
         <div style="font-size:10px;color:var(--text-muted)">${e.provincia||''}</div>
       </td>
       <td>
-        ${e.costo_envio?`<div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--teal);font-weight:600">$${Number(e.costo_envio).toLocaleString('es-AR')}</div>`:'<span style="color:var(--text-muted);font-size:11px">—</span>'}
+        ${e.costo_envio
+          ? `<div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--teal);font-weight:600">$${Number(e.costo_envio).toLocaleString('es-AR')}</div>
+             <button title="Re-cotizar" onclick="abrirCotizador('${e.id}','${e.cp_dest||''}','${e.responsable||''}')" style="background:none;border:none;color:var(--text-muted);font-size:10px;cursor:pointer;padding:2px 0;text-decoration:underline">recotizar</button>`
+          : `<button onclick="abrirCotizador('${e.id}','${e.cp_dest||''}','${e.responsable||''}')" style="background:rgba(245,158,11,.15);border:1px solid #f59e0b;color:#f59e0b;font-size:11px;font-weight:600;padding:5px 10px;border-radius:7px;cursor:pointer">💰 Cotizar</button>`
+        }
       </td>
       <td>
         <!-- SELECT ESTADO ENVÍO -->
@@ -5319,5 +5438,44 @@ async function dsGuardar(){
 }
 
 </script>
+<!-- MODAL COTIZADOR CA -->
+<div id="modalCotizador" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;align-items:center;justify-content:center">
+  <div style="background:var(--navy-800);border:1px solid var(--border2);border-radius:14px;padding:28px;width:460px;max-width:95vw;max-height:90vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <div style="font-size:16px;font-weight:700;color:var(--text)">💰 Cotizar envío — CA</div>
+      <button onclick="cerrarCotizador()" style="background:none;border:none;color:var(--text-muted);font-size:20px;cursor:pointer;line-height:1">×</button>
+    </div>
+    <div id="cotizadorSubtitle" style="font-size:12px;color:var(--text-muted);margin-bottom:18px"></div>
+
+    <!-- CP Destino -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
+      <div>
+        <label style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:5px">CP Destino</label>
+        <input id="cotCpDest" class="input" style="font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:700;text-align:center" placeholder="Ej: 1408" />
+      </div>
+      <div>
+        <label style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:5px">CP Origen</label>
+        <input id="cotCpOrig" class="input" value="1842" style="font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:700;text-align:center" />
+      </div>
+    </div>
+
+    <button onclick="ejecutarCotizacion()" style="background:var(--grad);color:#fff;border:none;width:100%;padding:10px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;margin-bottom:16px">
+      🔍 Consultar tarifas
+    </button>
+
+    <!-- Resultados -->
+    <div id="cotizadorResultados" style="display:none">
+      <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">Seleccioná una opción:</div>
+      <div id="cotizadorOpciones" style="display:flex;flex-direction:column;gap:8px"></div>
+      <div id="cotizadorValidez" style="font-size:10px;color:var(--text-muted);margin-top:10px;text-align:right"></div>
+    </div>
+
+    <div id="cotizadorLoading" style="display:none;text-align:center;padding:20px;color:var(--text-muted);font-size:13px">
+      ⏳ Consultando tarifas CA...
+    </div>
+    <div id="cotizadorError" style="display:none;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);border-radius:8px;padding:12px;font-size:12px;color:#ef4444;margin-top:8px"></div>
+  </div>
+</div>
+
 </body>
 </html>
