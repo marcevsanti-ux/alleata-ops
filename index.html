@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v2.3.37</title>
+<title>Alleata · Operaciones v2.3.38</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -288,7 +288,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.3.37 · 17 abr 2026
+      v2.3.38 · 17 abr 2026
     </div>
   </div>
 </div>
@@ -347,7 +347,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.3.37 · 17 abr 2026
+      v2.3.38 · 17 abr 2026
     </div>
   </div>
 </nav>
@@ -361,7 +361,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <div class="topbar-right" id="topbar-date"></div>
     <button onclick="refreshCurrentModule()" title="Actualizar" style="background:none;border:1px solid var(--border2);color:var(--text-muted);border-radius:7px;padding:4px 10px;cursor:pointer;font-size:13px;margin-left:10px;transition:all .2s" onmouseover="this.style.color='var(--teal)';this.style.borderColor='var(--teal)'" onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border2)'">↺</button>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.3.37</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.3.38</div>
   </div>
   <div class="content">
 
@@ -1232,7 +1232,7 @@ tr:hover td{background:var(--surface2);}
 </div>
 
 <script>
-console.log('[Alleata v2.3.37] OK');
+console.log('[Alleata v2.3.38] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -2539,6 +2539,7 @@ async function guardarConfigSLA(){
 
 // ── COTIZADOR CA ──
 const CA_CUSTOMER_ID = '0001226778';
+const CA_CP_ORIGEN = '1289'; // CP Moretti (C.California 2082, CABA)
 const CA_API_BASE = 'https://api.correoargentino.com.ar/micorreo/v1';
 let _cotizadorEnvioId = null;
 let _caToken = null;
@@ -2578,7 +2579,7 @@ function cerrarCotizador(){
 
 async function ejecutarCotizacion(){
   const cpDest = document.getElementById('cotCpDest').value.trim();
-  const cpOrig = document.getElementById('cotCpOrig').value.trim();
+  const cpOrig = document.getElementById('cotCpOrig').value.trim() || CA_CP_ORIGEN;
   const errEl = document.getElementById('cotizadorError');
   const loadEl = document.getElementById('cotizadorLoading');
   const resEl = document.getElementById('cotizadorResultados');
@@ -2954,7 +2955,9 @@ function renderEnviosTable(list){
         ${e.costo_envio
           ? `<div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--teal);font-weight:600">$${Number(e.costo_envio).toLocaleString('es-AR')}</div>
              <button title="Re-cotizar" onclick="abrirCotizador('${e.id}','${e.cp_dest||''}','${e.responsable||''}')" style="background:none;border:none;color:var(--text-muted);font-size:10px;cursor:pointer;padding:2px 0;text-decoration:underline">recotizar</button>`
-          : `<button onclick="abrirCotizador('${e.id}','${e.cp_dest||''}','${e.responsable||''}')" style="background:rgba(245,158,11,.15);border:1px solid #f59e0b;color:#f59e0b;font-size:11px;font-weight:600;padding:5px 10px;border-radius:7px;cursor:pointer">💰 Cotizar</button>`
+          : e.estado === 'Pre-Colecta'
+            ? `<button onclick="abrirCotizador('${e.id}','${e.cp_dest||''}','${e.responsable||''}')" style="background:rgba(245,158,11,.15);border:1px solid #f59e0b;color:#f59e0b;font-size:11px;font-weight:600;padding:5px 10px;border-radius:7px;cursor:pointer">💰 Cotizar</button>`
+            : `<button disabled title="Solo disponible en estado Pre-Colecta" style="background:var(--surface2);border:1px solid var(--border);color:var(--text-muted);font-size:11px;padding:5px 10px;border-radius:7px;cursor:not-allowed;opacity:.4">💰 Cotizar</button>`
         }
       </td>
       <td>
@@ -5455,7 +5458,7 @@ async function dsGuardar(){
       </div>
       <div>
         <label style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:5px">CP Origen</label>
-        <input id="cotCpOrig" class="input" value="1842" style="font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:700;text-align:center" />
+        <input id="cotCpOrig" class="input" value="1289" style="font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:700;text-align:center" />
       </div>
     </div>
 
