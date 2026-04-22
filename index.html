@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v2.3.39</title>
+<title>Alleata · Operaciones v2.3.41</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -288,7 +288,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.3.39 · 17 abr 2026
+      v2.3.41 · 17 abr 2026
     </div>
   </div>
 </div>
@@ -347,7 +347,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.3.39 · 17 abr 2026
+      v2.3.41 · 17 abr 2026
     </div>
   </div>
 </nav>
@@ -361,7 +361,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <div class="topbar-right" id="topbar-date"></div>
     <button onclick="refreshCurrentModule()" title="Actualizar" style="background:none;border:1px solid var(--border2);color:var(--text-muted);border-radius:7px;padding:4px 10px;cursor:pointer;font-size:13px;margin-left:10px;transition:all .2s" onmouseover="this.style.color='var(--teal)';this.style.borderColor='var(--teal)'" onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border2)'">↺</button>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.3.39</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.3.41</div>
   </div>
   <div class="content">
 
@@ -1232,7 +1232,7 @@ tr:hover td{background:var(--surface2);}
 </div>
 
 <script>
-console.log('[Alleata v2.3.39] OK');
+console.log('[Alleata v2.3.41] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -2560,10 +2560,21 @@ async function getCAToken(){
   return _caToken;
 }
 
-function abrirCotizador(envioId, cpDest, responsable){
+function abrirCotizador(envioId, cpDest, responsable, calle, ciudad, provincia){
   _cotizadorEnvioId = envioId;
   document.getElementById('cotizadorSubtitle').textContent = `OT: ${envioId.slice(-8)} · Responsable: ${responsable||'—'}`;
   document.getElementById('cotCpDest').value = cpDest || '';
+  // Mostrar dirección destino
+  const dirParts = [calle, ciudad, provincia].filter(Boolean);
+  const dirEl = document.getElementById('cotizadorDireccion');
+  if(dirEl){
+    if(dirParts.length){
+      dirEl.textContent = '📍 ' + dirParts.join(', ');
+      dirEl.style.display = 'block';
+    } else {
+      dirEl.style.display = 'none';
+    }
+  }
   document.getElementById('cotizadorResultados').style.display = 'none';
   document.getElementById('cotizadorError').style.display = 'none';
   document.getElementById('cotizadorLoading').style.display = 'none';
@@ -2954,9 +2965,9 @@ function renderEnviosTable(list){
       <td>
         ${e.costo_envio
           ? `<div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--teal);font-weight:600">$${Number(e.costo_envio).toLocaleString('es-AR')}</div>
-             <button title="Re-cotizar" onclick="abrirCotizador('${e.id}','${e.cp_dest||''}','${e.responsable||''}')" style="background:none;border:none;color:var(--text-muted);font-size:10px;cursor:pointer;padding:2px 0;text-decoration:underline">recotizar</button>`
+             <button title="Re-cotizar" onclick="abrirCotizador('${e.id}','${e.cp_dest||''}','${e.responsable||''}','${(e.direccion_completa||'').replace(/'/g,'')}','${e.ciudad||''}','${e.provincia||''}')" style="background:none;border:none;color:var(--text-muted);font-size:10px;cursor:pointer;padding:2px 0;text-decoration:underline">recotizar</button>`
           : e.estado === 'Pre-Colecta'
-            ? `<button onclick="abrirCotizador('${e.id}','${e.cp_dest||''}','${e.responsable||''}')" style="background:rgba(245,158,11,.15);border:1px solid #f59e0b;color:#f59e0b;font-size:11px;font-weight:600;padding:5px 10px;border-radius:7px;cursor:pointer">💰 Cotizar</button>`
+            ? `<button onclick="abrirCotizador('${e.id}','${e.cp_dest||''}','${e.responsable||''}','${(e.direccion_completa||'').replace(/'/g,'')}','${e.ciudad||''}','${e.provincia||''}')" style="background:rgba(245,158,11,.15);border:1px solid #f59e0b;color:#f59e0b;font-size:11px;font-weight:600;padding:5px 10px;border-radius:7px;cursor:pointer">💰 Cotizar</button>`
             : `<button disabled title="Solo disponible en estado Pre-Colecta" style="background:var(--surface2);border:1px solid var(--border);color:var(--text-muted);font-size:11px;padding:5px 10px;border-radius:7px;cursor:not-allowed;opacity:.4">💰 Cotizar</button>`
         }
       </td>
@@ -5448,7 +5459,8 @@ async function dsGuardar(){
       <div style="font-size:16px;font-weight:700;color:var(--text)">💰 Cotizar envío — CA</div>
       <button onclick="cerrarCotizador()" style="background:none;border:none;color:var(--text-muted);font-size:20px;cursor:pointer;line-height:1">×</button>
     </div>
-    <div id="cotizadorSubtitle" style="font-size:12px;color:var(--text-muted);margin-bottom:18px"></div>
+    <div id="cotizadorSubtitle" style="font-size:12px;color:var(--text-muted);margin-bottom:6px"></div>
+    <div id="cotizadorDireccion" style="display:none;font-size:12px;color:var(--teal);font-weight:500;margin-bottom:14px;background:rgba(29,191,142,.08);border-radius:7px;padding:7px 12px"></div>
 
     <!-- CP Destino -->
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
@@ -5460,6 +5472,13 @@ async function dsGuardar(){
         <label style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:5px">CP Origen</label>
         <input id="cotCpOrig" class="input" value="1289" style="font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:700;text-align:center" />
       </div>
+    </div>
+
+    <!-- Info paquete -->
+    <div style="background:var(--navy-700);border-radius:8px;padding:10px 14px;margin-bottom:12px;display:flex;gap:16px;flex-wrap:wrap;font-size:11px;color:var(--text-muted)">
+      <span>📦 <b style="color:var(--text)">15×28×24 cm</b></span>
+      <span>⚖️ <b style="color:var(--text)">2 kg</b></span>
+      <span>💵 Valor declarado: <b style="color:var(--text)">$100.000</b></span>
     </div>
 
     <button onclick="ejecutarCotizacion()" style="background:var(--grad);color:#fff;border:none;width:100%;padding:10px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;margin-bottom:16px">
