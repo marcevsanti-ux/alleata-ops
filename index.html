@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v2.3.42</title>
+<title>Alleata · Operaciones v2.3.43</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -288,7 +288,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.3.42 · 17 abr 2026
+      v2.3.43 · 24 abr 2026
     </div>
   </div>
 </div>
@@ -347,7 +347,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.3.42 · 17 abr 2026
+      v2.3.43 · 24 abr 2026
     </div>
   </div>
 </nav>
@@ -361,7 +361,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <div class="topbar-right" id="topbar-date"></div>
     <button onclick="refreshCurrentModule()" title="Actualizar" style="background:none;border:1px solid var(--border2);color:var(--text-muted);border-radius:7px;padding:4px 10px;cursor:pointer;font-size:13px;margin-left:10px;transition:all .2s" onmouseover="this.style.color='var(--teal)';this.style.borderColor='var(--teal)'" onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border2)'">↺</button>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.3.42</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.3.43</div>
   </div>
   <div class="content">
 
@@ -986,16 +986,31 @@ tr:hover td{background:var(--surface2);}
         <option value="critico">Crítico</option><option value="alerta">Alerta</option><option value="verde">En término</option>
       </select>
       <div id="ds-op-pills" style="display:flex;gap:5px;flex-wrap:wrap"></div>
-      <a href="https://alleata.lightning.force.com/lightning/r/Report/00ORm00000CPncvMAD/view?queryScope=userFolders"
-         target="_blank"
-         style="display:inline-flex;align-items:center;gap:6px;padding:6px 14px;background:linear-gradient(135deg,#1dbf8e,#1a9fd4);color:#fff;font-size:12px;font-weight:600;border-radius:8px;text-decoration:none;white-space:nowrap;margin-left:auto">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="flex-shrink:0">
-          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-          <polyline points="7 10 12 15 17 10"/>
-          <line x1="12" y1="15" x2="12" y2="3"/>
-        </svg>
-        Descargar archivo SF
-      </a>
+    </div>
+
+    <!-- Import Desinstalaciones SF -->
+    <div id="dsImportArea" style="margin-bottom:14px;background:var(--navy-700);border-radius:10px;padding:14px 18px;">
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+        <label id="dsImportLabel" style="background:var(--grad);color:#fff;border:none;padding:8px 18px;font-family:'Inter',sans-serif;font-size:12px;font-weight:700;cursor:pointer;border-radius:8px;display:inline-flex;align-items:center;gap:7px;white-space:nowrap;">
+          📂 Importar desde Salesforce
+          <input type="file" id="dsFileInput" accept=".xlsx,.xls" style="display:none" onchange="importDesinstalaciones(event)">
+        </label>
+        <div style="display:flex;align-items:center;gap:6px;padding:6px 12px;background:var(--navy-600);border-radius:7px;flex:1;min-width:200px;">
+          <span style="font-size:11px;color:var(--text-muted);white-space:nowrap;">📊 Reporte SF:</span>
+          <a href="https://alleata.lightning.force.com/lightning/r/Report/00ORm00000CPncvMAD/view?queryScope=userFolders"
+             target="_blank"
+             style="font-size:11px;color:var(--blue);text-decoration:none;font-weight:500;white-space:nowrap;"
+             onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">
+            Desinstalaciones Pendientes ↗
+          </a>
+        </div>
+      </div>
+      <div id="dsImportMsg" style="font-size:11px;color:var(--text-muted);margin-top:8px"></div>
+      <div id="dsImportProgress" style="display:none;margin-top:8px">
+        <div class="progress-text" id="dsProgressText">Procesando...</div>
+        <div class="progress-track" style="margin-top:4px"><div class="progress-fill" id="dsProgressFill"></div></div>
+      </div>
+      <div id="dsImportResult"></div>
     </div>
     <div class="table-wrap">
       <table class="table">
@@ -1241,7 +1256,7 @@ tr:hover td{background:var(--surface2);}
 </div>
 
 <script>
-console.log('[Alleata v2.3.42] OK');
+console.log('[Alleata v2.3.43] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -5449,6 +5464,139 @@ function dsModalAbrir(otNum){
 function dsModalClose(){document.getElementById('ds-modal-overlay').style.display='none';DesinModule.otActual=null;DesinModule.nuevoEstado=null;}
 document.getElementById('ds-modal-overlay').addEventListener('click',function(e){if(e.target===this)dsModalClose();});
 function dsSelEst(btn,estado){document.querySelectorAll('.ds-est-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');DesinModule.nuevoEstado=estado;}
+
+async function importDesinstalaciones(e){
+  const file=e.target.files[0];
+  if(!file)return;
+  const msg=document.getElementById('dsImportMsg');
+  const prog=document.getElementById('dsImportProgress');
+  const fill=document.getElementById('dsProgressFill');
+  const ptext=document.getElementById('dsProgressText');
+  const result=document.getElementById('dsImportResult');
+  msg.textContent='';result.innerHTML='';
+  prog.style.display='block';
+  ptext.textContent='Leyendo archivo...';fill.style.width='20%';
+
+  try{
+    const data=await file.arrayBuffer();
+    const{read,utils}=XLSX;
+    const wb=read(data);
+    const ws=wb.Sheets[wb.SheetNames[0]];
+    const rows=utils.sheet_to_json(ws,{header:1,defval:null});
+
+    // Buscar fila de encabezados
+    let headerIdx=-1;
+    for(let i=0;i<rows.length;i++){
+      if(rows[i]&&rows[i].some(c=>String(c||'').includes('Id. de orden de trabajo'))){headerIdx=i;break;}
+    }
+    if(headerIdx===-1)throw new Error('No se encontró la fila de encabezados. Verificá que sea el reporte de SF.');
+    const headers=rows[headerIdx].map(h=>String(h||'').trim());
+    const col=(name)=>headers.findIndex(h=>h.toLowerCase().includes(name.toLowerCase()));
+
+    const iSFId=col('Id. de orden de trabajo');
+    const iOT=col('Número de orden');
+    const iResp=col('Responsable');
+    const iTipo=col('Tipo de registro');
+    const iCuenta=col('cuenta');
+    const iComercio=col('Nombre del comercio')>=0?col('Nombre del comercio'):col('cuenta');
+    const iCiudad=col('Ciudad');
+    const iProv=col('Estado/Provincia');
+    const iCP=col('Código postal');
+    const iObs=col('Observaciones');
+    const iFecha=col('Fecha de creación')>=0?col('Fecha de creación'):col('Fecha de Despacho');
+    const iLogistica=col('Logística');
+    const iMotivo=col('Motivo de desinstalación');
+    const iAsig=col('Asignación');
+
+    function parseDate(str){
+      if(!str)return null;
+      const s=String(str).trim();
+      const parts=s.split('/');
+      if(parts.length===3){
+        const d=parts[0].padStart(2,'0');
+        const m=parts[1].padStart(2,'0');
+        const y=parts[2].length===2?'20'+parts[2]:parts[2];
+        return `${y}-${m}-${d}`;
+      }
+      return s||null;
+    }
+
+    function detectZona(prov){
+      if(!prov)return'interior';
+      const p=prov.toUpperCase();
+      if(p.includes('BUENOS AIRES')||p.includes('CABA')||p.includes('CAPITAL'))return'AMBA';
+      return'interior';
+    }
+
+    // Buscar operadores para mapear responsable → operador_id
+    const{data:profiles}=await sb.from('profiles').select('id,nombre');
+    const findUser=(nombre)=>{
+      if(!nombre)return null;
+      const n=nombre.toLowerCase();
+      const p=profiles?.find(p=>p.nombre&&n.includes(p.nombre.toLowerCase().split(' ')[0].toLowerCase()));
+      return p?.nombre||nombre; // devuelve nombre del perfil o el nombre original
+    };
+
+    const dataRows=rows.slice(headerIdx+1).filter(r=>r&&r.some(c=>c!==null));
+    // Filtrar subtotales
+    const validRows=dataRows.filter(r=>{
+      const sfId=String(r[iSFId]||'').trim();
+      const ot=String(r[iOT]||'').trim();
+      if(!sfId||!ot)return false;
+      if(ot.toLowerCase()==='subtotal'||ot.toLowerCase()==='total')return false;
+      return true;
+    });
+
+    ptext.textContent=`Procesando ${validRows.length} OTs...`;fill.style.width='50%';
+
+    let importadas=0,duplicadas=0,errores=0;
+    for(const r of validRows){
+      const sfId=String(r[iSFId]||'').trim();
+      const ot=String(r[iOT]||'').trim();
+      const resp=String(r[iResp]||'').trim();
+      const ciudad=String(r[iCiudad]||'').trim();
+      const prov=String(r[iProv]||'').trim();
+      const item={
+        sf_id:sfId,
+        ot:ot,
+        responsable:resp,
+        operador_id:findUser(resp),
+        tipo:'desinstalacion',
+        tipo_sf:String(r[iTipo]||'').trim(),
+        comercio:iComercio>=0?String(r[iComercio]||'').trim():null,
+        cuenta:String(r[iCuenta]||'').trim(),
+        ciudad:ciudad,
+        provincia:prov,
+        zona:detectZona(prov),
+        cp:iCP>=0?String(r[iCP]||'').trim()||null:null,
+        observaciones:iObs>=0?String(r[iObs]||'').trim()||null:null,
+        fecha_asignacion:parseDate(r[iFecha>=0?iFecha:null]),
+        logistica:iLogistica>=0&&r[iLogistica]?String(r[iLogistica]).trim():'SF',
+        motivo_desinstalacion:iMotivo>=0?String(r[iMotivo]||'').trim()||null:null,
+        estado:'Pendiente',
+      };
+      Object.keys(item).forEach(k=>item[k]===null&&delete item[k]);
+      const{error}=await sb.from('ordenes_trabajo').upsert(item,{onConflict:'sf_id',ignoreDuplicates:true});
+      if(error){
+        if(error.code==='23505')duplicadas++;
+        else{errores++;console.error(error);}
+      }else{importadas++;}
+    }
+
+    fill.style.width='100%';ptext.textContent='✅ Listo';
+    result.innerHTML=`<div class="alert alert-ok" style="margin-top:10px">
+      ✅ <strong>${importadas}</strong> OTs importadas · <strong>${duplicadas}</strong> ya existían · <strong>${errores}</strong> errores
+    </div>`;
+    auditLog({tabla:'ordenes_trabajo',registro_id:'BATCH',accion:'IMPORTACION_SF',
+      campo:'lote',valor_antes:null,valor_despues:`${importadas} desinstalaciones importadas`});
+    DesinModule.cargado=false;
+    await cargarDesinstalaciones();
+  }catch(err){
+    ptext.textContent='Error: '+err.message;
+    result.innerHTML=`<div class="alert alert-err">❌ ${err.message}</div>`;
+  }
+  e.target.value='';
+}
 
 async function dsGuardar(){
   const ot=DesinModule.otActual;if(!ot)return;
