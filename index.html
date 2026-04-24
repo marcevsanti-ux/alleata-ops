@@ -908,14 +908,73 @@ tr:hover td{background:var(--surface2);}
     </div>
   </div>
   <div class="card">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px">
+      <input class="input" id="rl-buscar" placeholder="🔍 OT, cuenta, ciudad..." style="width:200px;font-size:12px;padding:6px 10px" oninput="rlRenderTabla()">
+      <select class="select" id="rl-f-resp" onchange="rlRenderTabla()" style="font-size:12px;padding:6px 8px">
+        <option value="">Todos los responsables</option>
+      </select>
+      <select class="select" id="rl-f-estado" onchange="rlFiltrarEstado(this.value)" style="font-size:12px;padding:6px 8px">
+        <option value="">Todos los estados</option>
+        <option>Pre-Colecta</option><option>Despachado</option><option>En tránsito</option>
+        <option>En camino</option><option>Entregado</option><option>Retirar Terminal</option>
+        <option>Fallido</option><option>Devuelto</option>
+      </select>
+    </div>
+    <div class="table-wrap">
+      <table class="table">
+        <thead><tr>
+          <th>OT / Cuenta</th><th>Responsable</th><th>Destino</th>
+          <th>Tracking</th><th>Estado</th><th>Retorno</th><th>Obs.</th><th></th>
+        </tr></thead>
+        <tbody id="rl-tbody">
+          <tr><td colspan="8" style="text-align:center;padding:30px;color:var(--text-muted)">Cargando...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="module" id="mod-desinstalaciones">
+  <div class="stats-row" style="margin-bottom:16px">
+    <div class="stat-box" onclick="dsFiltroPorEstado('')" style="cursor:pointer">
+      <div class="stat-num" id="ds-num-total" style="color:var(--teal)">—</div>
+      <div class="stat-label">TOTAL</div>
+      <button class="btn btn-sm" style="margin-top:4px;font-size:10px;padding:2px 8px">📋 Listar</button>
+    </div>
+    <div class="stat-box" onclick="dsFiltroPorEstado('Pendiente')" style="cursor:pointer;border-left:3px solid #f59e0b">
+      <div class="stat-num" id="ds-num-pendiente" style="color:#f59e0b">—</div>
+      <div class="stat-label">PENDIENTES</div>
+      <button class="btn btn-sm" style="margin-top:4px;font-size:10px;padding:2px 8px">📋 Listar</button>
+    </div>
+    <div class="stat-box" onclick="dsFiltroPorEstado('En Proceso')" style="cursor:pointer;border-left:3px solid #1a9fd4">
+      <div class="stat-num" id="ds-num-enproceso" style="color:#1a9fd4">—</div>
+      <div class="stat-label">EN PROCESO</div>
+      <button class="btn btn-sm" style="margin-top:4px;font-size:10px;padding:2px 8px">📋 Listar</button>
+    </div>
+    <div class="stat-box" onclick="dsFiltroPorEstado('Despachado')" style="cursor:pointer;border-left:3px solid #8b5cf6">
+      <div class="stat-num" id="ds-num-despachado" style="color:#8b5cf6">—</div>
+      <div class="stat-label">DESPACHADAS</div>
+      <button class="btn btn-sm" style="margin-top:4px;font-size:10px;padding:2px 8px">📋 Listar</button>
+    </div>
+    <div class="stat-box s-green" onclick="dsFiltroPorEstado('Terminal recuperada')" style="cursor:pointer">
+      <div class="stat-num" id="ds-num-exitosa" style="color:var(--teal)">—</div>
+      <div class="stat-label">EXITOSAS</div>
+      <button class="btn btn-sm" style="margin-top:4px;font-size:10px;padding:2px 8px">📋 Listar</button>
+    </div>
+    <div class="stat-box s-red" onclick="dsFiltroPorEstado('Extraviada')" style="cursor:pointer">
+      <div class="stat-num" id="ds-num-extraviada">—</div>
+      <div class="stat-label">EXTRAVIADAS</div>
+      <button class="btn btn-sm" style="margin-top:4px;font-size:10px;padding:2px 8px">📋 Listar</button>
+    </div>
+  </div>
+
+  <div class="card">
     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px">
       <div id="dsFiltroRespWrap" class="field" style="margin:0;min-width:180px;display:none">
-        <label class="label">Filtrar por responsable</label>
-        <select class="select" id="ds-f-resp" onchange="filtrarDesins()">
-          <option value="">Todos</option>
-        </select>
+        <label class="label">Responsable</label>
+        <select class="select" id="ds-f-resp" onchange="filtrarDesins()"><option value="">Todos</option></select>
       </div>
-      <div class="field" style="margin:0;min-width:160px">
+      <div class="field" style="margin:0;min-width:140px">
         <label class="label">Estado</label>
         <select class="select" id="ds-f-estado" onchange="filtrarDesins()">
           <option value="">Todos</option>
@@ -923,28 +982,29 @@ tr:hover td{background:var(--surface2);}
           <option>Terminal recuperada</option><option>Extraviada</option><option>Fallido</option>
         </select>
       </div>
-      <div class="field" style="margin:0;min-width:120px">
+      <div class="field" style="margin:0;min-width:110px">
         <label class="label">Zona</label>
         <select class="select" id="ds-f-zona" onchange="filtrarDesins()">
           <option value="">Todas</option>
           <option value="AMBA">AMBA</option><option value="interior">Interior</option>
         </select>
       </div>
-      <div class="field" style="margin:0;min-width:130px">
+      <div class="field" style="margin:0;min-width:120px">
         <label class="label">SLA</label>
         <select class="select" id="ds-f-sla" onchange="filtrarDesins()">
           <option value="">Todo SLA</option>
           <option value="critico">Crítico</option><option value="alerta">Alerta</option><option value="verde">En término</option>
         </select>
       </div>
-      <div style="position:relative;min-width:260px">
+      <div style="position:relative;flex:1;min-width:220px">
         <svg style="position:absolute;left:10px;top:50%;transform:translateY(-50%);opacity:0.4;pointer-events:none" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-        <input id="ds-buscar" class="input" style="padding-left:32px" placeholder="Buscar por OT, comercio, ciudad..." oninput="filtrarDesins()">
+        <input id="ds-buscar" class="input" style="padding-left:32px;width:100%" placeholder="Buscar OT, comercio, ciudad..." oninput="filtrarDesins()">
       </div>
       <button class="btn-ghost btn-sm" onclick="dsLimpiarFiltros()">Limpiar filtros</button>
       <div id="ds-op-pills" style="display:none"></div>
     </div>
-        <!-- Import Desinstalaciones SF -->
+
+    <!-- Import Desinstalaciones SF -->
     <div id="dsImportArea" style="margin-bottom:14px;background:var(--navy-700);border-radius:10px;padding:14px 18px;">
       <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
         <label id="dsImportLabel" style="background:var(--grad);color:#fff;border:none;padding:8px 18px;font-family:'Inter',sans-serif;font-size:12px;font-weight:700;cursor:pointer;border-radius:8px;display:inline-flex;align-items:center;gap:7px;white-space:nowrap;">
@@ -954,14 +1014,13 @@ tr:hover td{background:var(--surface2);}
         <div style="display:flex;align-items:center;gap:6px;padding:6px 12px;background:var(--navy-600);border-radius:7px;flex:1;min-width:200px;">
           <span style="font-size:11px;color:var(--text-muted);white-space:nowrap;">📊 Reporte SF:</span>
           <a href="https://alleata.lightning.force.com/lightning/r/Report/00ORm00000CPncvMAD/view?queryScope=userFolders"
-             target="_blank"
-             style="font-size:11px;color:var(--blue);text-decoration:none;font-weight:500;white-space:nowrap;"
+             target="_blank" style="font-size:11px;color:var(--blue);text-decoration:none;font-weight:500;white-space:nowrap;"
              onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">
             Desinstalaciones Pendientes ↗
           </a>
         </div>
-        <button id="btnDsAutoTracking" onclick="dsAutoTracking()" title="Actualizar estados desde Correo Argentino"
-          style="background:rgba(26,159,212,.15);border:1px solid rgba(26,159,212,.4);color:var(--blue);padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;white-space:nowrap;transition:all .2s"
+        <button id="btnDsAutoTracking" onclick="dsAutoTracking()"
+          style="background:rgba(26,159,212,.15);border:1px solid rgba(26,159,212,.4);color:var(--blue);padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;white-space:nowrap;"
           onmouseover="this.style.background='rgba(26,159,212,.25)'" onmouseout="this.style.background='rgba(26,159,212,.15)'">
           🔄 Auto-tracking
         </button>
@@ -1425,9 +1484,7 @@ function buildDashCards(modulos,isAdmin){
       <div class="dash-card-stat" id="dc-${c.mod}">${c.stat}</div>
     </div>`;
   }).join('');
-  loadOpsPanel(isAdmin).catch(err=>{
-    console.error('[loadOpsPanel ERROR]', err);
-  });
+  loadOpsPanel(isAdmin);
 }
 
 const MOD_INFO={home:'Dashboard',sims:'Verificador SIMs',envios:'Envíos',rollout:'Rollout',desinstalaciones:'Desinstalaciones',horas:'Control de Horas',ajustes:'Ajustes',ally:'Configuración Ally',distri:'Distribuidores'};
@@ -1581,18 +1638,13 @@ async function loadBadges(){
   const pn=nombre.split(' ')[0];
   if(!isAdmin) envQ=envQ.ilike('responsable','%'+pn+'%');
   const{data:env=[]}=await envQ;
-  // Desinstalaciones con paginación
-  const des=[];
-  {
-    let _from=0;const _PAGE=1000;
+  const des=[];{let _f=0;const _P=1000;
     while(true){
       let _q=sb.from('v_ordenes_con_sla').select('ot,estado').eq('tipo','desinstalacion');
       if(!isAdmin)_q=_q.ilike('operador_id','%'+pn+'%');
-      const{data:_page}=await _q.range(_from,_from+_PAGE-1);
-      if(!_page||_page.length===0)break;
-      des.push(..._page);
-      if(_page.length<_PAGE)break;
-      _from+=_PAGE;
+      const{data:_pg}=await _q.range(_f,_f+_P-1);
+      if(!_pg||_pg.length===0)break;
+      des.push(..._pg);if(_pg.length<_P)break;_f+=_P;
     }
   }
   const envCount=(env||[]).filter(e=>!['Entregado','Fallido','Devuelto','Perdido'].includes(e.estado)).length;
@@ -1627,20 +1679,14 @@ async function loadOpsPanel(isAdmin){
   // QUERIES — admin ve todo, operador filtra por su nombre
   let envQ=sb.from('envios').select('id,ot_numero,tipo,responsable,estado,estado_devolucion,fecha,created_at,track,track_devolucion,logistica').not('estado','eq','null');
   if(!isAdmin) envQ=envQ.ilike('responsable','%'+primerNombre+'%');
-  // Fetch envios
   const{data:envios=[]}=await envQ;
-  // Fetch desinstalaciones con paginación (Supabase limita 1000)
-  const desins=[];
-  {
-    let _from=0;const _PAGE=1000;
+  const desins=[];{let _f=0;const _P=1000;
     while(true){
       let _q=sb.from('v_ordenes_con_sla').select('ot,operador_id,estado,sla_estado,tipo,dias_transcurridos').eq('tipo','desinstalacion');
       if(!isAdmin)_q=_q.ilike('operador_id','%'+primerNombre+'%');
-      const{data:_page}=await _q.range(_from,_from+_PAGE-1);
-      if(!_page||_page.length===0)break;
-      desins.push(..._page);
-      if(_page.length<_PAGE)break;
-      _from+=_PAGE;
+      const{data:_pg}=await _q.range(_f,_f+_P-1);
+      if(!_pg||_pg.length===0)break;
+      desins.push(..._pg);if(_pg.length<_P)break;_f+=_P;
     }
   }
 
@@ -5302,17 +5348,14 @@ async function cargarDesinstalaciones(){
     const primerNombre=nombreCompleto.split(' ')[0]; // "Gonzalo Marvaldi" → "Gonzalo"
     let baseQuery=sb.from('v_ordenes_con_sla').select('*').eq('tipo','desinstalacion');
     if(!isAdmin) baseQuery=baseQuery.ilike('operador_id','%'+primerNombre+'%');
-    // Supabase limita 1000 filas — paginamos
-    let allData=[];let from=0;const PAGE=1000;
+    const data=[];let _f=0;const _P=1000;
     while(true){
-      const{data:page,error}=await baseQuery.range(from,from+PAGE-1);
+      const{data:pg,error}=await baseQuery.range(_f,_f+_P-1);
       if(error)throw error;
-      if(!page||page.length===0)break;
-      allData=allData.concat(page);
-      if(page.length<PAGE)break;
-      from+=PAGE;
+      if(!pg||pg.length===0)break;
+      data.push(...pg);if(pg.length<_P)break;_f+=_P;
     }
-    const data=allData;const error=null;
+    const error=null;
     if(error)throw error;
     DesinModule.datos=data||[];DesinModule.cargado=true;
     document.getElementById('nb-desins').textContent=data.length;
@@ -5334,22 +5377,17 @@ function dsArmarPills(data,isAdmin){
 }
 
 function dsLimpiarFiltros(){
-  const r=document.getElementById('ds-f-resp');if(r)r.value='';
-  const e=document.getElementById('ds-f-estado');if(e)e.value='';
-  const z=document.getElementById('ds-f-zona');if(z)z.value='';
-  const s=document.getElementById('ds-f-sla');if(s)s.value='';
-  const b=document.getElementById('ds-buscar');if(b)b.value='';
+  ['ds-f-resp','ds-f-estado','ds-f-zona','ds-f-sla','ds-buscar'].forEach(id=>{
+    const el=document.getElementById(id);if(el)el.value='';
+  });
   filtrarDesins();
 }
 
 function dsCalcZona(ot){
-  if(ot.zona&&ot.zona.trim()){
-    return ot.zona.trim().toUpperCase().includes('AMBA')?'AMBA':'Interior';
-  }
+  if(ot.zona&&ot.zona.trim()) return ot.zona.trim().toUpperCase().includes('AMBA')?'AMBA':'Interior';
   if(!ot.cp)return'Sin zona';
   const n=parseInt(ot.cp,10);
-  if(n>=1000&&n<=1999)return'AMBA';
-  return'Interior';
+  return(n>=1000&&n<=1999)?'AMBA':'Interior';
 }
 
 function dsFiltroPorEstado(estado){document.getElementById('ds-f-estado').value=estado;filtrarDesins();}
@@ -5453,191 +5491,132 @@ function dsModalClose(){document.getElementById('ds-modal-overlay').style.displa
 document.getElementById('ds-modal-overlay').addEventListener('click',function(e){if(e.target===this)dsModalClose();});
 function dsSelEst(btn,estado){document.querySelectorAll('.ds-est-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');DesinModule.nuevoEstado=estado;}
 
-// ── IMPORT DESINSTALACIONES SF ──
+// ── IMPORT DESINSTALACIONES ──
 async function importDesinstalaciones(e){
   const file=e.target.files[0];if(!file)return;
-  const msg=document.getElementById('dsImportMsg');
-  const prog=document.getElementById('dsImportProgress');
-  const fill=document.getElementById('dsProgressFill');
-  const ptext=document.getElementById('dsProgressText');
+  const msg=document.getElementById('dsImportMsg'),prog=document.getElementById('dsImportProgress');
+  const fill=document.getElementById('dsProgressFill'),ptext=document.getElementById('dsProgressText');
   const result=document.getElementById('dsImportResult');
-  msg.textContent='';result.innerHTML='';
-  prog.style.display='block';ptext.textContent='Leyendo archivo...';fill.style.width='20%';
+  msg.textContent='';result.innerHTML='';prog.style.display='block';
+  ptext.textContent='Leyendo...';fill.style.width='20%';
   try{
-    const data=await file.arrayBuffer();
     const{read,utils}=XLSX;
-    const wb=read(data);const ws=wb.Sheets[wb.SheetNames[0]];
-    const rows=utils.sheet_to_json(ws,{header:1,defval:null});
-    let headerIdx=-1;
+    const wb=read(await file.arrayBuffer());
+    const rows=utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:null});
+    let hIdx=-1;
     for(let i=0;i<rows.length;i++){
-      if(rows[i]&&rows[i].some(c=>String(c||'').includes('Id. de orden de trabajo'))){headerIdx=i;break;}
+      if(rows[i]?.some(c=>String(c||'').includes('Id. de orden de trabajo'))){hIdx=i;break;}
     }
-    if(headerIdx===-1)throw new Error('No se encontró la fila de encabezados.');
-    const headers=rows[headerIdx].map(h=>String(h||'').trim());
-    const col=(name)=>headers.findIndex(h=>h.toLowerCase().includes(name.toLowerCase()));
-    const iSFId=col('Id. de orden de trabajo');
-    const iOT=col('Número de orden');
-    const iResp=col('Responsable');
-    const iTipo=col('Tipo de registro');
-    const iCuenta=col('cuenta');
+    if(hIdx<0)throw new Error('No se encontró la fila de encabezados.');
+    const hdrs=rows[hIdx].map(h=>String(h||'').trim());
+    const col=n=>hdrs.findIndex(h=>h.toLowerCase().includes(n.toLowerCase()));
+    const iSFId=col('Id. de orden de trabajo'),iOT=col('Número de orden');
+    const iResp=col('Responsable'),iTipo=col('Tipo de registro'),iCuenta=col('cuenta');
     const iComercio=col('Nombre del comercio')>=0?col('Nombre del comercio'):col('cuenta');
-    const iCiudad=col('Ciudad');const iProv=col('Estado/Provincia');
-    const iCP=col('Código postal');const iObs=col('Observaciones');
+    const iCiudad=col('Ciudad'),iProv=col('Estado/Provincia'),iCP=col('Código postal');
+    const iObs=col('Observaciones');
     const iFecha=col('Fecha de creación')>=0?col('Fecha de creación'):col('Fecha de Despacho');
-    const iFechaDespacho=col('Fecha de Despacho');
     const iMotivo=col('Motivo de desinstalación');
-    const iTracking=col('N° de seguimiento')>=0?col('N° de seguimiento'):col('seguimiento')>=0?col('seguimiento'):-1;
-    function parseDate(str){
-      if(!str)return null;const s=String(str).trim();if(!s)return null;
-      if(!isNaN(Number(s))&&Number(s)>40000)return new Date((Number(s)-25569)*86400000).toISOString().slice(0,10);
-      const p=s.split('/');
-      if(p.length===3)return `${p[2].length===2?'20'+p[2]:p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`;
-      return s||null;
-    }
-    function detectZona(prov){
-      if(!prov)return'interior';
-      return prov.toUpperCase().includes('BUENOS AIRES')||prov.toUpperCase().includes('CABA')?'AMBA':'interior';
-    }
-    const ESTADOS_MAP={'pendiente':'Pendiente','despachado':'Despachado','en proceso':'En Proceso',
-      'terminal recuperada':'Terminal recuperada','extraviada':'Extraviada','fallido':'Fallido'};
-    let currentEstado='Pendiente';
-    const{data:profiles}=await sb.from('profiles').select('id,nombre');
-    const findUser=(nombre)=>{
-      if(!nombre)return null;
-      const n=nombre.toLowerCase();
-      const p=profiles?.find(p=>p.nombre&&n.includes(p.nombre.toLowerCase().split(' ')[0].toLowerCase()));
-      return p?.nombre||nombre;
+    const iTrack=col('N° de seguimiento')>=0?col('N° de seguimiento'):col('seguimiento')>=0?col('seguimiento'):-1;
+    const pd=s=>{
+      if(!s)return null;const v=String(s).trim();if(!v)return null;
+      if(!isNaN(+v)&&+v>40000)return new Date((+v-25569)*86400000).toISOString().slice(0,10);
+      const p=v.split('/');if(p.length===3)return`${p[2].length===2?'20'+p[2]:p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`;
+      return v;
     };
-    const dataRows=rows.slice(headerIdx+1).filter(r=>r&&r.some(c=>c!==null));
-    const enrichedRows=[];
-    for(const r of dataRows){
-      const sfId=String(r[iSFId]||'').trim();const ot=String(r[iOT]||'').trim();
-      if(!sfId&&!ot){
-        const rowText=r.filter(Boolean).map(c=>String(c).trim().toLowerCase()).join(' ');
-        for(const[k,v] of Object.entries(ESTADOS_MAP)){if(rowText.includes(k)){currentEstado=v;break;}}
-        continue;
-      }
-      if(ot.toLowerCase()==='subtotal'||ot.toLowerCase()==='total'||ot.toLowerCase()==='conteo')continue;
-      if(!sfId||!ot)continue;
-      enrichedRows.push({r,estado:currentEstado});
+    const EMAP={'pendiente':'Pendiente','despachado':'Despachado','en proceso':'En Proceso',
+      'terminal recuperada':'Terminal recuperada','extraviada':'Extraviada','fallido':'Fallido'};
+    let curEst='Pendiente';
+    const{data:profs}=await sb.from('profiles').select('id,nombre');
+    const fUser=n=>{if(!n)return null;const nl=n.toLowerCase();const p=profs?.find(p=>p.nombre&&nl.includes(p.nombre.toLowerCase().split(' ')[0]));return p?.nombre||n;};
+    const enriched=[];
+    for(const r of rows.slice(hIdx+1).filter(r=>r?.some(c=>c!==null))){
+      const sfId=String(r[iSFId]||'').trim(),ot=String(r[iOT]||'').trim();
+      if(!sfId&&!ot){const txt=r.filter(Boolean).map(c=>String(c).toLowerCase()).join(' ');for(const[k,v]of Object.entries(EMAP))if(txt.includes(k)){curEst=v;break;}continue;}
+      if(!sfId||!ot||['subtotal','total','conteo'].includes(ot.toLowerCase()))continue;
+      enriched.push({r,estado:curEst});
     }
-    ptext.textContent=`Procesando ${enrichedRows.length} OTs...`;fill.style.width='50%';
-    let importadas=0,errores=0;
-    for(const{r,estado} of enrichedRows){
-      const sfId=String(r[iSFId]||'').trim();const ot=String(r[iOT]||'').trim();
-      const resp=String(r[iResp]||'').trim();
+    ptext.textContent=`Procesando ${enriched.length} OTs...`;fill.style.width='50%';
+    let imp=0,err=0;
+    for(const{r,estado}of enriched){
+      const sfId=String(r[iSFId]||'').trim(),ot=String(r[iOT]||'').trim();
       const prov=String(r[iProv]||'').trim();
-      const tracking=iTracking>=0?String(r[iTracking]||'').trim()||null:null;
-      const item={
-        sf_id:sfId,ot:ot,
-        operador_id:findUser(resp),
-        tipo:'desinstalacion',
+      const item={sf_id:sfId,ot,operador_id:fUser(String(r[iResp]||'').trim()),tipo:'desinstalacion',
         comercio:iComercio>=0?String(r[iComercio]||'').trim()||null:null,
         cuenta:String(r[iCuenta]||'').trim()||null,
-        ciudad:String(r[iCiudad]||'').trim()||null,
-        provincia:prov||null,
-        zona:detectZona(prov),
+        ciudad:String(r[iCiudad]||'').trim()||null,provincia:prov||null,
         cp:iCP>=0?String(r[iCP]||'').trim()||null:null,
         observaciones:iObs>=0?String(r[iObs]||'').trim()||null:null,
-        fecha_asignacion:parseDate(r[iFecha>=0?iFecha:undefined]),
+        fecha_asignacion:pd(r[iFecha>=0?iFecha:undefined]),
         logistica:estado==='Despachado'?'Correo Argentino':'SF',
-        estado:estado,
-        track:tracking,
-        updated_at:new Date().toISOString(),
-      };
+        estado,track:iTrack>=0?String(r[iTrack]||'').trim()||null:null,
+        updated_at:new Date().toISOString()};
       Object.keys(item).forEach(k=>{if(item[k]===null||item[k]==='')delete item[k];});
       const{error}=await sb.from('ordenes_trabajo').upsert(item,{onConflict:'sf_id',ignoreDuplicates:false});
-      if(error){errores++;console.error(error);}else{importadas++;}
+      if(error){err++;console.error(error);}else imp++;
     }
     fill.style.width='100%';ptext.textContent='✅ Listo';
-    result.innerHTML=`<div class="alert alert-ok" style="margin-top:10px">
-      ✅ <strong>${importadas}</strong> OTs procesadas · <strong>${errores}</strong> errores
-    </div>`;
-    auditLog({tabla:'ordenes_trabajo',registro_id:'BATCH',accion:'IMPORTACION_SF',
-      campo:'lote',valor_antes:null,valor_despues:`${importadas} desinst. importadas`});
+    result.innerHTML=`<div class="alert alert-ok" style="margin-top:10px">✅ <strong>${imp}</strong> procesadas · <strong>${err}</strong> errores</div>`;
+    auditLog({tabla:'ordenes_trabajo',registro_id:'BATCH',accion:'IMPORTACION_SF',campo:'lote',valor_antes:null,valor_despues:`${imp} desinst.`});
     DesinModule.cargado=false;await cargarDesinstalaciones();
-  }catch(err){
-    ptext.textContent='Error: '+err.message;
-    result.innerHTML=`<div class="alert alert-err">❌ ${err.message}</div>`;
-  }
+  }catch(err){ptext.textContent='Error: '+err.message;result.innerHTML=`<div class="alert alert-err">❌ ${err.message}</div>`;}
   e.target.value='';
 }
 
-// ── AUTO-TRACKING DESINSTALACIONES ──
 async function dsAutoTracking(){
   abrirModalAutoTracking();
-  const btn=document.getElementById('btnDsAutoTracking');
-  if(btn)btn.disabled=true;
-  const isAdmin=currentProfile?.rol==='admin';
-  const nombreOp=currentProfile?.nombre||'';
-  let q=sb.from('ordenes_trabajo')
-    .select('id,ot,track,estado,operador_id,comercio,cuenta')
-    .eq('estado','Despachado').not('track','is',null).neq('track','');
-  if(!isAdmin&&nombreOp)q=q.ilike('operador_id','%'+nombreOp.split(' ')[0]+'%');
+  const btn=document.getElementById('btnDsAutoTracking');if(btn)btn.disabled=true;
+  const isAdmin=currentProfile?.rol==='admin',op=currentProfile?.nombre||'';
+  let q=sb.from('ordenes_trabajo').select('id,ot,track,estado,operador_id,comercio,cuenta').eq('estado','Despachado').not('track','is',null).neq('track','');
+  if(!isAdmin&&op)q=q.ilike('operador_id','%'+op.split(' ')[0]+'%');
   const{data:ots}=await q;
-  if(!ots||ots.length===0){
-    atAddLog('info','—','—','—','No hay OTs despachadas con tracking.');
-    document.getElementById('atSubtitle').textContent='Sin OTs activas';
+  if(!ots?.length){
+    atAddLog('info','—','—','—','Sin OTs despachadas con tracking.');
+    document.getElementById('atSubtitle').textContent='Sin OTs';
     document.getElementById('atProgressBar').style.width='100%';
     document.getElementById('btnCerrarAutoTracking').style.display='block';
     document.getElementById('atFooter').style.display='block';
-    document.getElementById('atResumen').innerHTML='<span style="color:var(--text-muted);font-size:13px;">Sin OTs para procesar.</span>';
+    document.getElementById('atResumen').innerHTML='<span style="color:var(--text-muted)">Sin OTs para procesar.</span>';
     if(btn)btn.disabled=false;return;
   }
-  document.getElementById('atSubtitle').textContent=`Procesando ${ots.length} OTs despachadas...`;
-  let actualizados=0,alertas=0,errores=0,sinCambio=0;
-  const DELAY=600;
-  function mapearEstadoDes(historia,estadoCA){
-    const h=(historia||'').toUpperCase();const e=(estadoCA||'').toUpperCase();
-    if(h.includes('ENTREGADO')||h.includes('ENTREGA OK'))return'Terminal recuperada';
-    if(h.includes('DEVUELTO')||h.includes('DEVOLUCION'))return'Fallido';
-    if(h.includes('PERDIDO'))return'Extraviada';
-    if(h.includes('EN PODER DEL DISTRIBUIDOR')||h.includes('INTENTO DE ENTREGA'))return'En Proceso';
-    if(h.includes('EN ESPERA EN SUCURSAL'))return'En Proceso';
-    if(h.includes('CENTRO DE PROCESAMIENTO')||h.includes('CLASIFIC'))return'Despachado';
-    if(e.includes('RETORNANDO'))return'Fallido';
+  document.getElementById('atSubtitle').textContent=`Procesando ${ots.length} OTs...`;
+  let act=0,aler=0,err=0,sin=0;
+  const mapEst=(h,e)=>{
+    const H=(h||'').toUpperCase(),E=(e||'').toUpperCase();
+    if(H.includes('ENTREGADO')||H.includes('ENTREGA OK'))return'Terminal recuperada';
+    if(H.includes('DEVUELTO')||H.includes('DEVOLUCION'))return'Fallido';
+    if(H.includes('PERDIDO'))return'Extraviada';
+    if(H.includes('EN PODER DEL DISTRIBUIDOR')||H.includes('INTENTO DE ENTREGA'))return'En Proceso';
+    if(H.includes('EN ESPERA EN SUCURSAL'))return'En Proceso';
+    if(E.includes('RETORNANDO'))return'Fallido';
     return null;
-  }
+  };
   for(let i=0;i<ots.length;i++){
     const ot=ots[i];
-    const pct=Math.round(((i+1)/ots.length)*100);
-    document.getElementById('atProgressBar').style.width=pct+'%';
-    document.getElementById('atProgText').textContent=`${i+1} / ${ots.length}`;
-    const restante=Math.round(((ots.length-i-1)*DELAY)/1000);
-    document.getElementById('atETA').textContent=restante>0?`~${restante}s restantes`:'';
+    document.getElementById('atProgressBar').style.width=Math.round((i+1)/ots.length*100)+'%';
+    document.getElementById('atProgText').textContent=`${i+1}/${ots.length}`;
     try{
       const{eventos}=await fetchTrackingCA(ot.track);
-      if(!eventos||eventos.length===0){atAddLog('error',ot.ot,ot.operador_id,ot.comercio||ot.cuenta,'Sin eventos en CA');errores++;}
+      if(!eventos?.length){atAddLog('error',ot.ot,ot.operador_id,ot.comercio||ot.cuenta,'Sin eventos CA');err++;}
       else{
-        const ultimo=eventos[0];
-        const nuevoEstado=mapearEstadoDes(ultimo.historia,ultimo.estadoCA);
-        const detalle=ultimo.estadoCA?`${ultimo.historia} — ${ultimo.estadoCA}`:ultimo.historia;
-        const esAlerta=/DOMICILIO CERRADO|DIRECCIÓN INSUFICIENTE|RETORNANDO/i.test(ultimo.estadoCA+' '+ultimo.historia);
-        const upd={observaciones:detalle,updated_at:new Date().toISOString()};
-        if(nuevoEstado&&nuevoEstado!==ot.estado){
-          upd.estado=nuevoEstado;
-          if(['Terminal recuperada','Extraviada','Fallido'].includes(nuevoEstado))upd.fecha_cierre=new Date().toISOString();
-        }
+        const u=eventos[0],nEst=mapEst(u.historia,u.estadoCA),det=u.estadoCA?`${u.historia} — ${u.estadoCA}`:u.historia;
+        const esAl=/DOMICILIO CERRADO|DIRECCIÓN INSUFICIENTE|RETORNANDO/i.test(u.estadoCA+' '+u.historia);
+        const upd={observaciones:det,updated_at:new Date().toISOString()};
+        if(nEst&&nEst!==ot.estado){upd.estado=nEst;if(['Terminal recuperada','Extraviada','Fallido'].includes(nEst))upd.fecha_cierre=new Date().toISOString();}
         await sb.from('ordenes_trabajo').update(upd).eq('id',ot.id);
-        if(esAlerta){atAddLog('alerta',ot.ot,ot.operador_id,ot.comercio||ot.cuenta,`⚠️ ${detalle}`);alertas++;}
-        else if(nuevoEstado&&nuevoEstado!==ot.estado){atAddLog('cambio',ot.ot,ot.operador_id,ot.comercio||ot.cuenta,`${ot.estado} → ${nuevoEstado}`);actualizados++;}
-        else{atAddLog('ok',ot.ot,ot.operador_id,ot.comercio||ot.cuenta,`Sin cambios — ${detalle||ot.estado}`);sinCambio++;}
+        if(esAl){atAddLog('alerta',ot.ot,ot.operador_id,ot.comercio||ot.cuenta,`⚠️ ${det}`);aler++;}
+        else if(nEst&&nEst!==ot.estado){atAddLog('cambio',ot.ot,ot.operador_id,ot.comercio||ot.cuenta,`${ot.estado}→${nEst}`);act++;}
+        else{atAddLog('ok',ot.ot,ot.operador_id,ot.comercio||ot.cuenta,`Sin cambios — ${det}`);sin++;}
       }
-    }catch(err){atAddLog('error',ot.ot,ot.operador_id,ot.comercio||ot.cuenta,`Error: ${err.message}`);errores++;}
-    await new Promise(r=>setTimeout(r,DELAY));
+    }catch(e){atAddLog('error',ot.ot,ot.operador_id,ot.comercio||ot.cuenta,`Error: ${e.message}`);err++;}
+    await new Promise(r=>setTimeout(r,600));
   }
   document.getElementById('atProgressBar').style.width='100%';
   document.getElementById('atETA').textContent='Finalizado';
   document.getElementById('atSubtitle').textContent=`Completado — ${new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'})}`;
   document.getElementById('btnCerrarAutoTracking').style.display='block';
-  const resumen=document.getElementById('atResumen');
-  const chips=[
-    {val:actualizados,label:'actualizados',color:'var(--teal)',bg:'rgba(29,191,142,.12)'},
-    {val:alertas,label:'alertas',color:'#f59e0b',bg:'rgba(245,158,11,.12)'},
-    {val:sinCambio,label:'sin cambios',color:'var(--text-muted)',bg:'var(--navy-700)'},
-    {val:errores,label:'errores',color:'var(--red)',bg:'rgba(239,68,68,.1)'},
-  ].filter(c=>c.val>0);
-  resumen.innerHTML=chips.map(c=>`<div style="background:${c.bg};border-radius:8px;padding:6px 14px;text-align:center;"><div style="font-size:20px;font-weight:800;color:${c.color};font-family:'JetBrains Mono',monospace;">${c.val}</div><div style="font-size:10px;color:${c.color};text-transform:uppercase;letter-spacing:1px;font-weight:600;">${c.label}</div></div>`).join('')||'<span style="color:var(--text-muted);font-size:13px;">Sin novedades.</span>';
+  const chips=[{val:act,label:'actualizados',color:'var(--teal)',bg:'rgba(29,191,142,.12)'},{val:aler,label:'alertas',color:'#f59e0b',bg:'rgba(245,158,11,.12)'},{val:sin,label:'sin cambios',color:'var(--text-muted)',bg:'var(--navy-700)'},{val:err,label:'errores',color:'var(--red)',bg:'rgba(239,68,68,.1)'}].filter(c=>c.val>0);
+  document.getElementById('atResumen').innerHTML=chips.map(c=>`<div style="background:${c.bg};border-radius:8px;padding:6px 14px;text-align:center"><div style="font-size:20px;font-weight:800;color:${c.color};font-family:'JetBrains Mono',monospace">${c.val}</div><div style="font-size:10px;color:${c.color};text-transform:uppercase;letter-spacing:1px;font-weight:600">${c.label}</div></div>`).join('')||'<span style="color:var(--text-muted)">Sin novedades.</span>';
   document.getElementById('atFooter').style.display='block';
   if(btn)btn.disabled=false;
   DesinModule.cargado=false;await cargarDesinstalaciones();loadBadges();
