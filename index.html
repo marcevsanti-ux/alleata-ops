@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v2.3.58</title>
+<title>Alleata · Operaciones v2.3.59</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -288,7 +288,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.3.58 · 17 abr 2026
+      v2.3.59 · 17 abr 2026
     </div>
   </div>
 </div>
@@ -347,7 +347,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.3.58 · 17 abr 2026
+      v2.3.59 · 17 abr 2026
     </div>
   </div>
 </nav>
@@ -361,7 +361,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <div class="topbar-right" id="topbar-date"></div>
     <button onclick="refreshCurrentModule()" title="Actualizar" style="background:none;border:1px solid var(--border2);color:var(--text-muted);border-radius:7px;padding:4px 10px;cursor:pointer;font-size:13px;margin-left:10px;transition:all .2s" onmouseover="this.style.color='var(--teal)';this.style.borderColor='var(--teal)'" onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border2)'">↺</button>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.3.58</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.3.59</div>
   </div>
   <div class="content">
 
@@ -1295,7 +1295,7 @@ tr:hover td{background:var(--surface2);}
 </div>
 
 <script>
-console.log('[Alleata v2.3.58] OK');
+console.log('[Alleata v2.3.59] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -3330,14 +3330,11 @@ function atAddLog(tipo, ot, responsable, cuenta, detalle){
 
 // ── NOTIFICAR ALERTA AL GRUPO OPS ──
 async function notificarAlertaGrupo(envio, alertaLabel, detalle){
-  // Obtener grupo OPS activo desde ally_grupos
-  const {data:grupos} = await sb.from('ally_grupos').select('group_id,nombre')
-    .eq('tipo','ops').eq('activo',true).limit(1);
-  const grupoId = grupos?.[0]?.group_id;
-  if(!grupoId){
-    console.log('[Ally] Sin grupo OPS configurado para alertas');
-    return;
-  }
+  const {data:grupos, error:gErr} = await sb.from('ally_grupos').select('group_id,nombre,activo').eq('tipo','ops').limit(5);
+  console.log('[Ally] Grupos OPS:', grupos, gErr);
+  const grupo = grupos?.find(g=>g.activo==true||g.activo==='true'||g.activo===1)||grupos?.[0];
+  const grupoId = grupo?.group_id;
+  if(!grupoId){ console.log('[Ally] Sin grupo OPS'); return; }
   const msg = `⚠️ *OT ${envio.ot_numero}* — *${alertaLabel}*
 `
     + `👤 ${envio.cuenta||'—'}
@@ -3347,13 +3344,12 @@ async function notificarAlertaGrupo(envio, alertaLabel, detalle){
     + `👷 ${envio.responsable||'—'}
 `
     + `📡 ${detalle}`;
-
-  await fetch('https://adequate-blessing.up.railway.app/notificar', {
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
+  console.log('[Ally] Enviando alerta a:', grupo.nombre, grupoId);
+  const res = await fetch('https://adequate-blessing.up.railway.app/notificar', {
+    method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({numero: grupoId, mensaje: msg})
   });
-  console.log(`[Ally] Alerta enviada al grupo OPS: ${alertaLabel} — OT ${envio.ot_numero}`);
+  console.log('[Ally] Respuesta:', res.status, await res.text());
 }
 
 // ── NOTIFICAR ENTREGADO VÍA ALLY ──
