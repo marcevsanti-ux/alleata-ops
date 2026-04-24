@@ -5048,6 +5048,144 @@ async function importPreColecta(e){
     // Mapeo de columnas del reporte Pre-Colecta
     const iLogistica=col('Logística');
     const iSFId=col('Id. de orden de trabajo');
+    const iResp=col('Responsable de la OT');
+    const iTipo=col('Tipo de registro');
+    const iOT=col('Número de orden');
+    const iFecha=col('Fecha de creación');
+    const iNombreComercio=col('Nombre del comercio');
+    const iComercio=iNombreComercio;
+    const iCuenta=col('Cuenta');
+    const iContacto=col('Contacto');
+    const iHorario=col('Horario');
+    const iCalle=col('Calle');
+    const iCiudad=col('Ciudad');
+    const iCP=col('Código postal');
+    const iProv=col('Estado/Provincia');
+    const iObs=col('Observaciones');
+    const iCUIT=col('CUIT');
+    const iEmail=col('Email');
+    const iEmailComercio=iEmail;
+    const iTracking=col('N° de seguimiento');
+    const iTerminal=col('N° Terminal');
+    const iSimcard=col('N° Simcard');
+    const iUsuarioCajero=col('Usuario Cajero');
+    const iPassCajero=col('Contraseña Cajero');
+    const iMotivoDes=col('Motivo de desinstalación');
+
+    // Filtrar solo ALLEATA y agrupar logistica por merge de celdas
+    const dataRows=rows.slice(headerIdx+1).filter(r=>r&&r.some(c=>c!==null));
+    
+    let currentLogistica='';
+    const alleataRows=[];
+    for(const r of dataRows){
+      if(r[iLogistica])currentLogistica=String(r[iLogistica]).trim();
+      if(currentLogistica.toUpperCase()==='ALLEATA'&&r[iSFId]){
+        alleataRows.push({...r,_logistica:currentLogistica});
+      }
+    }
+
+    if(!alleataRows.length)throw new Error('No se encontraron OTs de logística ALLEATA en el archivo. Si querés importar Correo Argentino, usá el botón del canal derecho.');
+
+    // Avisar sobre otras logísticas presentes en el archivo
+    const otrasLog=[...new Set(dataRows.filter(r=>{
+      let l=''; if(r[iLogistica])l=String(r[iLogistica]).trim().toUpperCase();
+      return l&&l!=='ALLEATA'&&l!=='SUBTOTAL'&&l!=='TOTAL';
+    }).map(r=>r[iLogistica]))].filter(Boolean);
+    if(otrasLog.length) msg.textContent=`ℹ️ Se ignoraron logísticas: ${otrasLog.join(', ')}`;
+
+    ptext.textContent=`Procesando ${alleataRows.length} OTs ALLEATA...`;fill.style.width='40%';
+
+    function parseDate(str){
+      if(!str)return null;
+      const s=String(str).trim();
+      const parts=s.split('/');
+      if(parts.length===3){
+        const d=parts[0].padStart(2,'0');
+        const m=parts[1].padStart(2,'0');
+        const y=parts[2].length===2?'20'+parts[2]:parts[2];
+        return `${y}-${m}-${d}`;
+      }
+      return s;
+    }
+    const{data:profiles}=await sb.from('profiles').select('id,nombre');
+    const findUser=(nombre)=>{
+      if(!nombre)return null;
+      const p=profiles?.find(p=>p.nombre&&nombre.toLowerCase().includes(p.nombre.toLowerCase().split(' ')[0].toLowerCase()));
+      return p?.id||null;
+    };
+
+    const records=alleataRows.map(r=>({
+      sf_id:String(r[iSFId]||'').trim(),
+      user_id:findUser(String(r[iResp]||'')),
+      responsable:String(r[iResp]||'').trim(),
+      tipo:String(r[iTipo]||'').trim(),
+      ot_numero:String(r[iOT]||'').trim(),
+      fecha:parseDate(r[iFecha]),
+      nombre_comercio:String(r[iComercio]||'').trim(),
+      cuenta:String(r[iCuenta]||'').trim(),
+      contacto:String(r[iContacto]||'').trim(),
+      horario:String(r[iHorario]||'').trim(),
+      direccion_completa:String(r[iCalle]||'').trim(),
+      ciudad:String(r[iCiudad]||'').trim(),
+      cp_dest:String(r[iCP]||'').trim(),
+      provincia:String(r[iProv]||'').trim(),
+      notas:String(r[iObs]||'').trim(),
+      cuit:String(r[iCUIT]||'').replace(/\.0$/,'').trim(),
+      email_dest:String(r[iEmail]||'').trim(),
+      track:String(r[iTracking]||'').trim(),
+      logistica:'ALLEATA',
+      estado:'Pre-Colecta',
+    })).filter(r=>r.sf_id);
+
+    const{error}=await sb.from('envios').upsert(records,{onConflict:'sf_id',ignoreDuplicates:true});
+    if(error)throw error;
+
+    fill.style.width='100%';
+    ptext.textContent='✅ Importación completada';
+    result.innerHTML=`<div class="alert alert-ok" style="margin-top:8px">
+      ✅ <strong>${records.length}</strong> OTs procesadas — solo se insertaron las <strong>nuevas</strong>, las existentes no fueron modificadas.
+    </div>`;
+    auditLog({tabla:'envios', registro_id:'BATCH', accion:'IMPORTACION_PRECOLECTA',
+      campo:'lote', valor_antes:null, valor_despues:`${records.length} OTs procesadas (Alleata)`});
+    loadBadges();
+  }catch(err){
+    prog.style.display='none';
+    result.innerHTML=`<div class="alert alert-err">❌ ${err.message}</div>`;
+  }
+  e.target.value='';
+}
+// ── FIN IMPORT PRE-COLECTA ──
+
+// ── IMPORT DESINSTALACIONES SF ──
+async function importDesinstalaciones(e){
+  const file=e.target.files[0];
+  if(!file)return;
+  const msg=document.getElementById('dsImportMsg');
+  const prog=document.getElementById('dsImportProgress');
+  const fill=document.getElementById('dsProgressFill');
+  const ptext=document.getElementById('dsProgressText');
+  const result=document.getElementById('dsImportResult');
+  msg.textContent='';result.innerHTML='';
+  prog.style.display='block';
+  ptext.textContent='Leyendo archivo...';fill.style.width='20%';
+
+  try{
+    const data=await file.arrayBuffer();
+    const{read,utils}=XLSX;
+    const wb=read(data);
+    const ws=wb.Sheets[wb.SheetNames[0]];
+    const rows=utils.sheet_to_json(ws,{header:1,defval:null});
+
+    // Buscar fila de encabezados
+    let headerIdx=-1;
+    for(let i=0;i<rows.length;i++){
+      if(rows[i]&&rows[i].some(c=>String(c||'').includes('Id. de orden de trabajo'))){headerIdx=i;break;}
+    }
+    if(headerIdx===-1)throw new Error('No se encontró la fila de encabezados. Verificá que sea el reporte de SF.');
+    const headers=rows[headerIdx].map(h=>String(h||'').trim());
+    const col=(name)=>headers.findIndex(h=>h.toLowerCase().includes(name.toLowerCase()));
+
+    const iSFId=col('Id. de orden de trabajo');
     const iOT=col('Número de orden');
     const iResp=col('Responsable');
     const iTipo=col('Tipo de registro');
@@ -5059,17 +5197,13 @@ async function importPreColecta(e){
     const iObs=col('Observaciones');
     const iFecha=col('Fecha de creación')>=0?col('Fecha de creación'):col('Fecha de Despacho');
     const iFechaDespacho=col('Fecha de Despacho');
-    const iLogistica=col('Logística');
     const iMotivo=col('Motivo de desinstalación');
-    const iAsig=col('Asignación');
-    // Tracking: columna "N° de seguimiento" o similar
     const iTracking=col('N° de seguimiento')>=0?col('N° de seguimiento'):col('seguimiento')>=0?col('seguimiento'):col('tracking')>=0?col('tracking'):-1;
 
     function parseDate(str){
       if(!str)return null;
       const s=String(str).trim();
       if(!s)return null;
-      // Formato Excel numérico (días desde 1900)
       if(!isNaN(Number(s))&&Number(s)>40000){
         const d=new Date((Number(s)-25569)*86400000);
         return d.toISOString().slice(0,10);
@@ -5091,19 +5225,14 @@ async function importPreColecta(e){
       return'interior';
     }
 
-    // El Excel de SF agrupa filas por estado (fila de grupo = solo col A/B con el estado, sin sf_id)
-    // Propagamos el estado hacia abajo igual que logística en envíos
+    // El Excel de SF agrupa OTs por estado (filas de grupo sin sf_id)
+    // Propagamos el estado hacia abajo
     const ESTADOS_SF_MAP={
-      'pendiente':'Pendiente',
-      'despachado':'Despachado',
-      'en proceso':'En Proceso',
-      'terminal recuperada':'Terminal recuperada',
-      'extraviada':'Extraviada',
-      'fallido':'Fallido',
+      'pendiente':'Pendiente','despachado':'Despachado','en proceso':'En Proceso',
+      'terminal recuperada':'Terminal recuperada','extraviada':'Extraviada','fallido':'Fallido',
     };
     let currentEstado='Pendiente';
 
-    // Buscar operadores para mapear responsable → operador_id
     const{data:profiles}=await sb.from('profiles').select('id,nombre');
     const findUser=(nombre)=>{
       if(!nombre)return null;
@@ -5113,15 +5242,11 @@ async function importPreColecta(e){
     };
 
     const dataRows=rows.slice(headerIdx+1).filter(r=>r&&r.some(c=>c!==null));
-
-    // Propagar estado desde filas de grupo (igual que logística en Pre-Colecta)
     const enrichedRows=[];
     for(const r of dataRows){
       const sfId=String(r[iSFId]||'').trim();
       const ot=String(r[iOT]||'').trim();
-      // Fila de grupo: tiene texto en col B/C pero NO tiene sf_id ni OT
       if(!sfId&&!ot){
-        // Buscar el estado en cualquier celda de la fila
         const rowText=r.filter(Boolean).map(c=>String(c).trim().toLowerCase()).join(' ');
         for(const[k,v] of Object.entries(ESTADOS_SF_MAP)){
           if(rowText.includes(k)){currentEstado=v;break;}
@@ -5135,7 +5260,7 @@ async function importPreColecta(e){
 
     ptext.textContent=`Procesando ${enrichedRows.length} OTs...`;fill.style.width='50%';
 
-    let importadas=0,actualizadas=0,errores=0;
+    let importadas=0,errores=0;
     for(const{r,estado} of enrichedRows){
       const sfId=String(r[iSFId]||'').trim();
       const ot=String(r[iOT]||'').trim();
@@ -5143,10 +5268,7 @@ async function importPreColecta(e){
       const ciudad=String(r[iCiudad]||'').trim();
       const prov=String(r[iProv]||'').trim();
       const tracking=iTracking>=0?String(r[iTracking]||'').trim()||null:null;
-      // Logística: si está despachado → "Correo Argentino", si no hay col → SF
-      const logisticaRaw=iLogistica>=0&&r[iLogistica]?String(r[iLogistica]).trim():'';
-      const logistica=logisticaRaw||
-        (estado==='Despachado'?'Correo Argentino':'SF');
+      const logistica=estado==='Despachado'?'Correo Argentino':'SF';
 
       const item={
         sf_id:sfId,
@@ -5171,7 +5293,6 @@ async function importPreColecta(e){
         updated_at:new Date().toISOString(),
       };
       Object.keys(item).forEach(k=>item[k]===null&&delete item[k]);
-      // upsert con ignoreDuplicates:false para ACTUALIZAR estado y tracking si ya existe
       const{error}=await sb.from('ordenes_trabajo').upsert(item,{onConflict:'sf_id',ignoreDuplicates:false});
       if(error){errores++;console.error(error);}
       else{importadas++;}
@@ -5179,7 +5300,7 @@ async function importPreColecta(e){
 
     fill.style.width='100%';ptext.textContent='✅ Listo';
     result.innerHTML=`<div class="alert alert-ok" style="margin-top:10px">
-      ✅ <strong>${importadas}</strong> OTs procesadas (nuevas + actualizadas) · <strong>${errores}</strong> errores
+      ✅ <strong>${importadas}</strong> OTs procesadas · <strong>${errores}</strong> errores
     </div>`;
     auditLog({tabla:'ordenes_trabajo',registro_id:'BATCH',accion:'IMPORTACION_SF',
       campo:'lote',valor_antes:null,valor_despues:`${importadas} desinstalaciones importadas`});
@@ -5191,6 +5312,7 @@ async function importPreColecta(e){
   }
   e.target.value='';
 }
+// ── FIN IMPORT DESINSTALACIONES ──
 
 async function dsGuardar(){
   const ot=DesinModule.otActual;if(!ot)return;
