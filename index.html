@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v2.3.56</title>
+<title>Alleata · Operaciones v2.3.58</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -288,7 +288,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.3.56 · 17 abr 2026
+      v2.3.58 · 17 abr 2026
     </div>
   </div>
 </div>
@@ -347,7 +347,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.3.56 · 17 abr 2026
+      v2.3.58 · 17 abr 2026
     </div>
   </div>
 </nav>
@@ -361,7 +361,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <div class="topbar-right" id="topbar-date"></div>
     <button onclick="refreshCurrentModule()" title="Actualizar" style="background:none;border:1px solid var(--border2);color:var(--text-muted);border-radius:7px;padding:4px 10px;cursor:pointer;font-size:13px;margin-left:10px;transition:all .2s" onmouseover="this.style.color='var(--teal)';this.style.borderColor='var(--teal)'" onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border2)'">↺</button>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.3.56</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.3.58</div>
   </div>
   <div class="content">
 
@@ -1295,7 +1295,7 @@ tr:hover td{background:var(--surface2);}
 </div>
 
 <script>
-console.log('[Alleata v2.3.56] OK');
+console.log('[Alleata v2.3.58] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -3328,6 +3328,34 @@ function atAddLog(tipo, ot, responsable, cuenta, detalle){
   log.scrollTop = log.scrollHeight;
 }
 
+// ── NOTIFICAR ALERTA AL GRUPO OPS ──
+async function notificarAlertaGrupo(envio, alertaLabel, detalle){
+  // Obtener grupo OPS activo desde ally_grupos
+  const {data:grupos} = await sb.from('ally_grupos').select('group_id,nombre')
+    .eq('tipo','ops').eq('activo',true).limit(1);
+  const grupoId = grupos?.[0]?.group_id;
+  if(!grupoId){
+    console.log('[Ally] Sin grupo OPS configurado para alertas');
+    return;
+  }
+  const msg = `⚠️ *OT ${envio.ot_numero}* — *${alertaLabel}*
+`
+    + `👤 ${envio.cuenta||'—'}
+`
+    + `📍 ${envio.ciudad||'—'}, ${envio.provincia||'—'}
+`
+    + `👷 ${envio.responsable||'—'}
+`
+    + `📡 ${detalle}`;
+
+  await fetch('https://adequate-blessing.up.railway.app/notificar', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({numero: grupoId, mensaje: msg})
+  });
+  console.log(`[Ally] Alerta enviada al grupo OPS: ${alertaLabel} — OT ${envio.ot_numero}`);
+}
+
 // ── NOTIFICAR ENTREGADO VÍA ALLY ──
 async function notificarEntregadoWhatsApp(envio){
   // Mapeo responsable → número de celular (desde profiles en Supabase)
@@ -3414,7 +3442,20 @@ async function autoActualizarTracking(){
         const detalle = ultimo.estadoCA ? `${ultimo.historia} — ${ultimo.estadoCA}` : ultimo.historia;
 
         // Detectar alertas especiales
-        const esAlerta = /DOMICILIO CERRADO|DIRECCIÓN INSUFICIENTE|RETORNANDO/i.test(ultimo.estadoCA + ' ' + ultimo.historia);
+        // Detectar alertas — domicilio cerrado, visitas fallidas, dirección insuficiente
+        const textoEvento = (ultimo.estadoCA + ' ' + ultimo.historia).toUpperCase();
+        const esAlerta = /DOMICILIO CERRADO|DIRECCIÓN INSUFICIENTE|RETORNANDO|VISITA FALLIDA|AUSENTE|SIN DESTINATARIO/i.test(textoEvento);
+
+        // Detectar número de visita (CA usa: DOMICILIO CERRADO/1 VISITA, /2 VISITA, etc.)
+        const matchVisita = textoEvento.match(/(\d+)\s*(?:RA|DA|TA|°)?\s*VISITA/i)
+          || textoEvento.match(/DOMICILIO CERRADO\/(\d+)/i)
+          || textoEvento.match(/INTENTO.*?(\d+)/i);
+        const nroVisita = matchVisita ? parseInt(matchVisita[1]) : null;
+        const visitaLabel = nroVisita === 1 ? '1ra VISITA FALLIDA'
+          : nroVisita === 2 ? '2da VISITA FALLIDA'
+          : nroVisita === 3 ? '3ra VISITA FALLIDA ⚠️'
+          : nroVisita ? `${nroVisita}° VISITA FALLIDA`
+          : esAlerta ? 'VISITA FALLIDA' : null;
 
         const sla = calcularSLA(eventos);
         const updateAT = {
@@ -3432,11 +3473,15 @@ async function autoActualizarTracking(){
           await sb.from('envios').update(updateAT).eq('id', envio.id);
           // Notificar al responsable por WhatsApp si pasó a Entregado
           if(estadoMapeado === 'Entregado' && envio.responsable){
-            notificarEntregadoWhatsApp({...envio, ultimo_evento_new: detalle}).catch(e=>console.warn('Notif WA error:', e.message));
+            notificarEntregadoWhatsApp({...envio, ultimo_evento_new: detalle})
+              .then(()=>atAddLog('ok', otLabel, envio.responsable, envio.cuenta, '📱 WhatsApp enviado a '+envio.responsable))
+              .catch(e=>atAddLog('error', otLabel, envio.responsable, envio.cuenta, '❌ WA falló: '+e.message));
           }
           if(esAlerta){
-            atAddLog('alerta', otLabel, envio.responsable, envio.cuenta, `⚠️ ${detalle}`);
+            atAddLog('alerta', otLabel, envio.responsable, envio.cuenta, `⚠️ ${visitaLabel||'ALERTA'} — ${detalle}`);
             alertas++;
+            // Notificar al grupo OPS
+            notificarAlertaGrupo(envio, visitaLabel||'VISITA FALLIDA', detalle).catch(e=>console.warn('Notif grupo error:', e.message));
           } else {
             atAddLog('cambio', otLabel, envio.responsable, envio.cuenta, `${envio.estado} → ${estadoMapeado}`);
             actualizados++;
@@ -3445,8 +3490,9 @@ async function autoActualizarTracking(){
           // Aunque no cambie el estado, actualizar SLA y evento
           await sb.from('envios').update(updateAT).eq('id', envio.id);
           if(esAlerta){
-            atAddLog('alerta', otLabel, envio.responsable, envio.cuenta, `⚠️ ${detalle}`);
+            atAddLog('alerta', otLabel, envio.responsable, envio.cuenta, `⚠️ ${visitaLabel||'ALERTA'} — ${detalle}`);
             alertas++;
+            notificarAlertaGrupo(envio, visitaLabel||'VISITA FALLIDA', detalle).catch(e=>console.warn('Notif grupo error:', e.message));
           } else {
             atAddLog('ok', otLabel, envio.responsable, envio.cuenta, `Sin cambios — ${detalle||envio.estado}`);
             sinCambio++;
