@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v2.3.45</title>
+<title>Alleata · Operaciones v2.3.46</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -288,7 +288,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.3.45 · 24 abr 2026
+      v2.3.46 · 24 abr 2026
     </div>
   </div>
 </div>
@@ -347,7 +347,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.3.45 · 24 abr 2026
+      v2.3.46 · 24 abr 2026
     </div>
   </div>
 </nav>
@@ -361,7 +361,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <div class="topbar-right" id="topbar-date"></div>
     <button onclick="refreshCurrentModule()" title="Actualizar" style="background:none;border:1px solid var(--border2);color:var(--text-muted);border-radius:7px;padding:4px 10px;cursor:pointer;font-size:13px;margin-left:10px;transition:all .2s" onmouseover="this.style.color='var(--teal)';this.style.borderColor='var(--teal)'" onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border2)'">↺</button>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.3.45</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.3.46</div>
   </div>
   <div class="content">
 
@@ -1039,6 +1039,11 @@ tr:hover td{background:var(--surface2);}
             Desinstalaciones Pendientes ↗
           </a>
         </div>
+        <button id="btnDsAutoTracking" onclick="dsAutoTracking()" title="Actualizar estados de desinstalaciones despachadas por Correo Argentino"
+          style="background:rgba(26,159,212,.15);border:1px solid rgba(26,159,212,.4);color:var(--blue);padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;white-space:nowrap;transition:all .2s"
+          onmouseover="this.style.background='rgba(26,159,212,.25)'" onmouseout="this.style.background='rgba(26,159,212,.15)'">
+          🔄 Auto-tracking
+        </button>
       </div>
       <div id="dsImportMsg" style="font-size:11px;color:var(--text-muted);margin-top:8px"></div>
       <div id="dsImportProgress" style="display:none;margin-top:8px">
@@ -1291,7 +1296,7 @@ tr:hover td{background:var(--surface2);}
 </div>
 
 <script>
-console.log('[Alleata v2.3.45] OK');
+console.log('[Alleata v2.3.46] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -5624,6 +5629,15 @@ function dsLimpiarFiltros(){
   filtrarDesins();
 }
 
+function dsCalcZona(ot){
+  // Prioridad: campo zona de DB → CP → 'Sin zona'
+  if(ot.zona&&ot.zona.trim()) return ot.zona.trim().toUpperCase().includes('AMBA')?'AMBA':'Interior';
+  if(!ot.cp) return 'Sin zona';
+  const n=parseInt(ot.cp,10);
+  if(n>=1000&&n<=1999) return 'AMBA';
+  return 'Interior';
+}
+
 function filtrarDesins(){
   const buscar=document.getElementById('ds-buscar').value.toLowerCase().trim();
   const estado=document.getElementById('ds-f-estado').value;
@@ -5633,7 +5647,7 @@ function filtrarDesins(){
   DesinModule.filtrados=DesinModule.datos.filter(ot=>{
     if(resp&&ot.operador_id!==resp)return false;
     if(estado&&ot.estado!==estado)return false;
-    if(zona&&ot.zona!==zona)return false;
+    if(zona&&dsCalcZona(ot)!==zona)return false;
     if(sla&&ot.sla_estado!==sla)return false;
     if(buscar&&![ot.ot,ot.comercio,ot.ciudad,ot.cuenta,ot.logistica].some(v=>v&&v.toLowerCase().includes(buscar)))return false;
     return true;
@@ -5727,6 +5741,112 @@ function dsModalAbrir(otNum){
 function dsModalClose(){document.getElementById('ds-modal-overlay').style.display='none';DesinModule.otActual=null;DesinModule.nuevoEstado=null;}
 document.getElementById('ds-modal-overlay').addEventListener('click',function(e){if(e.target===this)dsModalClose();});
 function dsSelEst(btn,estado){document.querySelectorAll('.ds-est-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');DesinModule.nuevoEstado=estado;}
+
+async function dsAutoTracking(){
+  abrirModalAutoTracking();
+  const btn=document.getElementById('btnDsAutoTracking');
+  if(btn)btn.disabled=true;
+
+  const isAdmin=currentProfile?.rol==='admin';
+  const nombreOp=currentProfile?.nombre||'';
+
+  // Traer OTs en estado Despachado con tracking, de logística CA
+  let q=sb.from('ordenes_trabajo')
+    .select('id,ot,track,estado,operador_id,comercio,cuenta')
+    .eq('estado','Despachado')
+    .not('track','is',null)
+    .neq('track','');
+  if(!isAdmin&&nombreOp) q=q.ilike('operador_id','%'+nombreOp.split(' ')[0]+'%');
+
+  const{data:ots,error}=await q;
+  if(error||!ots||ots.length===0){
+    atAddLog('info','—','—','—','No hay OTs despachadas con tracking para actualizar.');
+    document.getElementById('atSubtitle').textContent='Sin OTs activas';
+    document.getElementById('atProgressBar').style.width='100%';
+    document.getElementById('btnCerrarAutoTracking').style.display='block';
+    document.getElementById('atFooter').style.display='block';
+    document.getElementById('atResumen').innerHTML='<span style="color:var(--text-muted);font-size:13px;">Sin OTs despachadas para procesar.</span>';
+    if(btn)btn.disabled=false;
+    return;
+  }
+
+  document.getElementById('atSubtitle').textContent=`Procesando ${ots.length} desinstalación${ots.length!==1?'es':''} despachada${ots.length!==1?'s':''}...`;
+
+  let actualizados=0,alertas=0,errores=0,sinCambio=0;
+  const DELAY=600;
+
+  // Mapeo de estados CA → estados de desinstalación
+  function mapearEstadoDes(historia, estadoCA){
+    const h=(historia||'').toUpperCase();
+    const e=(estadoCA||'').toUpperCase();
+    if(h.includes('ENTREGADO')||h.includes('ENTREGA OK')||h.includes('ENTREGA EFECTUADA')) return 'Terminal recuperada';
+    if(h.includes('DEVUELTO')||h.includes('DEVOLUCION')) return 'Fallido';
+    if(h.includes('PERDIDO')) return 'Extraviada';
+    if(h.includes('EN PODER DEL DISTRIBUIDOR')||h.includes('INTENTO DE ENTREGA')) return 'En Proceso';
+    if(h.includes('EN ESPERA EN SUCURSAL')) return 'En Proceso';
+    if(h.includes('CENTRO DE PROCESAMIENTO')||h.includes('CLASIFIC')) return 'Despachado';
+    if(e.includes('RETORNANDO')) return 'Fallido';
+    return null;
+  }
+
+  for(let i=0;i<ots.length;i++){
+    const ot=ots[i];
+    const pct=Math.round(((i+1)/ots.length)*100);
+    const restante=Math.round(((ots.length-i-1)*DELAY)/1000);
+    document.getElementById('atProgressBar').style.width=pct+'%';
+    document.getElementById('atProgText').textContent=`${i+1} / ${ots.length}`;
+    document.getElementById('atETA').textContent=restante>0?`~${restante}s restantes`:'';
+
+    try{
+      const{eventos}=await fetchTrackingCA(ot.track);
+      if(!eventos||eventos.length===0){
+        atAddLog('error',ot.ot,ot.operador_id,ot.comercio||ot.cuenta,'Sin eventos en CA');
+        errores++;
+      } else {
+        const ultimo=eventos[0];
+        const nuevoEstado=mapearEstadoDes(ultimo.historia,ultimo.estadoCA);
+        const detalle=ultimo.estadoCA?`${ultimo.historia} — ${ultimo.estadoCA}`:ultimo.historia;
+        const esAlerta=/DOMICILIO CERRADO|DIRECCIÓN INSUFICIENTE|RETORNANDO/i.test(ultimo.estadoCA+' '+ultimo.historia);
+        const upd={observaciones:detalle,updated_at:new Date().toISOString()};
+        if(nuevoEstado&&nuevoEstado!==ot.estado){
+          upd.estado=nuevoEstado;
+          if(nuevoEstado==='Terminal recuperada'||nuevoEstado==='Extraviada') upd.fecha_cierre=new Date().toISOString();
+        }
+        await sb.from('ordenes_trabajo').update(upd).eq('id',ot.id);
+        if(esAlerta){
+          atAddLog('alerta',ot.ot,ot.operador_id,ot.comercio||ot.cuenta,`⚠️ ${detalle}`);alertas++;
+        } else if(nuevoEstado&&nuevoEstado!==ot.estado){
+          atAddLog('cambio',ot.ot,ot.operador_id,ot.comercio||ot.cuenta,`${ot.estado} → ${nuevoEstado}`);actualizados++;
+        } else {
+          atAddLog('ok',ot.ot,ot.operador_id,ot.comercio||ot.cuenta,`Sin cambios — ${detalle||ot.estado}`);sinCambio++;
+        }
+      }
+    }catch(err){
+      atAddLog('error',ot.ot,ot.operador_id,ot.comercio||ot.cuenta,`Error: ${err.message||'sin respuesta'}`);
+      errores++;
+    }
+    await new Promise(r=>setTimeout(r,DELAY));
+  }
+
+  document.getElementById('atProgressBar').style.width='100%';
+  document.getElementById('atETA').textContent='Finalizado';
+  document.getElementById('atSubtitle').textContent=`Completado — ${new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'})}`;
+  document.getElementById('btnCerrarAutoTracking').style.display='block';
+
+  const resumen=document.getElementById('atResumen');
+  const chips=[
+    {val:actualizados,label:'actualizados',color:'var(--teal)',bg:'rgba(29,191,142,.12)'},
+    {val:alertas,label:'alertas',color:'#f59e0b',bg:'rgba(245,158,11,.12)'},
+    {val:sinCambio,label:'sin cambios',color:'var(--text-muted)',bg:'var(--navy-700)'},
+    {val:errores,label:'errores',color:'var(--red)',bg:'rgba(239,68,68,.1)'},
+  ].filter(c=>c.val>0);
+  resumen.innerHTML=chips.map(c=>`<div style="background:${c.bg};border-radius:8px;padding:6px 14px;text-align:center;"><div style="font-size:20px;font-weight:800;color:${c.color};font-family:'JetBrains Mono',monospace;">${c.val}</div><div style="font-size:10px;color:${c.color};text-transform:uppercase;letter-spacing:1px;font-weight:600;">${c.label}</div></div>`).join('')||'<span style="color:var(--text-muted);font-size:13px;">Sin novedades.</span>';
+  document.getElementById('atFooter').style.display='block';
+  if(btn)btn.disabled=false;
+  DesinModule.cargado=false;
+  await cargarDesinstalaciones();
+  loadBadges();
+}
 
 async function importDesinstalaciones(e){
   const file=e.target.files[0];
