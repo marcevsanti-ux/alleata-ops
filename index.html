@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v2.3.55</title>
+<title>Alleata · Operaciones v2.3.56</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -288,7 +288,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.3.55 · 17 abr 2026
+      v2.3.56 · 17 abr 2026
     </div>
   </div>
 </div>
@@ -347,7 +347,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.3.55 · 17 abr 2026
+      v2.3.56 · 17 abr 2026
     </div>
   </div>
 </nav>
@@ -361,7 +361,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <div class="topbar-right" id="topbar-date"></div>
     <button onclick="refreshCurrentModule()" title="Actualizar" style="background:none;border:1px solid var(--border2);color:var(--text-muted);border-radius:7px;padding:4px 10px;cursor:pointer;font-size:13px;margin-left:10px;transition:all .2s" onmouseover="this.style.color='var(--teal)';this.style.borderColor='var(--teal)'" onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border2)'">↺</button>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.3.55</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.3.56</div>
   </div>
   <div class="content">
 
@@ -1295,7 +1295,7 @@ tr:hover td{background:var(--surface2);}
 </div>
 
 <script>
-console.log('[Alleata v2.3.55] OK');
+console.log('[Alleata v2.3.56] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -3328,6 +3328,35 @@ function atAddLog(tipo, ot, responsable, cuenta, detalle){
   log.scrollTop = log.scrollHeight;
 }
 
+// ── NOTIFICAR ENTREGADO VÍA ALLY ──
+async function notificarEntregadoWhatsApp(envio){
+  // Mapeo responsable → número de celular (desde profiles en Supabase)
+  const {data:perfil} = await sb.from('profiles').select('celular,nombre')
+    .ilike('nombre','%'+envio.responsable.split(' ')[0]+'%').maybeSingle();
+  if(!perfil?.celular){
+    console.log(`[Ally] Sin celular para ${envio.responsable}`);
+    return;
+  }
+  const estadoEmoji = {'Entregado':'✅','Devuelto':'🔴','En camino':'🚚','En espera en sucursal':'🟡','Fallido':'❌'};
+  const emoji = estadoEmoji[envio.estado_nuevo||'Entregado']||'✅';
+  const msg = `${emoji} *OT ${envio.ot_numero}* — *Entregado*
+`
+    + `👤 ${envio.cuenta||'—'}
+`
+    + `📍 ${envio.ciudad||'—'}, ${envio.provincia||'—'}
+`
+    + `📡 ${envio.ultimo_evento_new||'Entregado por CA'}`;
+
+  // Llamar al endpoint /notificar del agente Ally
+  const allyUrl = 'https://adequate-blessing.up.railway.app/notificar';
+  await fetch(allyUrl, {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({numero: perfil.celular, mensaje: msg})
+  });
+  console.log(`[Ally] Notificación enviada a ${perfil.nombre} (${perfil.celular})`);
+}
+
 async function autoActualizarTracking(){
   abrirModalAutoTracking();
   const btn = document.getElementById('btnAutoTracking');
@@ -3401,6 +3430,10 @@ async function autoActualizarTracking(){
         if(estadoMapeado && estadoMapeado !== envio.estado){
           updateAT.estado = estadoMapeado;
           await sb.from('envios').update(updateAT).eq('id', envio.id);
+          // Notificar al responsable por WhatsApp si pasó a Entregado
+          if(estadoMapeado === 'Entregado' && envio.responsable){
+            notificarEntregadoWhatsApp({...envio, ultimo_evento_new: detalle}).catch(e=>console.warn('Notif WA error:', e.message));
+          }
           if(esAlerta){
             atAddLog('alerta', otLabel, envio.responsable, envio.cuenta, `⚠️ ${detalle}`);
             alertas++;
@@ -3563,12 +3596,10 @@ function mapearEstadoCA(historia, estadoCA='', tipoOT=''){
 
   const esInstalacion = TIPOS_OT_INSTALACION.some(x => t.includes(x));
 
-  // Regla Exitoso → mapeado como "Entregado" en Alleata
-  if(esInstalacion){
-    if(e === 'ENTREGADO' || e === 'ENTREGA EN SUCURSAL') return 'Entregado';
-  }
+  // estadoCA = ENTREGADO siempre gana, sin importar tipo ni historia
+  if(e === 'ENTREGADO' || e === 'ENTREGA EN SUCURSAL' || e === 'ENTREGA EFECTUADA') return 'Entregado';
 
-  // Reglas generales por Historia
+  // Reglas generales por Historia — ENTREGADO antes de INTENTO DE ENTREGA
   if(h.includes('ENTREGADO')||h.includes('ENTREGA OK')||h.includes('ENTREGA EFECTUADA')) return 'Entregado';
   if(h.includes('DEVUELTO')||h.includes('DEVOLUCION')) return 'Devuelto';
   if(h.includes('EN PODER DEL DISTRIBUIDOR')||h.includes('INTENTO DE ENTREGA')) return 'En camino';
