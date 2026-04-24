@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v2.3.48</title>
+<title>Alleata · Operaciones v2.3.49</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -288,7 +288,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.3.48 · 17 abr 2026
+      v2.3.49 · 17 abr 2026
     </div>
   </div>
 </div>
@@ -347,7 +347,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.3.48 · 17 abr 2026
+      v2.3.49 · 17 abr 2026
     </div>
   </div>
 </nav>
@@ -361,7 +361,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <div class="topbar-right" id="topbar-date"></div>
     <button onclick="refreshCurrentModule()" title="Actualizar" style="background:none;border:1px solid var(--border2);color:var(--text-muted);border-radius:7px;padding:4px 10px;cursor:pointer;font-size:13px;margin-left:10px;transition:all .2s" onmouseover="this.style.color='var(--teal)';this.style.borderColor='var(--teal)'" onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border2)'">↺</button>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.3.48</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.3.49</div>
   </div>
   <div class="content">
 
@@ -1217,7 +1217,7 @@ tr:hover td{background:var(--surface2);}
 </div>
 
 <script>
-console.log('[Alleata v2.3.48] OK');
+console.log('[Alleata v2.3.49] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -1425,7 +1425,9 @@ function buildDashCards(modulos,isAdmin){
       <div class="dash-card-stat" id="dc-${c.mod}">${c.stat}</div>
     </div>`;
   }).join('');
-  loadOpsPanel(isAdmin);
+  loadOpsPanel(isAdmin).catch(err=>{
+    console.error('[loadOpsPanel ERROR]', err);
+  });
 }
 
 const MOD_INFO={home:'Dashboard',sims:'Verificador SIMs',envios:'Envíos',rollout:'Rollout',desinstalaciones:'Desinstalaciones',horas:'Control de Horas',ajustes:'Ajustes',ally:'Configuración Ally',distri:'Distribuidores'};
@@ -1578,19 +1580,21 @@ async function loadBadges(){
   const nombre=currentProfile?.nombre||'';
   const pn=nombre.split(' ')[0];
   if(!isAdmin) envQ=envQ.ilike('responsable','%'+pn+'%');
-  async function fetchAllDesins(filtroOp){
-    let all=[];let from=0;const PAGE=1000;
+  const{data:env=[]}=await envQ;
+  // Desinstalaciones con paginación
+  const des=[];
+  {
+    let _from=0;const _PAGE=1000;
     while(true){
-      let q=sb.from('v_ordenes_con_sla').select('ot,estado').eq('tipo','desinstalacion');
-      if(filtroOp)q=q.ilike('operador_id','%'+filtroOp+'%');
-      const{data:page}=await q.range(from,from+PAGE-1);
-      if(!page||page.length===0)break;
-      all=all.concat(page);if(page.length<PAGE)break;from+=PAGE;
+      let _q=sb.from('v_ordenes_con_sla').select('ot,estado').eq('tipo','desinstalacion');
+      if(!isAdmin)_q=_q.ilike('operador_id','%'+pn+'%');
+      const{data:_page}=await _q.range(_from,_from+_PAGE-1);
+      if(!_page||_page.length===0)break;
+      des.push(..._page);
+      if(_page.length<_PAGE)break;
+      _from+=_PAGE;
     }
-    return all;
   }
-  const [envRes,des]=await Promise.all([envQ,fetchAllDesins(!isAdmin?pn:null)]);
-  const env=envRes?.data||[];
   const envCount=(env||[]).filter(e=>!['Entregado','Fallido','Devuelto','Perdido'].includes(e.estado)).length;
   const desCount=(des||[]).filter(d=>!['Terminal recuperada','Extraviada'].includes(d.estado)).length;
   const nbEnv=document.getElementById('nb-envios');if(nbEnv)nbEnv.textContent=envCount;
@@ -1623,20 +1627,22 @@ async function loadOpsPanel(isAdmin){
   // QUERIES — admin ve todo, operador filtra por su nombre
   let envQ=sb.from('envios').select('id,ot_numero,tipo,responsable,estado,estado_devolucion,fecha,created_at,track,track_devolucion,logistica').not('estado','eq','null');
   if(!isAdmin) envQ=envQ.ilike('responsable','%'+primerNombre+'%');
-  async function fetchDesinsAll(filtroOp){
-    let all=[];let from=0;const PAGE=1000;
+  // Fetch envios
+  const{data:envios=[]}=await envQ;
+  // Fetch desinstalaciones con paginación (Supabase limita 1000)
+  const desins=[];
+  {
+    let _from=0;const _PAGE=1000;
     while(true){
-      let q=sb.from('v_ordenes_con_sla').select('ot,operador_id,estado,sla_estado,tipo,dias_transcurridos').eq('tipo','desinstalacion');
-      if(filtroOp)q=q.ilike('operador_id','%'+filtroOp+'%');
-      const{data:page}=await q.range(from,from+PAGE-1);
-      if(!page||page.length===0)break;
-      all=all.concat(page);if(page.length<PAGE)break;from+=PAGE;
+      let _q=sb.from('v_ordenes_con_sla').select('ot,operador_id,estado,sla_estado,tipo,dias_transcurridos').eq('tipo','desinstalacion');
+      if(!isAdmin)_q=_q.ilike('operador_id','%'+primerNombre+'%');
+      const{data:_page}=await _q.range(_from,_from+_PAGE-1);
+      if(!_page||_page.length===0)break;
+      desins.push(..._page);
+      if(_page.length<_PAGE)break;
+      _from+=_PAGE;
     }
-    return all;
   }
-  const [envResult,desData]=await Promise.all([envQ,fetchDesinsAll(!isAdmin?primerNombre:null)]);
-  const envios=envResult?.data||[];
-  const desins=desData||[];
 
   const directas=envios.filter(e=>e.estado&&!['Recibido ✅','Pendiente rótulo','Rótulo generado','En camino retorno'].includes(e.estado));
   const ESTADOS_CERRADOS=['Entregado','Fallido','Devuelto','Perdido'];
