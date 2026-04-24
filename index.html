@@ -986,7 +986,16 @@ tr:hover td{background:var(--surface2);}
         <option value="critico">Crítico</option><option value="alerta">Alerta</option><option value="verde">En término</option>
       </select>
       <div id="ds-op-pills" style="display:flex;gap:5px;flex-wrap:wrap"></div>
-
+      <a href="https://alleata.lightning.force.com/lightning/r/Report/00ORm00000CPncvMAD/view?queryScope=userFolders"
+         target="_blank"
+         style="display:inline-flex;align-items:center;gap:6px;padding:6px 14px;background:linear-gradient(135deg,#1dbf8e,#1a9fd4);color:#fff;font-size:12px;font-weight:600;border-radius:8px;text-decoration:none;white-space:nowrap;margin-left:auto">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="flex-shrink:0">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="7 10 12 15 17 10"/>
+          <line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+        Descargar archivo SF
+      </a>
     </div>
     <div class="table-wrap">
       <table class="table">
@@ -5294,9 +5303,22 @@ async function cargarDesinstalaciones(){
     const isAdmin=currentProfile?.rol==='admin';
     const nombreCompleto=currentProfile?.nombre||'';
     const primerNombre=nombreCompleto.split(' ')[0]; // "Gonzalo Marvaldi" → "Gonzalo"
-    let query=sb.from('v_ordenes_con_sla').select('*').eq('tipo','desinstalacion');
-    if(!isAdmin) query=query.ilike('operador_id','%'+primerNombre+'%');
-    const{data,error}=await query;
+    let baseQuery=sb.from('v_ordenes_con_sla').select('*').eq('tipo','desinstalacion');
+    if(!isAdmin) baseQuery=baseQuery.ilike('operador_id','%'+primerNombre+'%');
+    // Supabase limita 1000 filas por defecto — paginamos hasta traer todo
+    let allData=[];
+    let from=0;
+    const PAGE=1000;
+    while(true){
+      const{data:page,error}=await baseQuery.range(from,from+PAGE-1);
+      if(error)throw error;
+      if(!page||page.length===0)break;
+      allData=allData.concat(page);
+      if(page.length<PAGE)break;
+      from+=PAGE;
+    }
+    const data=allData;
+    const error=null;
     if(error)throw error;
     DesinModule.datos=data||[];DesinModule.cargado=true;
     document.getElementById('nb-desins').textContent=data.length;
