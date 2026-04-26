@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v2.3.60</title>
+<title>Alleata · Operaciones v2.3.62</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -288,7 +288,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.3.60 · 25 abr 2026
+      v2.3.62 · 25 abr 2026
     </div>
   </div>
 </div>
@@ -347,7 +347,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.3.60 · 25 abr 2026
+      v2.3.62 · 25 abr 2026
     </div>
   </div>
 </nav>
@@ -361,7 +361,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <div class="topbar-right" id="topbar-date"></div>
     <button onclick="refreshCurrentModule()" title="Actualizar" style="background:none;border:1px solid var(--border2);color:var(--text-muted);border-radius:7px;padding:4px 10px;cursor:pointer;font-size:13px;margin-left:10px;transition:all .2s" onmouseover="this.style.color='var(--teal)';this.style.borderColor='var(--teal)'" onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border2)'">↺</button>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.3.60</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.3.62</div>
   </div>
   <div class="content">
 
@@ -1229,8 +1229,28 @@ tr:hover td{background:var(--surface2);}
   <div class="modal-box">
     <div class="modal-title">📢 Grupo WhatsApp</div>
     <input type="hidden" id="allyGrId">
+
+    <!-- Selector WA — siempre visible, carga dinámica -->
+    <div class="field">
+      <label class="label" style="display:flex;align-items:center;gap:6px">
+        📲 Grupos de WhatsApp
+        <span id="allyGrWAStatus" style="font-size:10px;color:var(--text-muted);font-weight:400">cargando...</span>
+      </label>
+      <select class="select" id="allyGrWASelector" disabled style="opacity:0.6">
+        <option value="">⏳ Cargando grupos...</option>
+      </select>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:5px">
+        Al seleccionar, se autocompletan nombre y Group ID ↓
+      </div>
+    </div>
+
+    <div style="height:1px;background:var(--border2);margin:4px 0 12px"></div>
+
     <div class="field"><label class="label">Nombre</label><input class="input" id="allyGrNombre" placeholder="Nombre del grupo"></div>
-    <div class="field"><label class="label">Group ID</label><input class="input" id="allyGrGroupId" placeholder="120363...@g.us"></div>
+    <div class="field">
+      <label class="label">Group ID</label>
+      <input class="input" id="allyGrGroupId" placeholder="120363...@g.us" style="font-family:'JetBrains Mono',monospace;font-size:12px">
+    </div>
     <div class="field"><label class="label">Tipo</label>
       <select class="select" id="allyGrTipo">
         <option value="ops">Operaciones</option>
@@ -1295,7 +1315,7 @@ tr:hover td{background:var(--surface2);}
 </div>
 
 <script>
-console.log('[Alleata v2.3.60] OK');
+console.log('[Alleata v2.3.62] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -4527,12 +4547,65 @@ async function allyToggleContacto(id, activo) {
   cargarAllyContactos();
 }
 
-function allyNuevoGrupo() {
+async function allyNuevoGrupo() {
+  // Resetear campos
   ['allyGrId','allyGrNombre','allyGrGroupId','allyGrDesc'].forEach(id => document.getElementById(id).value='');
-  document.getElementById('allyGrTipo').value='ops';
-  document.getElementById('allyGrUnidad').value='alleata';
-  document.getElementById('allyGrMsg').innerHTML='';
-  document.getElementById('modalAllyGrupo').style.display='flex';
+  document.getElementById('allyGrTipo').value = 'ops';
+  document.getElementById('allyGrUnidad').value = 'alleata';
+  document.getElementById('allyGrMsg').innerHTML = '';
+
+  // Resetear selector a estado de carga
+  const sel = document.getElementById('allyGrWASelector');
+  const status = document.getElementById('allyGrWAStatus');
+  sel.innerHTML = '<option value="">⏳ Cargando grupos...</option>';
+  sel.disabled = true;
+  sel.style.opacity = '0.6';
+  if (status) status.textContent = 'cargando...';
+
+  // Abrir modal inmediatamente
+  document.getElementById('modalAllyGrupo').style.display = 'flex';
+
+  // Cargar grupos en paralelo (no bloquea la apertura del modal)
+  try {
+    const resp = await fetch('https://alleata-agent-production.up.railway.app/whatsapp/groups', {
+      headers: { 'x-automation-secret': '123456' }
+    });
+
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+
+    const groups = await resp.json();
+    const valid = groups.filter(g => g.name && g.group_id);
+
+    if (valid.length > 0) {
+      sel.innerHTML =
+        '<option value="">— Seleccionar grupo de WhatsApp —</option>' +
+        valid.map(g =>
+          `<option data-name="${g.name}" data-gid="${g.group_id}" value="${g.group_id}">${g.name} — ${g.group_id}</option>`
+        ).join('');
+      sel.disabled = false;
+      sel.style.opacity = '1';
+      if (status) status.textContent = `${valid.length} grupos encontrados`;
+
+      sel.onchange = function() {
+        const opt = sel.options[sel.selectedIndex];
+        if (opt.value) {
+          document.getElementById('allyGrNombre').value   = opt.dataset.name || '';
+          document.getElementById('allyGrGroupId').value  = opt.dataset.gid  || '';
+        } else {
+          document.getElementById('allyGrNombre').value   = '';
+          document.getElementById('allyGrGroupId').value  = '';
+        }
+      };
+    } else {
+      sel.innerHTML = '<option value="">Sin grupos disponibles — ingresar manualmente</option>';
+      if (status) status.textContent = 'sin resultados';
+    }
+  } catch(e) {
+    sel.innerHTML = '<option value="">Error al cargar — ingresar manualmente</option>';
+    sel.style.opacity = '1';
+    if (status) status.textContent = 'error: ' + e.message;
+    console.warn('[allyNuevoGrupo] fetch error:', e.message);
+  }
 }
 
 function allyEditGrupo(g) {
@@ -4562,6 +4635,144 @@ async function allyGuardarGrupo() {
   closeModal('modalAllyGrupo');
   cargarAllyGrupos();
 }
+async function allyNuevaRegla() {
+  await _abrirModalRegla(null);
+}
+
+async function allyEditRegla(r) {
+  await _abrirModalRegla(r);
+}
+
+async function _abrirModalRegla(r) {
+  const [{ data: grupos }, { data: contactos }] = await Promise.all([
+    sb.from('ally_grupos').select('nombre, group_id').eq('activo', true).order('nombre'),
+    sb.from('contactos').select('nombre').eq('activo', true).order('nombre'),
+  ]);
+
+  const grupoNames    = (grupos    || []).map(g => g.nombre);
+  const contactoNames = (contactos || []).map(c => c.nombre);
+  const selGrupos     = r ? (r.send_to_groups   || []) : [];
+  const selContactos  = r ? (r.send_to_contacts || []) : [];
+  const cond          = r ? (r.condition        || {}) : {};
+  const condEstados   = ['Entregado','Devuelto','Fallido','En camino','En espera en sucursal','En tránsito','Perdido'];
+
+  document.getElementById('modalAllyRegla')?.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'modalAllyRegla';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px';
+  modal.innerHTML = `
+    <div class="modal-box" style="max-width:540px;width:100%;max-height:90vh;overflow-y:auto">
+      <div class="modal-title">🔔 ${r ? 'Editar' : 'Nueva'} Regla</div>
+      <input type="hidden" id="allyRlId" value="${r?.id || ''}">
+
+      <div class="field">
+        <label class="label">Nombre de la regla</label>
+        <input class="input" id="allyRlNombre" value="${r?.name || ''}" placeholder="Ej: Entregado → Sales">
+      </div>
+
+      <div class="field">
+        <label class="label">Estado que dispara la regla</label>
+        <select class="select" id="allyRlEstado">
+          <option value="">— Cualquier cambio de estado —</option>
+          ${condEstados.map(e => `<option value="${e}" ${cond.new_status === e ? 'selected' : ''}>${e}</option>`).join('')}
+        </select>
+      </div>
+
+      <div class="field">
+        <label class="label">📢 Grupos a notificar</label>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;padding:10px;background:var(--navy-900);border-radius:8px;min-height:40px" id="allyRlGruposWrap">
+          ${grupoNames.length === 0
+            ? '<span style="color:var(--text-muted);font-size:12px">Sin grupos activos en Config. Ally → Grupos</span>'
+            : grupoNames.map(n => `
+              <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;background:var(--navy-700);padding:4px 10px;border-radius:20px;border:1px solid ${selGrupos.includes(n)?'var(--teal)':'var(--border2)'}">
+                <input type="checkbox" value="${n}" ${selGrupos.includes(n) ? 'checked' : ''}
+                  onchange="this.closest('label').style.border='1px solid '+(this.checked?'var(--teal)':'var(--border2)')">
+                ${n}
+              </label>`).join('')}
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="label">👥 Contactos a notificar</label>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;padding:10px;background:var(--navy-900);border-radius:8px;min-height:40px" id="allyRlContactosWrap">
+          ${contactoNames.length === 0
+            ? '<span style="color:var(--text-muted);font-size:12px">Sin contactos activos en Config. Ally → Contactos</span>'
+            : contactoNames.map(n => `
+              <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;background:var(--navy-700);padding:4px 10px;border-radius:20px;border:1px solid ${selContactos.includes(n)?'var(--teal)':'var(--border2)'}">
+                <input type="checkbox" value="${n}" ${selContactos.includes(n) ? 'checked' : ''}
+                  onchange="this.closest('label').style.border='1px solid '+(this.checked?'var(--teal)':'var(--border2)')">
+                ${n}
+              </label>`).join('')}
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="label">Template del mensaje</label>
+        <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">
+          Variables disponibles: <code>{{ot}}</code> <code>{{tracking}}</code> <code>{{estado}}</code> <code>{{estado_anterior}}</code>
+        </div>
+        <textarea class="input" id="allyRlTemplate" rows="5"
+          style="font-family:'JetBrains Mono',monospace;font-size:12px;resize:vertical"
+          placeholder="Ej: ✅ OT {{ot}} entregada.&#10;Tracking: {{tracking}}">${r?.message_template || ''}</textarea>
+      </div>
+
+      <div class="field" style="display:flex;align-items:center;gap:8px">
+        <input type="checkbox" id="allyRlActiva" ${r?.active ? 'checked' : ''} style="cursor:pointer">
+        <label for="allyRlActiva" style="font-size:13px;cursor:pointer">Regla activa</label>
+      </div>
+
+      <div id="allyRlMsg"></div>
+      <div style="display:flex;gap:10px;margin-top:12px">
+        <button class="btn btn-sm" onclick="allyGuardarRegla()">Guardar</button>
+        <button class="btn-ghost btn-sm" onclick="document.getElementById('modalAllyRegla').remove()">Cancelar</button>
+      </div>
+    </div>`;
+
+  document.body.appendChild(modal);
+}
+
+async function allyGuardarRegla() {
+  const id       = document.getElementById('allyRlId').value;
+  const name     = document.getElementById('allyRlNombre').value.trim();
+  const estado   = document.getElementById('allyRlEstado').value;
+  const template = document.getElementById('allyRlTemplate').value.trim();
+  const active   = document.getElementById('allyRlActiva').checked;
+
+  // Recoger checks de grupos y contactos (por nombre, no por group_id)
+  const grupos    = [...document.querySelectorAll('#allyRlGruposWrap input[type=checkbox]:checked')].map(i => i.value);
+  const contactos = [...document.querySelectorAll('#allyRlContactosWrap input[type=checkbox]:checked')].map(i => i.value);
+
+  if (!name) {
+    document.getElementById('allyRlMsg').innerHTML = '<div class="alert alert-err">El nombre es obligatorio</div>';
+    return;
+  }
+
+  const datos = {
+    name,
+    trigger_type:     'shipment_status_change',
+    condition:        estado ? { new_status: estado } : {},
+    message_template: template,
+    send_to_groups:   grupos,      // array de nombres → processAllyRules los resuelve a group_id
+    send_to_contacts: contactos,   // array de nombres → processAllyRules los resuelve a whatsapp
+    active,
+    updated_at: new Date().toISOString(),
+  };
+
+  const { error } = id
+    ? await sb.from('ally_notification_rules').update(datos).eq('id', id)
+    : await sb.from('ally_notification_rules').insert(datos);
+
+  if (error) {
+    document.getElementById('allyRlMsg').innerHTML = `<div class="alert alert-err">Error: ${error.message}</div>`;
+    return;
+  }
+
+  document.getElementById('modalAllyRegla').remove();
+  cargarAllyReglas();
+}
+
+
 
 // ══ MÓDULO DISTRIBUIDORES ════════════════════════════════════════════════════════
 const CP_COORDS={1005:[-34.6037,-58.3816],1289:[-34.639,-58.378],1414:[-34.588,-58.44],1425:[-34.588,-58.42],1604:[-34.476,-58.52],1625:[-34.349,-58.797],1629:[-34.458,-58.914],1640:[-34.492,-58.509],1650:[-34.567,-58.539],1657:[-34.588,-58.658],1663:[-34.539,-58.706],1700:[-34.617,-58.557],1704:[-34.644,-58.565],1708:[-34.653,-58.62],1714:[-34.659,-58.665],1748:[-34.604,-58.937],1752:[-34.678,-58.529],1757:[-34.748,-58.597],1805:[-34.847,-58.515],1821:[-34.7,-58.405],1824:[-34.705,-58.4],1827:[-34.765,-58.423],1832:[-34.765,-58.423],1836:[-34.801,-58.454],1856:[-34.894,-58.399],1862:[-34.944,-58.47],1875:[-34.705,-58.315],1880:[-34.763,-58.208],1886:[-34.836,-58.193],1900:[-34.9205,-57.9536],1984:[-34.995,-58.006],2000:[-32.9468,-60.6393],2800:[-34.098,-59.027],2900:[-33.3347,-60.2117],3000:[-31.6333,-60.7],3100:[-31.7333,-60.5167],3300:[-27.3671,-55.896],3400:[-27.4806,-58.8341],3500:[-27.4514,-58.9867],3600:[-26.1775,-58.1781],4000:[-26.8083,-65.2176],4400:[-24.7821,-65.4232],4600:[-24.1857,-65.2994],5000:[-31.4135,-64.1811],5151:[-31.3456,-64.3376],5152:[-31.3456,-64.3376],5500:[-32.8908,-68.8272],5800:[-33.1232,-64.3493],5900:[-32.4072,-63.2409],6000:[-34.5667,-60.9167],6700:[-34.5696,-59.1076],7000:[-37.325,-59.1392],7174:[-37.643,-57.706],7300:[-36.7756,-59.8578],7400:[-36.8921,-60.3224],7600:[-38.0023,-57.5575],7601:[-38.0023,-57.5575],7602:[-38.0023,-57.5575],7603:[-38.0023,-57.5575],7604:[-38.0023,-57.5575],7607:[-38.272,-57.837],7608:[-38.0023,-57.5575],7609:[-37.875,-57.523],7610:[-38.0023,-57.5575],7620:[-37.754,-58.287],7630:[-38.554,-58.746],8000:[-38.7183,-62.2663],8300:[-38.9516,-68.0591],8400:[-41.1335,-71.3103],8500:[-40.8135,-62.9967],9000:[-45.8645,-67.4977]};
