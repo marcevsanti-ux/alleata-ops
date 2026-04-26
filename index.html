@@ -4525,7 +4525,7 @@ async function cargarAllyReglas() {
             </div>
           </div>
           <div style="font-size:11px;color:var(--text-muted);display:grid;grid-template-columns:1fr 1fr;gap:6px 16px;margin-bottom:8px">
-            <div>🎯 Condición: <span style="color:var(--blue)">${cond.new_status||'Cualquier cambio'}</span></div>
+            <div>🎯 Condición: <span style="color:var(--blue)">${cond.new_status||'Cualquier cambio'}</span>${cond.historia_ca_contains?`<span style="font-size:10px;color:var(--text-muted);margin-left:6px">· historia ⊃ <code>${cond.historia_ca_contains}</code></span>`:''} ${cond.estado_ca_contains?`<span style="font-size:10px;color:var(--text-muted)">· estadoCA ⊃ <code>${cond.estado_ca_contains}</code></span>`:''}</div>
             <div style="grid-column:1/-1;display:flex;flex-wrap:wrap;gap:6px;margin-top:2px">
               ${r.notify_responsable_ot     ? '<span style="font-size:10px;background:var(--navy-900);padding:2px 7px;border-radius:10px">📩 DM Resp. OT</span>'      : ''}
               ${r.notify_propietario_cuenta ? '<span style="font-size:10px;background:var(--navy-900);padding:2px 7px;border-radius:10px">📩 DM Prop. Cta</span>'     : ''}
@@ -4720,11 +4720,36 @@ async function _abrirModalRegla(r) {
       </div>
 
       <div class="field">
-        <label class="label">Estado que dispara la regla</label>
+        <label class="label">Estado normalizado que dispara</label>
         <select class="select" id="allyRlEstado">
           <option value="">— Cualquier cambio de estado —</option>
           ${condEstados.map(e => `<option value="${e}" ${cond.new_status === e ? 'selected' : ''}>${e}</option>`).join('')}
         </select>
+      </div>
+
+      <div style="background:var(--navy-900);border-radius:8px;padding:12px;margin-bottom:4px">
+        <div style="font-size:11px;font-weight:600;color:var(--text-muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">
+          Filtros avanzados CA (opcional)
+        </div>
+        <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px">
+          Si se completan, la regla solo dispara cuando el evento de CA coincide. Dejar vacío para ignorar.
+        </div>
+        <div class="field" style="margin-bottom:8px">
+          <label class="label" style="font-size:11px">Historia CA contiene</label>
+          <input class="input" id="allyRlHistoriaContains"
+            value="${cond.historia_ca_contains || ''}"
+            placeholder="Ej: INTENTO DE ENTREGA"
+            style="font-family:'JetBrains Mono',monospace;font-size:12px;text-transform:uppercase"
+            oninput="this.value=this.value.toUpperCase()">
+        </div>
+        <div class="field" style="margin-bottom:0">
+          <label class="label" style="font-size:11px">Estado CA contiene</label>
+          <input class="input" id="allyRlEstadoCAContains"
+            value="${cond.estado_ca_contains || ''}"
+            placeholder="Ej: DOMICILIO CERRADO"
+            style="font-family:'JetBrains Mono',monospace;font-size:12px;text-transform:uppercase"
+            oninput="this.value=this.value.toUpperCase()">
+        </div>
       </div>
 
       <div class="field">
@@ -4844,7 +4869,15 @@ async function allyGuardarRegla() {
   const datos = {
     name,
     trigger_type:             'shipment_status_change',
-    condition:                estado ? { new_status: estado } : {},
+    condition: (() => {
+      const c = {};
+      if (estado) c.new_status = estado;
+      const hc = document.getElementById('allyRlHistoriaContains')?.value.trim();
+      const ec = document.getElementById('allyRlEstadoCAContains')?.value.trim();
+      if (hc) c.historia_ca_contains = hc;
+      if (ec) c.estado_ca_contains   = ec;
+      return c;
+    })(),
     message_template:         template,
     send_to_groups:           grupos,
     send_to_contacts:         contactos,
