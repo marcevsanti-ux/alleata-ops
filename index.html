@@ -4399,24 +4399,204 @@ async function cargarAllyGrupos() {
   </tr>`).join('');
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+// PATCH: Reemplazar cargarAllyReglas y allyToggleRegla en index.html
+// Conecta el tab "Reglas" de Config. Ally a ally_notification_rules (tabla real)
+// ══════════════════════════════════════════════════════════════════════════════
+
 async function cargarAllyReglas() {
   const wrap = document.getElementById('ally-reglas-wrap');
-  const {data} = await sb.from('ally_reglas').select('*').order('estado_ot');
-  if (!data || !data.length) { wrap.innerHTML='<p style="color:var(--text-muted)">Sin reglas configuradas</p>'; return; }
-  const estados = ['Pre-Colecta','Despachado','En tránsito','En camino','En espera en sucursal','Entregado','Fallido','Devuelto','Perdido'];
-  wrap.innerHTML = `<div class="table-wrap"><table class="table"><thead><tr><th>Estado OT</th><th>Notificar a</th><th>Activo</th><th></th></tr></thead><tbody>`+
-    data.map(r => `<tr>
-      <td><span style="font-size:12px;font-weight:600">${r.estado_ot}</span></td>
-      <td style="font-size:12px">${r.destinatario_tipo==='propietario_cuenta'?'👤 Propietario de cuenta':r.destinatario_tipo}</td>
-      <td>
-        <label style="cursor:pointer;display:flex;align-items:center;gap:6px">
-          <input type="checkbox" ${r.activo?'checked':''} onchange="allyToggleRegla('${r.id}',this.checked)" style="cursor:pointer">
-          <span style="font-size:11px;color:var(--text-muted)">${r.activo?'Activa':'Inactiva'}</span>
-        </label>
-      </td>
-      <td style="font-size:11px;color:var(--text-muted)">${r.mensaje_template||'Mensaje automático'}</td>
-    </tr>`).join('')+
-    '</tbody></table></div>';
+  wrap.innerHTML = '<p style="color:var(--text-muted);padding:12px">Cargando...</p>';
+
+  // Cargar reglas + grupos + contactos en paralelo para los selects
+  const [
+    { data: reglas },
+    { data: grupos },
+    { data: contactos }
+  ] = await Promise.all([
+    sb.from('ally_notification_rules').select('*').order('name'),
+    sb.from('ally_grupos').select('nombre').eq('activo', true).order('nombre'),
+    sb.from('contactos').select('nombre').eq('activo', true).order('nombre'),
+  ]);
+
+  const grupoOpts = (grupos || []).map(g => `<option value="${g.nombre}">${g.nombre}</option>`).join('');
+  const contactoOpts = (contactos || []).map(c => `<option value="${c.nombre}">${c.nombre}</option>`).join('');
+
+  if (!reglas || !reglas.length) {
+    wrap.innerHTML = `
+      <div style="color:var(--text-muted);padding:20px 0;font-size:13px">Sin reglas configuradas.</div>
+      <button class="btn btn-sm" onclick="allyNuevaRegla(${JSON.stringify(grupoOpts).replace(/'/g,"&#39;")}, ${JSON.stringify(contactoOpts).replace(/'/g,"&#39;")})">+ Nueva regla</button>`;
+    return;
+  }
+
+  const condEstados = ['Entregado','Devuelto','Fallido','En camino','En espera en sucursal','En tránsito','Perdido'];
+
+  wrap.innerHTML = `
+    <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
+      <button class="btn btn-sm" onclick="allyNuevaRegla()">+ Nueva regla</button>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:12px">
+      ${reglas.map(r => {
+        const cond = r.condition || {};
+        const grupos_str = (r.send_to_groups || []).join(', ') || '—';
+        const contactos_str = (r.send_to_contacts || []).join(', ') || '—';
+        return `
+        <div style="background:var(--navy-700);border:1px solid var(--border2);border-radius:12px;padding:14px 16px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <div style="font-weight:700;font-size:13px">${r.name}</div>
+            <div style="display:flex;align-items:center;gap:10px">
+              <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12px">
+                <input type="checkbox" ${r.active ? 'checked' : ''} onchange="allyToggleRegla('${r.id}', this.checked)">
+                <span style="color:${r.active ? 'var(--teal)' : 'var(--text-muted)'}">${r.active ? 'Activa' : 'Inactiva'}</span>
+              </label>
+              <button style="background:none;border:none;cursor:pointer;color:var(--teal);font-size:12px"
+                onclick='allyEditRegla(${JSON.stringify(r).replace(/'/g, "&#39;")})'>✏️</button>
+              <button style="background:none;border:none;cursor:pointer;color:var(--red);font-size:12px"
+                onclick="allyEliminarRegla('${r.id}','${r.name}')">🗑️</button>
+            </div>
+          </div>
+          <div style="font-size:11px;color:var(--text-muted);display:grid;grid-template-columns:1fr 1fr;gap:4px 16px">
+            <div>🎯 Condición: <span style="color:var(--blue)">${cond.new_status || 'Cualquier cambio'}</span></div>
+            <div>📢 Grupos: <span style="color:var(--text)">${grupos_str}</span></div>
+            <div>👥 Contactos: <span style="color:var(--text)">${contactos_str}</span></div>
+          </div>
+          <div style="margin-top:8px;font-size:11px;background:var(--navy-900);border-radius:6px;padding:8px;color:var(--text-muted);white-space:pre-wrap;font-family:'JetBrains Mono',monospace">${r.message_template || '—'}</div>
+        </div>`;
+      }).join('')}
+    </div>`;
+}
+
+async function allyToggleRegla(id, active) {
+  await sb.from('ally_notification_rules').update({ active, updated_at: new Date().toISOString() }).eq('id', id);
+  cargarAllyReglas();
+}
+
+async function allyEliminarRegla(id, name) {
+  if (!confirm(`¿Eliminar la regla "${name}"?`)) return;
+  await sb.from('ally_notification_rules').delete().eq('id', id);
+  cargarAllyReglas();
+}
+
+// ── Modal nueva/editar regla ───────────────────────────────────────────────────
+
+async function allyNuevaRegla() {
+  await _abrirModalRegla(null);
+}
+
+async function allyEditRegla(r) {
+  await _abrirModalRegla(r);
+}
+
+async function _abrirModalRegla(r) {
+  // Cargar grupos y contactos para los multiselects
+  const [{ data: grupos }, { data: contactos }] = await Promise.all([
+    sb.from('ally_grupos').select('nombre').eq('activo', true).order('nombre'),
+    sb.from('contactos').select('nombre').eq('activo', true).order('nombre'),
+  ]);
+
+  const grupoNames    = (grupos || []).map(g => g.nombre);
+  const contactoNames = (contactos || []).map(c => c.nombre);
+  const selGrupos     = r ? (r.send_to_groups   || []) : [];
+  const selContactos  = r ? (r.send_to_contacts || []) : [];
+  const cond          = r ? (r.condition || {}) : {};
+  const condEstados   = ['Entregado','Devuelto','Fallido','En camino','En espera en sucursal','En tránsito','Perdido'];
+
+  // Remover modal anterior si existe
+  document.getElementById('modalAllyRegla')?.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'modalAllyRegla';
+  modal.className = 'modal-overlay';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px';
+  modal.innerHTML = `
+    <div class="modal-box" style="max-width:520px;width:100%;max-height:90vh;overflow-y:auto">
+      <div class="modal-title">🔔 ${r ? 'Editar' : 'Nueva'} Regla</div>
+      <input type="hidden" id="allyRlId" value="${r?.id || ''}">
+
+      <div class="field">
+        <label class="label">Nombre</label>
+        <input class="input" id="allyRlNombre" value="${r?.name || ''}" placeholder="Ej: Entregado → Sales">
+      </div>
+
+      <div class="field">
+        <label class="label">Estado que dispara la regla</label>
+        <select class="select" id="allyRlEstado">
+          <option value="">— Cualquier cambio de estado —</option>
+          ${condEstados.map(e => `<option value="${e}" ${cond.new_status === e ? 'selected' : ''}>${e}</option>`).join('')}
+        </select>
+      </div>
+
+      <div class="field">
+        <label class="label">Grupos a notificar</label>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;padding:8px;background:var(--navy-900);border-radius:8px;min-height:36px" id="allyRlGruposWrap">
+          ${grupoNames.map(n => `
+            <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;background:var(--navy-700);padding:3px 8px;border-radius:20px">
+              <input type="checkbox" value="${n}" ${selGrupos.includes(n) ? 'checked' : ''}> ${n}
+            </label>`).join('') || '<span style="color:var(--text-muted);font-size:12px">Sin grupos activos</span>'}
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="label">Contactos a notificar</label>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;padding:8px;background:var(--navy-900);border-radius:8px;min-height:36px" id="allyRlContactosWrap">
+          ${contactoNames.map(n => `
+            <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;background:var(--navy-700);padding:3px 8px;border-radius:20px">
+              <input type="checkbox" value="${n}" ${selContactos.includes(n) ? 'checked' : ''}> ${n}
+            </label>`).join('') || '<span style="color:var(--text-muted);font-size:12px">Sin contactos activos</span>'}
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="label">Template del mensaje</label>
+        <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">Variables: {{ot}} {{tracking}} {{estado}} {{estado_anterior}}</div>
+        <textarea class="input" id="allyRlTemplate" rows="5" style="font-family:'JetBrains Mono',monospace;font-size:12px;resize:vertical">${r?.message_template || ''}</textarea>
+      </div>
+
+      <div id="allyRlMsg"></div>
+      <div style="display:flex;gap:10px;margin-top:10px">
+        <button class="btn btn-sm" onclick="allyGuardarRegla()">Guardar</button>
+        <button class="btn-ghost btn-sm" onclick="document.getElementById('modalAllyRegla').remove()">Cancelar</button>
+      </div>
+    </div>`;
+
+  document.body.appendChild(modal);
+}
+
+async function allyGuardarRegla() {
+  const id       = document.getElementById('allyRlId').value;
+  const name     = document.getElementById('allyRlNombre').value.trim();
+  const estado   = document.getElementById('allyRlEstado').value;
+  const template = document.getElementById('allyRlTemplate').value.trim();
+
+  const grupos = [...document.querySelectorAll('#allyRlGruposWrap input:checked')].map(i => i.value);
+  const contactos = [...document.querySelectorAll('#allyRlContactosWrap input:checked')].map(i => i.value);
+
+  if (!name) {
+    document.getElementById('allyRlMsg').innerHTML = '<div class="alert alert-err">El nombre es obligatorio</div>';
+    return;
+  }
+
+  const datos = {
+    name,
+    trigger_type: 'shipment_status_change',
+    condition:    estado ? { new_status: estado } : {},
+    message_template: template,
+    send_to_groups:   grupos,
+    send_to_contacts: contactos,
+    updated_at: new Date().toISOString(),
+  };
+
+  const { error } = id
+    ? await sb.from('ally_notification_rules').update(datos).eq('id', id)
+    : await sb.from('ally_notification_rules').insert({ ...datos, active: false });
+
+  if (error) {
+    document.getElementById('allyRlMsg').innerHTML = `<div class="alert alert-err">Error: ${error.message}</div>`;
+    return;
+  }
+
+  document.getElementById('modalAllyRegla').remove();
+  cargarAllyReglas();
 }
 
 function allyNuevoContacto() {
@@ -4498,10 +4678,6 @@ async function allyGuardarGrupo() {
   cargarAllyGrupos();
 }
 
-async function allyToggleRegla(id, activo) {
-  await sb.from('ally_reglas').update({activo}).eq('id',id);
-  cargarAllyReglas();
-}
 
 // ══ MÓDULO DISTRIBUIDORES ════════════════════════════════════════════════════════
 const CP_COORDS={1005:[-34.6037,-58.3816],1289:[-34.639,-58.378],1414:[-34.588,-58.44],1425:[-34.588,-58.42],1604:[-34.476,-58.52],1625:[-34.349,-58.797],1629:[-34.458,-58.914],1640:[-34.492,-58.509],1650:[-34.567,-58.539],1657:[-34.588,-58.658],1663:[-34.539,-58.706],1700:[-34.617,-58.557],1704:[-34.644,-58.565],1708:[-34.653,-58.62],1714:[-34.659,-58.665],1748:[-34.604,-58.937],1752:[-34.678,-58.529],1757:[-34.748,-58.597],1805:[-34.847,-58.515],1821:[-34.7,-58.405],1824:[-34.705,-58.4],1827:[-34.765,-58.423],1832:[-34.765,-58.423],1836:[-34.801,-58.454],1856:[-34.894,-58.399],1862:[-34.944,-58.47],1875:[-34.705,-58.315],1880:[-34.763,-58.208],1886:[-34.836,-58.193],1900:[-34.9205,-57.9536],1984:[-34.995,-58.006],2000:[-32.9468,-60.6393],2800:[-34.098,-59.027],2900:[-33.3347,-60.2117],3000:[-31.6333,-60.7],3100:[-31.7333,-60.5167],3300:[-27.3671,-55.896],3400:[-27.4806,-58.8341],3500:[-27.4514,-58.9867],3600:[-26.1775,-58.1781],4000:[-26.8083,-65.2176],4400:[-24.7821,-65.4232],4600:[-24.1857,-65.2994],5000:[-31.4135,-64.1811],5151:[-31.3456,-64.3376],5152:[-31.3456,-64.3376],5500:[-32.8908,-68.8272],5800:[-33.1232,-64.3493],5900:[-32.4072,-63.2409],6000:[-34.5667,-60.9167],6700:[-34.5696,-59.1076],7000:[-37.325,-59.1392],7174:[-37.643,-57.706],7300:[-36.7756,-59.8578],7400:[-36.8921,-60.3224],7600:[-38.0023,-57.5575],7601:[-38.0023,-57.5575],7602:[-38.0023,-57.5575],7603:[-38.0023,-57.5575],7604:[-38.0023,-57.5575],7607:[-38.272,-57.837],7608:[-38.0023,-57.5575],7609:[-37.875,-57.523],7610:[-38.0023,-57.5575],7620:[-37.754,-58.287],7630:[-38.554,-58.746],8000:[-38.7183,-62.2663],8300:[-38.9516,-68.0591],8400:[-41.1335,-71.3103],8500:[-40.8135,-62.9967],9000:[-45.8645,-67.4977]};
