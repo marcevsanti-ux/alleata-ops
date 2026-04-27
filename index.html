@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v2.3.71</title>
+<title>Alleata · Operaciones v2.3.72</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -288,7 +288,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.3.71 · 25 abr 2026
+      v2.3.72 · 25 abr 2026
     </div>
   </div>
 </div>
@@ -347,7 +347,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.3.71 · 25 abr 2026
+      v2.3.72 · 25 abr 2026
     </div>
   </div>
 </nav>
@@ -361,7 +361,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <div class="topbar-right" id="topbar-date"></div>
     <button onclick="refreshCurrentModule()" title="Actualizar" style="background:none;border:1px solid var(--border2);color:var(--text-muted);border-radius:7px;padding:4px 10px;cursor:pointer;font-size:13px;margin-left:10px;transition:all .2s" onmouseover="this.style.color='var(--teal)';this.style.borderColor='var(--teal)'" onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border2)'">↺</button>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.3.71</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.3.72</div>
   </div>
   <div class="content">
 
@@ -1328,7 +1328,7 @@ tr:hover td{background:var(--surface2);}
 </div>
 
 <script>
-console.log('[Alleata v2.3.71] OK');
+console.log('[Alleata v2.3.72] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -3392,56 +3392,33 @@ function atAddLog(tipo, ot, responsable, cuenta, detalle){
 }
 
 // ── NOTIFICAR ALERTA AL GRUPO OPS ──
+// ── NOTIFICACIONES INDIVIDUALES VÍA processAllyRules ──────────────────────────
+// Ambas funciones delegan al backend ca_status_checker_one, que corre
+// processAllyRules y dispara las reglas configuradas en ally_notification_rules.
+// Esto reemplaza el flujo viejo de /notificar hardcodeado.
+
 async function notificarAlertaGrupo(envio, alertaLabel, detalle){
-  const {data:grupos, error:gErr} = await sb.from('ally_grupos').select('group_id,nombre,activo').eq('tipo','ops').limit(5);
-  console.log('[Ally] Grupos OPS:', grupos, gErr);
-  const grupo = grupos?.find(g=>g.activo==true||g.activo==='true'||g.activo===1)||grupos?.[0];
-  const grupoId = grupo?.group_id;
-  if(!grupoId){ console.log('[Ally] Sin grupo OPS'); return; }
-  const msg = `⚠️ *OT ${envio.ot_numero}* — *${alertaLabel}*
-`
-    + `👤 ${envio.cuenta||'—'}
-`
-    + `📍 ${envio.ciudad||'—'}, ${envio.provincia||'—'}
-`
-    + `👷 ${envio.responsable||'—'}
-`
-    + `📡 ${detalle}`;
-  console.log('[Ally] Enviando alerta a:', grupo.nombre, grupoId);
-  const res = await fetch('https://adequate-blessing.up.railway.app/notificar', {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({numero: grupoId, mensaje: msg})
-  });
-  console.log('[Ally] Respuesta:', res.status, await res.text());
+  // Ya se maneja vía processAllyRules en el backend
+  // Solo loguear para el modal
+  console.log(`[Ally] Alerta registrada: OT ${envio.ot_numero} — ${alertaLabel}`);
 }
 
-// ── NOTIFICAR ENTREGADO VÍA ALLY ──
 async function notificarEntregadoWhatsApp(envio){
-  // Mapeo responsable → número de celular (desde profiles en Supabase)
-  const {data:perfil} = await sb.from('profiles').select('celular,nombre')
-    .ilike('nombre','%'+envio.responsable.split(' ')[0]+'%').maybeSingle();
-  if(!perfil?.celular){
-    console.log(`[Ally] Sin celular para ${envio.responsable}`);
-    return;
+  // Disparar processAllyRules vía ca_status_checker_one
+  // Eso evalúa las reglas de ally_notification_rules y envía al grupo correcto
+  try {
+    await fetch('https://alleata-agent-production.up.railway.app/automations/run/ca_status_checker_one', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-automation-secret': '123456'
+      },
+      body: JSON.stringify({ ot_numero: envio.ot_numero })
+    });
+    console.log(`[Ally] processAllyRules disparado para OT ${envio.ot_numero}`);
+  } catch(e) {
+    console.warn(`[Ally] Error disparando processAllyRules para OT ${envio.ot_numero}:`, e.message);
   }
-  const estadoEmoji = {'Entregado':'✅','Devuelto':'🔴','En camino':'🚚','En espera en sucursal':'🟡','Fallido':'❌'};
-  const emoji = estadoEmoji[envio.estado_nuevo||'Entregado']||'✅';
-  const msg = `${emoji} *OT ${envio.ot_numero}* — *Entregado*
-`
-    + `👤 ${envio.cuenta||'—'}
-`
-    + `📍 ${envio.ciudad||'—'}, ${envio.provincia||'—'}
-`
-    + `📡 ${envio.ultimo_evento_new||'Entregado por CA'}`;
-
-  // Llamar al endpoint /notificar del agente Ally
-  const allyUrl = 'https://adequate-blessing.up.railway.app/notificar';
-  await fetch(allyUrl, {
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({numero: perfil.celular, mensaje: msg})
-  });
-  console.log(`[Ally] Notificación enviada a ${perfil.nombre} (${perfil.celular})`);
 }
 
 async function autoActualizarTracking(){
@@ -3530,17 +3507,16 @@ async function autoActualizarTracking(){
         if(estadoMapeado && estadoMapeado !== envio.estado){
           updateAT.estado = estadoMapeado;
           await sb.from('envios').update(updateAT).eq('id', envio.id);
-          // Notificar al responsable por WhatsApp si pasó a Entregado
-          if(estadoMapeado === 'Entregado' && envio.responsable){
-            notificarEntregadoWhatsApp({...envio, ultimo_evento_new: detalle})
-              .then(()=>atAddLog('ok', otLabel, envio.responsable, envio.cuenta, '📱 WhatsApp enviado a '+envio.responsable))
-              .catch(e=>atAddLog('error', otLabel, envio.responsable, envio.cuenta, '❌ WA falló: '+e.message));
-          }
+          // Disparar processAllyRules vía backend para CUALQUIER cambio de estado
+          // Esto evalúa ally_notification_rules y envía notificaciones al grupo correcto
+          fetch('https://alleata-agent-production.up.railway.app/automations/run/ca_status_checker_one', {
+            method: 'POST',
+            headers: {'Content-Type':'application/json','x-automation-secret':'123456'},
+            body: JSON.stringify({ ot_numero: envio.ot_numero })
+          }).catch(e => console.warn(`[AT] processAllyRules error OT ${envio.ot_numero}:`, e.message));
           if(esAlerta){
             atAddLog('alerta', otLabel, envio.responsable, envio.cuenta, `⚠️ ${visitaLabel||'ALERTA'} — ${detalle}`);
             alertas++;
-            // Notificar al grupo OPS
-            notificarAlertaGrupo(envio, visitaLabel||'VISITA FALLIDA', detalle).catch(e=>console.warn('Notif grupo error:', e.message));
           } else {
             atAddLog('cambio', otLabel, envio.responsable, envio.cuenta, `${envio.estado} → ${estadoMapeado}`);
             actualizados++;
@@ -3551,7 +3527,12 @@ async function autoActualizarTracking(){
           if(esAlerta){
             atAddLog('alerta', otLabel, envio.responsable, envio.cuenta, `⚠️ ${visitaLabel||'ALERTA'} — ${detalle}`);
             alertas++;
-            notificarAlertaGrupo(envio, visitaLabel||'VISITA FALLIDA', detalle).catch(e=>console.warn('Notif grupo error:', e.message));
+            // Sin cambio de estado pero hay alerta CA — disparar processAllyRules igual
+            fetch('https://alleata-agent-production.up.railway.app/automations/run/ca_status_checker_one', {
+              method: 'POST',
+              headers: {'Content-Type':'application/json','x-automation-secret':'123456'},
+              body: JSON.stringify({ ot_numero: envio.ot_numero })
+            }).catch(e => console.warn(`[AT] processAllyRules alerta OT ${envio.ot_numero}:`, e.message));
           } else {
             atAddLog('ok', otLabel, envio.responsable, envio.cuenta, `Sin cambios — ${detalle||envio.estado}`);
             sinCambio++;
