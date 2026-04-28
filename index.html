@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v2.3.74</title>
+<title>Alleata · Operaciones v2.3.75</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -288,7 +288,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.3.74 · 27 abr 2026
+      v2.3.75 · 27 abr 2026
     </div>
   </div>
 </div>
@@ -347,7 +347,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.3.74 · 27 abr 2026
+      v2.3.75 · 27 abr 2026
     </div>
   </div>
 </nav>
@@ -361,7 +361,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <div class="topbar-right" id="topbar-date"></div>
     <button onclick="refreshCurrentModule()" title="Actualizar" style="background:none;border:1px solid var(--border2);color:var(--text-muted);border-radius:7px;padding:4px 10px;cursor:pointer;font-size:13px;margin-left:10px;transition:all .2s" onmouseover="this.style.color='var(--teal)';this.style.borderColor='var(--teal)'" onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border2)'">↺</button>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.3.74</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.3.75</div>
   </div>
   <div class="content">
 
@@ -1030,9 +1030,14 @@ tr:hover td{background:var(--surface2);}
           📂 Importar desde Salesforce
           <input type="file" id="dsFileInput" accept=".xlsx,.xls" style="display:none" onchange="importDesinstalaciones(event)">
         </label>
+        <button id="btnDsVaciarBase" onclick="dsVaciarBase()"
+          style="background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.35);color:#fca5a5;padding:8px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;"
+          onmouseover="this.style.background='rgba(239,68,68,.22)'" onmouseout="this.style.background='rgba(239,68,68,.12)'">
+          🗑️ Vaciar base
+        </button>
         <div style="display:flex;align-items:center;gap:6px;padding:6px 12px;background:var(--navy-600);border-radius:7px;flex:1;min-width:200px;">
           <span style="font-size:11px;color:var(--text-muted);white-space:nowrap;">📊 Reporte SF:</span>
-          <a href="https://alleata.lightning.force.com/lightning/r/Report/00ORm00000CPncvMAD/view?queryScope=userFolders"
+          <a href="https://alleata.lightning.force.com/lightning/r/Report/00ORm00000CRTa5MAH/view"
              target="_blank" style="font-size:11px;color:var(--blue);text-decoration:none;font-weight:500;white-space:nowrap;"
              onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">
             Desinstalaciones Pendientes ↗
@@ -1328,7 +1333,7 @@ tr:hover td{background:var(--surface2);}
 </div>
 
 <script>
-console.log('[Alleata v2.3.74] OK');
+console.log('[Alleata v2.3.75] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -6177,6 +6182,45 @@ function dsGeoReset(){
 // ── END GEO PANEL ──
 
 // ── IMPORT DESINSTALACIONES ──
+async function dsVaciarBase(){
+  const msg=document.getElementById('dsImportMsg');
+  const result=document.getElementById('dsImportResult');
+  const btn=document.getElementById('btnDsVaciarBase');
+  const total=DesinModule?.datos?.length||0;
+  const ok1=confirm(`⚠️ Vas a borrar TODAS las OTs de Desinstalaciones (${total || 'base actual'}).\n\nNo se toca Envíos, Ally, Rollout ni otras tablas.\n\n¿Continuar?`);
+  if(!ok1)return;
+  const ok2=confirm('Última confirmación: esta acción no se puede deshacer.\n\nDespués deberás importar el nuevo Excel actualizado.');
+  if(!ok2)return;
+  try{
+    if(btn){btn.disabled=true;btn.textContent='🗑️ Vaciando...';}
+    if(msg)msg.textContent='Vaciando base de Desinstalaciones...';
+    if(result)result.innerHTML='';
+
+    const {error}=await sb
+      .from('ordenes_trabajo')
+      .delete()
+      .eq('tipo','desinstalacion');
+
+    if(error)throw error;
+
+    if(result)result.innerHTML='<div class="alert alert-ok" style="margin-top:10px">✅ Base de Desinstalaciones vaciada. Ahora podés importar el Excel actualizado.</div>';
+    if(msg)msg.textContent='Base vaciada correctamente.';
+
+    DesinModule.datos=[];
+    DesinModule.filtrados=[];
+    DesinModule.cargado=false;
+    await cargarDesinstalaciones();
+    loadBadges();
+    auditLog({tabla:'ordenes_trabajo',registro_id:'DESINSTALACIONES',accion:'DELETE',campo:'tipo',valor_antes:'desinstalacion',valor_despues:'base vaciada'});
+  }catch(e){
+    console.error('[Desinstalaciones] Error vaciando base:',e);
+    if(result)result.innerHTML=`<div class="alert alert-err" style="margin-top:10px">❌ Error al vaciar base: ${e.message}</div>`;
+    if(msg)msg.textContent='Error al vaciar base.';
+  }finally{
+    if(btn){btn.disabled=false;btn.textContent='🗑️ Vaciar base';}
+  }
+}
+
 async function importDesinstalaciones(e){
   const file=e.target.files[0];if(!file)return;
   const msg=document.getElementById('dsImportMsg'),prog=document.getElementById('dsImportProgress');
