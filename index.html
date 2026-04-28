@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v2.3.89</title>
+<title>Alleata · Operaciones v2.3.90</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -300,7 +300,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.3.89 · 28 abr 2026
+      v2.3.90 · 28 abr 2026
     </div>
   </div>
 </div>
@@ -360,7 +360,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.3.89 · 28 abr 2026
+      v2.3.90 · 28 abr 2026
     </div>
   </div>
 </nav>
@@ -374,7 +374,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <div class="topbar-right" id="topbar-date"></div>
     <button onclick="refreshCurrentModule()" title="Actualizar" style="background:none;border:1px solid var(--border2);color:var(--text-muted);border-radius:7px;padding:4px 10px;cursor:pointer;font-size:13px;margin-left:10px;transition:all .2s" onmouseover="this.style.color='var(--teal)';this.style.borderColor='var(--teal)'" onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border2)'">↺</button>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.3.89</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.3.90</div>
   </div>
   <div class="content">
 
@@ -1714,7 +1714,7 @@ function dsRutaCSV(){
   a.click();
 }
 
-console.log('[Alleata v2.3.89] OK');
+console.log('[Alleata v2.3.90] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -6918,31 +6918,59 @@ async function autoTrackingDesinstalaciones(){
 
 
 async function dsAutoTracking(){
-  // AUTO-TRACKING DESINSTALACIONES v2.3.89
-  // Scope: tipo=desinstalacion, logistica CA, con seguimiento, estados activos
-  // Restricciones: NO Envíos, NO Ally, NO wasender, NO Railway, NO processAllyRules
+  // AUTO-TRACKING DESINSTALACIONES v2.3.90
+  // NO Envíos, NO Ally, NO wasender, NO Railway, NO processAllyRules
+  console.log('[DS AT START] dsAutoTracking iniciado', new Date().toISOString());
   abrirModalAutoTracking();
   const btn = document.getElementById('btnDsAutoTracking');
   if(btn) btn.disabled = true;
 
   // ── 1. Query OTs activas Desinstalaciones + Correo Argentino ─────────────
-  const { data: ots, error: qErr } = await sb.from('ordenes_trabajo')
-    .select('id,ot,nro_seguimiento,estado,operador_id,comercio,cuenta,fecha_asignacion')
+  // Filtro amplio: no filtramos por logística acá para no perder OTs con valor inesperado
+  // El filtro de logística lo hacemos en JS después del query
+  const { data: otsRaw, error: qErr } = await sb.from('ordenes_trabajo')
+    .select('id,ot,nro_seguimiento,estado,operador_id,comercio,cuenta,fecha_asignacion,logistica')
     .eq('tipo', 'desinstalacion')
     .not('nro_seguimiento', 'is', null)
-    .neq('nro_seguimiento', '')
-    .in('estado', ['Despachado','DESPACHADO','En Proceso','EN_TRANSITO','En tránsito'])
-    .or('logistica.ilike.%correo%,logistica.ilike.%argentino%,logistica.eq.CA');
+    .neq('nro_seguimiento', '');
+  // NO filtrar por estado ni logística en SQL — lo hacemos en JS para debug completo
 
-  if(qErr || !ots?.length){
-    const msg = qErr ? 'Error: '+qErr.message : 'Sin OTs activas con Correo Argentino.';
-    atAddLog('info','—','—','—', msg);
-    document.getElementById('atSubtitle').textContent = 'Sin OTs';
+  console.log('[DS AT QUERY] total tipo=desinstalacion con tracking:', otsRaw?.length, '| qErr:', qErr?.message||null);
+  console.log('[DS AT QUERY] raw:', otsRaw);
+
+  if(qErr){
+    atAddLog('error','—','—','—','Error en query: '+qErr.message);
+    document.getElementById('atSubtitle').textContent = 'Error query';
     document.getElementById('atProgressBar').style.width = '100%';
     document.getElementById('btnCerrarAutoTracking').style.display = 'block';
     document.getElementById('atFooter').style.display = 'block';
     document.getElementById('atResumen').innerHTML =
-      `<span style="color:var(--text-muted)">${msg}</span>`;
+      `<span style="color:var(--red)">❌ ${qErr.message}</span>`;
+    if(btn) btn.disabled = false;
+    return;
+  }
+
+  // Filtrar en JS: estados activos + logística CA (case insensitive)
+  const ots = (otsRaw||[]).filter(o => {
+    const est = (o.estado||'').toLowerCase();
+    const log = (o.logistica||'').toLowerCase();
+    const estadoActivo = ['despachado','en proceso','en_transito','en tránsito','en transito'].some(e=>est.includes(e));
+    const esCA = log.includes('correo')||log.includes('argentino')||log==='ca'||log==='';
+    // log vacío: incluir igual para no perder OTs sin logística asignada
+    return estadoActivo && esCA;
+  });
+
+  console.log('[DS AT QUERY] después de filtro JS → procesables:', ots.length);
+  ots.forEach(o => console.log('[DS AT QUERY OT]', o.ot, '| estado:', o.estado, '| logistica:', o.logistica, '| tracking:', o.nro_seguimiento));
+
+  if(!ots.length){
+    const msg = `Sin OTs activas para procesar (total con tracking: ${otsRaw?.length||0}, filtradas: 0)`;
+    atAddLog('info','—','—','—', msg);
+    document.getElementById('atSubtitle').textContent = msg;
+    document.getElementById('atProgressBar').style.width = '100%';
+    document.getElementById('btnCerrarAutoTracking').style.display = 'block';
+    document.getElementById('atFooter').style.display = 'block';
+    document.getElementById('atResumen').innerHTML = `<span style="color:var(--text-muted)">${msg}</span>`;
     if(btn) btn.disabled = false;
     return;
   }
@@ -6950,67 +6978,44 @@ async function dsAutoTracking(){
   document.getElementById('atSubtitle').textContent =
     `Procesando ${ots.length} OTs Desinstalaciones (CA)...`;
 
-  // ── 2. Reglas de transición de estado (spec v2.3.89) ─────────────────────
-  // PREIMPOSICION  → mantener DESPACHADO (no cambiar estado, calcular SLA Merchant)
-  // INGRESO_CORREO → pasar a EN_TRANSITO SOLO si estaba en DESPACHADO
-  // ENTREGADO      → pasar a ENTREGADO
-  // DEVUELTO       → pasar a Fallido
-  // PERDIDO        → pasar a Extraviada
-  // Normalizar texto CA — quita tildes, mayúsculas, trim
+  // ── 2. resolverTransicion ─────────────────────────────────────────────────
   const normCA = v => (v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().trim();
 
-  // resolverTransicion recibe historia Y estadoCA para cubrir ambos campos del parser
-  // Normaliza ambos antes de comparar (case-insensitive, sin tildes, includes)
   const resolverTransicion = (historia, estadoCA, estadoActual) => {
     const h  = normCA(historia);
-    const e  = normCA(estadoCA);     // campo estadoCA también puede traer la info
+    const e  = normCA(estadoCA);
     const ea = normCA(estadoActual);
-
-    // Función helper: busca en ambos campos
     const any = (...tokens) => tokens.some(t => h.includes(t) || e.includes(t));
 
-    // -- Evaluación con includes en ambos campos --
     if(any('PREIMPOS'))
       return { caKey:'PREIMPOSICION', nuevoEstado: null };
 
     if(any('INGRESO AL CORREO', 'INGRESO CORREO')){
-      console.log('[MATCH CA] INGRESO AL CORREO detectado | historia:', historia, '| estadoCA:', estadoCA);
-      // Cambiar a En Proceso (EN_TRANSITO) solo si venía de Despachado
-      const esDespachado = ea.includes('DESPACH');
-      return { caKey:'INGRESO_CORREO', nuevoEstado: esDespachado ? 'En Proceso' : null };
+      console.log('[MATCH CA] INGRESO AL CORREO | historia:', historia, '| estadoCA:', estadoCA, '| ea:', ea);
+      return { caKey:'INGRESO_CORREO', nuevoEstado: ea.includes('DESPACH') ? 'En Proceso' : null };
     }
-
-    // Fallback: si solo dice INGRESO (sin "AL CORREO") — también aplica
     if(any('INGRESO')){
-      console.log('[MATCH CA] INGRESO (genérico) detectado | historia:', historia, '| estadoCA:', estadoCA);
-      const esDespachado = ea.includes('DESPACH');
-      return { caKey:'INGRESO_CORREO', nuevoEstado: esDespachado ? 'En Proceso' : null };
+      console.log('[MATCH CA] INGRESO genérico | historia:', historia, '| estadoCA:', estadoCA, '| ea:', ea);
+      return { caKey:'INGRESO_CORREO', nuevoEstado: ea.includes('DESPACH') ? 'En Proceso' : null };
     }
-
     if(any('ENTREGADO', 'ENTREGA OK'))
       return { caKey:'ENTREGADO',       nuevoEstado: 'Terminal recuperada' };
-
     if(any('DEVUELTO', 'DEVOLUCION'))
       return { caKey:'DEVUELTO',        nuevoEstado: 'Fallido' };
-
     if(any('PERDIDO'))
       return { caKey:'PERDIDO',         nuevoEstado: 'Extraviada' };
-
     if(any('EN PODER DEL DISTRIBUIDOR', 'INTENTO DE ENTREGA'))
       return { caKey:'EN_DISTRIBUCION', nuevoEstado: 'En Proceso' };
-
     if(any('EN ESPERA EN SUCURSAL'))
       return { caKey:'EN_SUCURSAL',     nuevoEstado: 'En Proceso' };
-
     if(any('RETORNANDO'))
       return { caKey:'RETORNANDO',      nuevoEstado: 'Fallido' };
-
     return { caKey:'OTRO', nuevoEstado: null };
   };
 
   // ── 3. SLA helpers ────────────────────────────────────────────────────────
   const SLA_MERCHANT_DIAS  = 5;
-  const SLA_LOGISTICO_DIAS = 7; // configurable a futuro
+  const SLA_LOGISTICO_DIAS = 7;
 
   const parseCADate = str => {
     if(!str) return null;
@@ -7019,7 +7024,6 @@ async function dsAutoTracking(){
   };
 
   const calcSLA = (ot, eventos) => {
-    // Buscar primer evento INGRESO (el más antiguo — eventos[0] es el más reciente)
     const ingresoEv = [...eventos].reverse()
       .find(e => (e.historia||'').toUpperCase().includes('INGRESO'));
     const fechaDespacho = ot.fecha_asignacion ? new Date(ot.fecha_asignacion) : null;
@@ -7027,33 +7031,18 @@ async function dsAutoTracking(){
     const hoy = new Date();
 
     let merchantSLA = null, logisticoSLA = null;
-
-    // SLA Merchant: despacho → ingreso CA
     if(fechaDespacho){
       const refFin = fechaIngreso || hoy;
       const dias = Math.max(0, Math.round((refFin - fechaDespacho) / 86400000));
-      const ok   = dias <= SLA_MERCHANT_DIAS;
-      merchantSLA = {
-        dias, limite: SLA_MERCHANT_DIAS, ok,
-        estado: ok ? 'OK' : 'VENCIDO',
-        label: `Merchant: ${dias}d / ${SLA_MERCHANT_DIAS}d`
-      };
+      merchantSLA = { dias, estado: dias <= SLA_MERCHANT_DIAS ? 'OK' : 'VENCIDO',
+        label: `Merchant: ${dias}d / ${SLA_MERCHANT_DIAS}d` };
     }
-
-    // SLA Logístico: ingreso CA → último evento
     if(fechaIngreso){
       const ultFecha = parseCADate(eventos[0]?.fecha);
-      const dias = ultFecha
-        ? Math.max(0, Math.round((ultFecha - fechaIngreso) / 86400000))
-        : Math.max(0, Math.round((hoy - fechaIngreso) / 86400000));
-      const ok = dias <= SLA_LOGISTICO_DIAS;
-      logisticoSLA = {
-        dias, limite: SLA_LOGISTICO_DIAS, ok,
-        estado: ok ? 'EN CURSO' : 'VENCIDO',
-        label: `Logístico: ${dias}d / ${SLA_LOGISTICO_DIAS}d`
-      };
+      const dias = Math.max(0, Math.round(((ultFecha||hoy) - fechaIngreso) / 86400000));
+      logisticoSLA = { dias, estado: dias <= SLA_LOGISTICO_DIAS ? 'EN CURSO' : 'VENCIDO',
+        label: `Logístico: ${dias}d / ${SLA_LOGISTICO_DIAS}d` };
     }
-
     return { merchantSLA, logisticoSLA };
   };
 
@@ -7066,115 +7055,112 @@ async function dsAutoTracking(){
       Math.round((i+1)/ots.length*100) + '%';
     document.getElementById('atProgText').textContent = `${i+1}/${ots.length}`;
 
-    // 4a. Limpiar tracking
     const tracking = (ot.nro_seguimiento || '').replace(/\s/g,'').trim();
+    console.log('[DS AT OT]', ot.ot, '| estado:', ot.estado, '| logistica:', ot.logistica, '| tracking:', tracking, '| id:', ot.id);
+
     if(!tracking){
-      atAddLog('error', ot.ot, ot.operador_id, ot.comercio||ot.cuenta, 'Sin N° seguimiento');
+      atAddLog('error', ot.ot, ot.operador_id, ot.comercio||ot.cuenta, 'Sin tracking');
       err++; continue;
     }
 
     try {
-      // 4b. Consultar CA — misma función que Envíos (fetchTrackingCA)
+      // Fetch CA
       const { eventos, pieza } = await fetchTrackingCA(tracking);
+      console.log('[DS AT FETCH]', ot.ot, '| eventos:', eventos?.length, '| pieza:', pieza, '| data:', eventos);
 
       if(!eventos?.length){
         atAddLog('error', ot.ot, ot.operador_id, ot.comercio||ot.cuenta, 'Sin eventos CA');
         err++; continue;
       }
 
-      const ultimo    = eventos[0];
-      // Pasar historia + estadoCA + estadoActual — normalización cubre ambos campos
+      const ultimo = eventos[0];
       const { caKey, nuevoEstado } = resolverTransicion(ultimo.historia, ultimo.estadoCA, ot.estado);
       console.log('[DS AT] CA match →', caKey, '| historia:', ultimo.historia, '| estadoCA:', ultimo.estadoCA);
-      const det       = ultimo.estadoCA
+
+      const det = ultimo.estadoCA
         ? `${ultimo.historia} — ${ultimo.estadoCA}` : ultimo.historia;
       const { merchantSLA, logisticoSLA } = calcSLA(ot, eventos);
 
-      // 4c. Historial completo CA (JSON)
+      // Historial completo
       const historialCA = eventos.map(e => ({
-        fecha:    e.fecha,
-        estado:   e.estadoCA  || '',
-        historia: e.historia  || '',
-        planta:   e.planta    || ''
+        fecha: e.fecha, estado: e.estadoCA||'', historia: e.historia||'', planta: e.planta||''
       }));
 
-      // 4d. PASO 1 — Guardar SIEMPRE historial_logistica y pieza_ca
-      // Independiente de si hay cambio de estado o no
-      const updTracking = {
-        historial_logistica: historialCA,
-        updated_at: new Date().toISOString()
-      };
-      if(pieza) updTracking.pieza_ca = pieza;
+      // PASO 1: Guardar SIEMPRE historial + pieza + SLA
+      const updTracking = { historial_logistica: historialCA, updated_at: new Date().toISOString() };
+      if(pieza)        updTracking.pieza_ca            = pieza;
       if(merchantSLA)  updTracking.sla_merchant_estado  = merchantSLA.estado;
       if(logisticoSLA) updTracking.sla_logistico_estado = logisticoSLA.estado;
 
+      console.log('[DS AT UPDATE TRACKING]', ot.id, updTracking);
+
       const { error: trackErr } = await sb
         .from('ordenes_trabajo').update(updTracking).eq('id', ot.id);
-      if(trackErr) throw trackErr;
+
+      console.log('[DS AT UPDATE RESULT]', trackErr ? 'ERROR: '+trackErr.message : 'OK');
+
+      if(trackErr){
+        atAddLog('error', ot.ot, ot.operador_id, ot.comercio||ot.cuenta,
+          `❌ Error guardando historial: ${trackErr.message}`);
+        err++; continue; // no throw — seguir con siguiente OT
+      }
       console.log('[TRACK GUARDADO]', ot.id, eventos.length, 'eventos | pieza:', pieza||'—');
 
-      // 4e. PASO 2 — Aplicar reglas de estado (solo si hay cambio)
+      // PASO 2: Cambio de estado si corresponde
       const estadoCambia = nuevoEstado && nuevoEstado !== ot.estado;
       const obsCambia    = det !== (ot.observacion_estado || '');
 
       if(!estadoCambia && !obsCambia){
-        const slaStr = [
-          merchantSLA  ? `SLA ${merchantSLA.estado}`  : null,
-          logisticoSLA ? `SLA Log ${logisticoSLA.estado}` : null,
-        ].filter(Boolean).join(' | ');
+        const slaStr = [merchantSLA?`SLA ${merchantSLA.estado}`:null, logisticoSLA?`SLA Log ${logisticoSLA.estado}`:null]
+          .filter(Boolean).join(' | ');
         atAddLog('ok', ot.ot, ot.operador_id, ot.comercio||ot.cuenta,
-          `Sin cambios — ${caKey} | ${slaStr||det}`);
+          `Historial guardado | Sin cambio estado — ${caKey} | ${slaStr||det}`);
         sin++; continue;
       }
 
-      // 4f. PASO 3 — Build update de estado/observación
-      const upd = { updated_at: new Date().toISOString() };
-      upd.observacion_estado = det;
-      upd.observaciones      = det;
-
+      // PASO 3: Update estado/obs
+      const upd = { updated_at: new Date().toISOString(), observacion_estado: det, observaciones: det };
       if(estadoCambia){
         upd.estado = nuevoEstado;
         if(['Terminal recuperada','Extraviada','Fallido'].includes(nuevoEstado))
           upd.fecha_cierre = new Date().toISOString();
       }
-
-      // 4g. Write estado/obs — NO Ally, NO wasender, NO Railway
       console.log('[DS AT] Escribiendo estado DB | OT:', ot.ot, '| estado:', upd.estado||'(sin cambio)', '| id:', ot.id);
+
       const { error: updErr } = await sb
         .from('ordenes_trabajo').update(upd).eq('id', ot.id);
-      if(updErr) throw updErr;
+      if(updErr){
+        atAddLog('error', ot.ot, ot.operador_id, ot.comercio||ot.cuenta,
+          `❌ Error guardando estado: ${updErr.message}`);
+        err++; continue;
+      }
 
-      // 4g. Log claro (formato spec)
       const slaLog = [
-        merchantSLA  ? `SLA Merchant: ${merchantSLA.estado} (${merchantSLA.label})`  : null,
+        merchantSLA  ? `SLA Merchant: ${merchantSLA.estado} (${merchantSLA.label})` : null,
         logisticoSLA ? `SLA Logístico: ${logisticoSLA.estado} (${logisticoSLA.label})` : null,
       ].filter(Boolean).join(' | ');
-
       const logLine = estadoCambia
-        ? `Estado CA: ${caKey} | OT: ${ot.estado} → ${nuevoEstado} | ${slaLog}`
+        ? `Estado CA: ${caKey} | ${ot.estado} → ${nuevoEstado} | ${slaLog}`
         : `Estado CA: ${caKey} | obs actualizada | ${slaLog}`;
-
       atAddLog(estadoCambia ? 'cambio' : 'ok',
         ot.ot, ot.operador_id, ot.comercio||ot.cuenta, logLine);
       act++;
 
-      // Console output (spec)
       console.log(`[DS AT] OT: ${ot.ot} | Tracking: ${tracking}`);
-      console.log(`[DS AT] Estado CA: ${caKey} | Estado OT: ${estadoCambia ? `${ot.estado} → ${nuevoEstado}` : `${ot.estado} (sin cambio)`}`);
+      console.log(`[DS AT] Estado CA: ${caKey} | OT: ${estadoCambia?`${ot.estado} → ${nuevoEstado}`:ot.estado+' (sin cambio)'}`);
       if(merchantSLA)  console.log(`[DS AT] SLA Merchant:  ${merchantSLA.estado} (${merchantSLA.label})`);
       if(logisticoSLA) console.log(`[DS AT] SLA Logístico: ${logisticoSLA.estado} (${logisticoSLA.label})`);
 
     } catch(e){
-      // Punto 6: error no rompe ejecución, se loggea y continúa
       atAddLog('error', ot.ot, ot.operador_id, ot.comercio||ot.cuenta, `Error: ${e.message}`);
-      console.error(`[DS AT] Error OT ${ot.ot}:`, e.message);
+      console.error(`[DS AT] Error OT ${ot.ot}:`, e.message, e);
       err++;
     }
 
-    await new Promise(r => setTimeout(r, 600)); // rate limiting CA
+    await new Promise(r => setTimeout(r, 600));
   }
 
-  // ── 5. Resumen final ──────────────────────────────────────────────────────
+  // ── 5. Resumen ────────────────────────────────────────────────────────────
   document.getElementById('atProgressBar').style.width = '100%';
   document.getElementById('atETA').textContent = 'Finalizado';
   document.getElementById('atSubtitle').textContent =
@@ -7200,6 +7186,50 @@ async function dsAutoTracking(){
   await cargarDesinstalaciones();
   loadBadges();
 }
+
+// ── dsTestTrackingUno — función de prueba para un tracking específico ────────
+// Uso en consola: dsTestTrackingUno('00012267780ALT13C3A1901')
+async function dsTestTrackingUno(trackingNum){
+  console.log('[DS TEST] Buscando OT con tracking:', trackingNum);
+  const { data: ots, error } = await sb.from('ordenes_trabajo')
+    .select('*')
+    .eq('tipo', 'desinstalacion')
+    .eq('nro_seguimiento', trackingNum.trim())
+    .limit(1);
+
+  if(error){ console.error('[DS TEST] Error query:', error); return; }
+  if(!ots?.length){ console.warn('[DS TEST] OT no encontrada para tracking:', trackingNum); return; }
+
+  const ot = ots[0];
+  console.log('[DS TEST] OT encontrada:', ot.ot, '| id:', ot.id, '| estado:', ot.estado, '| logistica:', ot.logistica);
+
+  try {
+    const { eventos, pieza } = await fetchTrackingCA(trackingNum.trim());
+    console.log('[DS TEST] fetchTrackingCA OK | eventos:', eventos?.length, '| pieza:', pieza);
+    if(!eventos?.length){ console.warn('[DS TEST] Sin eventos'); return; }
+
+    const historialCA = eventos.map(e => ({
+      fecha: e.fecha, estado: e.estadoCA||'', historia: e.historia||'', planta: e.planta||''
+    }));
+    const updTracking = {
+      historial_logistica: historialCA,
+      pieza_ca: pieza || null,
+      updated_at: new Date().toISOString()
+    };
+    console.log('[DS TEST] updTracking payload:', updTracking);
+
+    const { data: updData, error: updErr } = await sb
+      .from('ordenes_trabajo').update(updTracking).eq('id', ot.id).select();
+    console.log('[DS TEST] UPDATE RESULT:', updErr ? 'ERROR: '+updErr.message : 'OK');
+    console.log('[DS TEST] Updated row:', updData);
+    if(updErr) console.error('[DS TEST] update error detail:', updErr);
+    else console.log('[DS TEST] ✅ historial_logistica guardado para OT', ot.ot);
+  } catch(e){
+    console.error('[DS TEST] Exception:', e.message, e);
+  }
+}
+// Exponer globalmente para uso desde consola
+window.dsTestTrackingUno = dsTestTrackingUno;
 
 
 async function dsGuardar(){
