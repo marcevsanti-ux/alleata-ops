@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v2.3.90</title>
+<title>Alleata · Operaciones v2.3.91</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -300,7 +300,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.3.90 · 28 abr 2026
+      v2.3.91 · 28 abr 2026
     </div>
   </div>
 </div>
@@ -360,7 +360,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.3.90 · 28 abr 2026
+      v2.3.91 · 28 abr 2026
     </div>
   </div>
 </nav>
@@ -374,7 +374,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <div class="topbar-right" id="topbar-date"></div>
     <button onclick="refreshCurrentModule()" title="Actualizar" style="background:none;border:1px solid var(--border2);color:var(--text-muted);border-radius:7px;padding:4px 10px;cursor:pointer;font-size:13px;margin-left:10px;transition:all .2s" onmouseover="this.style.color='var(--teal)';this.style.borderColor='var(--teal)'" onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border2)'">↺</button>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.3.90</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.3.91</div>
   </div>
   <div class="content">
 
@@ -1714,7 +1714,7 @@ function dsRutaCSV(){
   a.click();
 }
 
-console.log('[Alleata v2.3.90] OK');
+console.log('[Alleata v2.3.91] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -6918,7 +6918,7 @@ async function autoTrackingDesinstalaciones(){
 
 
 async function dsAutoTracking(){
-  // AUTO-TRACKING DESINSTALACIONES v2.3.90
+  // AUTO-TRACKING DESINSTALACIONES v2.3.91
   // NO Envíos, NO Ally, NO wasender, NO Railway, NO processAllyRules
   console.log('[DS AT START] dsAutoTracking iniciado', new Date().toISOString());
   abrirModalAutoTracking();
@@ -7109,6 +7109,7 @@ async function dsAutoTracking(){
       // PASO 2: Cambio de estado si corresponde
       const estadoCambia = nuevoEstado && nuevoEstado !== ot.estado;
       const obsCambia    = det !== (ot.observacion_estado || '');
+      console.log('[DS AT] estadoCambia:', estadoCambia, '| nuevoEstado:', nuevoEstado, '| estadoActual:', ot.estado, '| obsCambia:', obsCambia);
 
       if(!estadoCambia && !obsCambia){
         const slaStr = [merchantSLA?`SLA ${merchantSLA.estado}`:null, logisticoSLA?`SLA Log ${logisticoSLA.estado}`:null]
@@ -7222,8 +7223,51 @@ async function dsTestTrackingUno(trackingNum){
       .from('ordenes_trabajo').update(updTracking).eq('id', ot.id).select();
     console.log('[DS TEST] UPDATE RESULT:', updErr ? 'ERROR: '+updErr.message : 'OK');
     console.log('[DS TEST] Updated row:', updData);
-    if(updErr) console.error('[DS TEST] update error detail:', updErr);
-    else console.log('[DS TEST] ✅ historial_logistica guardado para OT', ot.ot);
+    if(updErr){ console.error('[DS TEST] update error detail:', updErr); return; }
+    console.log('[DS TEST] ✅ historial_logistica guardado para OT', ot.ot);
+
+    // ── Resolver transición de estado ──────────────────────────────────
+    // Estado correcto de la app: 'En Proceso' (confirmado en ECOL y filtros)
+    // normCA: quita tildes, mayúsculas, trim — mismo helper que dsAutoTracking
+    const normCA = v => (v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().trim();
+    const ultimo = eventos[0];
+    const h  = normCA(ultimo.historia);
+    const e  = normCA(ultimo.estadoCA);
+    const ea = normCA(ot.estado);
+    const any = (...tokens) => tokens.some(t => h.includes(t) || e.includes(t));
+
+    let nuevoEstado = null;
+    if(any('PREIMPOS'))                                       nuevoEstado = null; // mantener Despachado
+    else if(any('INGRESO AL CORREO','INGRESO CORREO','INGRESO')) nuevoEstado = ea.includes('DESPACH') ? 'En Proceso' : null;
+    else if(any('ENTREGADO','ENTREGA OK'))                    nuevoEstado = 'Terminal recuperada';
+    else if(any('DEVUELTO','DEVOLUCION'))                     nuevoEstado = 'Fallido';
+    else if(any('PERDIDO'))                                   nuevoEstado = 'Extraviada';
+    else if(any('EN PODER DEL DISTRIBUIDOR','INTENTO DE ENTREGA')) nuevoEstado = 'En Proceso';
+    else if(any('EN ESPERA EN SUCURSAL'))                     nuevoEstado = 'En Proceso';
+    else if(any('RETORNANDO'))                                nuevoEstado = 'Fallido';
+
+    console.log('[DS TEST] TRANSICION', ot.estado, '->', nuevoEstado||'(sin cambio)', '| ultimo evento:', ultimo);
+
+    if(nuevoEstado && nuevoEstado !== ot.estado){
+      const updEstado = {
+        estado:             nuevoEstado,
+        observacion_estado: ultimo.historia || ultimo.estadoCA || '',
+        observaciones:      ultimo.historia || ultimo.estadoCA || '',
+        updated_at:         new Date().toISOString()
+      };
+      if(['Terminal recuperada','Extraviada','Fallido'].includes(nuevoEstado))
+        updEstado.fecha_cierre = new Date().toISOString();
+
+      console.log('[DS TEST] Guardando estado:', updEstado);
+      const { data: estData, error: estErr } = await sb
+        .from('ordenes_trabajo').update(updEstado).eq('id', ot.id).select();
+      console.log('[DS TEST] Estado update result:', estErr ? 'ERROR: '+estErr.message : 'OK');
+      console.log('[DS TEST] Row después del estado update:', estData);
+      if(!estErr) console.log('[DS TEST] ✅ Estado actualizado:', ot.estado, '→', nuevoEstado);
+      else        console.error('[DS TEST] ❌ Error estado:', estErr);
+    } else {
+      console.log('[DS TEST] ℹ️ Sin cambio de estado | historia:', ultimo.historia, '| estadoCA:', ultimo.estadoCA);
+    }
   } catch(e){
     console.error('[DS TEST] Exception:', e.message, e);
   }
