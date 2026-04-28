@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v2.3.75</title>
+<title>Alleata · Operaciones v2.3.74</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -288,7 +288,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.3.75 · 27 abr 2026
+      v2.3.74 · 27 abr 2026
     </div>
   </div>
 </div>
@@ -347,7 +347,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.3.75 · 27 abr 2026
+      v2.3.74 · 27 abr 2026
     </div>
   </div>
 </nav>
@@ -361,7 +361,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <div class="topbar-right" id="topbar-date"></div>
     <button onclick="refreshCurrentModule()" title="Actualizar" style="background:none;border:1px solid var(--border2);color:var(--text-muted);border-radius:7px;padding:4px 10px;cursor:pointer;font-size:13px;margin-left:10px;transition:all .2s" onmouseover="this.style.color='var(--teal)';this.style.borderColor='var(--teal)'" onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border2)'">↺</button>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.3.75</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.3.74</div>
   </div>
   <div class="content">
 
@@ -1030,14 +1030,9 @@ tr:hover td{background:var(--surface2);}
           📂 Importar desde Salesforce
           <input type="file" id="dsFileInput" accept=".xlsx,.xls" style="display:none" onchange="importDesinstalaciones(event)">
         </label>
-        <button id="btnDsVaciarBase" onclick="dsVaciarBase()"
-          style="background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.35);color:#fca5a5;padding:8px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;"
-          onmouseover="this.style.background='rgba(239,68,68,.22)'" onmouseout="this.style.background='rgba(239,68,68,.12)'">
-          🗑️ Vaciar base
-        </button>
         <div style="display:flex;align-items:center;gap:6px;padding:6px 12px;background:var(--navy-600);border-radius:7px;flex:1;min-width:200px;">
           <span style="font-size:11px;color:var(--text-muted);white-space:nowrap;">📊 Reporte SF:</span>
-          <a href="https://alleata.lightning.force.com/lightning/r/Report/00ORm00000CRTa5MAH/view"
+          <a href="https://alleata.lightning.force.com/lightning/r/Report/00ORm00000CPncvMAD/view?queryScope=userFolders"
              target="_blank" style="font-size:11px;color:var(--blue);text-decoration:none;font-weight:500;white-space:nowrap;"
              onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">
             Desinstalaciones Pendientes ↗
@@ -1333,7 +1328,7 @@ tr:hover td{background:var(--surface2);}
 </div>
 
 <script>
-console.log('[Alleata v2.3.75] OK');
+console.log('[Alleata v2.3.74] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -6182,169 +6177,230 @@ function dsGeoReset(){
 // ── END GEO PANEL ──
 
 // ── IMPORT DESINSTALACIONES ──
-async function dsVaciarBase(){
-  const msg=document.getElementById('dsImportMsg');
-  const result=document.getElementById('dsImportResult');
-  const btn=document.getElementById('btnDsVaciarBase');
-  const total=DesinModule?.datos?.length||0;
-  const ok1=confirm(`⚠️ Vas a borrar TODAS las OTs de Desinstalaciones (${total || 'base actual'}).\n\nNo se toca Envíos, Ally, Rollout ni otras tablas.\n\n¿Continuar?`);
-  if(!ok1)return;
-  const ok2=confirm('Última confirmación: esta acción no se puede deshacer.\n\nDespués deberás importar el nuevo Excel actualizado.');
-  if(!ok2)return;
-  try{
-    if(btn){btn.disabled=true;btn.textContent='🗑️ Vaciando...';}
-    if(msg)msg.textContent='Vaciando base de Desinstalaciones...';
-    if(result)result.innerHTML='';
-
-    const {error}=await sb
-      .from('ordenes_trabajo')
-      .delete()
-      .eq('tipo','desinstalacion');
-
-    if(error)throw error;
-
-    if(result)result.innerHTML='<div class="alert alert-ok" style="margin-top:10px">✅ Base de Desinstalaciones vaciada. Ahora podés importar el Excel actualizado.</div>';
-    if(msg)msg.textContent='Base vaciada correctamente.';
-
-    DesinModule.datos=[];
-    DesinModule.filtrados=[];
-    DesinModule.cargado=false;
-    await cargarDesinstalaciones();
-    loadBadges();
-    auditLog({tabla:'ordenes_trabajo',registro_id:'DESINSTALACIONES',accion:'DELETE',campo:'tipo',valor_antes:'desinstalacion',valor_despues:'base vaciada'});
-  }catch(e){
-    console.error('[Desinstalaciones] Error vaciando base:',e);
-    if(result)result.innerHTML=`<div class="alert alert-err" style="margin-top:10px">❌ Error al vaciar base: ${e.message}</div>`;
-    if(msg)msg.textContent='Error al vaciar base.';
-  }finally{
-    if(btn){btn.disabled=false;btn.textContent='🗑️ Vaciar base';}
-  }
-}
-
 async function importDesinstalaciones(e){
-  const file=e.target.files[0];if(!file)return;
-  const msg=document.getElementById('dsImportMsg'),prog=document.getElementById('dsImportProgress');
-  const fill=document.getElementById('dsProgressFill'),ptext=document.getElementById('dsProgressText');
-  const result=document.getElementById('dsImportResult');
-  msg.textContent='';result.innerHTML='';prog.style.display='block';
-  ptext.textContent='Leyendo...';fill.style.width='20%';
-  try{
-    const{read,utils}=XLSX;
-    const wb=read(await file.arrayBuffer());
-    const rows=utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:null});
-    // Buscar fila de encabezados (fila 11 en este reporte = contiene "Id. de orden de trabajo")
-    let hIdx=-1;
-    for(let i=0;i<rows.length;i++){
-      if(rows[i]?.some(c=>String(c||'').includes('Id. de orden de trabajo'))){hIdx=i;break;}
+  const file = e.target.files[0]; if(!file) return;
+  const msg    = document.getElementById('dsImportMsg');
+  const prog   = document.getElementById('dsImportProgress');
+  const fill   = document.getElementById('dsProgressFill');
+  const ptext  = document.getElementById('dsProgressText');
+  const result = document.getElementById('dsImportResult');
+  msg.textContent = ''; result.innerHTML = ''; prog.style.display = 'block';
+  ptext.textContent = 'Leyendo archivo...'; fill.style.width = '10%';
+
+  try {
+    const {read, utils} = XLSX;
+    const wb   = read(await file.arrayBuffer());
+    const ws   = wb.Sheets[wb.SheetNames[0]];
+    const rows = utils.sheet_to_json(ws, {header:1, defval:null, raw:true});
+
+    // 1. Buscar fila de encabezados — match exacto primero, luego parcial
+    let hIdx = -1;
+    for(let i = 0; i < rows.length; i++){
+      if(rows[i]?.some(c => String(c||'').trim() === 'Id. de orden de trabajo')){ hIdx = i; break; }
     }
-    if(hIdx<0)throw new Error('No se encontró la fila de encabezados (busca "Id. de orden de trabajo").');
-    const hdrs=rows[hIdx].map(h=>String(h||'').trim());
-    const col=n=>hdrs.findIndex(h=>h.toLowerCase().includes(n.toLowerCase()));
+    if(hIdx < 0){
+      for(let i = 0; i < rows.length; i++){
+        if(rows[i]?.some(c => String(c||'').includes('Id. de orden de trabajo'))){ hIdx = i; break; }
+      }
+    }
+    if(hIdx < 0) throw new Error('No se encontro la fila de encabezados. Verificar columna "Id. de orden de trabajo".');
 
-    // Columnas del reporte SF Desinstalaciones
-    const iLogistica=col('Logística');   // col A — se propaga hacia abajo (celdas combinadas)
-    const iEstadoSF=col('Estado');       // col B — se propaga hacia abajo (celdas combinadas)
-    const iSFId=col('Id. de orden de trabajo');
-    const iFecha=col('Fecha de creación')>=0?col('Fecha de creación'):col('Fecha de Despacho');
-    const iOT=col('Número de orden');
-    const iComercio=col('Nombre del comercio')>=0?col('Nombre del comercio'):col('cuenta')>=0?col('cuenta'):-1;
-    const iCuenta=col('Cuenta: Nombre')>=0?col('Cuenta: Nombre'):col('Cuenta')>=0?col('Cuenta'):col('cuenta');
-    const iCalle=col('Calle')>=0?col('Calle'):col('Dirección de envío (Calle)')>=0?col('Dirección de envío (Calle)'):-1;
-    const iDireccion=col('Dirección')>=0?col('Dirección'):col('Dirección de envío')>=0?col('Dirección de envío'):-1;
-    const iCiudad=col('Ciudad')>=0?col('Ciudad'):col('Dirección de envío (Ciudad)')>=0?col('Dirección de envío (Ciudad)'):-1;
-    const iProv=col('Estado/Provincia')>=0?col('Estado/Provincia'):col('Provincia')>=0?col('Provincia'):col('Dirección de envío (Estado/Provincia)')>=0?col('Dirección de envío (Estado/Provincia)'):-1;
-    const iCP=col('Código postal')>=0?col('Código postal'):col('Dirección de envío (Código postal/ZIP)')>=0?col('Dirección de envío (Código postal/ZIP)'):-1;
-    const iContacto=col('Contacto');
-    const iHorario=col('Horario');
-    const iTerminal=col('N terminal')>=0?col('N terminal'):col('Terminal');
-    const iResp=col('Responsable');
-    const iTrack=col('N° de seguimiento')>=0?col('N° de seguimiento'):col('N de seguimiento')>=0?col('N de seguimiento'):col('seguimiento')>=0?col('seguimiento'):-1;
-    const iObs=col('Observaciones');
+    console.log('Filas Excel totales:', rows.length);
+    console.log('Header index:', hIdx);
+    console.log('Encabezados detectados:', rows[hIdx]);
 
-    console.log('[Import Desins] Columnas detectadas:', {iLogistica,iEstadoSF,iSFId,iOT,iComercio,iCuenta,iResp,iCalle,iDireccion,iCiudad,iProv,iCP,iTrack,iObs});
+    const hdrs = rows[hIdx].map(h => String(h||'').trim());
 
-    const pd=s=>{
-      if(!s)return null;const v=String(s).trim();if(!v)return null;
-      if(!isNaN(+v)&&+v>40000)return new Date((+v-25569)*86400000).toISOString().slice(0,10);
-      const p=v.split('/');if(p.length===3)return`${p[2].length===2?'20'+p[2]:p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`;
+    // Busqueda exacta primero, luego parcial (para nombres de columna con acentos)
+    const col = name => {
+      const nl = name.toLowerCase();
+      const exact = hdrs.findIndex(h => h.toLowerCase() === nl);
+      if(exact >= 0) return exact;
+      return hdrs.findIndex(h => h.toLowerCase().includes(nl));
+    };
+
+    // 2. Mapear columnas
+    const iSFId     = col('id. de orden de trabajo');
+    const iOT       = col('numero de orden de trabajo') >= 0
+                      ? col('numero de orden de trabajo') : col('numero de orden');
+    const iResp     = col('responsable');
+    const iCuenta   = col('cuenta: nombre') >= 0 ? col('cuenta: nombre') : col('cuenta');
+    const iComercio = col('nombre del comercio') >= 0 ? col('nombre del comercio') : col('nombre comercio');
+    const iFecha    = col('fecha de creacion') >= 0 ? col('fecha de creacion')
+                      : col('fecha creacion') >= 0 ? col('fecha creacion')
+                      : col('fecha') >= 0 ? col('fecha') : -1;
+    const iObs      = col('observaciones');
+    const iEstadoSF = col('estado');
+    const iLogistica= col('logistica') >= 0 ? col('logistica') : col('log');
+    const iTrack    = col('n de seguimiento') >= 0 ? col('n de seguimiento')
+                      : col('seguimiento') >= 0 ? col('seguimiento') : -1;
+    const iTerminal = col('n terminal') >= 0 ? col('n terminal') : col('terminal');
+    const iContacto = col('contacto');
+    const iHorario  = col('horario');
+    // Direccion con fallback C3
+    const iCalle    = col('calle') >= 0 ? col('calle') : col('direccion de envio (calle)');
+    const iCiudad   = col('ciudad') >= 0 ? col('ciudad') : col('direccion de envio (ciudad)');
+    const iProv     = col('estado/provincia') >= 0 ? col('estado/provincia')
+                      : col('provincia') >= 0 ? col('provincia')
+                      : col('direccion de envio (estado');
+    const iCP       = col('codigo postal') >= 0 ? col('codigo postal')
+                      : col('direccion de envio (codigo postal');
+    const iDirLibre = col('direccion');
+
+    console.log('Indices de columnas:', {iSFId,iOT,iResp,iCuenta,iComercio,iFecha,
+      iCalle,iCiudad,iProv,iCP,iDirLibre,iEstadoSF,iLogistica,iTrack,iObs});
+
+    // 3. Helpers
+    const sv  = (r,i) => (i >= 0 && r[i] != null) ? String(r[i]).trim() : '';
+    const svN = (r,i) => { const v = sv(r,i); return v || null; };
+    const SKIP = new Set(['subtotal','total','conteo','grand total','count']);
+
+    const parseDate = s => {
+      if(!s) return null; const v = String(s).trim(); if(!v) return null;
+      if(!isNaN(+v) && +v > 40000)
+        return new Date((+v - 25569)*86400000).toISOString().slice(0,10);
+      const p = v.split('/');
+      if(p.length === 3)
+        return `${p[2].length===2?'20'+p[2]:p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`;
       return v;
     };
 
-    // Mapeo de estados SF → estados portal
-    const EMAP={
-      'pendiente':'Pendiente','pendiente de completar':'Pendiente',
+    const EMAP = {'pendiente':'Pendiente','pendiente de completar':'Pendiente',
       'despachado':'Despachado','en proceso':'En Proceso',
-      'retirar terminal':'Retirar Terminal',
-      'terminal recuperada':'Terminal recuperada',
-      'extraviada':'Extraviada','fallido':'Fallido'
+      'retirar terminal':'Retirar Terminal','terminal recuperada':'Terminal recuperada',
+      'extraviada':'Extraviada','fallido':'Fallido',
+      'retiro pactado':'Retiro pactado','pendiente retiro':'Pendiente retiro'};
+    const mapEst = v => {
+      if(!v) return null; const vl = v.trim().toLowerCase();
+      for(const [k,m] of Object.entries(EMAP)) if(vl.includes(k)) return m;
+      return v.trim() || null;
     };
-    const mapEst=v=>{if(!v)return null;const vl=v.trim().toLowerCase();for(const[k,mapped]of Object.entries(EMAP))if(vl.includes(k))return mapped;return v.trim()||null;};
 
-    const{data:profs}=await sb.from('profiles').select('id,nombre');
-    const fUser=n=>{if(!n)return null;const nl=n.toLowerCase();const p=profs?.find(p=>p.nombre&&nl.includes(p.nombre.toLowerCase().split(' ')[0]));return p?.nombre||n;};
+    const {data:profs} = await sb.from('profiles').select('id,nombre');
+    const resolveUser = n => {
+      if(!n) return n;
+      const nl = n.toLowerCase();
+      const p  = profs?.find(p => p.nombre && nl.includes(p.nombre.toLowerCase().split(' ')[0]));
+      return p?.nombre || n;
+    };
 
-    // Propagar Logística y Estado (celdas combinadas en col A y B)
-    let curLog='SF', curEst='Pendiente';
-    const enriched=[];
-    for(const r of rows.slice(hIdx+1)){
-      if(!r||!r.some(c=>c!==null))continue;
-      // Propagar logística si la celda tiene valor
-      if(iLogistica>=0&&r[iLogistica]){const v=String(r[iLogistica]).trim();if(v&&v!=='Subtotal'&&v!=='Total')curLog=v;}
-      // Propagar estado si la celda tiene valor
-      if(iEstadoSF>=0&&r[iEstadoSF]){const v=String(r[iEstadoSF]).trim();if(v&&v!=='Subtotal'&&v!=='Total'){const m=mapEst(v);if(m)curEst=m;}}
-      const sfId=String(r[iSFId]||'').trim();
-      const ot=String(r[iOT]||'').trim();
-      if(!sfId||!ot)continue;
-      if(['subtotal','total','conteo'].includes(ot.toLowerCase()))continue;
-      enriched.push({r,estado:curEst,logistica:curLog});
+    // 4. Construir filas validas
+    // Propagar Logistica y Estado SF (celdas combinadas verticalmente en el reporte SF)
+    let curLog = 'SF', curEst = 'Pendiente';
+    const enriched = [];
+    let omitidas = 0;
+
+    for(let ri = hIdx + 1; ri < rows.length; ri++){
+      const r = rows[ri];
+      if(!r || !r.some(c => c !== null)) continue; // fila vacia
+
+      // Propagar logistica si celda tiene valor
+      if(iLogistica >= 0 && r[iLogistica]){
+        const v = String(r[iLogistica]).trim();
+        if(v && !SKIP.has(v.toLowerCase())) curLog = v;
+      }
+      // Propagar estado SF si celda tiene valor
+      if(iEstadoSF >= 0 && r[iEstadoSF]){
+        const v = String(r[iEstadoSF]).trim();
+        if(v && !SKIP.has(v.toLowerCase())){ const m = mapEst(v); if(m) curEst = m; }
+      }
+
+      const sfId = sv(r, iSFId);
+      const ot   = sv(r, iOT);
+
+      // Regla 6: descartar si sf_id o ot vacios o son filas de subtotal
+      if(!sfId){ omitidas++; continue; }
+      if(!ot)  { omitidas++; continue; }
+      if(SKIP.has(ot.toLowerCase())){ omitidas++; continue; }
+
+      enriched.push({r, sfId, ot, estado:curEst, logistica:curLog});
     }
 
-    const byEst={};enriched.forEach(({estado})=>{byEst[estado]=(byEst[estado]||0)+1;});
-    console.log('[Import Desins] Estados detectados:', byEst, `Total: ${enriched.length}`);
-    ptext.textContent=`Procesando ${enriched.length} OTs...`;fill.style.width='50%';
-    let imp=0,err=0;
-    for(const{r,estado,logistica}of enriched){
-      const sfId=String(r[iSFId]||'').trim(),ot=String(r[iOT]||'').trim();
-      const prov=String(r[iProv]||'').trim();
+    console.log('Filas validas para importar:', enriched.length);
+    console.log('Filas omitidas (sf_id/ot vacios o subtotales):', omitidas);
+    // Muestra 3 filas de muestra
+    enriched.slice(0,3).forEach(({r,sfId,ot,estado,logistica},i)=>
+      console.log('Muestra['+i+']:', {sfId,ot,estado,logistica,
+        cuenta:svN(r,iCuenta), ciudad:svN(r,iCiudad), resp:svN(r,iResp)}));
 
-      // C3 — Fallback de dirección: si calle/ciudad/provincia/cp están vacíos, usar campo Dirección
-      const calle  = iCalle>=0  ? String(r[iCalle]||'').trim()  : '';
-      const ciudad = iCiudad>=0 ? String(r[iCiudad]||'').trim() : '';
-      const cp     = iCP>=0     ? String(r[iCP]||'').trim()     : '';
-      const tieneDireccionEstructurada = calle || ciudad || prov || cp;
-      const direccionFallback = (!tieneDireccionEstructurada && iDireccion>=0)
-        ? String(r[iDireccion]||'').trim() || null
-        : null;
+    if(!enriched.length)
+      throw new Error(`No se encontraron filas validas en las ${rows.length - hIdx - 1} filas leidas desde encabezados.`);
 
-      const item={sf_id:sfId,ot,operador_id:fUser(String(r[iResp]||'').trim()),tipo:'desinstalacion',
-        comercio:iComercio>=0?String(r[iComercio]||'').trim()||null:null,
-        cuenta:iCuenta>=0?String(r[iCuenta]||'').trim()||null:null,
-        calle:calle||null,
-        ciudad:ciudad||null,
-        provincia:prov||null,
-        cp:cp||null,
-        direccion:direccionFallback,
-        observaciones:iObs>=0?String(r[iObs]||'').trim()||null:null,
-        fecha_asignacion:pd(r[iFecha>=0?iFecha:undefined]),
-        logistica:logistica,
-        estado,
-        nro_seguimiento:iTrack>=0?String(r[iTrack]||'').trim()||null:null,
-        nro_terminal:iTerminal>=0?String(r[iTerminal]||'').trim()||null:null,
-        contacto:iContacto>=0?String(r[iContacto]||'').trim()||null:null,
-        horario:iHorario>=0?String(r[iHorario]||'').trim()||null:null,
-        updated_at:new Date().toISOString()};
-      Object.keys(item).forEach(k=>{if(item[k]===null||item[k]==='')delete item[k];});
-      const{error}=await sb.from('ordenes_trabajo').upsert(item,{onConflict:'sf_id',ignoreDuplicates:false});
-      if(error){err++;console.error(error);}else imp++;
+    ptext.textContent = `Procesando ${enriched.length} OTs...`;
+    fill.style.width = '50%';
+
+    // 5. Upsert
+    let imp = 0, err = 0;
+    const errLog = [];
+
+    for(const {r, sfId, ot, estado, logistica} of enriched){
+      // C3: fallback de direccion
+      const calle  = sv(r, iCalle);
+      const ciudad = sv(r, iCiudad);
+      const prov   = sv(r, iProv);
+      const cp     = sv(r, iCP);
+      const tieneDirEst = calle || ciudad || prov || cp;
+      const dirFallback = (!tieneDirEst && iDirLibre >= 0) ? svN(r, iDirLibre) : null;
+
+      const item = {
+        sf_id:            sfId,
+        ot:               ot,
+        tipo:             'desinstalacion',
+        operador_id:      resolveUser(sv(r, iResp)) || null,
+        cuenta:           svN(r, iCuenta),
+        comercio:         svN(r, iComercio),
+        calle:            calle  || null,
+        ciudad:           ciudad || null,
+        provincia:        prov   || null,
+        cp:               cp     || null,
+        direccion:        dirFallback,
+        fecha_asignacion: parseDate(iFecha >= 0 ? r[iFecha] : null),
+        logistica:        logistica,
+        estado:           estado,
+        nro_seguimiento:  svN(r, iTrack),
+        nro_terminal:     svN(r, iTerminal),
+        contacto:         svN(r, iContacto),
+        horario:          svN(r, iHorario),
+        observaciones:    svN(r, iObs),
+        updated_at:       new Date().toISOString()
+      };
+      // Limpiar nulls para no pisar datos existentes con null
+      Object.keys(item).forEach(k => { if(item[k] === null || item[k] === undefined) delete item[k]; });
+
+      const {error} = await sb.from('ordenes_trabajo')
+        .upsert(item, {onConflict:'sf_id', ignoreDuplicates:false});
+      if(error){
+        err++;
+        errLog.push({ot, sf_id:sfId, msg:error.message});
+        console.error('[Import Desins] Error OT '+ot+':', error.message);
+      } else {
+        imp++;
+      }
     }
-    fill.style.width='100%';ptext.textContent='✅ Listo';
-    result.innerHTML=`<div class="alert alert-ok" style="margin-top:10px">✅ <strong>${imp}</strong> procesadas · <strong>${err}</strong> errores</div>`;
-    auditLog({tabla:'ordenes_trabajo',registro_id:'BATCH',accion:'IMPORTACION_SF',campo:'lote',valor_antes:null,valor_despues:`${imp} desinst.`});
-    DesinModule.cargado=false;await cargarDesinstalaciones();
-  }catch(err){ptext.textContent='Error: '+err.message;result.innerHTML=`<div class="alert alert-err">❌ ${err.message}</div>`;}
-  e.target.value='';
+
+    // 6. Resultado final
+    fill.style.width = '100%'; ptext.textContent = 'Listo';
+    if(errLog.length) console.error('[Import Desins] Errores:', errLog);
+    result.innerHTML = `
+      <div class="alert ${err===0?'alert-ok':'alert-err'}" style="margin-top:10px">
+        <strong>${imp}</strong> importadas &nbsp;&middot;&nbsp;
+        <strong>${omitidas}</strong> omitidas (sin id) &nbsp;&middot;&nbsp;
+        <strong>${err}</strong> errores
+        ${err>0?`<details style="margin-top:6px"><summary style="cursor:pointer;font-size:11px">Ver errores</summary><pre style="font-size:10px;margin-top:4px">${errLog.slice(0,10).map(e=>e.ot+': '+e.msg).join('\n')}</pre></details>`:''}
+      </div>`;
+    auditLog({tabla:'ordenes_trabajo',registro_id:'BATCH',
+      accion:'IMPORTACION_DESINSTALACIONES',campo:'lote',
+      valor_antes:null,valor_despues:`imp:${imp} err:${err} omit:${omitidas}`});
+    DesinModule.cargado = false;
+    await cargarDesinstalaciones();
+
+  } catch(ex){
+    ptext.textContent = 'Error: ' + ex.message;
+    result.innerHTML = `<div class="alert alert-err">❌ ${ex.message}</div>`;
+    console.error('[Import Desins] Exception:', ex);
+  }
+  e.target.value = '';
 }
-
 async function dsAutoTracking(){
   abrirModalAutoTracking();
   const btn=document.getElementById('btnDsAutoTracking');if(btn)btn.disabled=true;
