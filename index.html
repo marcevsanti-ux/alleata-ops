@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v2.3.82</title>
+<title>Alleata · Operaciones v2.3.84</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -300,7 +300,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.3.82 · 28 abr 2026
+      v2.3.84 · 28 abr 2026
     </div>
   </div>
 </div>
@@ -360,7 +360,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.3.82 · 28 abr 2026
+      v2.3.84 · 28 abr 2026
     </div>
   </div>
 </nav>
@@ -374,7 +374,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <div class="topbar-right" id="topbar-date"></div>
     <button onclick="refreshCurrentModule()" title="Actualizar" style="background:none;border:1px solid var(--border2);color:var(--text-muted);border-radius:7px;padding:4px 10px;cursor:pointer;font-size:13px;margin-left:10px;transition:all .2s" onmouseover="this.style.color='var(--teal)';this.style.borderColor='var(--teal)'" onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border2)'">↺</button>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.3.82</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.3.84</div>
   </div>
   <div class="content">
 
@@ -1143,6 +1143,7 @@ tr:hover td{background:var(--surface2);}
             <th onclick="dsOrdenar('distancia_km')" style="cursor:pointer">Distancia</th>
             <th onclick="dsOrdenar('logistica')" style="cursor:pointer">Logística</th>
             <th onclick="dsOrdenar('nro_seguimiento')" style="cursor:pointer">N° Seguimiento</th>
+            <th style="width:44px;text-align:center">CA</th>
             <th onclick="dsOrdenar('observacion_estado')" style="cursor:pointer">Observación</th>
             <th onclick="dsOrdenar('estado')" style="cursor:pointer">Estado</th>
             <th onclick="dsOrdenar('costo_envio')" style="cursor:pointer">Costo</th>
@@ -1151,7 +1152,7 @@ tr:hover td{background:var(--surface2);}
           </tr>
         </thead>
         <tbody id="ds-tbody">
-          <tr><td colspan="12" style="text-align:center;padding:30px;color:var(--text-muted)">Cargando...</td></tr>
+          <tr><td colspan="13" style="text-align:center;padding:30px;color:var(--text-muted)">Cargando...</td></tr>
         </tbody>
       </table>
     </div>
@@ -1485,15 +1486,17 @@ function dsTabSwitch(tab){
 })();
 
 // ── Desinstalaciones: Consulta CA individual (lupa) ──────────────────
-async function dsConsultarCA(otId, trackNum, otNum, btn){
+async function dsConsultarCA(otId, trackNum, otNum){
   if(!trackNum||!otId)return;
-  const orig=btn.textContent;
-  btn.textContent='⏳'; btn.disabled=true;
+  // Mismo patrón que consultarTracking() de Envíos
+  const btn=document.getElementById(`ds-track-btn-${otId}`);
+  if(btn){ btn.textContent='⏳'; btn.disabled=true; }
+  mostrarModalTrackingCA(trackNum, null, 'loading');
   try{
     const{eventos}=await fetchTrackingCA(trackNum);
     if(!eventos?.length){
-      btn.textContent='❌'; btn.title='Sin eventos CA';
-      setTimeout(()=>{btn.textContent='🔍';btn.disabled=false;btn.title='Consultar Correo Argentino';},2500);
+      mostrarModalTrackingCA(trackNum, null, 'sin_eventos');
+      if(btn){btn.textContent='🔍';btn.disabled=false;}
       return;
     }
     const u=eventos[0];
@@ -1516,12 +1519,12 @@ async function dsConsultarCA(otId, trackNum, otNum, btn){
     // Refresh the row state in DesinModule.datos
     const ot=DesinModule.datos?.find(x=>x.id===otId||x.ot===otNum);
     if(ot){ot.observaciones=det;if(nEst)ot.estado=nEst;}
-    setTimeout(()=>{btn.textContent='🔍';btn.disabled=false;btn.title='Consultar Correo Argentino';
-      if(nEst)dsRenderTabla(DesinModule.filtrados||DesinModule.datos||[]);
-    },2000);
-  }catch(e){
-    btn.textContent='❌'; btn.title='Error: '+e.message;
-    setTimeout(()=>{btn.textContent='🔍';btn.disabled=false;btn.title='Consultar Correo Argentino';},3000);
+  } catch(e) {
+    mostrarModalTrackingCA(trackNum, null, 'error', e.message);
+  } finally {
+    if(btn){ btn.textContent='🔍'; btn.disabled=false; }
+    if(DesinModule.filtrados||DesinModule.datos)
+      dsRenderTabla(DesinModule.filtrados||DesinModule.datos||[]);
   }
 }
 
@@ -1677,7 +1680,7 @@ function dsRutaCSV(){
   a.click();
 }
 
-console.log('[Alleata v2.3.82] OK');
+console.log('[Alleata v2.3.84] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -6334,7 +6337,7 @@ function dsClasificarLogistica(log){
 
 function dsRenderTabla(datos){
   const tbody=document.getElementById('ds-tbody');
-  if(!datos.length){tbody.innerHTML='<tr><td colspan="12" style="text-align:center;padding:30px;color:var(--text-muted)">Sin resultados</td></tr>';return;}
+  if(!datos.length){tbody.innerHTML='<tr><td colspan="13" style="text-align:center;padding:30px;color:var(--text-muted)">Sin resultados</td></tr>';return;}
   const col=DesinModule.ordenCol,dir=DesinModule.ordenDir==='asc'?1:-1;
   const sorted=[...datos].sort((a,b)=>{
     let va=col==='sla_estado'?(DS_SLA_ORD[a[col]]??9):(a[col]??'');
@@ -6363,12 +6366,29 @@ function dsRenderTabla(datos){
         <div style="font-weight:700;font-size:12px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${ot.cuenta||ot.comercio||''}">${ot.cuenta||ot.comercio||'—'}</div>
         ${ot.comercio&&ot.comercio!==ot.cuenta?`<div style="font-size:10px;color:var(--text-muted);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${ot.comercio}</div>`:''}
       </td>
-      <td><div style="font-size:12px">${ot.ciudad||'—'}</div>
-          <span class="badge" style="${ot.zona==='AMBA'?'background:rgba(26,159,212,.12);color:var(--blue)':'background:rgba(139,92,246,.12);color:#8b5cf6'}">${ot.zona_sf||ot.zona||'—'}</span>
+      <td onclick="dsModalAbrir('${ot.ot}')">
+        <div style="font-size:12px">${(()=>{
+          if(ot.ciudad)return ot.ciudad;
+          if(ot.direccion){const p=ot.direccion.split(',');return p.length>=2?p[1].trim():'Sin ciudad';}
+          return '—';
+        })()}</div>
+        <span class="badge" style="${ot.zona_sf==='AMBA'||ot.zona==='AMBA'?'background:rgba(26,159,212,.12);color:var(--blue)':'background:rgba(139,92,246,.12);color:#8b5cf6'}">${ot.zona_sf||ot.zona||'—'}</span>
       </td>
-      <td onclick="dsModalAbrir('${ot.ot}')"><span style="font-size:11px;color:var(--text-muted)">${ot.distancia_km?`~${ot.distancia_km} km`:'—'}</span></td>
+      <td onclick="dsModalAbrir('${ot.ot}')" style="text-align:right">
+        ${(()=>{
+          // Para OTs viejas: derivar ciudad desde campo direccion
+          let c=ot.ciudad, p=ot.provincia;
+          if(!c && ot.direccion){
+            const pts=ot.direccion.split(',').map(x=>x.trim()).filter(Boolean);
+            if(pts.length>=3){c=pts[1];p=p||(pts[2].replace(/\s*[A-Z0-9]{4,}\s*,?\s*$/,'').trim());}
+            else if(pts.length===2){c=pts[1];}
+          }
+          return calcDistancia(c||ot.zona_sf,p||ot.provincia);
+        })()}
+      </td>
       <td><span class="badge" style="${ot.gestion_propia?'background:rgba(29,191,142,.12);color:var(--teal)':'background:var(--surface2);color:var(--text-muted)'}">${ot.logistica||'—'}</span></td>
-      <td style="white-space:nowrap"><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-muted)">${ot.nro_seguimiento||'—'}</span>${ot.nro_seguimiento?`<button onclick="event.stopPropagation();dsConsultarCA('${ot.id}','${ot.nro_seguimiento}','${ot.ot}',this)" title="Consultar Correo Argentino" style="background:none;border:none;cursor:pointer;color:var(--teal);font-size:13px;margin-left:4px;vertical-align:middle;padding:0;opacity:.7" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.7">🔍</button>`:''}</td>
+      <td><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-muted)">${ot.nro_seguimiento||'—'}</span></td>
+      <td style="text-align:center">${ot.nro_seguimiento?`<button id="ds-track-btn-${ot.id}" title="Consultar CA" style="background:var(--surface2);border:1px solid var(--border2);color:var(--blue);font-size:11px;padding:4px 7px;border-radius:6px;cursor:pointer" onclick="event.stopPropagation();dsConsultarCA('${ot.id}','${ot.nro_seguimiento}','${ot.ot}')">🔍</button>`:'<span style="color:var(--text-muted)">—</span>'}</td>
       <td>${ot.observacion_estado
         ? `<span title="${ot.observacion_estado}" style="display:block;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;color:var(--text-muted)">${ot.observacion_estado}</span>`
         : '<span style="color:var(--text-muted)">—</span>'}</td>
@@ -6387,7 +6407,7 @@ function dsRenderTabla(datos){
     const rows=groups[grp];
     if(!rows.length)return;
     const gc=GCOLORS[grp]||'var(--text-muted)';
-    html+=`<tr><td colspan="12" style="background:var(--navy-900);padding:6px 12px;border-top:2px solid ${gc}20"><span style="font-size:10px;font-weight:700;color:${gc};text-transform:uppercase;letter-spacing:.08em">${GICONS[grp]} ${grp} <span style="opacity:.5;font-weight:400">(${rows.length})</span></span></td></tr>`;
+    html+=`<tr><td colspan="13" style="background:var(--navy-900);padding:6px 12px;border-top:2px solid ${gc}20"><span style="font-size:10px;font-weight:700;color:${gc};text-transform:uppercase;letter-spacing:.08em">${GICONS[grp]} ${grp} <span style="opacity:.5;font-weight:400">(${rows.length})</span></span></td></tr>`;
     html+=rows.map(renderRow).join('');
   });
   tbody.innerHTML=html;
@@ -6634,6 +6654,9 @@ async function importDesinstalaciones(e){
     const iComercio = colAny('Nombre del comercio','Nombre comercio','Comercio');
     const iFecha    = colAny('Fecha de creacion','Fecha creacion','Fecha');
     const iObs      = colAny('Observaciones generales','Observaciones','Observacion','Notas');
+    const iZonaSF   = colAny('Categoria Zona','Categoria zona','Zona','Zone');
+    const iGestionR = colAny('Gestion Retiros','Gestión Retiros','gestion retiros');
+    const iStatusG  = colAny('Status Gestion Retiros','Status Gestión Retiros','status gestion');
     const iObsEstado= colAny('Observación sobre estado de OT','Observacion sobre estado de OT','Observación OT','Observacion OT');
     const iCosto    = colAny('Costo de envio','Costo envio','Costo de envío','costo envio');
     const iEstadoSF = colAny('Estado');
@@ -6642,10 +6665,12 @@ async function importDesinstalaciones(e){
     const iTerminal = colAny('N terminal','Nro terminal','Terminal','Serie terminal');
     const iContacto = colAny('Contacto','Nombre contacto');
     const iHorario  = colAny('Horario','Horario atencion');
-    const iCalle    = colAny('Calle','Direccion de envio calle','Direccion calle');
-    const iCiudad   = colAny('Ciudad','Direccion de envio ciudad');
-    const iProv     = colAny('Estado/Provincia','Provincia','Estado provincia','Direccion de envio estado');
-    const iCP       = colAny('Codigo postal','CP','Direccion de envio codigo postal');
+    // Dirección estructurada (OTs nuevas — 4 campos separados)
+    const iCalle    = colAny('Direccion de envio (Calle)','Calle','Direccion envio calle','Direccion calle');
+    const iCiudad   = colAny('Direccion de envio (Ciudad)','Ciudad','Direccion envio ciudad');
+    const iProv     = colAny('Direccion de envio (Estado/Provincia)','Estado/Provincia','Provincia','Estado provincia');
+    const iCP       = colAny('Direccion de envio (Codigo postal/ZIP)','Codigo postal','CP','ZIP');
+    // Dirección libre (OTs viejas — campo único)
     const iDirLibre = colAny('Direccion','Domicilio');
 
     // 5. Log obligatorio de columnas clave
@@ -6757,12 +6782,31 @@ async function importDesinstalaciones(e){
     const errLog = [];
 
     for(const {r, sfId, ot, estado, logistica} of enriched){
+      // Dirección estructurada (OTs nuevas)
       const calle  = sv(r, iCalle);
       const ciudad = sv(r, iCiudad);
       const prov   = sv(r, iProv);
       const cp     = sv(r, iCP);
-      const tieneDirEst = calle || ciudad || prov || cp;
-      const dirFallback = (!tieneDirEst && iDirLibre >= 0) ? svN(r, iDirLibre) : null;
+      const tieneDirEst = !!(calle || ciudad || prov || cp);
+      // Dirección libre (OTs viejas — campo único tipo '237 Uruguay, Gral. San Martín, Chaco')
+      const dirLibre = iDirLibre >= 0 ? svN(r, iDirLibre) : null;
+      const dirFallback = !tieneDirEst ? dirLibre : null;
+      // Para OTs viejas: intentar derivar ciudad/prov desde el campo Dirección
+      // Formato típico SF: 'Calle 123, Ciudad, Provincia CP, Argentina'
+      let ciudadDerived = ciudad || '';
+      let provDerived   = prov   || '';
+      if(!tieneDirEst && dirLibre){
+        const partes = dirLibre.split(',').map(p=>p.trim()).filter(Boolean);
+        // partes[0]=calle, partes[1]=ciudad, partes[2]=provincia+cp, partes[3]=país
+        if(partes.length >= 3){
+          ciudadDerived = ciudadDerived || partes[1] || '';
+          // provincia viene como 'Chaco H3509' o 'Buenos Aires 1631'
+          const provRaw = partes[2] || '';
+          provDerived = provDerived || provRaw.replace(/\s*[A-Z0-9]{4,}\s*,?\s*$/, '').trim();
+        } else if(partes.length === 2){
+          ciudadDerived = ciudadDerived || partes[1] || '';
+        }
+      }
 
       const item = {
         sf_id:            sfId,
@@ -6772,8 +6816,9 @@ async function importDesinstalaciones(e){
         cuenta:           svN(r, iCuenta),
         comercio:         svN(r, iComercio),
         calle:            calle  || null,
-        ciudad:           ciudad || null,
-        provincia:        prov   || null,
+        direccion:        dirFallback || null,
+        ciudad:           ciudadDerived || null,
+        provincia:        provDerived   || null,
         cp:               cp     || null,
         fecha_asignacion: parseDate(iFecha >= 0 ? r[iFecha] : null),
         logistica:        logistica,
@@ -6787,6 +6832,7 @@ async function importDesinstalaciones(e){
           ? {costo_envio: parseFloat(String(r[iCosto]).replace(/[^0-9.]/g,''))||null} : {}),
         ...(typeof _dbHasObsEstado !== 'undefined' && _dbHasObsEstado
           ? {observacion_estado: svN(r,iObsEstado)} : {}),
+        zona_sf:          iZonaSF >= 0 ? svN(r, iZonaSF) : null,
         updated_at:       new Date().toISOString()
       };
       Object.keys(item).forEach(k => { if(item[k] === null || item[k] === undefined) delete item[k]; });
