@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v2.3.84</title>
+<title>Alleata · Operaciones v2.3.85</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -300,7 +300,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.3.84 · 28 abr 2026
+      v2.3.85 · 28 abr 2026
     </div>
   </div>
 </div>
@@ -360,7 +360,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.3.84 · 28 abr 2026
+      v2.3.85 · 28 abr 2026
     </div>
   </div>
 </nav>
@@ -374,7 +374,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <div class="topbar-right" id="topbar-date"></div>
     <button onclick="refreshCurrentModule()" title="Actualizar" style="background:none;border:1px solid var(--border2);color:var(--text-muted);border-radius:7px;padding:4px 10px;cursor:pointer;font-size:13px;margin-left:10px;transition:all .2s" onmouseover="this.style.color='var(--teal)';this.style.borderColor='var(--teal)'" onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border2)'">↺</button>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.3.84</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.3.85</div>
   </div>
   <div class="content">
 
@@ -1486,47 +1486,81 @@ function dsTabSwitch(tab){
 })();
 
 // ── Desinstalaciones: Consulta CA individual (lupa) ──────────────────
+// Reutiliza EXACTAMENTE el mismo flujo que consultarTracking() de Envíos:
+//   mostrarModalTrackingCA → fetchTrackingCA → mostrarModalTrackingCA(ok)
+// La diferencia: persiste en ordenes_trabajo, no en envios, y NO dispara Ally.
 async function dsConsultarCA(otId, trackNum, otNum){
-  if(!trackNum||!otId)return;
-  // Mismo patrón que consultarTracking() de Envíos
-  const btn=document.getElementById(`ds-track-btn-${otId}`);
-  if(btn){ btn.textContent='⏳'; btn.disabled=true; }
+  // Protección: tracking vacío
+  if(!trackNum || trackNum.trim() === ''){
+    showTrackingToast('⚠️ Esta OT no tiene N° de seguimiento', 'yellow');
+    return;
+  }
+
+  console.log('[Desins CA] tracking usado:', trackNum);
+  console.log('[Desins CA] usando función: consultarTracking() de Envíos (flujo completo)');
+
+  // Botón — mismo patrón que consultarTracking()
+  const btn = document.getElementById(`ds-track-btn-${otId}`);
+  if(btn){ btn.textContent = '⏳'; btn.disabled = true; }
+
+  // Timeout de 10 segundos
+  const timer = setTimeout(() => {
+    mostrarModalTrackingCA(trackNum, null, 'error', 'Tiempo de espera agotado (10s). Intentar nuevamente.');
+    if(btn){ btn.textContent = '🔍'; btn.disabled = false; }
+    console.warn('[Desins CA] timeout 10s para tracking:', trackNum);
+  }, 10000);
+
+  // 1. Mostrar modal en estado loading — idéntico a consultarTracking()
   mostrarModalTrackingCA(trackNum, null, 'loading');
-  try{
-    const{eventos}=await fetchTrackingCA(trackNum);
-    if(!eventos?.length){
-      mostrarModalTrackingCA(trackNum, null, 'sin_eventos');
-      if(btn){btn.textContent='🔍';btn.disabled=false;}
+
+  try {
+    // 2. Consultar CA — misma función que Envíos
+    const { eventos, pieza } = await fetchTrackingCA(trackNum);
+    clearTimeout(timer);
+
+    if(!eventos || eventos.length === 0){
+      mostrarModalTrackingCA(trackNum, null, 'error', 'Sin eventos registrados para este número');
       return;
     }
-    const u=eventos[0];
-    const mapEstDS=h=>{
-      const H=(h||'').toUpperCase();
-      if(H.includes('ENTREGADO')||H.includes('ENTREGA OK'))return'Terminal recuperada';
-      if(H.includes('DEVUELTO')||H.includes('DEVOLUCION'))return'Fallido';
-      if(H.includes('PERDIDO'))return'Extraviada';
-      if(H.includes('EN PODER DEL DISTRIBUIDOR')||H.includes('INTENTO DE ENTREGA'))return'En Proceso';
-      if(H.includes('EN ESPERA EN SUCURSAL'))return'En Proceso';
+
+    // 3. Mostrar modal con historial — idéntico a consultarTracking()
+    mostrarModalTrackingCA(trackNum, { eventos, pieza }, 'ok');
+
+    // 4. Persistir en ordenes_trabajo (no en envios — sin tocar Envíos)
+    const ultimo = eventos[0];
+    const mapEstDS = (historia, estadoCA) => {
+      const H = (historia || '').toUpperCase();
+      const E = (estadoCA  || '').toUpperCase();
+      if(H.includes('ENTREGADO') || H.includes('ENTREGA OK')) return 'Terminal recuperada';
+      if(H.includes('DEVUELTO')  || H.includes('DEVOLUCION')) return 'Fallido';
+      if(H.includes('PERDIDO'))                                return 'Extraviada';
+      if(H.includes('EN PODER DEL DISTRIBUIDOR') || H.includes('INTENTO DE ENTREGA')) return 'En Proceso';
+      if(H.includes('EN ESPERA EN SUCURSAL'))                  return 'En Proceso';
+      if(E.includes('RETORNANDO'))                             return 'Fallido';
       return null;
     };
-    const nEst=mapEstDS(u.historia);
-    const det=u.estadoCA?`${u.historia} — ${u.estadoCA}`:u.historia;
-    const upd={observaciones:det,updated_at:new Date().toISOString()};
-    if(nEst) upd.estado=nEst;
-    const{error}=await sb.from('ordenes_trabajo').update(upd).eq('id',otId);
-    if(error)throw error;
-    btn.textContent='✅'; btn.title=`Actualizado: ${det}`;
-    // Refresh the row state in DesinModule.datos
-    const ot=DesinModule.datos?.find(x=>x.id===otId||x.ot===otNum);
-    if(ot){ot.observaciones=det;if(nEst)ot.estado=nEst;}
-  } catch(e) {
-    mostrarModalTrackingCA(trackNum, null, 'error', e.message);
+    const estadoNuevo = mapEstDS(ultimo.historia, ultimo.estadoCA);
+    const det = ultimo.estadoCA ? `${ultimo.historia} — ${ultimo.estadoCA}` : ultimo.historia;
+    const upd = { observaciones: det, updated_at: new Date().toISOString() };
+    if(estadoNuevo) upd.estado = estadoNuevo;
+    // NO se dispara Ally, NO se envían mensajes, NO se toca cron
+    await sb.from('ordenes_trabajo').update(upd).eq('id', otId);
+
+    // Refrescar fila en memoria
+    const ot = DesinModule.datos?.find(x => x.id === otId || x.ot === otNum);
+    if(ot){ ot.observaciones = det; if(estadoNuevo) ot.estado = estadoNuevo; }
+
+  } catch(err){
+    clearTimeout(timer);
+    console.error('[Desins CA] error:', err);
+    mostrarModalTrackingCA(trackNum, null, 'error', err.message);
   } finally {
-    if(btn){ btn.textContent='🔍'; btn.disabled=false; }
-    if(DesinModule.filtrados||DesinModule.datos)
-      dsRenderTabla(DesinModule.filtrados||DesinModule.datos||[]);
+    clearTimeout(timer);
+    if(btn){ btn.textContent = '🔍'; btn.disabled = false; }
+    dsRenderTabla(DesinModule.filtrados || DesinModule.datos || []);
   }
 }
+
 
 // ── Desinstalaciones: filtro por zona AMBA ────────────────────────────
 let _dsZonaFiltro='';
@@ -1680,7 +1714,7 @@ function dsRutaCSV(){
   a.click();
 }
 
-console.log('[Alleata v2.3.84] OK');
+console.log('[Alleata v2.3.85] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
