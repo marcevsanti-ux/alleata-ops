@@ -1032,7 +1032,7 @@ tr:hover td{background:var(--surface2);}
         </label>
         <div style="display:flex;align-items:center;gap:6px;padding:6px 12px;background:var(--navy-600);border-radius:7px;flex:1;min-width:200px;">
           <span style="font-size:11px;color:var(--text-muted);white-space:nowrap;">📊 Reporte SF:</span>
-          <a href="https://alleata.lightning.force.com/lightning/r/Report/00ORm00000CPncvMAD/view?queryScope=userFolders"
+          <a id="btn-ver-reporte" href="https://alleata.lightning.force.com/lightning/r/Report/00ORm00000CRTa5MAH/view"
              target="_blank" style="font-size:11px;color:var(--blue);text-decoration:none;font-weight:500;white-space:nowrap;"
              onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">
             Desinstalaciones Pendientes ↗
@@ -6193,7 +6193,7 @@ async function importDesinstalaciones(e){
     const ws   = wb.Sheets[wb.SheetNames[0]];
     const rows = utils.sheet_to_json(ws, {header:1, defval:null, raw:true});
 
-    // 1. Buscar fila de encabezados — match exacto primero, luego parcial
+    // 1. Buscar fila de encabezados
     let hIdx = -1;
     for(let i = 0; i < rows.length; i++){
       if(rows[i]?.some(c => String(c||'').trim() === 'Id. de orden de trabajo')){ hIdx = i; break; }
@@ -6207,50 +6207,64 @@ async function importDesinstalaciones(e){
 
     console.log('Filas Excel totales:', rows.length);
     console.log('Header index:', hIdx);
-    console.log('Encabezados detectados:', rows[hIdx]);
-
     const hdrs = rows[hIdx].map(h => String(h||'').trim());
+    console.log('Encabezados detectados:', hdrs);
 
-    // Busqueda exacta primero, luego parcial (para nombres de columna con acentos)
-    const col = name => {
-      const nl = name.toLowerCase();
-      const exact = hdrs.findIndex(h => h.toLowerCase() === nl);
-      if(exact >= 0) return exact;
-      return hdrs.findIndex(h => h.toLowerCase().includes(nl));
-    };
+    // 2. Normalizador: quita tildes, minusculas, trim
+    const norm = v => String(v||'')
+      .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+      .toLowerCase().trim();
 
-    // 2. Mapear columnas
-    const iSFId     = col('id. de orden de trabajo');
-    const iOT       = col('numero de orden de trabajo') >= 0
-                      ? col('numero de orden de trabajo') : col('numero de orden');
-    const iResp     = col('responsable');
-    const iCuenta   = col('cuenta: nombre') >= 0 ? col('cuenta: nombre') : col('cuenta');
-    const iComercio = col('nombre del comercio') >= 0 ? col('nombre del comercio') : col('nombre comercio');
-    const iFecha    = col('fecha de creacion') >= 0 ? col('fecha de creacion')
-                      : col('fecha creacion') >= 0 ? col('fecha creacion')
-                      : col('fecha') >= 0 ? col('fecha') : -1;
-    const iObs      = col('observaciones');
-    const iEstadoSF = col('estado');
-    const iLogistica= col('logistica') >= 0 ? col('logistica') : col('log');
-    const iTrack    = col('n de seguimiento') >= 0 ? col('n de seguimiento')
-                      : col('seguimiento') >= 0 ? col('seguimiento') : -1;
-    const iTerminal = col('n terminal') >= 0 ? col('n terminal') : col('terminal');
-    const iContacto = col('contacto');
-    const iHorario  = col('horario');
-    // Direccion con fallback C3
-    const iCalle    = col('calle') >= 0 ? col('calle') : col('direccion de envio (calle)');
-    const iCiudad   = col('ciudad') >= 0 ? col('ciudad') : col('direccion de envio (ciudad)');
-    const iProv     = col('estado/provincia') >= 0 ? col('estado/provincia')
-                      : col('provincia') >= 0 ? col('provincia')
-                      : col('direccion de envio (estado');
-    const iCP       = col('codigo postal') >= 0 ? col('codigo postal')
-                      : col('direccion de envio (codigo postal');
-    const iDirLibre = col('direccion');
+    const hdrsNorm = hdrs.map(norm);
 
-    console.log('Indices de columnas:', {iSFId,iOT,iResp,iCuenta,iComercio,iFecha,
+    // 3. colAny: exacto primero, luego parcial — todo normalizado
+    function colAny(...names){
+      const targets = names.map(norm);
+      for(const t of targets){
+        const i = hdrsNorm.findIndex(h => h === t);
+        if(i >= 0) return i;
+      }
+      for(const t of targets){
+        const i = hdrsNorm.findIndex(h => h.includes(t));
+        if(i >= 0) return i;
+      }
+      return -1;
+    }
+
+    // 4. Mapeo de columnas
+    const iSFId     = colAny('Id. de orden de trabajo','Id de orden de trabajo','ID Orden de Trabajo','sf_id');
+    const iOT       = colAny('Numero de orden de trabajo','Numero de orden','Numero OT','OT','numero ot');
+    const iResp     = colAny('Responsable','responsable de la ot','responsable ot');
+    const iCuenta   = colAny('Cuenta: Nombre','Cuenta','cuenta sf');
+    const iComercio = colAny('Nombre del comercio','Nombre comercio','Comercio');
+    const iFecha    = colAny('Fecha de creacion','Fecha creacion','Fecha');
+    const iObs      = colAny('Observaciones','Observacion','Notas');
+    const iEstadoSF = colAny('Estado');
+    const iLogistica= colAny('Logistica','Logistico');
+    const iTrack    = colAny('N de seguimiento','Nro seguimiento','Seguimiento','tracking');
+    const iTerminal = colAny('N terminal','Nro terminal','Terminal','Serie terminal');
+    const iContacto = colAny('Contacto','Nombre contacto');
+    const iHorario  = colAny('Horario','Horario atencion');
+    const iCalle    = colAny('Calle','Direccion de envio calle','Direccion calle');
+    const iCiudad   = colAny('Ciudad','Direccion de envio ciudad');
+    const iProv     = colAny('Estado/Provincia','Provincia','Estado provincia','Direccion de envio estado');
+    const iCP       = colAny('Codigo postal','CP','Direccion de envio codigo postal');
+    const iDirLibre = colAny('Direccion','Domicilio');
+
+    // 5. Log obligatorio de columnas clave
+    console.log('IDX SFID:', iSFId, '→', iSFId >= 0 ? hdrs[iSFId] : '(NO ENCONTRADO)');
+    console.log('IDX OT:',   iOT,   '→', iOT   >= 0 ? hdrs[iOT]   : '(NO ENCONTRADO)');
+    console.log('Todos los indices:', {iSFId,iOT,iResp,iCuenta,iComercio,iFecha,
       iCalle,iCiudad,iProv,iCP,iDirLibre,iEstadoSF,iLogistica,iTrack,iObs});
 
-    // 3. Helpers
+    // 6. Abortar si no se encontraron columnas clave
+    if(iSFId < 0 || iOT < 0){
+      const faltantes = [iSFId<0?'"Id. de orden de trabajo"':null, iOT<0?'"Numero de orden de trabajo"':null]
+        .filter(Boolean).join(' / ');
+      throw new Error(`No se detectaron columnas clave: ${faltantes}.\nEncabezados disponibles: ${hdrs.filter(Boolean).join(', ')}`);
+    }
+
+    // 7. Helpers
     const sv  = (r,i) => (i >= 0 && r[i] != null) ? String(r[i]).trim() : '';
     const svN = (r,i) => { const v = sv(r,i); return v || null; };
     const SKIP = new Set(['subtotal','total','conteo','grand total','count']);
@@ -6265,76 +6279,72 @@ async function importDesinstalaciones(e){
       return v;
     };
 
-    const EMAP = {'pendiente':'Pendiente','pendiente de completar':'Pendiente',
+    const EMAP = {
+      'pendiente':'Pendiente','pendiente de completar':'Pendiente',
       'despachado':'Despachado','en proceso':'En Proceso',
       'retirar terminal':'Retirar Terminal','terminal recuperada':'Terminal recuperada',
       'extraviada':'Extraviada','fallido':'Fallido',
-      'retiro pactado':'Retiro pactado','pendiente retiro':'Pendiente retiro'};
+      'retiro pactado':'Retiro pactado','pendiente retiro':'Pendiente retiro'
+    };
     const mapEst = v => {
-      if(!v) return null; const vl = v.trim().toLowerCase();
-      for(const [k,m] of Object.entries(EMAP)) if(vl.includes(k)) return m;
+      if(!v) return null; const vl = norm(v);
+      for(const [k,m] of Object.entries(EMAP)) if(vl.includes(norm(k))) return m;
       return v.trim() || null;
     };
 
     const {data:profs} = await sb.from('profiles').select('id,nombre');
     const resolveUser = n => {
       if(!n) return n;
-      const nl = n.toLowerCase();
-      const p  = profs?.find(p => p.nombre && nl.includes(p.nombre.toLowerCase().split(' ')[0]));
+      const nl = norm(n);
+      const p  = profs?.find(p => p.nombre && nl.includes(norm(p.nombre.split(' ')[0])));
       return p?.nombre || n;
     };
 
-    // 4. Construir filas validas
-    // Propagar Logistica y Estado SF (celdas combinadas verticalmente en el reporte SF)
+    // 8. Construir filas validas
     let curLog = 'SF', curEst = 'Pendiente';
     const enriched = [];
     let omitidas = 0;
 
     for(let ri = hIdx + 1; ri < rows.length; ri++){
       const r = rows[ri];
-      if(!r || !r.some(c => c !== null)) continue; // fila vacia
+      if(!r || !r.some(c => c !== null)) continue;
 
-      // Propagar logistica si celda tiene valor
       if(iLogistica >= 0 && r[iLogistica]){
         const v = String(r[iLogistica]).trim();
-        if(v && !SKIP.has(v.toLowerCase())) curLog = v;
+        if(v && !SKIP.has(norm(v))) curLog = v;
       }
-      // Propagar estado SF si celda tiene valor
       if(iEstadoSF >= 0 && r[iEstadoSF]){
         const v = String(r[iEstadoSF]).trim();
-        if(v && !SKIP.has(v.toLowerCase())){ const m = mapEst(v); if(m) curEst = m; }
+        if(v && !SKIP.has(norm(v))){ const m = mapEst(v); if(m) curEst = m; }
       }
 
       const sfId = sv(r, iSFId);
       const ot   = sv(r, iOT);
 
-      // Regla 6: descartar si sf_id o ot vacios o son filas de subtotal
       if(!sfId){ omitidas++; continue; }
       if(!ot)  { omitidas++; continue; }
-      if(SKIP.has(ot.toLowerCase())){ omitidas++; continue; }
+      if(SKIP.has(norm(ot))){ omitidas++; continue; }
 
       enriched.push({r, sfId, ot, estado:curEst, logistica:curLog});
     }
 
     console.log('Filas validas para importar:', enriched.length);
     console.log('Filas omitidas (sf_id/ot vacios o subtotales):', omitidas);
-    // Muestra 3 filas de muestra
     enriched.slice(0,3).forEach(({r,sfId,ot,estado,logistica},i)=>
-      console.log('Muestra['+i+']:', {sfId,ot,estado,logistica,
+      console.log('Muestra['+i+']:', {sfId, ot, estado, logistica,
         cuenta:svN(r,iCuenta), ciudad:svN(r,iCiudad), resp:svN(r,iResp)}));
 
     if(!enriched.length)
-      throw new Error(`No se encontraron filas validas en las ${rows.length - hIdx - 1} filas leidas desde encabezados.`);
+      throw new Error(`No se encontraron filas validas. Filas omitidas: ${omitidas}. Verificar que sf_id y ot no esten vacios.`);
 
     ptext.textContent = `Procesando ${enriched.length} OTs...`;
     fill.style.width = '50%';
 
-    // 5. Upsert
+    // 9. Upsert
     let imp = 0, err = 0;
     const errLog = [];
 
     for(const {r, sfId, ot, estado, logistica} of enriched){
-      // C3: fallback de direccion
       const calle  = sv(r, iCalle);
       const ciudad = sv(r, iCiudad);
       const prov   = sv(r, iProv);
@@ -6364,7 +6374,6 @@ async function importDesinstalaciones(e){
         observaciones:    svN(r, iObs),
         updated_at:       new Date().toISOString()
       };
-      // Limpiar nulls para no pisar datos existentes con null
       Object.keys(item).forEach(k => { if(item[k] === null || item[k] === undefined) delete item[k]; });
 
       const {error} = await sb.from('ordenes_trabajo')
@@ -6378,15 +6387,15 @@ async function importDesinstalaciones(e){
       }
     }
 
-    // 6. Resultado final
+    // 10. Resultado
     fill.style.width = '100%'; ptext.textContent = 'Listo';
     if(errLog.length) console.error('[Import Desins] Errores:', errLog);
     result.innerHTML = `
       <div class="alert ${err===0?'alert-ok':'alert-err'}" style="margin-top:10px">
         <strong>${imp}</strong> importadas &nbsp;&middot;&nbsp;
-        <strong>${omitidas}</strong> omitidas (sin id) &nbsp;&middot;&nbsp;
+        <strong>${omitidas}</strong> omitidas &nbsp;&middot;&nbsp;
         <strong>${err}</strong> errores
-        ${err>0?`<details style="margin-top:6px"><summary style="cursor:pointer;font-size:11px">Ver errores</summary><pre style="font-size:10px;margin-top:4px">${errLog.slice(0,10).map(e=>e.ot+': '+e.msg).join('\n')}</pre></details>`:''}
+        ${err>0?`<details style="margin-top:6px"><summary style="cursor:pointer;font-size:11px">Ver errores</summary><pre style="font-size:10px;margin-top:4px">${errLog.slice(0,10).map(x=>x.ot+': '+x.msg).join('\n')}</pre></details>`:''}
       </div>`;
     auditLog({tabla:'ordenes_trabajo',registro_id:'BATCH',
       accion:'IMPORTACION_DESINSTALACIONES',campo:'lote',
