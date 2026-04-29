@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v2.3.94</title>
+<title>Alleata · Operaciones v2.3.95</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -300,7 +300,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.3.94 · 28 abr 2026
+      v2.3.95 · 28 abr 2026
     </div>
   </div>
 </div>
@@ -360,7 +360,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.3.94 · 28 abr 2026
+      v2.3.95 · 28 abr 2026
     </div>
   </div>
 </nav>
@@ -374,7 +374,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <div class="topbar-right" id="topbar-date"></div>
     <button onclick="refreshCurrentModule()" title="Actualizar" style="background:none;border:1px solid var(--border2);color:var(--text-muted);border-radius:7px;padding:4px 10px;cursor:pointer;font-size:13px;margin-left:10px;transition:all .2s" onmouseover="this.style.color='var(--teal)';this.style.borderColor='var(--teal)'" onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border2)'">↺</button>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.3.94</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.3.95</div>
   </div>
   <div class="content">
 
@@ -1809,7 +1809,7 @@ function dsRutaCSV(){
   a.click();
 }
 
-console.log('[Alleata v2.3.94] OK');
+console.log('[Alleata v2.3.95] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -2118,7 +2118,15 @@ function rlRenderTabla(){
   let list=_rlData.filter(e=>{
     if(_rlEstadoFiltro&&e.estado!==_rlEstadoFiltro)return false;
     if(resp&&e.responsable!==resp)return false;
-    if(buscar){const hay=[e.ot_numero,e.cuenta,e.ciudad,e.provincia,e.track].join(' ').toLowerCase();if(!hay.includes(buscar))return false;}
+    if(buscar){
+// normalizeOT: strip leading zeros for OT search comparison
+// normalizeOT('00017842') === '17842'  |  normalizeOT('17842') === '17842'
+function normalizeOT(v){ return String(v||'').replace(/^0+/,'') || '0'; }
+
+      const _bNorm=normalizeOT(buscar);
+      const hay=[e.ot_numero,e.cuenta,e.ciudad,e.provincia,e.track].join(' ').toLowerCase();
+      if(!normalizeOT(e.ot_numero).includes(_bNorm)&&!hay.includes(buscar))return false;
+    }
     return true;
   });
   if(!list.length){tbody.innerHTML='<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--text-muted)">Sin resultados</td></tr>';return;}
@@ -2934,8 +2942,12 @@ async function renderEnvios(){
   // Filtro búsqueda local (OT, tracking, cuenta, responsable)
   const buscar=(document.getElementById('envBuscar')?.value||'').trim().toLowerCase();
   if(buscar){
-    list=list.filter(e=>[e.ot_numero,e.track,e.cuenta,e.responsable,e.track_devolucion]
-      .join(' ').toLowerCase().includes(buscar));
+    const _bNorm=normalizeOT(buscar);
+    list=list.filter(e=>{
+      if(normalizeOT(e.ot_numero).includes(_bNorm))return true;
+      return [e.ot_numero,e.track,e.cuenta,e.responsable,e.track_devolucion]
+        .join(' ').toLowerCase().includes(buscar);
+    });
   }
   const empty=document.getElementById('enviosEmpty');
   empty.style.display=list.length?'none':'block';
@@ -6429,7 +6441,13 @@ function filtrarDesins(){
     if(zona&&dsGetZona(ot)!==zona)return false;
     if(sla&&ot.sla_estado!==sla)return false;
     if(_dsLogFiltro&&dsClasificarLogistica(ot.logistica)!==_dsLogFiltro)return false;
-    if(buscar&&![ot.ot,ot.comercio,ot.ciudad,ot.cuenta,ot.logistica,ot.nro_seguimiento].some(v=>v&&v.toLowerCase().includes(buscar)))return false;
+    // Búsqueda con normalización de ceros (17842 encuentra 00017842)
+    const _buscarNorm=normalizeOT(buscar);
+    if(buscar&&!(
+      normalizeOT(ot.ot).includes(_buscarNorm)||
+      [ot.ot,ot.comercio,ot.ciudad,ot.cuenta,ot.logistica,ot.nro_seguimiento]
+        .some(v=>v&&v.toLowerCase().includes(buscar))
+    ))return false;
     return true;
   });
   const todosLosDatos=DesinModule.datos; // contadores siempre sobre el total, no el filtro
@@ -7037,7 +7055,7 @@ async function autoTrackingDesinstalaciones(){
 
 
 async function dsAutoTracking(){
-  // AUTO-TRACKING DESINSTALACIONES v2.3.94
+  // AUTO-TRACKING DESINSTALACIONES v2.3.95
   // NO Envíos, NO Ally, NO wasender, NO Railway, NO processAllyRules
   console.log('[DS AT START] dsAutoTracking iniciado', new Date().toISOString());
   abrirModalAutoTracking();
