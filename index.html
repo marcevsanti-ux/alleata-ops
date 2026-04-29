@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v2.3.99</title>
+<title>Alleata · Operaciones v2.4.0</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -300,7 +300,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.3.99 · 28 abr 2026
+      v2.4.0 · 28 abr 2026
     </div>
   </div>
 </div>
@@ -360,7 +360,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.3.99 · 28 abr 2026
+      v2.4.0 · 28 abr 2026
     </div>
   </div>
 </nav>
@@ -374,7 +374,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <div class="topbar-right" id="topbar-date"></div>
     <button onclick="refreshCurrentModule()" title="Actualizar" style="background:none;border:1px solid var(--border2);color:var(--text-muted);border-radius:7px;padding:4px 10px;cursor:pointer;font-size:13px;margin-left:10px;transition:all .2s" onmouseover="this.style.color='var(--teal)';this.style.borderColor='var(--teal)'" onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border2)'">↺</button>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.3.99</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.4.0</div>
   </div>
   <div class="content">
 
@@ -1826,7 +1826,7 @@ function dsRutaCSV(){
   a.click();
 }
 
-console.log('[Alleata v2.3.99] OK');
+console.log('[Alleata v2.4.0] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -6669,7 +6669,7 @@ document.getElementById('ds-modal-overlay').addEventListener('click',function(e)
 function dsSelEst(btn,estado){document.querySelectorAll('.ds-est-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');DesinModule.nuevoEstado=estado;}
 
 // ── GEO PANEL ──
-const DS_GEO={zonaActiva:''};
+const DS_GEO={zonaActiva:'',provActiva:''};
 const ESTADOS_CERRADOS_GEO=['Terminal recuperada','Extraviada'];
 
 function dsRenderGeo(datos){
@@ -6741,7 +6741,8 @@ function dsRenderGeo(datos){
     const maxN=sorted[0]?.[1].total||1;
     provEl.innerHTML=sorted.map(([p,d])=>{
       const isAmba=d.zona==='AMBA';
-      return`<div onclick="dsGeoFiltrarProv('${p.replace(/'/g,"\'")}')" style="cursor:pointer;padding:6px 8px;border-radius:7px;border-left:3px solid ${isAmba?'var(--blue)':'var(--teal)'};transition:background .15s" onmouseover="this.style.background='var(--navy-700)'" onmouseout="this.style.background='transparent'">
+      const isSelected=DS_GEO.provActiva===p;
+      return`<div onclick="dsGeoFiltrarProv('${p.replace(/'/g,"\'")}')" style="cursor:pointer;padding:6px 8px;border-radius:7px;border-left:3px solid ${isAmba?'var(--blue)':'var(--teal)'};background:${isSelected?'var(--navy-700)':'transparent'};outline:${isSelected?'1px solid var(--teal)':'none'};transition:background .15s" onmouseover="this.style.background='var(--navy-700)'" onmouseout="this.style.background='${isSelected?"var(--navy-700)":'transparent'}'">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
           <span style="font-size:12px;font-weight:700;color:var(--text)">${p}</span>
           <span style="font-size:13px;font-weight:800;color:${isAmba?'var(--blue)':'var(--teal)'}">${d.total}</span>
@@ -6759,9 +6760,15 @@ function dsRenderGeo(datos){
     }).join('');
   }
 
-  // Localidades
+  // Localidades — filter by selected province if any
+  const ciudadSource = DS_GEO.provActiva
+    ? enriched.filter(d=>d._prov===DS_GEO.provActiva)
+    : filtrados;
+  // Dynamic title
+  const lbl2=document.getElementById('ds-geo-zona-label2');
+  if(lbl2) lbl2.textContent=DS_GEO.provActiva?`— ${DS_GEO.provActiva}`:'';
   const byCiudad={};
-  filtrados.forEach(d=>{
+  ciudadSource.forEach(d=>{
     const c=(d.ciudad||'Sin ciudad').trim();
     if(!byCiudad[c])byCiudad[c]={total:0,pend:0,proc:0,cerrada:0,cp:d.cp||'',zona:d._zona,prov:d._prov};
     byCiudad[c].total++;
@@ -6799,16 +6806,19 @@ function dsGeoFiltrarZona(zona){
   dsRenderGeo(DesinModule.datos);
 }
 function dsGeoFiltrarProv(prov){
-  const b=document.getElementById('ds-buscar');if(b){b.value=prov;filtrarDesins();}
+  // Toggle: click again on same province → deselect
+  DS_GEO.provActiva = DS_GEO.provActiva === prov ? '' : prov;
+  dsRenderGeo(DesinModule.filtrados||DesinModule.datos||[]);
 }
 function dsGeoBuscarCiudad(ciudad){
   const b=document.getElementById('ds-buscar');if(b){b.value=ciudad;filtrarDesins();}
 }
 function dsGeoReset(){
   DS_GEO.zonaActiva='';
+  DS_GEO.provActiva='';
   const lbl=document.getElementById('ds-geo-zona-label');if(lbl)lbl.textContent='';
   const lbl2=document.getElementById('ds-geo-zona-label2');if(lbl2)lbl2.textContent='';
-  dsRenderGeo(DesinModule.datos);
+  dsRenderGeo(DesinModule.filtrados||DesinModule.datos||[]);
 }
 // ── END GEO PANEL ──
 
@@ -7121,7 +7131,7 @@ async function autoTrackingDesinstalaciones(){
 
 
 async function dsAutoTracking(){
-  // AUTO-TRACKING DESINSTALACIONES v2.3.99
+  // AUTO-TRACKING DESINSTALACIONES v2.4.0
   // NO Envíos, NO Ally, NO wasender, NO Railway, NO processAllyRules
   console.log('[DS AT START] dsAutoTracking iniciado', new Date().toISOString());
   abrirModalAutoTracking();
