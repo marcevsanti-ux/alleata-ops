@@ -141,6 +141,14 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
 .priority-num{width:28px;height:28px;border-radius:50%;background:var(--grad);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:#fff;flex-shrink:0;font-family:'JetBrains Mono',monospace;}
 .btn-order{background:var(--surface2);border:1px solid var(--border2);color:var(--text-muted);width:28px;height:28px;border-radius:8px;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
 .btn-order:active{background:var(--navy-600);}
+
+  /* ── Desinstalaciones (rojo) — v2.8.0 ── */
+  .ot-card.desinstalacion{border-left:4px solid #ef4444;background:rgba(239,68,68,.04);}
+  .ot-card.desinstalacion .ot-num{color:#ef4444;}
+  .badge-desinstal{display:inline-block;background:rgba(239,68,68,.15);color:#ef4444;font-size:9px;font-weight:700;padding:1px 7px;border-radius:10px;margin-left:5px;letter-spacing:.04em;}
+  .btn-retirado{background:rgba(239,68,68,.15);color:#ef4444;border:1px solid rgba(239,68,68,.3);}
+  .btn-no-retiro{background:rgba(245,158,11,.15);color:#f59e0b;border:1px solid rgba(245,158,11,.3);}
+  .desinst-badge{display:inline-block;background:#ef4444;color:#fff;border-radius:8px;font-size:9px;font-weight:700;padding:0 5px;margin-left:3px;vertical-align:middle;}
 </style>
 </head>
 <body>
@@ -152,7 +160,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
       <div class="login-logo">
         <img id="loginLogo" src="" alt="Alleata">
         <div class="login-sub">Portal de Operaciones</div>
-        <div class="login-version">v2.7.6 · mobile</div>
+        <div class="login-version">v2.8.0 · mobile</div>
       </div>
       <div class="field"><label class="label">Email</label><input class="input" id="lEmail" type="email" placeholder="usuario@alleata.com" autocomplete="email"></div>
       <div class="field"><label class="label">Contraseña</label><input class="input" id="lPass" type="password" placeholder="••••••••" autocomplete="current-password"></div>
@@ -168,7 +176,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
   <div class="topbar">
     <img id="appLogo" src="" alt="Alleata">
     <div class="topbar-title" id="topbarTitle">Operaciones</div>
-    <div class="topbar-version">v2.7.6</div>
+    <div class="topbar-version">v2.8.0</div>
     <div class="topbar-avatar" id="topbarAvatar" onclick="openDrawer()">?</div>
   </div>
 
@@ -185,6 +193,9 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
     </div>
     <div class="tab" id="tab-historial" onclick="switchTab('historial')">
       <span class="tab-icon">🕐</span>HISTORIAL
+    </div>
+    <div class="tab" id="tab-desinst" onclick="switchTab('desinst')" style="display:none">
+      <span class="tab-icon">🔴</span>DESINST<span class="desinst-badge" id="desinstBadge" style="display:none">0</span>
     </div>
   </div>
 
@@ -471,11 +482,13 @@ function switchTab(tab){
   document.getElementById('content-'+tab).classList.add('active');
   if(tab==='ruta'){
     loadRuta();
+  dsm_checkRutaHoy();
   } else {
     stopRutaScanner();
   }
   if(tab!=='sims'){detenerSimCamera();}
   if(tab==='historial')renderHistorial();
+  if(tab==='desinst')loadDesinstalaciones();
 }
 
 // ── DRAWER ──
@@ -1570,6 +1583,101 @@ async function procesarImagenQR(e){
 }
 
 // ── FIN ──
+
+// ── DESINSTALACIONES MOBILE — v2.8.0 incremental ─────────────────────────
+async function loadDesinstalaciones(){
+  const el=document.getElementById('desinstList');
+  if(!el)return;
+  el.innerHTML='<div class="empty"><div class="empty-icon">⏳</div><p>Cargando...</p></div>';
+  const fecha=new Date().toISOString().slice(0,10);
+  const{data:ots,error}=await sb.from('ordenes_trabajo')
+    .select('id,ot,comercio,cuenta,contacto,horario,calle,ciudad,provincia,estado,observaciones,observacion_estado,hoja_ruta_orden')
+    .eq('tipo','desinstalacion').eq('hoja_ruta_activa',true).eq('hoja_ruta_fecha',fecha)
+    .order('hoja_ruta_orden',{ascending:true});
+  if(error){el.innerHTML=`<div class="empty"><p>Error: ${error.message}</p></div>`;return;}
+  const list=ots||[];
+  const badge=document.getElementById('desinstBadge');
+  const tab=document.getElementById('tab-desinst');
+  if(badge){badge.textContent=list.length;badge.style.display=list.length?'inline-block':'none';}
+  if(tab)tab.style.display=list.length?'flex':'none';
+  const sub=document.getElementById('desinstSubtitle');
+  if(sub)sub.textContent=list.length?`${list.length} OT${list.length!==1?'s':''} en ruta hoy`:'Sin OTs asignadas para hoy';
+  if(!list.length){el.innerHTML='<div class="empty"><div class="empty-icon">✅</div><p>Sin desinstalaciones en ruta hoy</p></div>';return;}
+  el.innerHTML=list.map(ot=>{
+    const zona=getZona(ot.ciudad,ot.provincia);
+    const distKm=getDistKm(ot.ciudad);
+    const maps='https://www.google.com/maps/search/?api=1&query='+encodeURIComponent((ot.calle||'')+' '+(ot.ciudad||'')+' Argentina');
+    const obs=ot.observacion_estado||ot.observaciones||'';
+    return`<div class="ot-card desinstalacion" style="margin-bottom:10px">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px">
+        <div>
+          <div class="ot-num">${ot.ot||'—'}<span class="badge-desinstal">DESINSTALACIÓN</span></div>
+          <div class="ot-tipo" style="color:#ef4444">${ot.estado||''}</div>
+        </div>
+        <span class="zona-badge" style="color:${zona.color};background:${zona.color}20;border:1px solid ${zona.color}40">${zona.zona}${distKm?` · ~${distKm}km`:''}</span>
+      </div>
+      <div class="ot-comercio">${ot.comercio||ot.cuenta||'—'}</div>
+      <div class="ot-cuenta">${ot.cuenta||''}</div>
+      <div style="display:flex;flex-direction:column;gap:4px;margin:8px 0">
+        ${ot.calle?`<div class="ot-row"><span>📍</span>${ot.calle}, ${ot.ciudad||''}</div>`:''}
+        ${ot.horario?`<div class="ot-row"><span>🕐</span>${ot.horario}</div>`:''}
+        ${ot.contacto?`<div class="ot-row"><span>📞</span><a href="tel:${ot.contacto}" style="color:var(--blue);text-decoration:none">${ot.contacto}</a> <a href="https://wa.me/${ot.contacto.replace(/[^0-9]/g,'')}?text=Hola%2C+OT+${ot.ot}+Alleata%3A+%C2%BFcoordinamos+retiro%3F" target="_blank" style="margin-left:6px">💬</a></div>`:''}
+        ${obs?`<div class="ot-row" style="color:var(--text-muted)"><span>📝</span>${obs}</div>`:''}
+      </div>
+      <div class="ot-actions">
+        <button class="btn-sm btn-retirado" style="flex:1" onclick="dsm_marcarRetirado('${ot.id}','${ot.ot}')">✅ Terminal retirada</button>
+        <button class="btn-sm btn-no-retiro" style="flex:1" onclick="dsm_marcarNoRetiro('${ot.id}','${ot.ot}')">⛔ No contactado</button>
+        <a href="${maps}" target="_blank" class="btn-sm btn-maps">🗺️</a>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function dsm_marcarRetirado(otId,otNum){
+  if(!confirm(`¿Marcar OT ${otNum} como Terminal retirada?`))return;
+  const{error}=await sb.from('ordenes_trabajo').update({
+    estado:'Terminal recuperada',hoja_ruta_activa:false,updated_at:new Date().toISOString()
+  }).eq('id',otId);
+  if(error){alert('Error: '+error.message);return;}
+  showScanFeedback('✅ OT '+otNum+' — Terminal retirada','ok');
+  await loadDesinstalaciones();
+}
+
+async function dsm_marcarNoRetiro(otId,otNum){
+  if(!confirm(`¿Marcar OT ${otNum} como No contactado?`))return;
+  const{error}=await sb.from('ordenes_trabajo').update({
+    estado:'No contactado',updated_at:new Date().toISOString()
+  }).eq('id',otId);
+  if(error){alert('Error: '+error.message);return;}
+  showScanFeedback('OT '+otNum+' — No contactado','warn');
+  await loadDesinstalaciones();
+}
+
+async function dsm_checkRutaHoy(){
+  try{
+    const fecha=new Date().toISOString().slice(0,10);
+    const{count}=await sb.from('ordenes_trabajo')
+      .select('id',{count:'exact',head:true})
+      .eq('tipo','desinstalacion').eq('hoja_ruta_activa',true).eq('hoja_ruta_fecha',fecha);
+    if(count>0){
+      const tab=document.getElementById('tab-desinst');
+      const badge=document.getElementById('desinstBadge');
+      if(tab)tab.style.display='flex';
+      if(badge){badge.textContent=count;badge.style.display='inline-block';}
+    }
+  }catch(_){}
+}
 </script>
+  <!-- TAB: DESINSTALACIONES — v2.8.0 incremental -->
+  <div class="tab-content" id="content-desinst">
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-title" style="color:#ef4444">🔴 Hoja de Ruta — Desinstalaciones</div>
+      <div id="desinstSubtitle" style="font-size:11px;color:var(--text-muted);margin-top:2px">OTs asignadas para hoy</div>
+    </div>
+    <div id="desinstList">
+      <div class="empty"><div class="empty-icon">📭</div><p>Sin desinstalaciones en ruta hoy</p></div>
+    </div>
+  </div>
+
 </body>
 </html>
