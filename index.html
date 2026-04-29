@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v2.4.5</title>
+<title>Alleata · Operaciones v2.4.8</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -300,7 +300,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.4.5 · 28 abr 2026
+      v2.4.8 · 28 abr 2026
     </div>
   </div>
 </div>
@@ -360,7 +360,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.4.5 · 28 abr 2026
+      v2.4.8 · 28 abr 2026
     </div>
   </div>
 </nav>
@@ -374,7 +374,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <div class="topbar-right" id="topbar-date"></div>
     <button onclick="refreshCurrentModule()" title="Actualizar" style="background:none;border:1px solid var(--border2);color:var(--text-muted);border-radius:7px;padding:4px 10px;cursor:pointer;font-size:13px;margin-left:10px;transition:all .2s" onmouseover="this.style.color='var(--teal)';this.style.borderColor='var(--teal)'" onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border2)'">↺</button>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.4.5</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.4.8</div>
   </div>
   <div class="content">
 
@@ -979,6 +979,11 @@ tr:hover td{background:var(--surface2);}
       <div class="stat-label">EXTRAVIADAS</div>
       <button class="btn btn-sm" style="margin-top:4px;font-size:10px;padding:2px 8px">📋 Listar</button>
     </div>
+    <div onclick="dsFiltrarPendientesGestion()" style="cursor:pointer">
+      <div class="stat-num" id="ds-num-gestion" style="color:#f59e0b">0</div>
+      <div class="stat-label">PEND. GESTIÓN</div>
+      <div style="font-size:9px;color:var(--text-muted);margin-top:2px">Sin gestión asignada</div>
+    </div>
   </div>
 
   <div class="card">
@@ -1082,7 +1087,8 @@ tr:hover td{background:var(--surface2);}
     <!-- Hoja de ruta — botón y modal -->
     <div id="dsRutaBar" style="display:none;margin-bottom:10px;padding:8px 12px;background:rgba(29,191,142,.08);border:1px solid rgba(29,191,142,.2);border-radius:8px;align-items:center;gap:12px;flex-wrap:wrap">
       <span id="dsRutaCount" style="font-size:13px;font-weight:600;color:var(--teal)">0 OTs seleccionadas</span>
-      <button class="btn btn-sm" onclick="dsCrearHojaRuta()" style="background:var(--teal);color:#fff;border:none;padding:5px 14px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600">📄 Exportar listado</button>
+      <button class="btn btn-sm" onclick="dsExportarListado()" style="background:var(--teal);color:#fff;border:none;padding:5px 14px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600">📄 Exportar selección</button>
+      <button class="btn btn-sm" onclick="dsGestion_GenerarRuta()" style="background:rgba(139,92,246,.15);border:1px solid rgba(139,92,246,.4);color:#8b5cf6;padding:5px 14px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600">🗺️ Generar hoja de ruta</button>
       <button class="btn-ghost btn-sm" onclick="dsDeselAll()" style="font-size:12px">Deseleccionar todo</button>
     </div>
 
@@ -1125,6 +1131,11 @@ tr:hover td{background:var(--surface2);}
           onmouseover="this.style.background='rgba(26,159,212,.25)'" onmouseout="this.style.background='rgba(26,159,212,.15)'">
           🔄 Auto-tracking
         </button>
+        <button onclick="exportarListadoDesinstalaciones()"
+          style="background:rgba(29,191,142,.15);border:1px solid rgba(29,191,142,.4);color:var(--teal);padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;white-space:nowrap;"
+          onmouseover="this.style.background='rgba(29,191,142,.25)'" onmouseout="this.style.background='rgba(29,191,142,.15)'">
+          📄 Exportar listado
+        </button>
       </div>
       <div id="dsImportMsg" style="font-size:11px;color:var(--text-muted);margin-top:8px"></div>
       <div id="dsImportProgress" style="display:none;margin-top:8px">
@@ -1153,6 +1164,7 @@ tr:hover td{background:var(--surface2);}
             <th onclick="dsOrdenar('distancia_km')" style="cursor:pointer">Distancia</th>
             <th onclick="dsOrdenar('logistica')" style="cursor:pointer">Logística</th>
             <th onclick="dsOrdenar('nro_seguimiento')" style="cursor:pointer">N° Seguimiento</th>
+            <th style="width:32px;text-align:center" title="Iniciar chat WhatsApp">💬</th>
             <th style="width:44px;text-align:center">CA</th>
             <th onclick="dsOrdenar('observacion_estado')" style="cursor:pointer">Observación</th>
             <th onclick="dsOrdenar('estado')" style="cursor:pointer">Estado</th>
@@ -1165,7 +1177,7 @@ tr:hover td{background:var(--surface2);}
           </tr>
         </thead>
         <tbody id="ds-tbody">
-          <tr><td colspan="15" style="text-align:center;padding:30px;color:var(--text-muted)">Cargando...</td></tr>
+          <tr><td colspan="16" style="text-align:center;padding:30px;color:var(--text-muted)">Cargando...</td></tr>
         </tbody>
       </table>
     </div>
@@ -1829,6 +1841,12 @@ function dsExportarListado(){
 }
 
 
+// exportarListadoDesinstalaciones — public alias for the header button
+// Works on the current filtered dataset (no checkbox selection required)
+function exportarListadoDesinstalaciones(){
+  dsExportarListado();
+}
+
 // Keep dsCrearHojaRuta as alias for ALLEATA route selection (checkbox flow)
 function dsCrearHojaRuta(){
   dsExportarListado();
@@ -1951,7 +1969,159 @@ function dsRutaCSV(){
   a.click();
 }
 
-console.log('[Alleata v2.4.5] OK');
+// ══════════════════════════════════════════════════════════════════════
+// DESINSTALACIONES — FUNCIONES NUEVAS v2.4.8
+// Prefijo: dsGestion_, dsRuta_, dsExport_
+// No modifican lógica existente de Envíos ni Rollout
+// ══════════════════════════════════════════════════════════════════════
+
+// ── KPI: Pendientes de gestión ────────────────────────────────────────────
+// Una OT requiere gestión si no tiene Gestión Retiros ni Status Gestión asignados
+function dsGestion_ActualizarKPI(datos){
+  const pendientes = (datos||[]).filter(ot=>{
+    const est = (ot.estado||'').toLowerCase();
+    // Solo contar OTs activas (no cerradas)
+    if(['terminal recuperada','entregado','extraviada','fallido'].some(e=>est.includes(e)))return false;
+    // Requiere gestión si no tiene gestión_retiros ni status_gestion
+    const sinGestion = !ot.gestion_retiros && !ot.status_gestion;
+    return sinGestion;
+  });
+  const el = document.getElementById('ds-num-gestion');
+  if(el) el.textContent = pendientes.length;
+}
+
+function dsFiltrarPendientesGestion(){
+  // Filter listado to show only OTs without gestión assigned
+  DesinModule.filtrados = (DesinModule.datos||[]).filter(ot=>{
+    const est=(ot.estado||'').toLowerCase();
+    if(['terminal recuperada','entregado','extraviada','fallido'].some(e=>est.includes(e)))return false;
+    return !ot.gestion_retiros && !ot.status_gestion;
+  });
+  dsActualizarZonaCards(DesinModule.filtrados);
+  dsActualizarLogResumen(DesinModule.filtrados);
+  dsActualizarListadoSub();
+  dsRenderTabla(DesinModule.filtrados);
+  // Show filter indicator
+  const sub = document.getElementById('ds-listado-sub');
+  const txt = document.getElementById('ds-listado-sub-txt');
+  if(sub && txt){
+    sub.style.display='flex';
+    txt.textContent=`OTs sin gestión asignada (${DesinModule.filtrados.length})`;
+  }
+}
+
+// ── Hoja de ruta desde selección manual ──────────────────────────────────
+async function dsGestion_GenerarRuta(){
+  const sel = [...document.querySelectorAll('.ds-chk-ot:checked')];
+  if(!sel.length){ alert('Seleccioná al menos una OT para generar la hoja de ruta.'); return; }
+  const otNums = sel.map(c=>c.dataset.ot);
+  const ots = (DesinModule.datos||[]).filter(ot=>otNums.includes(ot.ot));
+  if(!ots.length){ alert('No se encontraron las OTs seleccionadas.'); return; }
+  if(!confirm(`¿Generar hoja de ruta con ${ots.length} OT${ots.length!==1?'s':''}?`)) return;
+
+  const bar = document.getElementById('dsRutaBar');
+  if(bar) bar.innerHTML = '<span style="color:var(--teal);font-size:13px">⏳ Guardando hoja de ruta...</span>';
+
+  try {
+    // 1. Get current user
+    const { data:{ user } } = await sb.auth.getUser();
+    const creador = user?.email || user?.id || 'unknown';
+    const fecha = new Date().toISOString().slice(0,10);
+
+    // 2. Create hoja_ruta record
+    const { data:hojaRuta, error:hrErr } = await sb
+      .from('hoja_ruta_desinstalaciones')
+      .insert({ fecha, usuario_creador: creador, estado:'pendiente', total_ots: ots.length })
+      .select().single();
+    if(hrErr) throw hrErr;
+
+    // 3. Insert items
+    const items = ots.map((ot, i) => ({
+      hoja_ruta_id: hojaRuta.id, ot: ot.ot,
+      tipo_ot: 'desinstalacion', orden: i+1, estado:'pendiente'
+    }));
+    const { error:itemErr } = await sb.from('hoja_ruta_desinstalaciones_items').insert(items);
+    if(itemErr) throw itemErr;
+
+    // 4. Mark OTs in ordenes_trabajo as hoja_ruta_activa
+    const ids = ots.map(ot=>ot.id).filter(Boolean);
+    if(ids.length){
+      await sb.from('ordenes_trabajo').update({
+        hoja_ruta_activa: true,
+        hoja_ruta_fecha: fecha
+      }).in('id', ids);
+    }
+
+    // 5. Clear sessionStorage (was temp)
+    try{ sessionStorage.removeItem('ds_ruta_pendiente'); }catch(_){}
+
+    dsDeselAll();
+
+    if(bar){
+      bar.innerHTML = `<span style="color:var(--teal);font-weight:600;font-size:13px">✅ Hoja de ruta guardada en Supabase con ${ots.length} OT${ots.length!==1?'s':''}. Ángel puede verla en mobile. <button onclick="dsExportarListado()" style="background:none;border:none;color:var(--teal);cursor:pointer;text-decoration:underline;font-size:13px">Ver listado</button></span>`;
+      bar.style.display='flex';
+      setTimeout(()=>{ bar.style.display='none'; dsSelUpdate(); }, 6000);
+    }
+    // Refresh data so hoja_ruta_activa is reflected
+    DesinModule.cargado = false;
+    await cargarDesinstalaciones();
+    console.log('[dsGestion_GenerarRuta] Persistido en Supabase:', hojaRuta.id, ots.length, 'OTs');
+
+  } catch(e) {
+    console.error('[dsGestion_GenerarRuta] Error:', e.message);
+    if(bar) bar.innerHTML = `<span style="color:var(--red);font-size:13px">❌ Error al guardar: ${e.message}</span>`;
+    bar.style.display='flex';
+  }
+}
+
+// ── Mobile support preparation ────────────────────────────────────────────
+
+// dsGestion_LimpiarRuta — clear today's route (admin only)
+async function dsGestion_LimpiarRuta(){
+  if(!confirm('¿Limpiar hoja de ruta activa? Esto quitará el flag hoja_ruta_activa de todas las OTs de hoy.')) return;
+  const fecha = new Date().toISOString().slice(0,10);
+  await sb.from('ordenes_trabajo').update({ hoja_ruta_activa:false, hoja_ruta_fecha:null })
+    .eq('hoja_ruta_fecha', fecha).eq('tipo','desinstalacion');
+  DesinModule.cargado=false;
+  await cargarDesinstalaciones();
+  alert('✅ Hoja de ruta limpiada');
+}
+
+// dsRuta_GetPendiente: retrieve route stored for mobile
+function dsRuta_GetPendiente(){
+  try{
+    const raw = sessionStorage.getItem('ds_ruta_pendiente');
+    return raw ? JSON.parse(raw) : null;
+  }catch(_){ return null; }
+}
+
+// dsRuta_ClearPendiente
+function dsRuta_ClearPendiente(){
+  try{ sessionStorage.removeItem('ds_ruta_pendiente'); }catch(_){}
+}
+
+// ── Hook KPI into filtrarDesins ───────────────────────────────────────────
+(function patchFiltrarDesinsForKPI(){
+  const orig = window.filtrarDesins;
+  if(!orig || window._kpiPatched) return;
+  window._kpiPatched = true;
+  window.filtrarDesins = function(){
+    orig();
+    dsGestion_ActualizarKPI(DesinModule.filtrados||[]);
+  };
+})();
+
+// ── Hook KPI into cargarDesinstalaciones ─────────────────────────────────
+// Called after data loads — patch DesinModule.datos setter via after-load hook
+const _origCargar = window.cargarDesinstalaciones;
+if(_origCargar){
+  window.cargarDesinstalaciones = async function(){
+    await _origCargar.apply(this, arguments);
+    dsGestion_ActualizarKPI(DesinModule.datos||[]);
+  };
+}
+
+console.log('[Alleata v2.4.8] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -6513,7 +6683,7 @@ const DesinModule={datos:[],filtrados:[],cargado:false,ordenCol:'sla_estado',ord
 const DS_SLA_ORD={critico:0,alerta:1,verde:2,sin_asignar:3,cerrada:4};
 
 async function cargarDesinstalaciones(){
-  document.getElementById('ds-tbody').innerHTML='<tr><td colspan="15" style="text-align:center;padding:28px;color:var(--text-muted)">Cargando...</td></tr>';
+  document.getElementById('ds-tbody').innerHTML='<tr><td colspan="16" style="text-align:center;padding:28px;color:var(--text-muted)">Cargando...</td></tr>';
   try{
     const isAdmin=currentProfile?.rol==='admin';
     const nombreCompleto=currentProfile?.nombre||'';
@@ -6634,7 +6804,7 @@ function dsClasificarLogistica(log){
 
 function dsRenderTabla(datos){
   const tbody=document.getElementById('ds-tbody');
-  if(!datos.length){tbody.innerHTML='<tr><td colspan="15" style="text-align:center;padding:30px;color:var(--text-muted)">Sin resultados</td></tr>';return;}
+  if(!datos.length){tbody.innerHTML='<tr><td colspan="16" style="text-align:center;padding:30px;color:var(--text-muted)">Sin resultados</td></tr>';return;}
   const col=DesinModule.ordenCol,dir=DesinModule.ordenDir==='asc'?1:-1;
   const sorted=[...datos].sort((a,b)=>{
     let va=col==='sla_estado'?(DS_SLA_ORD[a[col]]??9):(a[col]??'');
@@ -6687,6 +6857,9 @@ function dsRenderTabla(datos){
       </td>
       <td><span class="badge" style="${ot.gestion_propia?'background:rgba(29,191,142,.12);color:var(--teal)':'background:var(--surface2);color:var(--text-muted)'}">${ot.logistica||'—'}</span></td>
       <td><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-muted)">${ot.nro_seguimiento||'—'}</span></td>
+      <td style="text-align:center">
+        ${ot.contacto?`<a href="https://wa.me/${ot.contacto.replace(/[^0-9]/g,'')}?text=Hola%2C+te+contactamos+de+Alleata+para+coordinar+el+retiro+de+terminal%2C+OT+${ot.ot}.+%C2%BFPodemos+coordinar+d%C3%ADa+y+horario%3F" target="_blank" style="text-decoration:none;font-size:14px" title="WhatsApp ${ot.contacto}">💬</a>`
+        :'<span style="color:var(--border)">💬</span>'}</td>
       <td style="text-align:center">${ot.nro_seguimiento?`<button id="ds-track-btn-${ot.id}" title="Consultar CA" style="background:var(--surface2);border:1px solid var(--border2);color:var(--blue);font-size:11px;padding:4px 7px;border-radius:6px;cursor:pointer" onclick="event.stopPropagation();dsConsultarCA('${ot.id}','${ot.nro_seguimiento}','${ot.ot}')">🔍</button>`:'<span style="color:var(--text-muted)">—</span>'}</td>
       ${(()=>{
         const obs=ot.observacion_estado||ot.observaciones||'';
@@ -6763,7 +6936,7 @@ function dsRenderTabla(datos){
     const rows=groups[grp];
     if(!rows.length)return;
     const gc=GCOLORS[grp]||'var(--text-muted)';
-    html+=`<tr><td colspan="15" style="background:var(--navy-900);padding:6px 12px;border-top:2px solid ${gc}20"><span style="font-size:10px;font-weight:700;color:${gc};text-transform:uppercase;letter-spacing:.08em">${GICONS[grp]} ${grp} <span style="opacity:.5;font-weight:400">(${rows.length})</span></span></td></tr>`;
+    html+=`<tr><td colspan="16" style="background:var(--navy-900);padding:6px 12px;border-top:2px solid ${gc}20"><span style="font-size:10px;font-weight:700;color:${gc};text-transform:uppercase;letter-spacing:.08em">${GICONS[grp]} ${grp} <span style="opacity:.5;font-weight:400">(${rows.length})</span></span></td></tr>`;
     html+=rows.map(renderRow).join('');
   });
   tbody.innerHTML=html;
@@ -7296,7 +7469,7 @@ async function autoTrackingDesinstalaciones(){
 
 
 async function dsAutoTracking(){
-  // AUTO-TRACKING DESINSTALACIONES v2.4.5
+  // AUTO-TRACKING DESINSTALACIONES v2.4.8
   // NO Envíos, NO Ally, NO wasender, NO Railway, NO processAllyRules
   console.log('[DS AT START] dsAutoTracking iniciado', new Date().toISOString());
   abrirModalAutoTracking();
