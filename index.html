@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v2.4.8</title>
+<title>Alleata · Operaciones v2.4.9</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -300,7 +300,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.4.8 · 28 abr 2026
+      v2.4.9 · 29 abr 2026
     </div>
   </div>
 </div>
@@ -360,7 +360,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.4.8 · 28 abr 2026
+      v2.4.9 · 29 abr 2026
     </div>
   </div>
 </nav>
@@ -374,7 +374,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <div class="topbar-right" id="topbar-date"></div>
     <button onclick="refreshCurrentModule()" title="Actualizar" style="background:none;border:1px solid var(--border2);color:var(--text-muted);border-radius:7px;padding:4px 10px;cursor:pointer;font-size:13px;margin-left:10px;transition:all .2s" onmouseover="this.style.color='var(--teal)';this.style.borderColor='var(--teal)'" onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border2)'">↺</button>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.4.8</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.4.9</div>
   </div>
   <div class="content">
 
@@ -1087,7 +1087,7 @@ tr:hover td{background:var(--surface2);}
     <!-- Hoja de ruta — botón y modal -->
     <div id="dsRutaBar" style="display:none;margin-bottom:10px;padding:8px 12px;background:rgba(29,191,142,.08);border:1px solid rgba(29,191,142,.2);border-radius:8px;align-items:center;gap:12px;flex-wrap:wrap">
       <span id="dsRutaCount" style="font-size:13px;font-weight:600;color:var(--teal)">0 OTs seleccionadas</span>
-      <button class="btn btn-sm" onclick="dsExportarListado()" style="background:var(--teal);color:#fff;border:none;padding:5px 14px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600">📄 Exportar selección</button>
+      <button class="btn btn-sm" onclick="dsExportarListado(true)" style="background:var(--teal);color:#fff;border:none;padding:5px 14px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600">📄 Exportar selección</button>
       <button class="btn btn-sm" onclick="dsGestion_GenerarRuta()" style="background:rgba(139,92,246,.15);border:1px solid rgba(139,92,246,.4);color:#8b5cf6;padding:5px 14px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600">🗺️ Generar hoja de ruta</button>
       <button class="btn-ghost btn-sm" onclick="dsDeselAll()" style="font-size:12px">Deseleccionar todo</button>
     </div>
@@ -1742,15 +1742,20 @@ function dsSelUpdate(){
   if(allChk)allChk.checked=sel.length>0&&sel.length===all.length;
 }
 
-function dsExportarListado(){
-  const ots = (DesinModule.filtrados||DesinModule.datos||[]).filter(Boolean);
-  if(!ots.length){ alert('No hay OTs para exportar con los filtros actuales.'); return; }
+function dsExportarListado(soloSeleccionadas=false){
+  const base = (DesinModule.filtrados||DesinModule.datos||[]).filter(Boolean);
+  const checked = [...document.querySelectorAll('.ds-chk-ot:checked')].map(c=>c.dataset.ot).filter(Boolean);
+  let ots = soloSeleccionadas || checked.length ? base.filter(ot=>checked.includes(String(ot.ot))) : base;
+  if(!ots.length && checked.length){
+    ots = (DesinModule.datos||[]).filter(ot=>checked.includes(String(ot.ot)));
+  }
+  if(!ots.length){ alert(soloSeleccionadas?'No hay OTs seleccionadas para exportar.':'No hay OTs para exportar con los filtros actuales.'); return; }
 
   // Subtitle from active geo filters
   const parts = [];
   if(DS_GEO.provActiva) parts.push(DS_GEO.provActiva);
   if(DS_GEO.locActiva)  parts.push(DS_GEO.locActiva);
-  const subtitle = parts.join(' — ') || 'Todas las localidades';
+  const subtitle = parts.join(' — ') || (checked.length ? 'Selección manual' : 'Todas las localidades');
 
   // Active filters summary for header
   const filtros = [];
@@ -1970,7 +1975,7 @@ function dsRutaCSV(){
 }
 
 // ══════════════════════════════════════════════════════════════════════
-// DESINSTALACIONES — FUNCIONES NUEVAS v2.4.8
+// DESINSTALACIONES — FUNCIONES NUEVAS v2.4.9
 // Prefijo: dsGestion_, dsRuta_, dsExport_
 // No modifican lógica existente de Envíos ni Rollout
 // ══════════════════════════════════════════════════════════════════════
@@ -2044,12 +2049,13 @@ async function dsGestion_GenerarRuta(){
     if(itemErr) throw itemErr;
 
     // 4. Mark OTs in ordenes_trabajo as hoja_ruta_activa
-    const ids = ots.map(ot=>ot.id).filter(Boolean);
-    if(ids.length){
+    for(const [i,ot] of ots.entries()){
+      if(!ot.id) continue;
       await sb.from('ordenes_trabajo').update({
         hoja_ruta_activa: true,
-        hoja_ruta_fecha: fecha
-      }).in('id', ids);
+        hoja_ruta_fecha: fecha,
+        hoja_ruta_orden: i+1
+      }).eq('id', ot.id);
     }
 
     // 5. Clear sessionStorage (was temp)
@@ -2121,7 +2127,7 @@ if(_origCargar){
   };
 }
 
-console.log('[Alleata v2.4.8] OK');
+console.log('[Alleata v2.4.9] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -6802,6 +6808,15 @@ function dsClasificarLogistica(log){
   return'Logísticas Varias';
 }
 
+
+// ── WhatsApp helpers Desinstalaciones — v2.4.9 ─────────────────────────
+function dsEscapeHtml(v){return String(v??'').replace(/[&<>'\"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[m]));}
+function dsTelefonoWa(raw){let n=String(raw||'').replace(/\D/g,'');if(!n)return '';if(n.startsWith('00'))n=n.slice(2);if(n.startsWith('0'))n=n.replace(/^0+/,'');if(!n.startsWith('54')&&(n.startsWith('9')||n.startsWith('11')||n.startsWith('15')||n.length<=11))n='54'+n;return n;}
+function dsNombreContacto(ot){const base=String(ot.contacto_nombre||ot.nombre_contacto||ot.nombre||ot.comercio||ot.cuenta||'').trim();if(!base)return '';const limpio=base.replace(/\s+-\s+SUC\s+-.*$/i,'').replace(/\s+-\s+\d+.*$/,'').trim();return limpio.split(/\s+/).slice(0,2).join(' ');}
+function dsMensajeWhatsapp(ot,tipo='primer_aviso'){const nombre=dsNombreContacto(ot);const saludo=nombre?`Hola ${nombre} 👋`:'Hola 👋';if(tipo==='segundo_aviso'){return `${saludo}\nIntentamos comunicarnos con vos, pero no obtuvimos respuesta.\nComo te mencionamos anteriormente, debemos coordinar de forma inmediata el retiro de la terminal que ya no estás utilizando.\n\n⚠️ Recordá que en caso de no efectuar la devolución del equipo, se cobrará la totalidad del valor del mismo al método de pago registrado en tu cuenta.\n\n¡Gracias por tu colaboración! 😊\nEquipo de Alleata`;}return `${saludo}\nNecesitamos coordinar el retiro de la terminal que tenés en desuso 📦\n\nPor favor, te pedimos confirmar:\n📍 Dirección de retiro\n⏰ Horario disponible\n☎️ Teléfono de contacto\n\n⚠️ Le recordamos tener la terminal y todos sus accesorios listos en su caja o en una bolsa para agilizar el retiro.\n\nMuchas gracias,\nEquipo de Alleata`;}
+function dsWhatsappUrl(ot){const tel=dsTelefonoWa(ot.contacto);if(!tel)return '';return `https://wa.me/${tel}?text=${encodeURIComponent(dsMensajeWhatsapp(ot,'primer_aviso'))}`;}
+function dsWhatsappButton(ot){const url=dsWhatsappUrl(ot);if(!url)return '<span style="color:var(--border);font-size:15px" title="Sin contacto">☏</span>';return `<a href="${url}" target="_blank" title="WhatsApp ${dsEscapeHtml(ot.contacto||'')}" style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:8px;background:rgba(37,211,102,.12);border:1px solid rgba(37,211,102,.35);text-decoration:none;color:#25D366;font-weight:800" onclick="event.stopPropagation()">WA</a>`;}
+
 function dsRenderTabla(datos){
   const tbody=document.getElementById('ds-tbody');
   if(!datos.length){tbody.innerHTML='<tr><td colspan="16" style="text-align:center;padding:30px;color:var(--text-muted)">Sin resultados</td></tr>';return;}
@@ -6858,8 +6873,7 @@ function dsRenderTabla(datos){
       <td><span class="badge" style="${ot.gestion_propia?'background:rgba(29,191,142,.12);color:var(--teal)':'background:var(--surface2);color:var(--text-muted)'}">${ot.logistica||'—'}</span></td>
       <td><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-muted)">${ot.nro_seguimiento||'—'}</span></td>
       <td style="text-align:center">
-        ${ot.contacto?`<a href="https://wa.me/${ot.contacto.replace(/[^0-9]/g,'')}?text=Hola%2C+te+contactamos+de+Alleata+para+coordinar+el+retiro+de+terminal%2C+OT+${ot.ot}.+%C2%BFPodemos+coordinar+d%C3%ADa+y+horario%3F" target="_blank" style="text-decoration:none;font-size:14px" title="WhatsApp ${ot.contacto}">💬</a>`
-        :'<span style="color:var(--border)">💬</span>'}</td>
+        ${dsWhatsappButton(ot)}</td>
       <td style="text-align:center">${ot.nro_seguimiento?`<button id="ds-track-btn-${ot.id}" title="Consultar CA" style="background:var(--surface2);border:1px solid var(--border2);color:var(--blue);font-size:11px;padding:4px 7px;border-radius:6px;cursor:pointer" onclick="event.stopPropagation();dsConsultarCA('${ot.id}','${ot.nro_seguimiento}','${ot.ot}')">🔍</button>`:'<span style="color:var(--text-muted)">—</span>'}</td>
       ${(()=>{
         const obs=ot.observacion_estado||ot.observaciones||'';
@@ -7469,7 +7483,7 @@ async function autoTrackingDesinstalaciones(){
 
 
 async function dsAutoTracking(){
-  // AUTO-TRACKING DESINSTALACIONES v2.4.8
+  // AUTO-TRACKING DESINSTALACIONES v2.4.9
   // NO Envíos, NO Ally, NO wasender, NO Railway, NO processAllyRules
   console.log('[DS AT START] dsAutoTracking iniciado', new Date().toISOString());
   abrirModalAutoTracking();
