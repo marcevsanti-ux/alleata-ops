@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v2.5.1</title>
+<title>Alleata · Operaciones v2.5.2</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -300,7 +300,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.5.1 · 29 abr 2026
+      v2.5.2 · 29 abr 2026
     </div>
   </div>
 </div>
@@ -360,7 +360,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.5.1 · 29 abr 2026
+      v2.5.2 · 29 abr 2026
     </div>
   </div>
 </nav>
@@ -374,7 +374,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <div class="topbar-right" id="topbar-date"></div>
     <button onclick="refreshCurrentModule()" title="Actualizar" style="background:none;border:1px solid var(--border2);color:var(--text-muted);border-radius:7px;padding:4px 10px;cursor:pointer;font-size:13px;margin-left:10px;transition:all .2s" onmouseover="this.style.color='var(--teal)';this.style.borderColor='var(--teal)'" onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border2)'">↺</button>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.5.1</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.5.2</div>
   </div>
   <div class="content">
 
@@ -1989,7 +1989,7 @@ function dsRutaCSV(){
 }
 
 // ══════════════════════════════════════════════════════════════════════
-// DESINSTALACIONES — FUNCIONES NUEVAS v2.5.1
+// DESINSTALACIONES — FUNCIONES NUEVAS v2.5.2
 // Prefijo: dsGestion_, dsRuta_, dsExport_
 // No modifican lógica existente de Envíos ni Rollout
 // ══════════════════════════════════════════════════════════════════════
@@ -2086,6 +2086,8 @@ async function dsGestion_GenerarRuta(){
     DesinModule.cargado = false;
     await cargarDesinstalaciones();
     console.log('[dsGestion_GenerarRuta] Persistido en Supabase:', hojaRuta.id, ots.length, 'OTs');
+    // Notificar grupo Desinstalaciones vía Ally
+    allyDesinst_hookHojaRuta(ots, creador).catch(() => {});
 
   } catch(e) {
     console.error('[dsGestion_GenerarRuta] Error:', e.message);
@@ -2141,7 +2143,7 @@ if(_origCargar){
   };
 }
 
-// ── ALLY — CLASIFICACIÓN EVENTOS CA (v2.5.1) ─────────────────────────────
+// ── ALLY — CLASIFICACIÓN EVENTOS CA (v2.5.2) ─────────────────────────────
 // Funciones aisladas — NO tocar Desinstalaciones ni Hoja de Ruta
 // Resuelven el problema de clasificar PREIMPOSICION/INGRESO como AVISO, no ALERTA
 
@@ -2232,7 +2234,190 @@ El envío no registra avances recientes. Requiere seguimiento.`,
 ⚠️ Acción requerida: revisar caso.`
 };
 
-console.log('[Alleata v2.5.1] OK');
+// ══════════════════════════════════════════════════════════════════════
+// ETAPA 1 — DESINSTALACIONES + ALLY INTERNO (v2.5.2)
+// Grupo interno: Ángel / Luciana / Marcelo / Ally
+// NO envía a merchants todavía
+// ══════════════════════════════════════════════════════════════════════
+
+const ALLY_DESINST_SECRET = '123456';
+const ALLY_RAILWAY_BASE   = 'https://alleata-agent-production.up.railway.app';
+
+// ── Enviar mensaje al grupo Desinstalaciones vía Railway ──────────────────
+async function allyDesinst_enviarMensaje(mensaje, contexto = '') {
+  try {
+    // Obtener group_id del grupo DESINSTALACIONES desde ally_grupos
+    const { data: grupos } = await sb.from('ally_grupos')
+      .select('group_id, nombre')
+      .ilike('nombre', '%desinstalac%')
+      .eq('activo', true)
+      .limit(1);
+
+    const groupId = grupos?.[0]?.group_id;
+    if (!groupId) {
+      console.warn('[ALLY DESINST] Grupo DESINSTALACIONES no encontrado en ally_grupos');
+      return false;
+    }
+
+    const res = await fetch(`${ALLY_RAILWAY_BASE}/automations/send-message`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-automation-secret': ALLY_DESINST_SECRET
+      },
+      body: JSON.stringify({ group_id: groupId, message: mensaje, context: contexto })
+    });
+
+    if (res.ok) {
+      console.log(`[ALLY DESINST] Mensaje enviado OK (${contexto})`);
+      return true;
+    } else {
+      const err = await res.text().catch(() => res.status);
+      console.warn(`[ALLY DESINST] Error ${res.status}:`, err);
+      return false;
+    }
+  } catch (e) {
+    console.warn('[ALLY DESINST] fetch error:', e.message);
+    return false;
+  }
+}
+
+// ── Renderizar template con variables ────────────────────────────────────
+function allyDesinst_render(template, vars = {}) {
+  return template.replace(/\{\{(\w+)\}\}/g, (_, k) => vars[k] ?? `{{${k}}}`);
+}
+
+// ── 1. Resumen post auto-tracking desinstalaciones ───────────────────────
+async function allyDesinst_reporteAutoTracking({ procesados, actualizados, errores, alertas }) {
+  const fecha = new Date().toLocaleDateString('es-AR', {
+    weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric'
+  });
+  const hora = new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+  const msg = [
+    `📊 Auto-tracking Desinstalaciones`,
+    ``,
+    `📅 ${fecha} — ${hora}`,
+    `📦 Procesadas: ${procesados}`,
+    actualizados  ? `✅ Actualizadas: ${actualizados}`  : null,
+    errores       ? `❌ Errores: ${errores}`             : null,
+    alertas?.length ? `\n⚠️ OTs con alerta:\n${alertas.slice(0,5).map(a => `• OT ${a.ot} — ${a.estado}`).join('\n')}` : null,
+  ].filter(Boolean).join('\n');
+  return allyDesinst_enviarMensaje(msg, 'reporte_autotracking');
+}
+
+// ── 2. SLA vencido ───────────────────────────────────────────────────────
+async function allyDesinst_alertaSLA(ot, cuenta, ciudad, tipo, diasSLA) {
+  const msg = [
+    tipo === 'merchant' ? `⏰ SLA Merchant vencido — Desinstalaciones` : `⏰ SLA CA vencido — Desinstalaciones`,
+    ``,
+    `📦 OT: ${ot}`,
+    `🏢 Comercio: ${cuenta || '—'}`,
+    `📍 Localidad: ${ciudad || '—'}`,
+    `📊 Días: ${diasSLA}d`,
+    tipo === 'merchant' ? `⚠️ El envío no ingresó a CA en tiempo.` : `⚠️ CA no entregó en plazo.`,
+  ].join('\n');
+  return allyDesinst_enviarMensaje(msg, `sla_${tipo}_vencido`);
+}
+
+// ── 3. OTs pendientes de gestión ─────────────────────────────────────────
+async function allyDesinst_reporteGestion(pendientes) {
+  if (!pendientes?.length) return;
+  const fecha = new Date().toLocaleDateString('es-AR', { day:'2-digit', month:'2-digit' });
+  const msg = [
+    `📋 Pendientes de gestión — Desinstalaciones`,
+    ``,
+    `📅 ${fecha} | Total: ${pendientes.length} OTs sin contactar`,
+    ``,
+    ...pendientes.slice(0, 8).map(ot =>
+      `• OT ${ot.ot} — ${ot.comercio || ot.cuenta || '—'} (${ot.ciudad || '—'})`
+    ),
+    pendientes.length > 8 ? `…y ${pendientes.length - 8} más.` : null,
+    ``,
+    `Gestionar en: alleata-ops`,
+  ].filter(Boolean).join('\n');
+  return allyDesinst_enviarMensaje(msg, 'pendientes_gestion');
+}
+
+// ── 4. Hoja de ruta creada ───────────────────────────────────────────────
+async function allyDesinst_hojaRutaCreada(ots, usuario) {
+  if (!ots?.length) return;
+  const fecha = new Date().toLocaleDateString('es-AR', {
+    weekday: 'long', day: '2-digit', month: '2-digit'
+  });
+  // Zona predominante
+  const zonaCnt = {};
+  ots.forEach(ot => { const z = dsGetZona(ot); zonaCnt[z] = (zonaCnt[z]||0)+1; });
+  const zona = Object.entries(zonaCnt).sort((a,b)=>b[1]-a[1])[0]?.[0] || '—';
+
+  const msg = [
+    `🚚 Hoja de ruta creada — Desinstalaciones`,
+    ``,
+    `📅 Fecha: ${fecha}`,
+    `📍 Zona: ${zona}`,
+    `📦 OTs: ${ots.length}`,
+    `👤 Creada por: ${usuario || 'Portal'}`,
+    ``,
+    ...ots.slice(0, 6).map(ot =>
+      `• OT ${ot.ot} — ${ot.comercio || ot.cuenta || '—'} (${ot.ciudad || '—'})`
+    ),
+    ots.length > 6 ? `…y ${ots.length - 6} más.` : null,
+  ].filter(Boolean).join('\n');
+  return allyDesinst_enviarMensaje(msg, 'hoja_ruta_creada');
+}
+
+// ── 5. Terminal recuperada ───────────────────────────────────────────────
+async function allyDesinst_terminalRecuperada(ot) {
+  const fecha = new Date().toLocaleDateString('es-AR', { day:'2-digit', month:'2-digit' });
+  const msg = [
+    `✅ Terminal recuperada — Desinstalaciones`,
+    ``,
+    `📦 OT: ${ot.ot || ot}`,
+    `🏢 Comercio: ${ot.comercio || ot.cuenta || '—'}`,
+    `📍 Zona: ${dsGetZona(ot)}`,
+    `👤 Operador: Marcelo`,
+    `📅 Fecha: ${fecha}`,
+  ].join('\n');
+  return allyDesinst_enviarMensaje(msg, 'terminal_recuperada');
+}
+
+// ── 6. Retiro fallido ────────────────────────────────────────────────────
+async function allyDesinst_retiroFallido(ot, motivo) {
+  const msg = [
+    `⚠️ Retiro fallido — Desinstalaciones`,
+    ``,
+    `📦 OT: ${ot.ot || ot}`,
+    `🏢 Comercio: ${ot.comercio || ot.cuenta || '—'}`,
+    `📍 ${ot.calle || ''}${ot.ciudad ? `, ${ot.ciudad}` : ''}`,
+    motivo ? `❌ Motivo: ${motivo}` : null,
+    ot.observaciones ? `📝 Obs: ${ot.observaciones}` : null,
+    ``,
+    `🔧 Requiere gestión.`,
+  ].filter(Boolean).join('\n');
+  return allyDesinst_enviarMensaje(msg, 'retiro_fallido');
+}
+
+// ── Hooks automáticos ────────────────────────────────────────────────────
+// Se llaman desde las funciones existentes si el grupo está configurado
+
+// Hook en dsGestion_GenerarRuta — llamado después de persistir
+async function allyDesinst_hookHojaRuta(ots, usuario) {
+  try { await allyDesinst_hojaRutaCreada(ots, usuario); }
+  catch(e) { console.warn('[ALLY DESINST] hookHojaRuta error:', e.message); }
+}
+
+// Hook en dsm_marcarRetirado — llamado después de actualizar estado
+async function allyDesinst_hookTerminalRecuperada(ot) {
+  try { await allyDesinst_terminalRecuperada(ot); }
+  catch(e) { console.warn('[ALLY DESINST] hookTerminalRecuperada error:', e.message); }
+}
+
+// Hook en dsm_marcarNoRetiro
+async function allyDesinst_hookRetiroFallido(ot, motivo) {
+  try { await allyDesinst_retiroFallido(ot, motivo); }
+  catch(e) { console.warn('[ALLY DESINST] hookRetiroFallido error:', e.message); }
+}
+
+console.log('[Alleata v2.5.2] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -4394,7 +4579,7 @@ async function autoActualizarTracking(){
         const detalle = ultimo.estadoCA ? `${ultimo.historia} — ${ultimo.estadoCA}` : ultimo.historia;
 
         // Detectar alertas especiales
-        // Detectar alertas usando clasificador CA (v2.5.1)
+        // Detectar alertas usando clasificador CA (v2.5.2)
         // Solo ALERTA para eventos de problema real — AVISO para tránsito normal
         const textoEvento = (ultimo.estadoCA + ' ' + ultimo.historia).toUpperCase();
         const _tipoEventoCA = allyClasificarEventoCA(textoEvento);
@@ -6925,7 +7110,7 @@ function dsClasificarLogistica(log){
 }
 
 
-// ── WhatsApp helpers Desinstalaciones — v2.5.1 ─────────────────────────
+// ── WhatsApp helpers Desinstalaciones — v2.5.2 ─────────────────────────
 function dsEscapeHtml(v){return String(v??'').replace(/[&<>'\"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[m]));}
 function dsTelefonoWa(raw){let n=String(raw||'').replace(/\D/g,'');if(!n)return '';if(n.startsWith('00'))n=n.slice(2);if(n.startsWith('0'))n=n.replace(/^0+/,'');if(!n.startsWith('54')&&(n.startsWith('9')||n.startsWith('11')||n.startsWith('15')||n.length<=11))n='54'+n;return n;}
 function dsNombreContacto(ot){const base=String(ot.contacto_nombre||ot.nombre_contacto||ot.nombre||ot.comercio||ot.cuenta||'').trim();if(!base)return '';const limpio=base.replace(/\s+-\s+SUC\s+-.*$/i,'').replace(/\s+-\s+\d+.*$/,'').trim();return limpio.split(/\s+/).slice(0,2).join(' ');}
@@ -7614,7 +7799,7 @@ async function autoTrackingDesinstalaciones(){
 
 
 async function dsAutoTracking(){
-  // AUTO-TRACKING DESINSTALACIONES v2.5.1
+  // AUTO-TRACKING DESINSTALACIONES v2.5.2
   // NO Envíos, NO Ally, NO wasender, NO Railway, NO processAllyRules
   console.log('[DS AT START] dsAutoTracking iniciado', new Date().toISOString());
   abrirModalAutoTracking();
@@ -7885,6 +8070,13 @@ async function dsAutoTracking(){
   DesinModule.filtrados = [];
   await cargarDesinstalaciones();
   loadBadges();
+  // Notificar resumen a grupo Desinstalaciones vía Ally
+  const _alertasAT = (DesinModule.datos||[]).filter(o=>{
+    const est=(o.estado||'').toLowerCase();
+    return est.includes('fallido')||est.includes('extraviada')||est.includes('no contactado');
+  }).map(o=>({ot:o.ot,estado:o.estado}));
+  allyDesinst_reporteAutoTracking({procesados:ots.length,actualizados:act,errores:err,alertas:_alertasAT})
+    .catch(()=>{});
 }
 
 // ── dsTestTrackingUno — función de prueba para un tracking específico ────────
