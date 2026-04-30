@@ -142,7 +142,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
 .btn-order{background:var(--surface2);border:1px solid var(--border2);color:var(--text-muted);width:28px;height:28px;border-radius:8px;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
 .btn-order:active{background:var(--navy-600);}
 
-  /* ── Desinstalaciones (rojo) — v2.8.1 ── */
+  /* ── Desinstalaciones (rojo) — v2.9.0 ── */
   .ot-card.desinstalacion{border-left:4px solid #ef4444;background:rgba(239,68,68,.04);}
   .ot-card.desinstalacion .ot-num{color:#ef4444;}
   .badge-desinstal{display:inline-block;background:rgba(239,68,68,.15);color:#ef4444;font-size:9px;font-weight:700;padding:1px 7px;border-radius:10px;margin-left:5px;letter-spacing:.04em;}
@@ -165,7 +165,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
       <div class="login-logo">
         <img id="loginLogo" src="" alt="Alleata">
         <div class="login-sub">Portal de Operaciones</div>
-        <div class="login-version">v2.8.1 · mobile</div>
+        <div class="login-version">v2.9.0 · mobile</div>
       </div>
       <div class="field"><label class="label">Email</label><input class="input" id="lEmail" type="email" placeholder="usuario@alleata.com" autocomplete="email"></div>
       <div class="field"><label class="label">Contraseña</label><input class="input" id="lPass" type="password" placeholder="••••••••" autocomplete="current-password"></div>
@@ -181,7 +181,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
   <div class="topbar">
     <img id="appLogo" src="" alt="Alleata">
     <div class="topbar-title" id="topbarTitle">Operaciones</div>
-    <div class="topbar-version">v2.8.1</div>
+    <div class="topbar-version">v2.9.0</div>
     <div class="topbar-avatar" id="topbarAvatar" onclick="openDrawer()">?</div>
   </div>
 
@@ -345,7 +345,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
     </div>
   </div>
 
-  <!-- TAB: DESINSTALACIONES — v2.8.1 incremental -->
+  <!-- TAB: DESINSTALACIONES — v2.9.0 incremental -->
   <div class="tab-content" id="content-desinst">
     <div class="card" style="margin-bottom:12px;border-left:4px solid var(--red)">
       <div class="card-title" style="color:#ef4444;margin-bottom:4px">🔴 Hoja de Ruta — Desinstalaciones</div>
@@ -500,6 +500,12 @@ function switchTab(tab){
   if(tab==='ruta'){
     loadRuta();
   dsm_checkRutaHoy();
+  // Auto-switch to DESINST tab if there are active OTs
+  dsm_checkRutaHoy().then(hasDesinst=>{
+    if(hasDesinst && document.getElementById('tab-desinst')?.style.display!=='none'){
+      console.log('[MOBILE] OTs desinstalación detectadas hoy — mostrando tab');
+    }
+  });
   } else {
     stopRutaScanner();
   }
@@ -1048,6 +1054,12 @@ async function confirmarCierreOT(){
     if(error){alert('Error: '+error.message);return;}
     closeModalCierre();
     showScanFeedback(retirado?'✅ Terminal retirada':'⚠️ Fallido registrado',retirado?'ok':'warn');
+    // Hook Ally — notificar grupo interno (no envía a merchants)
+    try {
+      const _otObj = {ot:otNum||id, comercio:'', cuenta:'', ciudad:'', calle:'', observaciones:notas};
+      if(retirado) allyDesinst_terminalRecuperada(_otObj).catch(()=>{});
+      else allyDesinst_retiroFallido(_otObj, notas||'Sin detalle').catch(()=>{});
+    } catch(_){}
     await loadDesinstalaciones();
     await dsm_checkRutaHoy();
     return;
@@ -1635,7 +1647,7 @@ async function procesarImagenQR(e){
 
 // ── FIN ──
 
-// ── DESINSTALACIONES MOBILE — v2.8.1 incremental ─────────────────────────
+// ── DESINSTALACIONES MOBILE — v2.9.0 incremental ─────────────────────────
 async function loadDesinstalaciones(){
   const el=document.getElementById('desinstList');
   if(!el)return;
@@ -1660,7 +1672,8 @@ async function loadDesinstalaciones(){
     const maps='https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(dir+' '+(ot.ciudad||'')+' Argentina');
     const obs=ot.observacion_estado||ot.observaciones||'';
     const tel=String(ot.contacto||'').replace(/\D/g,'');
-    const wa=tel?`https://wa.me/${tel.startsWith('54')?tel:'54'+tel}?text=${encodeURIComponent('Hola 👋\nNecesitamos coordinar el retiro de la terminal que tenés en desuso 📦\n\nPor favor, te pedimos confirmar dirección de retiro, horario disponible y teléfono de contacto.\n\nMuchas gracias,\nEquipo de Alleata')}`:'';
+    const _nombre=ot.comercio||ot.cuenta||'';
+    const wa=tel?`https://wa.me/${tel.startsWith('54')?tel:'54'+tel}?text=${encodeURIComponent('Hola'+(_nombre?' '+_nombre:'')+'👋\nTe contactamos de Alleata para coordinar el retiro de la terminal de la OT '+ot.ot+'.\n\nPor favor confirmanos dirección, horario disponible y contacto.\n\nGracias,\nEquipo Alleata')}`:'';
     return`<div class="ot-card desinstalacion" style="margin-bottom:10px">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px">
         <div>
@@ -1677,11 +1690,13 @@ async function loadDesinstalaciones(){
         ${ot.contacto?`<div class="ot-row"><span>📞</span><a href="tel:${ot.contacto}" style="color:var(--blue);text-decoration:none">${ot.contacto}</a> ${wa?`<a href="${wa}" target="_blank" style="margin-left:8px;color:#25D366;text-decoration:none;font-weight:800">WA</a>`:''}</div>`:''}
         ${obs?`<div class="ot-row" style="color:var(--text-muted)"><span>📝</span>${obs}</div>`:''}
       </div>
-      <div class="ot-actions" style="flex-wrap:wrap">
-        <button class="btn-sm btn-retirado" style="flex:1" onclick="dsm_openCierre('${ot.id}','${ot.ot}','DESINST_RETIRADO')">✅ Retirada</button>
-        <button class="btn-sm btn-no-retiro" style="flex:1" onclick="dsm_openCierre('${ot.id}','${ot.ot}','DESINST_FALLIDO')">❌ Fallido</button>
-        <button class="btn-sm btn-evidencia" onclick="dsm_openCierre('${ot.id}','${ot.ot}','DESINST_FALLIDO')">📷 Evidencia</button>
-        <a href="${maps}" target="_blank" class="btn-sm btn-maps">🗺️</a>
+      <div class="ot-actions" style="flex-wrap:wrap;gap:5px">
+        <button class="btn-sm btn-retirado" style="flex:1;min-width:120px" onclick="dsm_openCierre('${ot.id}','${ot.ot}','DESINST_RETIRADO')">✅ Retirada</button>
+        <button class="btn-sm btn-no-retiro" style="flex:1;min-width:120px" onclick="dsm_openCierre('${ot.id}','${ot.ot}','DESINST_FALLIDO')">❌ Fallido</button>
+        <button class="btn-sm btn-evidencia" style="flex:1" onclick="dsm_openCierre('${ot.id}','${ot.ot}','DESINST_RETIRADO')">📸 Foto</button>
+        ${ot.contacto?`<a href="tel:${ot.contacto}" class="btn-sm" style="flex:1;background:rgba(26,159,212,.15);color:var(--blue);border:1px solid rgba(26,159,212,.3);text-decoration:none;display:flex;align-items:center;justify-content:center">📞</a>`:''}
+        ${wa?`<a href="${wa}" target="_blank" class="btn-sm" style="flex:1;background:rgba(37,211,102,.15);color:#25D366;border:1px solid rgba(37,211,102,.3);text-decoration:none;display:flex;align-items:center;justify-content:center;font-weight:800">WA</a>`:''}
+        <a href="${maps}" target="_blank" class="btn-sm btn-maps" style="flex:0 0 40px">🗺️</a>
       </div>
     </div>`;
   }).join('');
@@ -1712,14 +1727,61 @@ async function dsm_checkRutaHoy(){
     const fecha=new Date().toISOString().slice(0,10);
     const{count}=await sb.from('ordenes_trabajo')
       .select('id',{count:'exact',head:true})
-      .eq('tipo','desinstalacion').eq('hoja_ruta_activa',true);
+      .eq('tipo','desinstalacion').eq('hoja_ruta_activa',true).eq('hoja_ruta_fecha',fecha);
+    const tab=document.getElementById('tab-desinst');
+    const badge=document.getElementById('desinstBadge');
     if(count>0){
-      const tab=document.getElementById('tab-desinst');
-      const badge=document.getElementById('desinstBadge');
       if(tab)tab.style.display='flex';
       if(badge){badge.textContent=count;badge.style.display='inline-block';}
+    } else {
+      if(tab)tab.style.display='none';
     }
-  }catch(_){}
+    return count||0;
+  }catch(_){ return 0; }
+}
+
+// ── ALLY DESINST MOBILE — v2.9.0 ─────────────────────────────────────────
+// Envía notificaciones al grupo Desinstalaciones interno
+// NO envía a merchants. Solo hooks internos.
+
+async function allyDesinst_enviarMensaje(mensaje, contexto) {
+  try {
+    const { data: grupos } = await sb.from('ally_grupos')
+      .select('group_id').ilike('nombre', '%desinstalac%').eq('activo', true).limit(1);
+    const groupId = grupos?.[0]?.group_id;
+    if (!groupId) return false;
+    await fetch('https://alleata-agent-production.up.railway.app/automations/send-message', {
+      method: 'POST',
+      headers: { 'Content-Type':'application/json','x-automation-secret':'123456' },
+      body: JSON.stringify({ group_id: groupId, message: mensaje, context: contexto })
+    });
+    return true;
+  } catch(e) { console.warn('[ALLY DESINST MOBILE]', e.message); return false; }
+}
+
+async function allyDesinst_terminalRecuperada(ot) {
+  const fecha = new Date().toLocaleDateString('es-AR', {day:'2-digit',month:'2-digit'});
+  const msg = `✅ Terminal recuperada — Desinstalaciones
+
+📦 OT: ${ot.ot||ot}
+🏢 Comercio: ${ot.comercio||ot.cuenta||'—'}
+📍 ${ot.ciudad||'—'}
+👤 Operador: Marcelo
+📅 ${fecha}`;
+  return allyDesinst_enviarMensaje(msg, 'terminal_recuperada');
+}
+
+async function allyDesinst_retiroFallido(ot, motivo) {
+  const msg = `⚠️ Retiro fallido — Desinstalaciones
+
+📦 OT: ${ot.ot||ot}
+🏢 Comercio: ${ot.comercio||ot.cuenta||'—'}
+📍 ${ot.calle||''}${ot.ciudad?', '+ot.ciudad:''}
+${motivo?'❌ Motivo: '+motivo:''}
+📝 ${ot.observaciones||ot.observacion_estado||''}
+
+🔧 Requiere gestión.`.trim();
+  return allyDesinst_enviarMensaje(msg, 'retiro_fallido');
 }
 </script>
 
