@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v2.5.0</title>
+<title>Alleata · Operaciones v2.5.1</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -300,7 +300,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.5.0 · 29 abr 2026
+      v2.5.1 · 29 abr 2026
     </div>
   </div>
 </div>
@@ -360,7 +360,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.5.0 · 29 abr 2026
+      v2.5.1 · 29 abr 2026
     </div>
   </div>
 </nav>
@@ -374,7 +374,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <div class="topbar-right" id="topbar-date"></div>
     <button onclick="refreshCurrentModule()" title="Actualizar" style="background:none;border:1px solid var(--border2);color:var(--text-muted);border-radius:7px;padding:4px 10px;cursor:pointer;font-size:13px;margin-left:10px;transition:all .2s" onmouseover="this.style.color='var(--teal)';this.style.borderColor='var(--teal)'" onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border2)'">↺</button>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.5.0</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.5.1</div>
   </div>
   <div class="content">
 
@@ -1989,7 +1989,7 @@ function dsRutaCSV(){
 }
 
 // ══════════════════════════════════════════════════════════════════════
-// DESINSTALACIONES — FUNCIONES NUEVAS v2.5.0
+// DESINSTALACIONES — FUNCIONES NUEVAS v2.5.1
 // Prefijo: dsGestion_, dsRuta_, dsExport_
 // No modifican lógica existente de Envíos ni Rollout
 // ══════════════════════════════════════════════════════════════════════
@@ -2141,7 +2141,98 @@ if(_origCargar){
   };
 }
 
-console.log('[Alleata v2.5.0] OK');
+// ── ALLY — CLASIFICACIÓN EVENTOS CA (v2.5.1) ─────────────────────────────
+// Funciones aisladas — NO tocar Desinstalaciones ni Hoja de Ruta
+// Resuelven el problema de clasificar PREIMPOSICION/INGRESO como AVISO, no ALERTA
+
+function allyNormalizarEventoCA(evento) {
+  return String(evento || '')
+    .trim()
+    .toUpperCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '');
+}
+
+function allyClasificarEventoCA(evento, horasSinMovimiento = 0) {
+  const e = allyNormalizarEventoCA(evento);
+  const eventosAviso = [
+    'PREIMPOSICION',
+    'INGRESO AL CORREO',
+    'REPESAJE',
+    'EN PROCESO DE CLASIFICACION',
+    'LLEGADA AL CENTRO DE PROCESAMIENTO',
+    'EN PODER DEL DISTRIBUIDOR',
+    'EN DISTRIBUCION',
+    'EN TRANSITO'
+  ];
+  const eventosAlerta = [
+    'DOMICILIO INSUFICIENTE',
+    'DOMICILIO INEXISTENTE',
+    'DESTINATARIO DESCONOCIDO',
+    'NO ENTREGADO',
+    'INTENTO DE ENTREGA',
+    'RECHAZADO',
+    'DEVOLUCION',
+    'DEVUELTO',
+    'EXTRAVIADO',
+    'EXTRAVIADA'
+  ];
+  if (eventosAlerta.some(x => e.includes(x))) return 'ALERTA';
+  if (eventosAviso.some(x  => e.includes(x))) return 'AVISO';
+  if (horasSinMovimiento >= 72)                return 'ATENCION';
+  return 'AVISO';
+}
+
+function allyDebeEscalarCA(evento, horasSinMovimiento) {
+  const tipo = allyClasificarEventoCA(evento, horasSinMovimiento);
+  if (tipo === 'AVISO')                                 return false;
+  if (tipo === 'ALERTA'   && horasSinMovimiento >= 48)  return true;
+  if (tipo === 'ATENCION' && horasSinMovimiento >= 72)  return true;
+  return false;
+}
+
+// Templates por tipo para uso futuro / logging
+const ALLY_CA_TEMPLATES = {
+  AVISO: `📦 AVISO - Actualización de estado
+📦 OT {{ot}}
+⭐ Propietario: {{propietario}}
+👷 Responsable: {{responsable}}
+🏢 {{cuenta}}
+📍 {{ciudad}}, {{provincia}}
+🚚 Tracking: {{tracking}}
+📌 Último evento:
+{{ultimo_evento}}
+🗓 {{fecha_evento}}
+Estado CA: {{estado_ca}}`,
+
+  ATENCION: `⚠️ ATENCIÓN - Seguimiento de envío
+📦 OT {{ot}}
+⭐ Propietario: {{propietario}}
+👷 Responsable: {{responsable}}
+🏢 {{cuenta}}
+📍 {{ciudad}}, {{provincia}}
+🚚 Tracking: {{tracking}}
+📌 Último evento:
+{{ultimo_evento}}
+🗓 {{fecha_evento}}
+El envío no registra avances recientes. Requiere seguimiento.`,
+
+  ALERTA: `🚨 ALERTA - Problema de entrega
+📦 OT {{ot}}
+⭐ Propietario: {{propietario}}
+👷 Responsable: {{responsable}}
+🏢 {{cuenta}}
+📍 {{ciudad}}, {{provincia}}
+🚚 Tracking: {{tracking}}
+❗ Estado CA:
+{{estado_ca}}
+📌 Último evento:
+{{ultimo_evento}}
+🗓 {{fecha_evento}}
+⚠️ Acción requerida: revisar caso.`
+};
+
+console.log('[Alleata v2.5.1] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -4303,9 +4394,15 @@ async function autoActualizarTracking(){
         const detalle = ultimo.estadoCA ? `${ultimo.historia} — ${ultimo.estadoCA}` : ultimo.historia;
 
         // Detectar alertas especiales
-        // Detectar alertas — domicilio cerrado, visitas fallidas, dirección insuficiente
+        // Detectar alertas usando clasificador CA (v2.5.1)
+        // Solo ALERTA para eventos de problema real — AVISO para tránsito normal
         const textoEvento = (ultimo.estadoCA + ' ' + ultimo.historia).toUpperCase();
-        const esAlerta = /DOMICILIO CERRADO|DIRECCIÓN INSUFICIENTE|RETORNANDO|VISITA FALLIDA|AUSENTE|SIN DESTINATARIO/i.test(textoEvento);
+        const _tipoEventoCA = allyClasificarEventoCA(textoEvento);
+        const esAlerta = _tipoEventoCA === 'ALERTA';
+        // Log para debug [ALLY CA]
+        const _horasSinMov = (()=>{ try{ const f=new Date(ultimo.fecha); return isNaN(f)?0:Math.round((Date.now()-f)/3600000); }catch(_){return 0;} })();
+        const _debeEscalar = allyDebeEscalarCA(textoEvento, _horasSinMov);
+        console.log('[ALLY CA]', { ot: envio.ot_numero, ultimoEvento: textoEvento, horasSinMovimiento: _horasSinMov, tipoAlerta: _tipoEventoCA, debeEscalar: _debeEscalar });
 
         // Detectar número de visita (CA usa: DOMICILIO CERRADO/1 VISITA, /2 VISITA, etc.)
         const matchVisita = textoEvento.match(/(\d+)\s*(?:RA|DA|TA|°)?\s*VISITA/i)
@@ -4352,12 +4449,17 @@ async function autoActualizarTracking(){
           if(esAlerta){
             atAddLog('alerta', otLabel, envio.responsable, envio.cuenta, `⚠️ ${visitaLabel||'ALERTA'} — ${detalle}`);
             alertas++;
-            // Sin cambio de estado pero hay alerta CA — disparar processAllyRules igual
+            // Sin cambio de estado pero hay alerta CA — disparar processAllyRules SOLO si es ALERTA real
+          // (no disparar para AVISO — PREIMPOSICION, INGRESO, etc. son eventos normales)
+          if(_tipoEventoCA === 'ALERTA') {
             fetch('https://alleata-agent-production.up.railway.app/automations/run/ca_status_checker_one', {
               method: 'POST',
               headers: {'Content-Type':'application/json','x-automation-secret':'123456'},
               body: JSON.stringify({ ot_numero: envio.ot_numero })
             }).catch(e => console.warn(`[AT] processAllyRules alerta OT ${envio.ot_numero}:`, e.message));
+          } else {
+            console.log(`[AT] Evento AVISO/ATENCION — no dispara processAllyRules: ${textoEvento.slice(0,60)}`);
+          }
           } else {
             atAddLog('ok', otLabel, envio.responsable, envio.cuenta, `Sin cambios — ${detalle||envio.estado}`);
             sinCambio++;
@@ -6823,7 +6925,7 @@ function dsClasificarLogistica(log){
 }
 
 
-// ── WhatsApp helpers Desinstalaciones — v2.5.0 ─────────────────────────
+// ── WhatsApp helpers Desinstalaciones — v2.5.1 ─────────────────────────
 function dsEscapeHtml(v){return String(v??'').replace(/[&<>'\"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[m]));}
 function dsTelefonoWa(raw){let n=String(raw||'').replace(/\D/g,'');if(!n)return '';if(n.startsWith('00'))n=n.slice(2);if(n.startsWith('0'))n=n.replace(/^0+/,'');if(!n.startsWith('54')&&(n.startsWith('9')||n.startsWith('11')||n.startsWith('15')||n.length<=11))n='54'+n;return n;}
 function dsNombreContacto(ot){const base=String(ot.contacto_nombre||ot.nombre_contacto||ot.nombre||ot.comercio||ot.cuenta||'').trim();if(!base)return '';const limpio=base.replace(/\s+-\s+SUC\s+-.*$/i,'').replace(/\s+-\s+\d+.*$/,'').trim();return limpio.split(/\s+/).slice(0,2).join(' ');}
@@ -7512,7 +7614,7 @@ async function autoTrackingDesinstalaciones(){
 
 
 async function dsAutoTracking(){
-  // AUTO-TRACKING DESINSTALACIONES v2.5.0
+  // AUTO-TRACKING DESINSTALACIONES v2.5.1
   // NO Envíos, NO Ally, NO wasender, NO Railway, NO processAllyRules
   console.log('[DS AT START] dsAutoTracking iniciado', new Date().toISOString());
   abrirModalAutoTracking();
