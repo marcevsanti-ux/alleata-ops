@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v2.5.4</title>
+<title>Alleata · Operaciones v2.5.5</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -300,7 +300,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.5.4 · 29 abr 2026
+      v2.5.5 · 02 may 2026
     </div>
   </div>
 </div>
@@ -360,7 +360,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.5.4 · 29 abr 2026
+      v2.5.5 · 02 may 2026
     </div>
   </div>
 </nav>
@@ -374,7 +374,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <div class="topbar-right" id="topbar-date"></div>
     <button onclick="refreshCurrentModule()" title="Actualizar" style="background:none;border:1px solid var(--border2);color:var(--text-muted);border-radius:7px;padding:4px 10px;cursor:pointer;font-size:13px;margin-left:10px;transition:all .2s" onmouseover="this.style.color='var(--teal)';this.style.borderColor='var(--teal)'" onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border2)'">↺</button>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.5.4</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.5.5</div>
   </div>
   <div class="content">
 
@@ -7567,6 +7567,121 @@ async function importDesinstalaciones(e){
       if(v.includes('CORREO'))           return 'CORREO ARGENTINO';
       return v; // Devolver el valor limpio si no matchea ningún patrón conocido
     }
+
+
+    // Normalización/auditoría de zona operativa para Desinstalaciones
+    // Regla: NO pisar la zona SF. Guardamos zona_sf como dato original y calculamos zona_operativa aparte.
+    function dsNormTxt(v){
+      return String(v || '')
+        .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+        .toUpperCase().trim();
+    }
+
+    function dsExtraerCP(cp, direccionLibre){
+      const raw = String(cp || '').trim();
+      if(raw) return raw;
+      const txt = String(direccionLibre || '').toUpperCase();
+      const m = txt.match(/\b([A-Z]\d{4}[A-Z]{0,3}|\d{4})\b/);
+      return m ? m[1] : '';
+    }
+
+    function dsZonaPorCiudad(ciudadRaw){
+      const c = dsNormTxt(ciudadRaw);
+      if(!c) return null;
+
+      // Si el Excel ya trae la zona embebida dentro del campo Ciudad, usarla como pista operativa.
+      if(c.includes('ZONA NORTE')) return 'Zona Norte';
+      if(c.includes('ZONA SUR'))   return 'Zona Sur';
+      if(c.includes('ZONA OESTE')) return 'Zona Oeste';
+      if(c.includes('CABA'))       return 'CABA';
+
+      const reglas = [
+        { zona:'Zona Oeste', keys:[
+          'LOMAS DEL MIRADOR','RAMOS MEJIA','SAN JUSTO','LA TABLADA','MORON','CASTELAR','ITUZAINGO',
+          'MERLO','MORENO','HAEDO','VILLA MADERO','CIUDADELA','GONZALEZ CATAN','LA REJA','ISIDRO CASANOVA',
+          'VILLA LUZURIAGA','RAFAEL CASTILLO','HURLINGHAM','TRES DE FEBRERO','CASEROS','EL PALOMAR'
+        ]},
+        { zona:'Zona Sur', keys:[
+          'MONTE GRANDE','LOMAS DE ZAMORA','BANFIELD','TEMPERLEY','LANUS','AVELLANEDA','QUILMES','BERAZATEGUI',
+          'FLORENCIO VARELA','ADROGUE','BURZACO','SARANDI','GERLI','EZEIZA','BERISSO','LA PLATA','TOLOSA',
+          'LOS HORNOS','SAN CARLOS','SAN VICENTE','MANUEL B GONNET','GONNET','ARTURO SEGUI','ENSENADA',
+          'WILDE','DOCK SUD','VALENTIN ALSINA','VILLA DOMINICO','RAFAEL CALZADA','ALEJANDRO KORN'
+        ]},
+        { zona:'Zona Norte', keys:[
+          'PILAR','PILAR CENTRO','ESCOBAR','BELEN DE ESCOBAR','TIGRE','SAN ISIDRO','VICENTE LOPEZ','SAN FERNANDO',
+          'MARTINEZ','OLIVOS','MUNRO','GARIN','JOSE C PAZ','JOSE C. PAZ','LOS CARDALES','ZELAYA','DEL VISO',
+          'BOULOGNE','BECCAR','VICTORIA','DON TORCUATO','GENERAL PACHECO','BENAVIDEZ','NORDELTA','MALVINAS ARGENTINAS'
+        ]}
+      ];
+
+      for(const regla of reglas){
+        if(regla.keys.some(k => c.includes(k))) return regla.zona;
+      }
+      return null;
+    }
+
+    function dsNormalizarZonaOperativa({zonaSf, ciudad, provincia, cp, direccion}){
+      const zsfRaw = String(zonaSf || '').trim();
+      const zsf    = dsNormTxt(zsfRaw);
+      const ciu    = dsNormTxt(ciudad);
+      const prov   = dsNormTxt(provincia);
+      const cpRaw  = dsExtraerCP(cp, direccion);
+      const cpNorm = dsNormTxt(cpRaw);
+
+      let zonaOperativa = null;
+      let confianza = 'BAJA';
+      let base = '';
+
+      if(cpNorm.startsWith('C')){
+        zonaOperativa = 'CABA';
+        confianza = 'ALTA_CP';
+        base = `CP ${cpRaw}`;
+      } else {
+        const zCiudad = dsZonaPorCiudad(ciudad);
+        if(zCiudad){
+          zonaOperativa = zCiudad;
+          confianza = 'MEDIA_CIUDAD';
+          base = `localidad ${ciudad || '—'}`;
+        }
+      }
+
+      const sfOperativa = (() => {
+        if(!zsf || zsf === 'PBA' || zsf === 'GBA' || zsf === 'BUENOS AIRES') return null;
+        if(zsf.includes('CABA')) return 'CABA';
+        if(zsf.includes('NORTE')) return 'Zona Norte';
+        if(zsf.includes('SUR')) return 'Zona Sur';
+        if(zsf.includes('OESTE')) return 'Zona Oeste';
+        return null;
+      })();
+
+      let diagnostico = 'SIN_ZONA';
+      let observacion = '';
+
+      if(!zonaOperativa){
+        diagnostico = 'SIN_ZONA';
+        observacion = 'No se pudo sugerir zona con CP/localidad. Requiere revisión manual.';
+      } else if(sfOperativa && sfOperativa !== zonaOperativa){
+        diagnostico = 'REVISAR_ZONA';
+        observacion = `SF dice ${zsfRaw}, pero ${base || 'CP/localidad'} sugiere ${zonaOperativa}.`;
+      } else if(zsf.includes('CABA') && zonaOperativa !== 'CABA' && (cpNorm.startsWith('B') || prov.includes('BUENOS AIRES'))){
+        diagnostico = 'REVISAR_ZONA';
+        observacion = `SF dice ${zsfRaw}, pero CP/provincia/localidad sugieren ${zonaOperativa}.`;
+      } else if(!sfOperativa){
+        diagnostico = 'OK_AUTO';
+        observacion = `Zona sugerida por ${base || 'regla operativa'}.`;
+      } else {
+        diagnostico = 'OK';
+        observacion = `Zona validada por ${base || 'regla operativa'}.`;
+      }
+
+      return {
+        zona_sf: zsfRaw || null,
+        zona_operativa: zonaOperativa,
+        zona_diagnostico: diagnostico,
+        zona_confianza: confianza,
+        zona_observacion: observacion
+      };
+    }
     const iTrack    = colAny('N° de seguimiento','N de seguimiento','N° seguimiento','Nro seguimiento','Seguimiento','tracking','n seguimiento');
     const iTerminal = colAny('N terminal','Nro terminal','Terminal','Serie terminal');
     const iContacto = colAny('Contacto','Nombre contacto');
@@ -7676,24 +7791,33 @@ async function importDesinstalaciones(e){
     fill.style.width = '50%';
 
     // Punto 2: verificar columnas DB antes de insertar
-    let _dbHasCosto = false, _dbHasObsEstado = false;
+    let _dbHasCosto = false, _dbHasObsEstado = false, _dbHasZonaAudit = false, _dbHasZonaObs = false;
     // Note: provincia, cp, gestion_retiros, status_gestion_retiros are always safe to write
     // (columns exist via ALTER TABLE run in sql_desinstalaciones_v2.4.8.sql)
     try {
-      const {data:colInfo} = await sb.from('ordenes_trabajo').select('costo_envio,observacion_estado,provincia,gestion_retiros').limit(1);
+      await sb.from('ordenes_trabajo').select('costo_envio').limit(1);
       _dbHasCosto = true;
+    } catch(_){}
+    try {
+      await sb.from('ordenes_trabajo').select('observacion_estado').limit(1);
       _dbHasObsEstado = true;
-    } catch(_e) {
-      // Si alguna columna no existe, Supabase lanza error
-      // Intentar de a una para saber cuál falta
-      try { await sb.from('ordenes_trabajo').select('costo_envio').limit(1); _dbHasCosto=true; } catch(_){}
-      try { await sb.from('ordenes_trabajo').select('observacion_estado').limit(1); _dbHasObsEstado=true; } catch(_){}
-    }
+    } catch(_){}
+    try {
+      await sb.from('ordenes_trabajo').select('zona_operativa,zona_diagnostico,zona_confianza,zona_audited_at').limit(1);
+      _dbHasZonaAudit = true;
+    } catch(_){}
+    try {
+      await sb.from('ordenes_trabajo').select('zona_observacion').limit(1);
+      _dbHasZonaObs = true;
+    } catch(_){}
+
     if(!_dbHasCosto) console.warn('[Import Desins] AVISO: columna costo_envio no existe en ordenes_trabajo — no se importará. Ejecutar: ALTER TABLE ordenes_trabajo ADD COLUMN IF NOT EXISTS costo_envio numeric;');
     if(!_dbHasObsEstado) console.warn('[Import Desins] AVISO: columna observacion_estado no existe en ordenes_trabajo — no se importará. Ejecutar: ALTER TABLE ordenes_trabajo ADD COLUMN IF NOT EXISTS observacion_estado text;');
+    if(!_dbHasZonaAudit) console.warn('[Import Desins] AVISO: columnas de auditoría de zona no existen — no se importarán zona_operativa/zona_diagnostico.');
 
     // 9. Upsert
     let imp = 0, err = 0;
+    let zonasOk = 0, zonasAuto = 0, zonasRevisar = 0, zonasSin = 0;
     const errLog = [];
 
     for(const {r, sfId, ot, estado, logistica} of enriched){
@@ -7723,6 +7847,20 @@ async function importDesinstalaciones(e){
         }
       }
 
+      const cpFinal = dsExtraerCP(cp, dirLibre);
+      const zonaAudit = dsNormalizarZonaOperativa({
+        zonaSf:    iZonaSF >= 0 ? svN(r, iZonaSF) : null,
+        ciudad:    ciudadDerived,
+        provincia: provDerived,
+        cp:        cpFinal,
+        direccion: dirFallback || calle
+      });
+
+      if(zonaAudit.zona_diagnostico === 'REVISAR_ZONA') zonasRevisar++;
+      else if(zonaAudit.zona_diagnostico === 'SIN_ZONA') zonasSin++;
+      else if(zonaAudit.zona_diagnostico === 'OK_AUTO') zonasAuto++;
+      else zonasOk++;
+
       const item = {
         sf_id:            sfId,
         ot:               ot,
@@ -7734,7 +7872,7 @@ async function importDesinstalaciones(e){
         direccion:        dirFallback || null,
         ciudad:           ciudadDerived || null,
         provincia:        provDerived   || null,
-        cp:               cp     || null,
+        cp:               cpFinal || null,
         fecha_asignacion: parseDate(iFecha >= 0 ? r[iFecha] : null),
         // Normalizar logística al guardar (doble seguridad)
         logistica:        normalizarLogisticaDesinst(logistica) || null,
@@ -7763,7 +7901,14 @@ async function importDesinstalaciones(e){
           })()} : {}),
         ...(typeof _dbHasObsEstado !== 'undefined' && _dbHasObsEstado
           ? {observacion_estado: svN(r,iObsEstado)} : {}),
-        zona_sf:              iZonaSF  >= 0 ? svN(r, iZonaSF)  : null,
+        zona_sf:              zonaAudit.zona_sf,
+        ...(_dbHasZonaAudit ? {
+          zona_operativa:    zonaAudit.zona_operativa,
+          zona_diagnostico:  zonaAudit.zona_diagnostico,
+          zona_confianza:    zonaAudit.zona_confianza,
+          zona_audited_at:   new Date().toISOString()
+        } : {}),
+        ...(_dbHasZonaObs ? { zona_observacion: zonaAudit.zona_observacion } : {}),
         gestion_retiros:      iGestionR >= 0 ? svN(r, iGestionR) : null,
         status_gestion_retiros: iStatusG >= 0 ? svN(r, iStatusG)  : null,
         updated_at:           new Date().toISOString()
@@ -7789,6 +7934,10 @@ async function importDesinstalaciones(e){
         <strong>${imp}</strong> importadas &nbsp;&middot;&nbsp;
         <strong>${omitidas}</strong> omitidas &nbsp;&middot;&nbsp;
         <strong>${err}</strong> errores
+        <div style="margin-top:8px;font-size:11px;color:var(--text-muted);line-height:1.6">
+          🧭 Auditoría zona: <strong>${zonasOk}</strong> OK · <strong>${zonasAuto}</strong> sugeridas · <strong>${zonasRevisar}</strong> revisar · <strong>${zonasSin}</strong> sin zona
+          ${zonasRevisar || zonasSin ? `<br><span style="color:var(--yellow)">⚠️ Las OTs con REVISAR_ZONA o SIN_ZONA no deberían entrar en hoja automática hasta validación manual.</span>` : ''}
+        </div>
         ${err>0?`<details style="margin-top:6px"><summary style="cursor:pointer;font-size:11px">Ver errores</summary><pre style="font-size:10px;margin-top:4px">${errLog.slice(0,10).map(x=>x.ot+': '+x.msg).join('\n')}</pre></details>`:''}
       </div>`;
     auditLog({tabla:'ordenes_trabajo',registro_id:'BATCH',
