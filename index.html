@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v2.5.7</title>
+<title>Alleata · Operaciones v2.5.8</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -300,7 +300,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.5.7 · 02 may 2026
+      v2.5.8 · 04 may 2026
     </div>
   </div>
 </div>
@@ -360,7 +360,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.5.7 · 02 may 2026
+      v2.5.8 · 04 may 2026
     </div>
   </div>
 </nav>
@@ -374,7 +374,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <div class="topbar-right" id="topbar-date"></div>
     <button onclick="refreshCurrentModule()" title="Actualizar" style="background:none;border:1px solid var(--border2);color:var(--text-muted);border-radius:7px;padding:4px 10px;cursor:pointer;font-size:13px;margin-left:10px;transition:all .2s" onmouseover="this.style.color='var(--teal)';this.style.borderColor='var(--teal)'" onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border2)'">↺</button>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.5.7</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.5.8</div>
   </div>
   <div class="content">
 
@@ -1131,6 +1131,11 @@ tr:hover td{background:var(--surface2);}
           onmouseover="this.style.background='rgba(26,159,212,.25)'" onmouseout="this.style.background='rgba(26,159,212,.15)'">
           🔄 Auto-tracking
         </button>
+        <button id="btnDsHojaRutaSugerir" onclick="dsHojaRutaSugerir()"
+          style="background:rgba(139,92,246,.15);border:1px solid rgba(139,92,246,.45);color:#a78bfa;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px;white-space:nowrap;"
+          onmouseover="this.style.background='rgba(139,92,246,.25)'" onmouseout="this.style.background='rgba(139,92,246,.15)'">
+          🚚 Hoja de ruta
+        </button>
         <button onclick="exportarListadoDesinstalaciones()"
           style="background:rgba(29,191,142,.15);border:1px solid rgba(29,191,142,.4);color:var(--teal);padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;white-space:nowrap;"
           onmouseover="this.style.background='rgba(29,191,142,.25)'" onmouseout="this.style.background='rgba(29,191,142,.15)'">
@@ -1144,6 +1149,9 @@ tr:hover td{background:var(--surface2);}
       </div>
       <div id="dsImportResult"></div>
     </div>
+
+    <!-- Sugerencia automática de hoja de ruta -->
+    <div id="dsHojaRutaPanel" style="display:none;margin-bottom:14px"></div>
     <!-- Subtítulo dinámico del listado (geo filter indicator) -->
     <div id="ds-listado-sub" style="display:none;padding:6px 12px;margin-bottom:8px;background:rgba(29,191,142,.08);border:1px solid rgba(29,191,142,.2);border-radius:8px;display:flex;justify-content:space-between;align-items:center">
       <span id="ds-listado-sub-txt" style="font-size:12px;font-weight:600;color:var(--teal)"></span>
@@ -2026,6 +2034,203 @@ function dsFiltrarPendientesGestion(){
   if(sub && txt){
     sub.style.display='flex';
     txt.textContent=`OTs sin gestión asignada (${DesinModule.filtrados.length})`;
+  }
+}
+
+
+// ── Hoja de ruta sugerida por Ally — desde dashboard ─────────────────────
+let DS_HOJA_RUTA_SUGERIDA = null;
+let DS_HOJA_RUTA_ULTIMO_MENSAJE = '';
+
+function dsHojaRutaEscape(v){
+  return String(v ?? '')
+    .replaceAll('&','&amp;')
+    .replaceAll('<','&lt;')
+    .replaceAll('>','&gt;')
+    .replaceAll('"','&quot;')
+    .replaceAll("'",'&#039;');
+}
+
+function dsHojaRutaPanel(){
+  let el = document.getElementById('dsHojaRutaPanel');
+  if(!el){
+    el = document.createElement('div');
+    el.id = 'dsHojaRutaPanel';
+    el.style.marginBottom = '14px';
+    const ref = document.getElementById('dsImportArea') || document.getElementById('dsLogResumen') || document.body;
+    ref.insertAdjacentElement('afterend', el);
+  }
+  el.style.display = 'block';
+  return el;
+}
+
+function dsHojaRutaHeaders(){
+  return {
+    'Content-Type': 'application/json',
+    'x-automation-secret': typeof ALLY_DESINST_SECRET !== 'undefined' ? ALLY_DESINST_SECRET : '123456'
+  };
+}
+
+function dsHojaRutaRenderSugerencia(data){
+  const panel = dsHojaRutaPanel();
+
+  if(!data?.ok){
+    panel.innerHTML = `<div class="alert alert-err">❌ Error: ${dsHojaRutaEscape(data?.error || 'No se pudo generar la hoja de ruta')}</div>`;
+    return;
+  }
+
+  if(!Array.isArray(data.ots) || data.ots.length === 0){
+    DS_HOJA_RUTA_SUGERIDA = null;
+    panel.innerHTML = `
+      <div style="background:var(--navy-800);border:1px solid var(--yellow-border);border-left:4px solid var(--yellow);border-radius:12px;padding:14px 16px">
+        <div style="font-weight:800;color:var(--yellow);font-size:14px;margin-bottom:4px">🚚 Hoja de ruta sugerida</div>
+        <div style="font-size:12px;color:var(--text-muted)">No hay OTs candidatas para hoja de ruta.</div>
+      </div>`;
+    return;
+  }
+
+  DS_HOJA_RUTA_SUGERIDA = data;
+  const resumen = Object.entries(data.resumen_zonas || {}).map(([zona,total]) => `
+    <span class="badge badge-blue" style="margin-right:6px;margin-bottom:6px">${dsHojaRutaEscape(zona)}: ${dsHojaRutaEscape(total)}</span>
+  `).join('');
+
+  panel.innerHTML = `
+    <div style="background:var(--navy-800);border:1px solid rgba(139,92,246,.35);border-left:4px solid #8b5cf6;border-radius:12px;overflow:hidden;box-shadow:var(--shadow)">
+      <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+        <div>
+          <div style="font-weight:900;color:#c4b5fd;font-size:15px">🚚 Hoja de ruta sugerida por Ally</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:3px">
+            Zona: <b style="color:#c4b5fd">${dsHojaRutaEscape(data.zona || 'Sin zona')}</b>
+            · ${dsHojaRutaEscape(data.total)} OT
+            · ${dsHojaRutaEscape(data.total_candidatas)} candidatas
+            · máx. ${dsHojaRutaEscape(data.capacidad_maxima || 10)} por hoja
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button onclick="dsHojaRutaConfirmar()" style="background:var(--grad);color:#fff;border:none;padding:8px 14px;border-radius:8px;font-size:12px;font-weight:800;cursor:pointer">✅ Confirmar hoja</button>
+          <button onclick="document.getElementById('dsHojaRutaPanel').style.display='none'" class="btn-ghost btn-sm" style="width:auto">Cerrar</button>
+        </div>
+      </div>
+      <div style="padding:12px 16px">
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">${resumen}</div>
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>#</th><th>OT</th><th>Comercio</th><th>Ciudad</th><th>Dirección</th><th>Gestión</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${data.ots.map(ot => `
+                <tr>
+                  <td>${dsHojaRutaEscape(ot.orden)}</td>
+                  <td class="mono" style="color:var(--teal)">${dsHojaRutaEscape(ot.ot)}</td>
+                  <td>${dsHojaRutaEscape(ot.comercio)}</td>
+                  <td>${dsHojaRutaEscape(ot.ciudad)}</td>
+                  <td>${dsHojaRutaEscape(ot.direccion)}</td>
+                  <td><span class="badge badge-green">${dsHojaRutaEscape(ot.status_gestion_retiros || 'Sin gestión')}</span></td>
+                </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>`;
+}
+
+function dsHojaRutaRenderConfirmada(result){
+  const panel = dsHojaRutaPanel();
+  DS_HOJA_RUTA_ULTIMO_MENSAJE = result?.mensaje || '';
+  panel.innerHTML = `
+    <div style="background:var(--navy-800);border:1px solid rgba(16,185,129,.35);border-left:4px solid var(--green);border-radius:12px;overflow:hidden;box-shadow:var(--shadow)">
+      <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+        <div>
+          <div style="font-weight:900;color:#6ee7b7;font-size:15px">✅ Hoja de ruta confirmada</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:3px">
+            Zona: <b style="color:#6ee7b7">${dsHojaRutaEscape(result.zona)}</b>
+            · Responsable: ${dsHojaRutaEscape(result.responsable)}
+            · Total: ${dsHojaRutaEscape(result.total)} OT
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button onclick="dsHojaRutaCopiarMensaje()" style="background:rgba(29,191,142,.15);border:1px solid rgba(29,191,142,.4);color:var(--teal);padding:8px 14px;border-radius:8px;font-size:12px;font-weight:800;cursor:pointer">📋 Copiar mensaje</button>
+          <button onclick="dsHojaRutaSugerir()" class="btn-ghost btn-sm" style="width:auto">🔄 Siguiente sugerencia</button>
+        </div>
+      </div>
+      <div style="padding:14px 16px">
+        <pre style="white-space:pre-wrap;background:var(--navy-900);border:1px solid var(--border);border-radius:10px;padding:14px;color:var(--text);font-family:'Inter',sans-serif;font-size:13px;line-height:1.55">${dsHojaRutaEscape(result.mensaje || '')}</pre>
+      </div>
+    </div>`;
+}
+
+async function dsHojaRutaSugerir(){
+  const panel = dsHojaRutaPanel();
+  panel.innerHTML = `
+    <div style="background:var(--navy-800);border:1px solid rgba(26,159,212,.35);border-left:4px solid var(--blue);border-radius:12px;padding:14px 16px">
+      <div style="font-weight:800;color:var(--blue);font-size:14px;margin-bottom:4px">🚚 Calculando hoja de ruta...</div>
+      <div style="font-size:12px;color:var(--text-muted)">Ally está buscando OTs despachadas de logística Alleata, sin hoja activa y con retiro confirmado.</div>
+    </div>`;
+
+  try{
+    const base = typeof ALLY_RAILWAY_BASE !== 'undefined' ? ALLY_RAILWAY_BASE : 'https://alleata-agent-production.up.railway.app';
+    const resp = await fetch(`${base}/api/desinstalaciones/hoja-ruta/sugerir`, {
+      method:'POST',
+      headers: dsHojaRutaHeaders(),
+      body: JSON.stringify({})
+    });
+    const data = await resp.json();
+    if(!resp.ok) throw new Error(data?.error || `HTTP ${resp.status}`);
+    dsHojaRutaRenderSugerencia(data);
+  }catch(e){
+    console.error('[dsHojaRutaSugerir]', e);
+    panel.innerHTML = `<div class="alert alert-err">❌ No se pudo sugerir hoja de ruta: ${dsHojaRutaEscape(e.message)}</div>`;
+  }
+}
+
+async function dsHojaRutaConfirmar(){
+  if(!DS_HOJA_RUTA_SUGERIDA?.ots?.length){
+    alert('Primero generá una sugerencia de hoja de ruta.');
+    return;
+  }
+
+  const ots = DS_HOJA_RUTA_SUGERIDA.ots.map(x => x.ot);
+  const zona = DS_HOJA_RUTA_SUGERIDA.zona || 'Sin zona';
+  const responsable = (window.currentUser?.nombre || window.currentUser?.email || window.currentUser?.name || document.getElementById('sideUserName')?.textContent || 'Marcelo').trim() || 'Marcelo';
+
+  if(!confirm(`¿Confirmar hoja de ruta ${zona} con ${ots.length} OT?\n\n${ots.join(', ')}`)) return;
+
+  const panel = dsHojaRutaPanel();
+  panel.insertAdjacentHTML('afterbegin', `<div class="alert alert-info" id="dsHojaRutaConfirmando">⏳ Confirmando hoja de ruta...</div>`);
+
+  try{
+    const base = typeof ALLY_RAILWAY_BASE !== 'undefined' ? ALLY_RAILWAY_BASE : 'https://alleata-agent-production.up.railway.app';
+    const resp = await fetch(`${base}/api/desinstalaciones/hoja-ruta/confirmar`, {
+      method:'POST',
+      headers: dsHojaRutaHeaders(),
+      body: JSON.stringify({ ots, zona, responsable })
+    });
+    const result = await resp.json();
+    document.getElementById('dsHojaRutaConfirmando')?.remove();
+    if(!resp.ok || !result.ok) throw new Error(result?.error || `HTTP ${resp.status}`);
+    dsHojaRutaRenderConfirmada(result);
+    DesinModule.cargado = false;
+    if(typeof cargarDesinstalaciones === 'function') await cargarDesinstalaciones();
+  }catch(e){
+    console.error('[dsHojaRutaConfirmar]', e);
+    document.getElementById('dsHojaRutaConfirmando')?.remove();
+    panel.insertAdjacentHTML('afterbegin', `<div class="alert alert-err">❌ No se pudo confirmar hoja de ruta: ${dsHojaRutaEscape(e.message)}</div>`);
+  }
+}
+
+async function dsHojaRutaCopiarMensaje(){
+  if(!DS_HOJA_RUTA_ULTIMO_MENSAJE){
+    alert('No hay mensaje para copiar.');
+    return;
+  }
+  try{
+    await navigator.clipboard.writeText(DS_HOJA_RUTA_ULTIMO_MENSAJE);
+    alert('Mensaje copiado.');
+  }catch(_){
+    alert('No se pudo copiar automáticamente. Seleccioná el texto y copialo manualmente.');
   }
 }
 
