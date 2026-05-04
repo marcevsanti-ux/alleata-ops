@@ -7,15 +7,21 @@ const SF_DESINSTALACIONES_REPORT =
 
 const ALLY_API_BASE = "https://alleata-agent-production.up.railway.app";
 
-// Si después querés esconderlo, lo pasamos a config del dashboard.
-const AUTOMATION_SECRET = window.AUTOMATION_SECRET || "";
-
 let ultimaHojaRutaSugerida = null;
 
 
 // ================================
 // HELPERS
 // ================================
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
 
 function getHojaRutaContainer() {
   let contenedor = document.getElementById("resultadoHojaRuta");
@@ -25,41 +31,16 @@ function getHojaRutaContainer() {
     contenedor.id = "resultadoHojaRuta";
     contenedor.style.marginTop = "16px";
 
-    const btnAutoTracking =
-      document.querySelector('[onclick*="autoTracking"]') ||
-      document.querySelector('[onclick*="runAutoTracking"]') ||
-      document.querySelector('[onclick*="desinstAutoTracking"]');
-
-    const parent =
-      btnAutoTracking?.closest(".card") ||
-      btnAutoTracking?.closest("div") ||
+    const zonaBotones =
+      document.querySelector("#btn-hoja-ruta-desinst")?.parentElement ||
+      document.querySelector('[onclick*="autoTracking"]')?.parentElement ||
+      document.querySelector('[onclick*="export"]')?.parentElement ||
       document.body;
 
-    parent.appendChild(contenedor);
+    zonaBotones.appendChild(contenedor);
   }
 
   return contenedor;
-}
-
-function getAuthHeaders() {
-  const headers = {
-    "Content-Type": "application/json"
-  };
-
-  if (AUTOMATION_SECRET) {
-    headers["x-automation-secret"] = AUTOMATION_SECRET;
-  }
-
-  return headers;
-}
-
-function escapeHtml(value) {
-  return String(value ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
 }
 
 function renderResumenZonas(resumen = {}) {
@@ -110,7 +91,8 @@ function renderHojaRuta(data) {
         <div>
           <div class="card-title" style="margin-bottom:4px">🚚 Hoja de ruta sugerida</div>
           <div style="font-size:13px;color:var(--text-muted)">
-            Zona elegida: <b style="color:var(--teal)">${escapeHtml(data.zona || "Sin zona")}</b>
+            Zona elegida:
+            <b style="color:var(--teal)">${escapeHtml(data.zona || "Sin zona")}</b>
             · ${escapeHtml(data.total || 0)} OT
             · Capacidad máx: ${escapeHtml(data.capacidad_maxima || 10)}
           </div>
@@ -132,6 +114,8 @@ function renderHojaRuta(data) {
               <th>Comercio</th>
               <th>Ciudad</th>
               <th>Dirección</th>
+              <th>Zona</th>
+              <th>Origen zona</th>
               <th>Gestión</th>
             </tr>
           </thead>
@@ -145,9 +129,11 @@ function renderHojaRuta(data) {
                 <td>${escapeHtml(ot.direccion)}</td>
                 <td>
                   <span class="badge badge-green">
-                    ${escapeHtml(ot.status_gestion_retiros || "Sin gestión")}
+                    ${escapeHtml(ot.zona_sugerida || "Sin zona")}
                   </span>
                 </td>
+                <td>${escapeHtml(ot.zona_origen || "—")}</td>
+                <td>${escapeHtml(ot.status_gestion_retiros || "Sin gestión")}</td>
               </tr>
             `).join("")}
           </tbody>
@@ -212,7 +198,6 @@ function renderHojaConfirmada(result) {
 
 function abrirReporteSF() {
   try {
-    console.log("Abriendo reporte de Salesforce...");
     window.open(SF_DESINSTALACIONES_REPORT, "_blank", "noopener,noreferrer");
   } catch (error) {
     console.error("Error al abrir reporte SF:", error);
@@ -221,7 +206,7 @@ function abrirReporteSF() {
 
 
 // ================================
-// HOJA DE RUTA — DASH
+// HOJA DE RUTA
 // ================================
 
 async function sugerirHojaRutaDesdeDash() {
@@ -231,7 +216,7 @@ async function sugerirHojaRutaDesdeDash() {
     <div class="card" style="margin-top:14px;border-left:3px solid var(--blue)">
       <div class="card-title">🚚 Calculando hoja de ruta...</div>
       <div style="font-size:13px;color:var(--text-muted)">
-        Buscando OTs despachadas, logística Alleata, sin hoja activa y con retiro confirmado.
+        Validando zonas por CP/localidad para logística Alleata.
       </div>
     </div>
   `;
@@ -239,7 +224,9 @@ async function sugerirHojaRutaDesdeDash() {
   try {
     const res = await fetch(`${ALLY_API_BASE}/api/desinstalaciones/hoja-ruta/sugerir`, {
       method: "POST",
-      headers: getAuthHeaders(),
+      headers: {
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify({})
     });
 
@@ -255,7 +242,7 @@ async function sugerirHojaRutaDesdeDash() {
 
     contenedor.innerHTML = `
       <div class="alert alert-err">
-        No se pudo generar la hoja de ruta: ${escapeHtml(error.message)}
+        No se pudo sugerir hoja de ruta: ${escapeHtml(error.message)}
       </div>
     `;
   }
@@ -286,27 +273,20 @@ async function confirmarHojaRutaDesdeDash() {
 
   if (!confirmado) return;
 
-  contenedor.insertAdjacentHTML("afterbegin", `
-    <div class="alert alert-info" id="confirmandoHojaRutaAlert">
-      Confirmando hoja de ruta...
-    </div>
-  `);
-
   try {
     const res = await fetch(`${ALLY_API_BASE}/api/desinstalaciones/hoja-ruta/confirmar`, {
       method: "POST",
-      headers: getAuthHeaders(),
+      headers: {
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify({
         ots,
         zona: ultimaHojaRutaSugerida.zona,
-        responsable
+        responsable,
       })
     });
 
     const result = await res.json();
-
-    const alert = document.getElementById("confirmandoHojaRutaAlert");
-    if (alert) alert.remove();
 
     if (!res.ok) {
       throw new Error(result?.error || `HTTP ${res.status}`);
@@ -320,12 +300,9 @@ async function confirmarHojaRutaDesdeDash() {
   } catch (error) {
     console.error("[HojaRuta] Error confirmar:", error);
 
-    const alert = document.getElementById("confirmandoHojaRutaAlert");
-    if (alert) alert.remove();
-
     contenedor.insertAdjacentHTML("afterbegin", `
       <div class="alert alert-err">
-        No se pudo confirmar la hoja de ruta: ${escapeHtml(error.message)}
+        No se pudo confirmar hoja de ruta: ${escapeHtml(error.message)}
       </div>
     `);
   }
@@ -343,8 +320,7 @@ async function copiarMensajeHojaRuta() {
     await navigator.clipboard.writeText(texto);
     alert("Mensaje copiado.");
   } catch (error) {
-    console.error("[HojaRuta] Error copiar:", error);
-    alert("No se pudo copiar automáticamente. Copialo manualmente desde el panel.");
+    alert("No se pudo copiar automáticamente.");
   }
 }
 
@@ -377,7 +353,7 @@ function insertarBotonHojaRuta() {
   btn.className = "btn-ghost btn-sm";
   btn.style.width = "auto";
   btn.style.marginLeft = "8px";
-  btn.innerHTML = "🚚 Sugerir hoja de ruta";
+  btn.innerHTML = "🚚 Hoja de ruta";
   btn.onclick = sugerirHojaRutaDesdeDash;
 
   referencia.parentElement.insertBefore(btn, referencia.nextSibling);
@@ -389,17 +365,10 @@ document.addEventListener("DOMContentLoaded", () => {
   const btnReporte = document.getElementById("btn-ver-reporte");
   if (btnReporte) {
     btnReporte.addEventListener("click", abrirReporteSF);
-  } else {
-    console.warn("[Desinstalaciones] btn-ver-reporte no encontrado en el DOM");
   }
 
   setTimeout(insertarBotonHojaRuta, 800);
 });
-
-
-// ================================
-// EXPONER FUNCIONES AL WINDOW
-// ================================
 
 window.abrirReporteSF = abrirReporteSF;
 window.sugerirHojaRutaDesdeDash = sugerirHojaRutaDesdeDash;
