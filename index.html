@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v2.5.8</title>
+<title>Alleata · Operaciones v2.5.5</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -300,7 +300,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.5.8 · 04 may 2026
+      v2.5.5 · 29 abr 2026
     </div>
   </div>
 </div>
@@ -360,7 +360,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.5.8 · 04 may 2026
+      v2.5.5 · 29 abr 2026
     </div>
   </div>
 </nav>
@@ -374,7 +374,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <div class="topbar-right" id="topbar-date"></div>
     <button onclick="refreshCurrentModule()" title="Actualizar" style="background:none;border:1px solid var(--border2);color:var(--text-muted);border-radius:7px;padding:4px 10px;cursor:pointer;font-size:13px;margin-left:10px;transition:all .2s" onmouseover="this.style.color='var(--teal)';this.style.borderColor='var(--teal)'" onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border2)'">↺</button>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.5.8</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.5.5</div>
   </div>
   <div class="content">
 
@@ -1131,11 +1131,6 @@ tr:hover td{background:var(--surface2);}
           onmouseover="this.style.background='rgba(26,159,212,.25)'" onmouseout="this.style.background='rgba(26,159,212,.15)'">
           🔄 Auto-tracking
         </button>
-        <button id="btnDsHojaRutaSugerir" onclick="dsHojaRutaSugerir()"
-          style="background:rgba(139,92,246,.15);border:1px solid rgba(139,92,246,.45);color:#a78bfa;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px;white-space:nowrap;"
-          onmouseover="this.style.background='rgba(139,92,246,.25)'" onmouseout="this.style.background='rgba(139,92,246,.15)'">
-          🚚 Hoja de ruta
-        </button>
         <button onclick="exportarListadoDesinstalaciones()"
           style="background:rgba(29,191,142,.15);border:1px solid rgba(29,191,142,.4);color:var(--teal);padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;white-space:nowrap;"
           onmouseover="this.style.background='rgba(29,191,142,.25)'" onmouseout="this.style.background='rgba(29,191,142,.15)'">
@@ -1149,9 +1144,6 @@ tr:hover td{background:var(--surface2);}
       </div>
       <div id="dsImportResult"></div>
     </div>
-
-    <!-- Sugerencia automática de hoja de ruta -->
-    <div id="dsHojaRutaPanel" style="display:none;margin-bottom:14px"></div>
     <!-- Subtítulo dinámico del listado (geo filter indicator) -->
     <div id="ds-listado-sub" style="display:none;padding:6px 12px;margin-bottom:8px;background:rgba(29,191,142,.08);border:1px solid rgba(29,191,142,.2);border-radius:8px;display:flex;justify-content:space-between;align-items:center">
       <span id="ds-listado-sub-txt" style="font-size:12px;font-weight:600;color:var(--teal)"></span>
@@ -1635,37 +1627,54 @@ function dsGetZona(ot){
   const prov    = (ot.provincia||'').toLowerCase().trim();
   const cp      = String(ot.cp||ot.codigo_postal||'').trim();
   const cpNum   = parseInt(cp)||0;
+  const distKm  = parseFloat(ot.distancia||ot.distancia_km||0)||0;
 
-  // CABA: CP 1000–1499 o ciudad/provincia contiene 'buenos aires' sin GBA indicator
+  // Distancia > 70km → Fuera AMBA directamente
+  if(distKm > 70) return 'Fuera AMBA';
+
+  // CABA
   if(prov.includes('ciudad autónoma')||prov.includes('ciudad autonoma')||prov==='caba')
     return 'CABA';
-  // Provincias del interior → Fuera AMBA inmediatamente (evita match parcial con 'norte', etc.)
-  const FUERA_AMBA=['santa fe','córdoba','cordoba','mendoza','tucumán','tucuman','salta','chaco','misiones','corrientes','entre ríos','entre rios','río negro','rio negro','neuquén','neuquen','la pampa','san luis','san juan','la rioja','catamarca','santiago del estero','jujuy','formosa','chubut','santa cruz','tierra del fuego'];
-  if(FUERA_AMBA.some(p=>prov.includes(p)))return 'Fuera AMBA';
   if(cpNum>=1000&&cpNum<=1499) return 'CABA';
 
-  // Zona Norte GBA
-  const norte=['tigre','san isidro','vicente lópez','vicente lopez','san martín','san martin',
-    'tres de febrero','pilar','escobar','malvinas argentinas','jose c paz','hurlingham'];
-  if(norte.some(c=>ciudad.includes(c))) return 'Zona Norte';
-  if(cpNum>=1600&&cpNum<=1669) return 'Zona Norte';
+  // Provincias del interior → Fuera AMBA
+  const FUERA_AMBA=['santa fe','córdoba','cordoba','mendoza','tucumán','tucuman','salta',
+    'chaco','misiones','corrientes','entre ríos','entre rios','río negro','rio negro',
+    'neuquén','neuquen','la pampa','san luis','san juan','la rioja','catamarca',
+    'santiago del estero','jujuy','formosa','chubut','santa cruz','tierra del fuego'];
+  if(FUERA_AMBA.some(p=>prov.includes(p))) return 'Fuera AMBA';
 
-  // Zona Sur GBA
-  const sur=['quilmes','lomas de zamora','lanús','lanus','almirante brown','esteban echeverria',
-    'esteban echeverría','florencio varela','berazategui','avellaneda','la matanza'];
+  // Zona Sur — spec explícito + CP
+  const sur=['la plata','berisso','ensenada','avellaneda','lanús','lanus',
+    'lomas de zamora','quilmes','monte grande','guernica','bernal','berazategui',
+    'florencio varela','almirante brown','esteban echeverria','esteban echeverría',
+    'ezpeleta','temperley','banfield','adrogué','adrogué','san justo'];
   if(sur.some(c=>ciudad.includes(c))) return 'Zona Sur';
   if(cpNum>=1800&&cpNum<=1899) return 'Zona Sur';
+  if(cpNum>=1900&&cpNum<=1999) return 'Zona Sur'; // La Plata
 
-  // Zona Oeste GBA
-  const oeste=['morón','moron','merlo','moreno','general rodríguez','general rodriguez',
-    'marcos paz','luján','lujan','la matanza','ituzaingo','ituzaingó'];
+  // Zona Oeste — spec explícito + CP
+  const oeste=['morón','moron','merlo','moreno','hurlingham','ituzaingo','ituzaingó',
+    'la matanza','san justo','ramos mejía','ramos mejia','haedo','castelar',
+    'palermo','ciudadela','liniers','marcos paz','luján','lujan',
+    'general rodríguez','general rodriguez'];
   if(oeste.some(c=>ciudad.includes(c))) return 'Zona Oeste';
   if(cpNum>=1700&&cpNum<=1769) return 'Zona Oeste';
 
-  // Si es Buenos Aires pero no CABA y no GBA → Fuera AMBA
+  // Zona Norte — spec explícito + CP
+  const norte=['tigre','san isidro','vicente lópez','vicente lopez','pilar','escobar',
+    'zárate','zarate','campana','san miguel','malvinas argentinas','jose c paz',
+    'san martín','san martin','tres de febrero','olivos','martinez','martínez',
+    'florida','munro','villa del parque','palermo','belgrano'];
+  if(norte.some(c=>ciudad.includes(c))) return 'Zona Norte';
+  if(cpNum>=1600&&cpNum<=1669) return 'Zona Norte';
+
+  // Buenos Aires pero no clasificada → Fuera AMBA (localidades lejanas)
   if(prov.includes('buenos aires')&&cpNum>=1500) return 'Fuera AMBA';
-  if(ciudad&&!prov.includes('buenos aires')&&prov) return 'Fuera AMBA';
+
+  // Sin datos suficientes
   if(!ciudad&&!prov) return 'Sin zona';
+  if(ciudad&&prov&&!prov.includes('buenos aires')) return 'Fuera AMBA';
   return 'Sin zona';
 }
 
@@ -1997,7 +2006,7 @@ function dsRutaCSV(){
 }
 
 // ══════════════════════════════════════════════════════════════════════
-// DESINSTALACIONES — FUNCIONES NUEVAS v2.5.4
+// DESINSTALACIONES — FUNCIONES NUEVAS v2.5.5
 // Prefijo: dsGestion_, dsRuta_, dsExport_
 // No modifican lógica existente de Envíos ni Rollout
 // ══════════════════════════════════════════════════════════════════════
@@ -2034,203 +2043,6 @@ function dsFiltrarPendientesGestion(){
   if(sub && txt){
     sub.style.display='flex';
     txt.textContent=`OTs sin gestión asignada (${DesinModule.filtrados.length})`;
-  }
-}
-
-
-// ── Hoja de ruta sugerida por Ally — desde dashboard ─────────────────────
-let DS_HOJA_RUTA_SUGERIDA = null;
-let DS_HOJA_RUTA_ULTIMO_MENSAJE = '';
-
-function dsHojaRutaEscape(v){
-  return String(v ?? '')
-    .replaceAll('&','&amp;')
-    .replaceAll('<','&lt;')
-    .replaceAll('>','&gt;')
-    .replaceAll('"','&quot;')
-    .replaceAll("'",'&#039;');
-}
-
-function dsHojaRutaPanel(){
-  let el = document.getElementById('dsHojaRutaPanel');
-  if(!el){
-    el = document.createElement('div');
-    el.id = 'dsHojaRutaPanel';
-    el.style.marginBottom = '14px';
-    const ref = document.getElementById('dsImportArea') || document.getElementById('dsLogResumen') || document.body;
-    ref.insertAdjacentElement('afterend', el);
-  }
-  el.style.display = 'block';
-  return el;
-}
-
-function dsHojaRutaHeaders(){
-  return {
-    'Content-Type': 'application/json',
-    'x-automation-secret': typeof ALLY_DESINST_SECRET !== 'undefined' ? ALLY_DESINST_SECRET : '123456'
-  };
-}
-
-function dsHojaRutaRenderSugerencia(data){
-  const panel = dsHojaRutaPanel();
-
-  if(!data?.ok){
-    panel.innerHTML = `<div class="alert alert-err">❌ Error: ${dsHojaRutaEscape(data?.error || 'No se pudo generar la hoja de ruta')}</div>`;
-    return;
-  }
-
-  if(!Array.isArray(data.ots) || data.ots.length === 0){
-    DS_HOJA_RUTA_SUGERIDA = null;
-    panel.innerHTML = `
-      <div style="background:var(--navy-800);border:1px solid var(--yellow-border);border-left:4px solid var(--yellow);border-radius:12px;padding:14px 16px">
-        <div style="font-weight:800;color:var(--yellow);font-size:14px;margin-bottom:4px">🚚 Hoja de ruta sugerida</div>
-        <div style="font-size:12px;color:var(--text-muted)">No hay OTs candidatas para hoja de ruta.</div>
-      </div>`;
-    return;
-  }
-
-  DS_HOJA_RUTA_SUGERIDA = data;
-  const resumen = Object.entries(data.resumen_zonas || {}).map(([zona,total]) => `
-    <span class="badge badge-blue" style="margin-right:6px;margin-bottom:6px">${dsHojaRutaEscape(zona)}: ${dsHojaRutaEscape(total)}</span>
-  `).join('');
-
-  panel.innerHTML = `
-    <div style="background:var(--navy-800);border:1px solid rgba(139,92,246,.35);border-left:4px solid #8b5cf6;border-radius:12px;overflow:hidden;box-shadow:var(--shadow)">
-      <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
-        <div>
-          <div style="font-weight:900;color:#c4b5fd;font-size:15px">🚚 Hoja de ruta sugerida por Ally</div>
-          <div style="font-size:12px;color:var(--text-muted);margin-top:3px">
-            Zona: <b style="color:#c4b5fd">${dsHojaRutaEscape(data.zona || 'Sin zona')}</b>
-            · ${dsHojaRutaEscape(data.total)} OT
-            · ${dsHojaRutaEscape(data.total_candidatas)} candidatas
-            · máx. ${dsHojaRutaEscape(data.capacidad_maxima || 10)} por hoja
-          </div>
-        </div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <button onclick="dsHojaRutaConfirmar()" style="background:var(--grad);color:#fff;border:none;padding:8px 14px;border-radius:8px;font-size:12px;font-weight:800;cursor:pointer">✅ Confirmar hoja</button>
-          <button onclick="document.getElementById('dsHojaRutaPanel').style.display='none'" class="btn-ghost btn-sm" style="width:auto">Cerrar</button>
-        </div>
-      </div>
-      <div style="padding:12px 16px">
-        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">${resumen}</div>
-        <div class="table-wrap">
-          <table class="table">
-            <thead>
-              <tr>
-                <th>#</th><th>OT</th><th>Comercio</th><th>Ciudad</th><th>Dirección</th><th>Gestión</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${data.ots.map(ot => `
-                <tr>
-                  <td>${dsHojaRutaEscape(ot.orden)}</td>
-                  <td class="mono" style="color:var(--teal)">${dsHojaRutaEscape(ot.ot)}</td>
-                  <td>${dsHojaRutaEscape(ot.comercio)}</td>
-                  <td>${dsHojaRutaEscape(ot.ciudad)}</td>
-                  <td>${dsHojaRutaEscape(ot.direccion)}</td>
-                  <td><span class="badge badge-green">${dsHojaRutaEscape(ot.status_gestion_retiros || 'Sin gestión')}</span></td>
-                </tr>`).join('')}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>`;
-}
-
-function dsHojaRutaRenderConfirmada(result){
-  const panel = dsHojaRutaPanel();
-  DS_HOJA_RUTA_ULTIMO_MENSAJE = result?.mensaje || '';
-  panel.innerHTML = `
-    <div style="background:var(--navy-800);border:1px solid rgba(16,185,129,.35);border-left:4px solid var(--green);border-radius:12px;overflow:hidden;box-shadow:var(--shadow)">
-      <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
-        <div>
-          <div style="font-weight:900;color:#6ee7b7;font-size:15px">✅ Hoja de ruta confirmada</div>
-          <div style="font-size:12px;color:var(--text-muted);margin-top:3px">
-            Zona: <b style="color:#6ee7b7">${dsHojaRutaEscape(result.zona)}</b>
-            · Responsable: ${dsHojaRutaEscape(result.responsable)}
-            · Total: ${dsHojaRutaEscape(result.total)} OT
-          </div>
-        </div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <button onclick="dsHojaRutaCopiarMensaje()" style="background:rgba(29,191,142,.15);border:1px solid rgba(29,191,142,.4);color:var(--teal);padding:8px 14px;border-radius:8px;font-size:12px;font-weight:800;cursor:pointer">📋 Copiar mensaje</button>
-          <button onclick="dsHojaRutaSugerir()" class="btn-ghost btn-sm" style="width:auto">🔄 Siguiente sugerencia</button>
-        </div>
-      </div>
-      <div style="padding:14px 16px">
-        <pre style="white-space:pre-wrap;background:var(--navy-900);border:1px solid var(--border);border-radius:10px;padding:14px;color:var(--text);font-family:'Inter',sans-serif;font-size:13px;line-height:1.55">${dsHojaRutaEscape(result.mensaje || '')}</pre>
-      </div>
-    </div>`;
-}
-
-async function dsHojaRutaSugerir(){
-  const panel = dsHojaRutaPanel();
-  panel.innerHTML = `
-    <div style="background:var(--navy-800);border:1px solid rgba(26,159,212,.35);border-left:4px solid var(--blue);border-radius:12px;padding:14px 16px">
-      <div style="font-weight:800;color:var(--blue);font-size:14px;margin-bottom:4px">🚚 Calculando hoja de ruta...</div>
-      <div style="font-size:12px;color:var(--text-muted)">Ally está buscando OTs despachadas de logística Alleata, sin hoja activa y con retiro confirmado.</div>
-    </div>`;
-
-  try{
-    const base = typeof ALLY_RAILWAY_BASE !== 'undefined' ? ALLY_RAILWAY_BASE : 'https://alleata-agent-production.up.railway.app';
-    const resp = await fetch(`${base}/api/desinstalaciones/hoja-ruta/sugerir`, {
-      method:'POST',
-      headers: dsHojaRutaHeaders(),
-      body: JSON.stringify({})
-    });
-    const data = await resp.json();
-    if(!resp.ok) throw new Error(data?.error || `HTTP ${resp.status}`);
-    dsHojaRutaRenderSugerencia(data);
-  }catch(e){
-    console.error('[dsHojaRutaSugerir]', e);
-    panel.innerHTML = `<div class="alert alert-err">❌ No se pudo sugerir hoja de ruta: ${dsHojaRutaEscape(e.message)}</div>`;
-  }
-}
-
-async function dsHojaRutaConfirmar(){
-  if(!DS_HOJA_RUTA_SUGERIDA?.ots?.length){
-    alert('Primero generá una sugerencia de hoja de ruta.');
-    return;
-  }
-
-  const ots = DS_HOJA_RUTA_SUGERIDA.ots.map(x => x.ot);
-  const zona = DS_HOJA_RUTA_SUGERIDA.zona || 'Sin zona';
-  const responsable = (window.currentUser?.nombre || window.currentUser?.email || window.currentUser?.name || document.getElementById('sideUserName')?.textContent || 'Marcelo').trim() || 'Marcelo';
-
-  if(!confirm(`¿Confirmar hoja de ruta ${zona} con ${ots.length} OT?\n\n${ots.join(', ')}`)) return;
-
-  const panel = dsHojaRutaPanel();
-  panel.insertAdjacentHTML('afterbegin', `<div class="alert alert-info" id="dsHojaRutaConfirmando">⏳ Confirmando hoja de ruta...</div>`);
-
-  try{
-    const base = typeof ALLY_RAILWAY_BASE !== 'undefined' ? ALLY_RAILWAY_BASE : 'https://alleata-agent-production.up.railway.app';
-    const resp = await fetch(`${base}/api/desinstalaciones/hoja-ruta/confirmar`, {
-      method:'POST',
-      headers: dsHojaRutaHeaders(),
-      body: JSON.stringify({ ots, zona, responsable })
-    });
-    const result = await resp.json();
-    document.getElementById('dsHojaRutaConfirmando')?.remove();
-    if(!resp.ok || !result.ok) throw new Error(result?.error || `HTTP ${resp.status}`);
-    dsHojaRutaRenderConfirmada(result);
-    DesinModule.cargado = false;
-    if(typeof cargarDesinstalaciones === 'function') await cargarDesinstalaciones();
-  }catch(e){
-    console.error('[dsHojaRutaConfirmar]', e);
-    document.getElementById('dsHojaRutaConfirmando')?.remove();
-    panel.insertAdjacentHTML('afterbegin', `<div class="alert alert-err">❌ No se pudo confirmar hoja de ruta: ${dsHojaRutaEscape(e.message)}</div>`);
-  }
-}
-
-async function dsHojaRutaCopiarMensaje(){
-  if(!DS_HOJA_RUTA_ULTIMO_MENSAJE){
-    alert('No hay mensaje para copiar.');
-    return;
-  }
-  try{
-    await navigator.clipboard.writeText(DS_HOJA_RUTA_ULTIMO_MENSAJE);
-    alert('Mensaje copiado.');
-  }catch(_){
-    alert('No se pudo copiar automáticamente. Seleccioná el texto y copialo manualmente.');
   }
 }
 
@@ -2348,7 +2160,7 @@ if(_origCargar){
   };
 }
 
-// ── ALLY — CLASIFICACIÓN EVENTOS CA (v2.5.4) ─────────────────────────────
+// ── ALLY — CLASIFICACIÓN EVENTOS CA (v2.5.5) ─────────────────────────────
 // Funciones aisladas — NO tocar Desinstalaciones ni Hoja de Ruta
 // Resuelven el problema de clasificar PREIMPOSICION/INGRESO como AVISO, no ALERTA
 
@@ -2440,7 +2252,7 @@ El envío no registra avances recientes. Requiere seguimiento.`,
 };
 
 // ══════════════════════════════════════════════════════════════════════
-// ETAPA 1 — DESINSTALACIONES + ALLY INTERNO (v2.5.4)
+// ETAPA 1 — DESINSTALACIONES + ALLY INTERNO (v2.5.5)
 // Grupo interno: Ángel / Luciana / Marcelo / Ally
 // NO envía a merchants todavía
 // ══════════════════════════════════════════════════════════════════════
@@ -2622,7 +2434,62 @@ async function allyDesinst_hookRetiroFallido(ot, motivo) {
   catch(e) { console.warn('[ALLY DESINST] hookRetiroFallido error:', e.message); }
 }
 
-console.log('[Alleata v2.5.4] OK');
+
+// ══════════════════════════════════════════════════════════════════
+// CORREO ARGENTINO — SUCURSALES CACHE (Script 3)
+// ══════════════════════════════════════════════════════════════════
+
+function parsearPlantaCA(planta) {
+  if (!planta) return null;
+  const p = planta.toUpperCase().trim();
+  const match = p.match(/^(.+?)\s+SUC\s*(\d+)$/);
+  if (!match) return null;
+  return {
+    ciudad: match[1].trim(),
+    nroSucursal: parseInt(match[2]),
+    plantaNorm: match[1].trim() + ' SUC' + match[2]
+  };
+}
+
+async function buscarSucursalCA(planta) {
+  if (!planta) return null;
+  const parsed = parsearPlantaCA(planta);
+  if (!parsed) return null;
+  try {
+    const { data: exacta } = await sb
+      .from('correo_sucursales_cache')
+      .select('*')
+      .ilike('planta_ca', parsed.plantaNorm)
+      .maybeSingle();
+    if (exacta) return exacta;
+    const { data: aprox } = await sb
+      .from('correo_sucursales_cache')
+      .select('*')
+      .ilike('localidad', '%' + parsed.ciudad + '%')
+      .eq('nro_sucursal', parsed.nroSucursal)
+      .maybeSingle();
+    return aprox || null;
+  } catch (e) {
+    console.warn('[CA Sucursal] Error:', e.message);
+    return null;
+  }
+}
+
+function formatearSucursalCA(sucursal, tracking) {
+  if (!sucursal) return null;
+  return [
+    '📦 Tu envío está en espera en sucursal.',
+    '',
+    '🏤 Sucursal: ' + (sucursal.sucursal_nombre || '—'),
+    '📍 Dirección: ' + (sucursal.direccion || '—') + ', ' + (sucursal.localidad || '—'),
+    '🕘 Horario: ' + (sucursal.horario || '—'),
+    tracking ? '🔎 Seguimiento: ' + tracking : null,
+    '',
+    '🪪 Llevar DNI para retirarlo.',
+  ].filter(v => v !== null).join('\n');
+}
+
+console.log('[Alleata v2.5.5] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -4784,7 +4651,7 @@ async function autoActualizarTracking(){
         const detalle = ultimo.estadoCA ? `${ultimo.historia} — ${ultimo.estadoCA}` : ultimo.historia;
 
         // Detectar alertas especiales
-        // Detectar alertas usando clasificador CA (v2.5.4)
+        // Detectar alertas usando clasificador CA (v2.5.5)
         // Solo ALERTA para eventos de problema real — AVISO para tránsito normal
         const textoEvento = (ultimo.estadoCA + ' ' + ultimo.historia).toUpperCase();
         const _tipoEventoCA = allyClasificarEventoCA(textoEvento);
@@ -7194,27 +7061,6 @@ function showToast(msg,type='ok'){
 const DesinModule={datos:[],filtrados:[],cargado:false,ordenCol:'sla_estado',ordenDir:'asc',opActivo:'',otActual:null,nuevoEstado:null};
 const DS_SLA_ORD={critico:0,alerta:1,verde:2,sin_asignar:3,cerrada:4};
 
-function dsEsCerradaDesdeSF(ot){
-  const flag = ot?.cerrada_desde_sf === true || ot?.cerrada_desde_sf === 'true' || ot?.cerrada_desde_sf === 1;
-  const estado = String(ot?.estado || '').trim().toLowerCase();
-  const estadoSf = String(ot?.estado_sf || '').trim().toLowerCase();
-
-  // En algunas vistas de Supabase puede no venir cerrada_desde_sf,
-  // pero sí queda el estado = Exitosa. Para operación, Exitosa no debe contarse ni mostrarse,
-  // salvo búsqueda puntual. Terminal recuperada sigue siendo un estado operativo propio de la app.
-  return flag || estado === 'exitosa' || estadoSf.includes('no_viene_en_archivo_sf');
-}
-function dsFechaCierreSFLabel(ot){
-  const raw = ot?.fecha_cierre_sf || ot?.updated_at;
-  if(!raw) return '—';
-  const d = new Date(raw);
-  if(Number.isNaN(d.getTime())) return String(raw);
-  return d.toLocaleString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
-}
-function dsDatosOperativos(datos){
-  return (datos||[]).filter(ot=>!dsEsCerradaDesdeSF(ot));
-}
-
 async function cargarDesinstalaciones(){
   document.getElementById('ds-tbody').innerHTML='<tr><td colspan="16" style="text-align:center;padding:28px;color:var(--text-muted)">Cargando...</td></tr>';
   try{
@@ -7234,10 +7080,9 @@ async function cargarDesinstalaciones(){
     const error=null;
     if(error)throw error;
     DesinModule.datos=data||[];DesinModule.cargado=true;
-    const dataOperativa = dsDatosOperativos(data||[]);
-    dsActualizarZonaCards(dataOperativa);
-    document.getElementById('nb-desins').textContent=dataOperativa.length;
-    dsArmarPills(dataOperativa,isAdmin);filtrarDesins();dsRenderGeo(dataOperativa);
+    dsActualizarZonaCards(data||[]);
+    document.getElementById('nb-desins').textContent=data.length;
+    dsArmarPills(data,isAdmin);filtrarDesins();dsRenderGeo(data);
   }catch(e){
     console.error(e);
     document.getElementById('ds-tbody').innerHTML=`<tr><td colspan="10" style="text-align:center;padding:28px;color:var(--red)">Error: ${e.message}</td></tr>`;
@@ -7277,11 +7122,7 @@ function filtrarDesins(){
   const zona=document.getElementById('ds-f-zona').value;
   const sla=document.getElementById('ds-f-sla').value;
   const resp=document.getElementById('ds-f-resp')?.value||'';
-  const hayBusqueda = !!buscar;
   DesinModule.filtrados=DesinModule.datos.filter(ot=>{
-    // Las OTs cerradas desde Salesforce no se muestran en operación,
-    // pero siguen apareciendo si se las busca por OT/comercio/ciudad.
-    if(!hayBusqueda && dsEsCerradaDesdeSF(ot))return false;
     if(resp&&ot.operador_id!==resp)return false;
     if(estado&&ot.estado!==estado)return false;
     if(zona&&dsGetZona(ot)!==zona)return false;
@@ -7300,12 +7141,12 @@ function filtrarDesins(){
     const _buscarNorm=normalizeOT(buscar);
     if(buscar&&!(
       normalizeOT(ot.ot).includes(_buscarNorm)||
-      [ot.ot,ot.comercio,ot.ciudad,ot.cuenta,ot.logistica,ot.nro_seguimiento,ot.estado,ot.estado_sf,ot.zona_observacion]
-        .some(v=>v&&String(v).toLowerCase().includes(buscar))
+      [ot.ot,ot.comercio,ot.ciudad,ot.cuenta,ot.logistica,ot.nro_seguimiento]
+        .some(v=>v&&v.toLowerCase().includes(buscar))
     ))return false;
     return true;
   });
-  const todosLosDatos=dsDatosOperativos(DesinModule.datos); // contadores operativos: excluye cerradas desde SF
+  const todosLosDatos=DesinModule.datos; // contadores siempre sobre el total, no el filtro
   document.getElementById('ds-num-total').textContent=todosLosDatos.length;
   document.getElementById('ds-num-pendiente').textContent=todosLosDatos.filter(x=>x.estado==='Pendiente').length;
   // 'En Proceso' = estado DS nuevo, 'En tránsito' = estado legacy de envios-style
@@ -7341,7 +7182,7 @@ function dsClasificarLogistica(log){
 }
 
 
-// ── WhatsApp helpers Desinstalaciones — v2.5.4 ─────────────────────────
+// ── WhatsApp helpers Desinstalaciones — v2.5.5 ─────────────────────────
 function dsEscapeHtml(v){return String(v??'').replace(/[&<>'\"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[m]));}
 function dsTelefonoWa(raw){let n=String(raw||'').replace(/\D/g,'');if(!n)return '';if(n.startsWith('00'))n=n.slice(2);if(n.startsWith('0'))n=n.replace(/^0+/,'');if(!n.startsWith('54')&&(n.startsWith('9')||n.startsWith('11')||n.startsWith('15')||n.length<=11))n='54'+n;return n;}
 function dsNombreContacto(ot){const base=String(ot.contacto_nombre||ot.nombre_contacto||ot.nombre||ot.comercio||ot.cuenta||'').trim();if(!base)return '';const limpio=base.replace(/\s+-\s+SUC\s+-.*$/i,'').replace(/\s+-\s+\d+.*$/,'').trim();return limpio.split(/\s+/).slice(0,2).join(' ');}
@@ -7416,7 +7257,6 @@ function dsRenderTabla(datos){
       })()}
       <td><span class="badge" style="${es}">${ot.estado||'—'}</span>
           ${ot.estado_distribuidor?`<div style="font-size:10px;color:var(--text-muted);margin-top:2px;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${ot.estado_distribuidor}</div>`:''}
-          ${dsEsCerradaDesdeSF(ot)?`<div title="Actualización SF: ${dsFechaCierreSFLabel(ot)}" style="font-size:10px;color:var(--green);margin-top:3px;font-weight:700;max-width:145px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">🔒 Cerrada desde SF</div>`:''}
       </td>
       ${(()=>{
         const cv=Number(ot.costo_envio||0);
@@ -7511,24 +7351,6 @@ function dsModalAbrir(otNum){
   document.getElementById('ds-m-logistica').textContent=ot.logistica||'—';
   document.getElementById('ds-m-gest').textContent=ot.estado_distribuidor||'—';
   document.getElementById('ds-m-obs').textContent=ot.observaciones||'—';
-  const _cerradaInfoId='ds-m-cerrada-sf-info';
-  let _cerradaInfo=document.getElementById(_cerradaInfoId);
-  if(!_cerradaInfo){
-    _cerradaInfo=document.createElement('div');
-    _cerradaInfo.id=_cerradaInfoId;
-    _cerradaInfo.style.cssText='display:none;margin:10px 0 14px;padding:10px 12px;border-radius:8px;background:rgba(16,185,129,.10);border:1px solid rgba(16,185,129,.25);color:#6ee7b7;font-size:12px;line-height:1.5';
-    const modalBody=document.querySelector('#ds-modal-overlay .modal')||document.getElementById('ds-modal-overlay')?.firstElementChild;
-    const anchor=document.getElementById('ds-m-sla-bar');
-    if(anchor&&anchor.parentNode) anchor.parentNode.insertBefore(_cerradaInfo, anchor);
-    else if(modalBody) modalBody.prepend(_cerradaInfo);
-  }
-  if(dsEsCerradaDesdeSF(ot)){
-    _cerradaInfo.style.display='block';
-    _cerradaInfo.innerHTML=`🔒 <b>OT cerrada desde Salesforce</b><br>Estado SF: <b>${dsEscapeHtml(ot.estado_sf||ot.estado||'—')}</b><br>Actualización SF: <b>${dsFechaCierreSFLabel(ot)}</b>`;
-  }else{
-    _cerradaInfo.style.display='none';
-    _cerradaInfo.innerHTML='';
-  }
   const _mgEl=document.getElementById('ds-m-gestion');
   const _sgEl=document.getElementById('ds-m-status-gestion');
   if(_mgEl) _mgEl.textContent=ot.gestion_retiros||'—';
@@ -7817,121 +7639,6 @@ async function importDesinstalaciones(e){
       if(v.includes('CORREO'))           return 'CORREO ARGENTINO';
       return v; // Devolver el valor limpio si no matchea ningún patrón conocido
     }
-
-
-    // Normalización/auditoría de zona operativa para Desinstalaciones
-    // Regla: NO pisar la zona SF. Guardamos zona_sf como dato original y calculamos zona_operativa aparte.
-    function dsNormTxt(v){
-      return String(v || '')
-        .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
-        .toUpperCase().trim();
-    }
-
-    function dsExtraerCP(cp, direccionLibre){
-      const raw = String(cp || '').trim();
-      if(raw) return raw;
-      const txt = String(direccionLibre || '').toUpperCase();
-      const m = txt.match(/\b([A-Z]\d{4}[A-Z]{0,3}|\d{4})\b/);
-      return m ? m[1] : '';
-    }
-
-    function dsZonaPorCiudad(ciudadRaw){
-      const c = dsNormTxt(ciudadRaw);
-      if(!c) return null;
-
-      // Si el Excel ya trae la zona embebida dentro del campo Ciudad, usarla como pista operativa.
-      if(c.includes('ZONA NORTE')) return 'Zona Norte';
-      if(c.includes('ZONA SUR'))   return 'Zona Sur';
-      if(c.includes('ZONA OESTE')) return 'Zona Oeste';
-      if(c.includes('CABA'))       return 'CABA';
-
-      const reglas = [
-        { zona:'Zona Oeste', keys:[
-          'LOMAS DEL MIRADOR','RAMOS MEJIA','SAN JUSTO','LA TABLADA','MORON','CASTELAR','ITUZAINGO',
-          'MERLO','MORENO','HAEDO','VILLA MADERO','CIUDADELA','GONZALEZ CATAN','LA REJA','ISIDRO CASANOVA',
-          'VILLA LUZURIAGA','RAFAEL CASTILLO','HURLINGHAM','TRES DE FEBRERO','CASEROS','EL PALOMAR'
-        ]},
-        { zona:'Zona Sur', keys:[
-          'MONTE GRANDE','LOMAS DE ZAMORA','BANFIELD','TEMPERLEY','LANUS','AVELLANEDA','QUILMES','BERAZATEGUI',
-          'FLORENCIO VARELA','ADROGUE','BURZACO','SARANDI','GERLI','EZEIZA','BERISSO','LA PLATA','TOLOSA',
-          'LOS HORNOS','SAN CARLOS','SAN VICENTE','MANUEL B GONNET','GONNET','ARTURO SEGUI','ENSENADA',
-          'WILDE','DOCK SUD','VALENTIN ALSINA','VILLA DOMINICO','RAFAEL CALZADA','ALEJANDRO KORN'
-        ]},
-        { zona:'Zona Norte', keys:[
-          'PILAR','PILAR CENTRO','ESCOBAR','BELEN DE ESCOBAR','TIGRE','SAN ISIDRO','VICENTE LOPEZ','SAN FERNANDO',
-          'MARTINEZ','OLIVOS','MUNRO','GARIN','JOSE C PAZ','JOSE C. PAZ','LOS CARDALES','ZELAYA','DEL VISO',
-          'BOULOGNE','BECCAR','VICTORIA','DON TORCUATO','GENERAL PACHECO','BENAVIDEZ','NORDELTA','MALVINAS ARGENTINAS'
-        ]}
-      ];
-
-      for(const regla of reglas){
-        if(regla.keys.some(k => c.includes(k))) return regla.zona;
-      }
-      return null;
-    }
-
-    function dsNormalizarZonaOperativa({zonaSf, ciudad, provincia, cp, direccion}){
-      const zsfRaw = String(zonaSf || '').trim();
-      const zsf    = dsNormTxt(zsfRaw);
-      const ciu    = dsNormTxt(ciudad);
-      const prov   = dsNormTxt(provincia);
-      const cpRaw  = dsExtraerCP(cp, direccion);
-      const cpNorm = dsNormTxt(cpRaw);
-
-      let zonaOperativa = null;
-      let confianza = 'BAJA';
-      let base = '';
-
-      if(cpNorm.startsWith('C')){
-        zonaOperativa = 'CABA';
-        confianza = 'ALTA_CP';
-        base = `CP ${cpRaw}`;
-      } else {
-        const zCiudad = dsZonaPorCiudad(ciudad);
-        if(zCiudad){
-          zonaOperativa = zCiudad;
-          confianza = 'MEDIA_CIUDAD';
-          base = `localidad ${ciudad || '—'}`;
-        }
-      }
-
-      const sfOperativa = (() => {
-        if(!zsf || zsf === 'PBA' || zsf === 'GBA' || zsf === 'BUENOS AIRES') return null;
-        if(zsf.includes('CABA')) return 'CABA';
-        if(zsf.includes('NORTE')) return 'Zona Norte';
-        if(zsf.includes('SUR')) return 'Zona Sur';
-        if(zsf.includes('OESTE')) return 'Zona Oeste';
-        return null;
-      })();
-
-      let diagnostico = 'SIN_ZONA';
-      let observacion = '';
-
-      if(!zonaOperativa){
-        diagnostico = 'SIN_ZONA';
-        observacion = 'No se pudo sugerir zona con CP/localidad. Requiere revisión manual.';
-      } else if(sfOperativa && sfOperativa !== zonaOperativa){
-        diagnostico = 'REVISAR_ZONA';
-        observacion = `SF dice ${zsfRaw}, pero ${base || 'CP/localidad'} sugiere ${zonaOperativa}.`;
-      } else if(zsf.includes('CABA') && zonaOperativa !== 'CABA' && (cpNorm.startsWith('B') || prov.includes('BUENOS AIRES'))){
-        diagnostico = 'REVISAR_ZONA';
-        observacion = `SF dice ${zsfRaw}, pero CP/provincia/localidad sugieren ${zonaOperativa}.`;
-      } else if(!sfOperativa){
-        diagnostico = 'OK_AUTO';
-        observacion = `Zona sugerida por ${base || 'regla operativa'}.`;
-      } else {
-        diagnostico = 'OK';
-        observacion = `Zona validada por ${base || 'regla operativa'}.`;
-      }
-
-      return {
-        zona_sf: zsfRaw || null,
-        zona_operativa: zonaOperativa,
-        zona_diagnostico: diagnostico,
-        zona_confianza: confianza,
-        zona_observacion: observacion
-      };
-    }
     const iTrack    = colAny('N° de seguimiento','N de seguimiento','N° seguimiento','Nro seguimiento','Seguimiento','tracking','n seguimiento');
     const iTerminal = colAny('N terminal','Nro terminal','Terminal','Serie terminal');
     const iContacto = colAny('Contacto','Nombre contacto');
@@ -7976,35 +7683,13 @@ async function importDesinstalaciones(e){
       'pendiente':'Pendiente','pendiente de completar':'Pendiente',
       'despachado':'Despachado','en proceso':'En Proceso',
       'retirar terminal':'Retirar Terminal','terminal recuperada':'Terminal recuperada',
-      'extraviada':'Extraviada','fallido':'Fallido','exitosa':'Exitosa','exitoso':'Exitosa',
-      'cerrada':'Exitosa','cerrado':'Exitosa','finalizada':'Exitosa','finalizado':'Exitosa',
-      'completada':'Exitosa','completado':'Exitosa','entregado':'Entregado',
+      'extraviada':'Extraviada','fallido':'Fallido',
       'retiro pactado':'Retiro pactado','pendiente retiro':'Pendiente retiro'
     };
     const mapEst = v => {
       if(!v) return null; const vl = norm(v);
       for(const [k,m] of Object.entries(EMAP)) if(vl.includes(norm(k))) return m;
       return v.trim() || null;
-    };
-    const esCierreSF = v => {
-      const vl = norm(v);
-      return ['exitosa','exitoso','cerrada','cerrado','finalizada','finalizado','completada','completado','entregada','entregado'].some(k=>vl.includes(k));
-    };
-    const parseDateTimeSF = s => {
-      if(!s) return null;
-      const v = String(s).trim();
-      if(!v) return null;
-      if(!isNaN(+v) && +v > 40000) return new Date((+v - 25569)*86400000).toISOString();
-      const d = new Date(v);
-      if(!Number.isNaN(d.getTime())) return d.toISOString();
-      const p = v.match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})(?:\s+(\d{1,2}):(\d{2}))?/);
-      if(p){
-        const yyyy = p[3].length===2 ? '20'+p[3] : p[3];
-        const hh = (p[4]||'00').padStart(2,'0');
-        const mm = (p[5]||'00').padStart(2,'0');
-        return new Date(`${yyyy}-${p[2].padStart(2,'0')}-${p[1].padStart(2,'0')}T${hh}:${mm}:00`).toISOString();
-      }
-      return null;
     };
 
     const {data:profs} = await sb.from('profiles').select('id,nombre');
@@ -8016,7 +7701,7 @@ async function importDesinstalaciones(e){
     };
 
     // 8. Construir filas validas
-    let curLog = 'SF', curEst = 'Pendiente', curEstadoSfRaw = 'Pendiente';
+    let curLog = 'SF', curEst = 'Pendiente';
     const enriched = [];
     let omitidas = 0;
 
@@ -8037,7 +7722,7 @@ async function importDesinstalaciones(e){
       }
       if(iEstadoSF >= 0 && r[iEstadoSF]){
         const v = String(r[iEstadoSF]).trim();
-        if(v && !SKIP.has(norm(v))){ const m = mapEst(v); if(m){ curEst = m; curEstadoSfRaw = v; } }
+        if(v && !SKIP.has(norm(v))){ const m = mapEst(v); if(m) curEst = m; }
       }
 
       const sfId = sv(r, iSFId);
@@ -8047,13 +7732,13 @@ async function importDesinstalaciones(e){
       if(!ot)  { omitidas++; continue; }
       if(SKIP.has(norm(ot))){ omitidas++; continue; }
 
-      enriched.push({r, sfId, ot, estado:curEst, estadoSfRaw:curEstadoSfRaw, logistica:curLog});
+      enriched.push({r, sfId, ot, estado:curEst, logistica:curLog});
     }
 
     console.log('Filas validas para importar:', enriched.length);
     console.log('Filas omitidas (sf_id/ot vacios o subtotales):', omitidas);
-    enriched.slice(0,3).forEach(({r,sfId,ot,estado,estadoSfRaw,logistica},i)=>
-      console.log('Muestra['+i+']:', {sfId, ot, estado, estadoSfRaw, logistica,
+    enriched.slice(0,3).forEach(({r,sfId,ot,estado,logistica},i)=>
+      console.log('Muestra['+i+']:', {sfId, ot, estado, logistica,
         cuenta:svN(r,iCuenta), ciudad:svN(r,iCiudad), resp:svN(r,iResp)}));
 
     if(!enriched.length)
@@ -8063,30 +7748,28 @@ async function importDesinstalaciones(e){
     fill.style.width = '50%';
 
     // Punto 2: verificar columnas DB antes de insertar
-    let _dbHasCosto = false, _dbHasObsEstado = false, _dbHasZonaAudit = false, _dbHasZonaObs = false, _dbHasCierreSF = false;
-    // Supabase no lanza excepción automáticamente en select; hay que leer { error }.
-    const dbCanWrite = async (cols) => {
-      const { error } = await sb.from('ordenes_trabajo').select(cols).limit(1);
-      return !error;
-    };
-    _dbHasCosto     = await dbCanWrite('costo_envio');
-    _dbHasObsEstado = await dbCanWrite('observacion_estado');
-    _dbHasZonaAudit = await dbCanWrite('zona_operativa,zona_diagnostico,zona_confianza,zona_audited_at');
-    _dbHasZonaObs   = await dbCanWrite('zona_observacion');
-    _dbHasCierreSF  = await dbCanWrite('cerrada_desde_sf,fecha_cierre_sf,estado_sf');
-
+    let _dbHasCosto = false, _dbHasObsEstado = false;
+    // Note: provincia, cp, gestion_retiros, status_gestion_retiros are always safe to write
+    // (columns exist via ALTER TABLE run in sql_desinstalaciones_v2.4.8.sql)
+    try {
+      const {data:colInfo} = await sb.from('ordenes_trabajo').select('costo_envio,observacion_estado,provincia,gestion_retiros').limit(1);
+      _dbHasCosto = true;
+      _dbHasObsEstado = true;
+    } catch(_e) {
+      // Si alguna columna no existe, Supabase lanza error
+      // Intentar de a una para saber cuál falta
+      try { await sb.from('ordenes_trabajo').select('costo_envio').limit(1); _dbHasCosto=true; } catch(_){}
+      try { await sb.from('ordenes_trabajo').select('observacion_estado').limit(1); _dbHasObsEstado=true; } catch(_){}
+    }
     if(!_dbHasCosto) console.warn('[Import Desins] AVISO: columna costo_envio no existe en ordenes_trabajo — no se importará. Ejecutar: ALTER TABLE ordenes_trabajo ADD COLUMN IF NOT EXISTS costo_envio numeric;');
     if(!_dbHasObsEstado) console.warn('[Import Desins] AVISO: columna observacion_estado no existe en ordenes_trabajo — no se importará. Ejecutar: ALTER TABLE ordenes_trabajo ADD COLUMN IF NOT EXISTS observacion_estado text;');
-    if(!_dbHasZonaAudit) console.warn('[Import Desins] AVISO: columnas de auditoría de zona no existen — no se importarán zona_operativa/zona_diagnostico.');
-    if(!_dbHasZonaObs) console.warn('[Import Desins] AVISO: columna zona_observacion no existe — no se importará.');
-    if(!_dbHasCierreSF) console.warn('[Import Desins] AVISO: columnas de cierre SF no existen — no se importará cerrada_desde_sf/fecha_cierre_sf/estado_sf.');
 
     // 9. Upsert
-    let imp = 0, err = 0;
-    let zonasOk = 0, zonasAuto = 0, zonasRevisar = 0, zonasSin = 0, cerradasSF = 0;
+    let imp = 0, err = 0, reconciliadas = 0;
     const errLog = [];
+    const importedOTs = new Set(); // para reconciliación post-import
 
-    for(const {r, sfId, ot, estado, estadoSfRaw, logistica} of enriched){
+    for(const {r, sfId, ot, estado, logistica} of enriched){
       // Dirección estructurada (OTs nuevas)
       const calle  = sv(r, iCalle);
       const ciudad = sv(r, iCiudad);
@@ -8113,27 +7796,6 @@ async function importDesinstalaciones(e){
         }
       }
 
-      const cpFinal = dsExtraerCP(cp, dirLibre);
-      const zonaAudit = dsNormalizarZonaOperativa({
-        zonaSf:    iZonaSF >= 0 ? svN(r, iZonaSF) : null,
-        ciudad:    ciudadDerived,
-        provincia: provDerived,
-        cp:        cpFinal,
-        direccion: dirFallback || calle
-      });
-
-      if(zonaAudit.zona_diagnostico === 'REVISAR_ZONA') zonasRevisar++;
-      else if(zonaAudit.zona_diagnostico === 'SIN_ZONA') zonasSin++;
-      else if(zonaAudit.zona_diagnostico === 'OK_AUTO') zonasAuto++;
-      else zonasOk++;
-
-      const cerradaSF = esCierreSF(estadoSfRaw || estado);
-      if(cerradaSF) cerradasSF++;
-      const estadoApp = cerradaSF ? 'Exitosa' : estado;
-      const fechaCierreSF = cerradaSF
-        ? (parseDateTimeSF(iModif >= 0 ? r[iModif] : null) || new Date().toISOString())
-        : null;
-
       const item = {
         sf_id:            sfId,
         ot:               ot,
@@ -8145,11 +7807,11 @@ async function importDesinstalaciones(e){
         direccion:        dirFallback || null,
         ciudad:           ciudadDerived || null,
         provincia:        provDerived   || null,
-        cp:               cpFinal || null,
+        cp:               cp     || null,
         fecha_asignacion: parseDate(iFecha >= 0 ? r[iFecha] : null),
         // Normalizar logística al guardar (doble seguridad)
         logistica:        normalizarLogisticaDesinst(logistica) || null,
-        estado:           estadoApp,
+        estado:           estado,
         nro_seguimiento:  svN(r, iTrack),
         contacto:         svN(r, iContacto),
         horario:          svN(r, iHorario),
@@ -8174,19 +7836,7 @@ async function importDesinstalaciones(e){
           })()} : {}),
         ...(typeof _dbHasObsEstado !== 'undefined' && _dbHasObsEstado
           ? {observacion_estado: svN(r,iObsEstado)} : {}),
-        zona_sf:              zonaAudit.zona_sf,
-        ...(_dbHasZonaAudit ? {
-          zona_operativa:    zonaAudit.zona_operativa,
-          zona_diagnostico:  zonaAudit.zona_diagnostico,
-          zona_confianza:    zonaAudit.zona_confianza,
-          zona_audited_at:   new Date().toISOString()
-        } : {}),
-        ...(_dbHasZonaObs ? { zona_observacion: zonaAudit.zona_observacion } : {}),
-        ...(_dbHasCierreSF ? {
-          estado_sf:          estadoSfRaw || estado || null,
-          cerrada_desde_sf:   cerradaSF,
-          fecha_cierre_sf:    fechaCierreSF
-        } : {}),
+        zona_sf:              iZonaSF  >= 0 ? svN(r, iZonaSF)  : null,
         gestion_retiros:      iGestionR >= 0 ? svN(r, iGestionR) : null,
         status_gestion_retiros: iStatusG >= 0 ? svN(r, iStatusG)  : null,
         updated_at:           new Date().toISOString()
@@ -8201,69 +7851,43 @@ async function importDesinstalaciones(e){
         console.error('[Import Desins] Error OT '+ot+':', error.message);
       } else {
         imp++;
+        importedOTs.add(String(ot).trim()); // acumular para reconciliación
       }
     }
 
-    // 10. Cierre automático por ausencia en el reporte SF
-    // Si la OT existe en la app, está operativa y ya no viene en el reporte de SF,
-    // la marcamos como cerrada desde Salesforce. No se borra: queda trazabilidad y aparece si se busca.
-    let cerradasPorAusenciaSF = 0;
-    if(_dbHasCierreSF){
-      try{
-        const otKey = v => {
-          const digits = String(v || '').replace(/\D/g,'').replace(/^0+/,'');
-          return digits || String(v || '').trim().toUpperCase();
-        };
-        const otsArchivo = new Set(enriched.map(x => otKey(x.ot)).filter(Boolean));
-        const estadosOperativosParaCierre = new Set([
-          'Pendiente','Reprogramar','Despachado','En Proceso','En tránsito','En transito',
-          'Retirar Terminal','Retiro pactado','Pendiente retiro','Fallido'
-        ]);
-
-        const existentes = [];
-        let from = 0;
-        const pageSize = 1000;
-        while(true){
-          const {data:pg,error:selErr} = await sb.from('ordenes_trabajo')
-            .select('id,ot,estado,cerrada_desde_sf,tipo')
-            .eq('tipo','desinstalacion')
-            .or('cerrada_desde_sf.is.null,cerrada_desde_sf.eq.false')
-            .range(from, from + pageSize - 1);
-          if(selErr) throw selErr;
-          if(!pg || !pg.length) break;
-          existentes.push(...pg);
-          if(pg.length < pageSize) break;
-          from += pageSize;
-        }
-
-        const faltantes = existentes.filter(row => {
-          const k = otKey(row.ot);
-          return k && !otsArchivo.has(k) && estadosOperativosParaCierre.has(row.estado);
-        });
-
-        for(let i=0;i<faltantes.length;i+=100){
-          const ids = faltantes.slice(i,i+100).map(x=>x.id);
-          if(!ids.length) continue;
-          const {error:updErr} = await sb.from('ordenes_trabajo')
-            .update({
-              cerrada_desde_sf: true,
-              fecha_cierre_sf: new Date().toISOString(),
-              estado_sf: 'NO_VIENE_EN_ARCHIVO_SF',
-              estado: 'Exitosa',
+    // 10. Reconciliación — marcar como Entregada las OTs que no vinieron en el reporte SF
+    // (evita que la app muestre más OTs activas que las que trae SF)
+    let reconciliadas = 0;
+    if(importedOTs.size > 0) {
+      try {
+        const hoyStr = new Date().toLocaleDateString('es-AR', {day:'2-digit',month:'2-digit',year:'numeric'});
+        const notaReconcil = ` | ACTUALIZADA DESDE SF ${hoyStr}`;
+        // Traer todas las OTs activas de Desinstalaciones (no cerradas)
+        const { data: activas } = await sb.from('ordenes_trabajo')
+          .select('id, ot')
+          .eq('tipo', 'desinstalacion')
+          .not('estado', 'in', '("Entregada","Terminal recuperada","Exitosa","Cerrada")');
+        const paraReconciliar = (activas||[]).filter(o => !importedOTs.has(String(o.ot).trim()));
+        if(paraReconciliar.length) {
+          const ids = paraReconciliar.map(o => o.id);
+          // Actualizar en lotes de 50 para no saturar la API
+          for(let i = 0; i < ids.length; i += 50) {
+            const lote = ids.slice(i, i+50);
+            await sb.from('ordenes_trabajo').update({
+              estado: 'Entregada',
+              fecha_cierre: new Date().toISOString().slice(0,10),
               updated_at: new Date().toISOString()
-            })
-            .in('id', ids);
-          if(updErr) throw updErr;
-          cerradasPorAusenciaSF += ids.length;
+            }).in('id', lote);
+          }
+          reconciliadas = paraReconciliar.length;
+          console.log(`[Import Desins] Reconciliación: ${reconciliadas} OTs marcadas Entregada (no vinieron en SF)`);
         }
-      }catch(closeErr){
-        console.error('[Import Desins] Error cerrando ausentes SF:', closeErr);
-        errLog.push({ot:'CIERRE_AUSENTES_SF', sf_id:'-', msg:closeErr.message});
-        err++;
+      } catch(recErr) {
+        console.warn('[Import Desins] Error en reconciliación (no crítico):', recErr.message);
       }
     }
 
-    // 11. Resultado
+    // 10. Resultado
     fill.style.width = '100%'; ptext.textContent = 'Listo';
     if(errLog.length) console.error('[Import Desins] Errores:', errLog);
     result.innerHTML = `
@@ -8271,16 +7895,12 @@ async function importDesinstalaciones(e){
         <strong>${imp}</strong> importadas &nbsp;&middot;&nbsp;
         <strong>${omitidas}</strong> omitidas &nbsp;&middot;&nbsp;
         <strong>${err}</strong> errores
-        <div style="margin-top:8px;font-size:11px;color:var(--text-muted);line-height:1.6">
-          🧭 Auditoría zona: <strong>${zonasOk}</strong> OK · <strong>${zonasAuto}</strong> sugeridas · <strong>${zonasRevisar}</strong> revisar · <strong>${zonasSin}</strong> sin zona<br>
-          🔒 Cierre SF directo: <strong>${cerradasSF}</strong> · por ausencia en reporte: <strong>${cerradasPorAusenciaSF}</strong> OTs ocultas de la vista operativa
-          ${zonasRevisar || zonasSin ? `<br><span style="color:var(--yellow)">⚠️ Las OTs con REVISAR_ZONA o SIN_ZONA no deberían entrar en hoja automática hasta validación manual.</span>` : ''}
-        </div>
+        ${reconciliadas > 0 ? `&nbsp;&middot;&nbsp;<strong style="color:var(--teal)">${reconciliadas}</strong> reconciliadas (ya no en SF)` : ''}
         ${err>0?`<details style="margin-top:6px"><summary style="cursor:pointer;font-size:11px">Ver errores</summary><pre style="font-size:10px;margin-top:4px">${errLog.slice(0,10).map(x=>x.ot+': '+x.msg).join('\n')}</pre></details>`:''}
       </div>`;
     auditLog({tabla:'ordenes_trabajo',registro_id:'BATCH',
       accion:'IMPORTACION_DESINSTALACIONES',campo:'lote',
-      valor_antes:null,valor_despues:`imp:${imp} err:${err} omit:${omitidas} cerradas_sf:${cerradasSF} ausentes_sf:${cerradasPorAusenciaSF}`});
+      valor_antes:null,valor_despues:`imp:${imp} err:${err} omit:${omitidas}`});
     DesinModule.cargado = false;
     await cargarDesinstalaciones();
 
@@ -8304,7 +7924,7 @@ async function autoTrackingDesinstalaciones(){
 
 
 async function dsAutoTracking(){
-  // AUTO-TRACKING DESINSTALACIONES v2.5.4
+  // AUTO-TRACKING DESINSTALACIONES v2.5.5
   // NO Envíos, NO Ally, NO wasender, NO Railway, NO processAllyRules
   console.log('[DS AT START] dsAutoTracking iniciado', new Date().toISOString());
   abrirModalAutoTracking();
