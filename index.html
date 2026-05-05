@@ -7865,7 +7865,8 @@ async function importDesinstalaciones(e){
         const { data: activas } = await sb.from('ordenes_trabajo')
           .select('id, ot')
           .eq('tipo', 'desinstalacion')
-          .not('estado', 'in', '("Entregada","Terminal recuperada","Exitosa","Cerrada")');
+          // Excluir estados terminales — todo lo demás se reconcilia
+          .not('estado', 'in', '("Entregada","Terminal recuperada","Exitosa","Cerrada","Entregado","Devuelto")');
         const paraReconciliar = (activas||[]).filter(o => !importedOTs.has(String(o.ot).trim()));
         if(paraReconciliar.length) {
           const ids = paraReconciliar.map(o => o.id);
