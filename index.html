@@ -2500,6 +2500,34 @@ function formatearSucursalCA(sucursal, tracking) {
   ].filter(v => v !== null).join('\n');
 }
 
+
+function _dsBadgeCAAmba(ot) {
+  const isCA = dsClasificarLogistica(ot.logistica) !== 'Logística Alleata';
+  if (!isCA) return '';
+  const cpStr = String(ot.cp || '');
+  const cpM   = cpStr.match(/\d{3,5}/);
+  const cpNum = cpM ? parseInt(cpM[0]) : 0;
+  if (cpNum && CP_COORDS[cpNum]) {
+    const cc   = CP_COORDS[cpNum];
+    const dist = haversine(CENTRAL_LAT, CENTRAL_LNG, cc[0], cc[1]);
+    if (dist <= 70) {
+      return '<span title="CA en AMBA (' + Math.round(dist) + 'km)" ' +
+             'style="background:rgba(245,158,11,.2);color:#f59e0b;font-size:9px;' +
+             'padding:1px 5px;border-radius:3px;margin-bottom:3px;display:inline-block">' +
+             '⚠️ CA+AMBA</span>';
+    }
+    return ''; // fuera AMBA
+  }
+  // Sin CP conocido pero provincia = Buenos Aires
+  const pBA = (ot.provincia || '').toLowerCase().includes('buenos aires');
+  if (pBA) {
+    return '<span title="CA en Buenos Aires — sin datos de distancia" ' +
+           'style="background:rgba(245,158,11,.1);color:#f59e0b;font-size:9px;' +
+           'padding:1px 5px;border-radius:3px;margin-bottom:3px;display:inline-block">? BA</span>';
+  }
+  return '';
+}
+
 console.log('[Alleata v2.6.3] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
@@ -7273,7 +7301,7 @@ function dsRenderTabla(datos){
         ${ot.comercio&&ot.comercio!==ot.cuenta?`<div style="font-size:10px;color:var(--text-muted);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${ot.comercio}</div>`:''}
       </td>
       <td onclick="dsModalAbrir('${ot.ot}')">
-        ${(()=>{ const _lgCA=dsClasificarLogistica(ot.logistica)!=='Logística Alleata';if(!_lgCA) return '';const _cpStr=String(ot.cp||''); const _cpM=_cpStr.match(/\d{3,5}/);const _cpNum=_cpM?parseInt(_cpM[0]):0;if(_cpNum&&CP_COORDS[_cpNum]){  const _cc=CP_COORDS[_cpNum];  const _dist=haversine(CENTRAL_LAT,CENTRAL_LNG,_cc[0],_cc[1]);  if(_dist<=70) return '<span title="CA con destino AMBA ('+Math.round(_dist)+'km)" style="background:rgba(245,158,11,.2);color:#f59e0b;font-size:9px;padding:1px 5px;border-radius:3px;margin-bottom:3px;display:inline-block">⚠️ CA+AMBA</span>';  return ''; // fuera AMBA — sin badge}const _pBA=(ot.provincia||'').toLowerCase().includes('buenos aires');return _pBA?'<span title="CA en Buenos Aires — CP sin datos de distancia" style="background:rgba(245,158,11,.1);color:#f59e0b;font-size:9px;padding:1px 5px;border-radius:3px;margin-bottom:3px;display:inline-block">? BA</span>':'';})()}
+        ${_dsBadgeCAAmba(ot)}
         <div style="font-size:12px">${(()=>{
           if(ot.ciudad)return ot.ciudad;
           if(ot.direccion){const p=ot.direccion.split(',');return p.length>=2?p[1].trim():'Sin ciudad';}
