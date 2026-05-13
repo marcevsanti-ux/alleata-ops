@@ -3541,7 +3541,7 @@ async function importSF(e){
     let importadas=0,duplicadas=0,errores=0;
     for(const r of dataRows){
       const track=String(r[iTracking]||'').trim();
-      const ot=String(r[iOT]||'').trim();
+      const ot=String(r[iOT_resolved]||'').trim();
       const sfId=String(r[iSFId]||'').trim();
       if(!ot&&!sfId)continue; // saltear filas sin OT ni SF ID
       if(ot&&(ot.toLowerCase()==='subtotal'||ot.toLowerCase()==='total'))continue; // saltear subtotales
@@ -6896,7 +6896,7 @@ async function importPreColecta(e){
       user_id:findUser(String(r[iResp]||'')),
       responsable:String(r[iResp]||'').trim(),
       tipo:String(r[iTipo]||'').trim(),
-      ot_numero:String(r[iOT]||'').trim(),
+      ot_numero:String(r[iOT_resolved]||'').trim(),
       fecha:parseDate(r[iFecha]),
       nombre_comercio:String(r[iComercio]||'').trim(),
       cuenta:String(r[iCuenta]||'').trim(),
@@ -7738,7 +7738,10 @@ async function importDesinstalaciones(e){
 
     // 4. Mapeo de columnas
     const iSFId     = colAny('Id. de orden de trabajo','Id de orden de trabajo','ID Orden de Trabajo','sf_id');
-    const iOT       = colAny('Número de orden de trabajo','Numero de orden de trabajo','Numero de orden','Numero OT','numero ot');
+    const iOT       = colAny('Número de orden de trabajo','Numero de orden de trabajo','N°o de orden de trabajo','No de orden de trabajo','Numero de orden','Numero OT','numero ot','numero orden');
+
+    // Fallback iOT_resolved: si no encontró por nombre exacto, buscar col con 'numero' que no sea sfid
+    const iOT_resolved = iOT >= 0 ? iOT_resolved : hdrsNorm.findIndex((h,idx2) => idx2 !== iSFId && h.includes('numero'));
     const iResp     = colAny('Responsable','responsable de la ot','responsable ot');
     const iCuenta   = colAny('Cuenta: Nombre','Cuenta','cuenta sf');
     const iComercio = colAny('Nombre del comercio','Nombre comercio','Comercio');
@@ -7777,8 +7780,8 @@ async function importDesinstalaciones(e){
 
     // 5. Log obligatorio de columnas clave
     console.log('IDX SFID:', iSFId, '→', iSFId >= 0 ? hdrs[iSFId] : '(NO ENCONTRADO)');
-    console.log('IDX OT:',   iOT,   '→', iOT   >= 0 ? hdrs[iOT]   : '(NO ENCONTRADO)');
-    console.log('Todos los indices:', {iSFId,iOT,iResp,iCuenta,iComercio,iFecha,
+    console.log('IDX OT:',   iOT_resolved,   '→', iOT   >= 0 ? hdrs[iOT_resolved]   : '(NO ENCONTRADO)');
+    console.log('Todos los indices:', {iSFId,iOT_resolved,iResp,iCuenta,iComercio,iFecha,
       iCalle,iCiudad,iProv,iCP,iDirLibre,iEstadoSF,iLogistica,iTrack,iObs});
 
     // 6. Abortar si no se encontraron columnas clave
@@ -7850,7 +7853,7 @@ async function importDesinstalaciones(e){
       }
 
       const sfId = sv(r, iSFId);
-      const ot   = sv(r, iOT);
+      const ot   = sv(r, iOT_resolved);
 
       if(!sfId){ omitidas++; continue; }
       if(!ot)  { omitidas++; continue; }
