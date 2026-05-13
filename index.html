@@ -9,7 +9,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v2.8.1</title>
+<title>Alleata · Operaciones v2.8.0</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -303,7 +303,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.8.1 · 7 may 2026
+      v2.8.0 · 7 may 2026
     </div>
   </div>
 </div>
@@ -363,7 +363,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.8.1 · 7 may 2026
+      v2.8.0 · 7 may 2026
     </div>
   </div>
 </nav>
@@ -377,7 +377,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <div class="topbar-right" id="topbar-date"></div>
     <button onclick="refreshCurrentModule()" title="Actualizar" style="background:none;border:1px solid var(--border2);color:var(--text-muted);border-radius:7px;padding:4px 10px;cursor:pointer;font-size:13px;margin-left:10px;transition:all .2s" onmouseover="this.style.color='var(--teal)';this.style.borderColor='var(--teal)'" onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border2)'">↺</button>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.8.1</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.8.0</div>
   </div>
   <div class="content">
 
@@ -1587,14 +1587,12 @@ async function dsConsultarCA(otId, trackNum, otNum){
     const mapEstDS = (historia, estadoCA) => {
       const H = (historia || '').toUpperCase();
       const E = (estadoCA  || '').toUpperCase();
-      // Chequear historia Y estadoCA para no perder casos como historia=INTENTO DE ENTREGA + estadoCA=ENTREGADO
-      const any = (...tokens) => tokens.some(t => H.includes(t) || E.includes(t));
-      if(any('ENTREGADO', 'ENTREGA OK'))                        return 'Terminal recuperada';
-      if(any('DEVUELTO', 'DEVOLUCION'))                         return 'Fallido';
-      if(any('PERDIDO'))                                         return 'Extraviada';
-      if(any('RETORNANDO'))                                      return 'Fallido';
-      if(any('EN ESPERA EN SUCURSAL'))                           return 'En Proceso';
-      if(any('EN PODER DEL DISTRIBUIDOR', 'INTENTO DE ENTREGA')) return 'En Proceso';
+      if(H.includes('ENTREGADO') || H.includes('ENTREGA OK')) return 'Terminal recuperada';
+      if(H.includes('DEVUELTO')  || H.includes('DEVOLUCION')) return 'Fallido';
+      if(H.includes('PERDIDO'))                                return 'Extraviada';
+      if(H.includes('EN PODER DEL DISTRIBUIDOR') || H.includes('INTENTO DE ENTREGA')) return 'En Proceso';
+      if(H.includes('EN ESPERA EN SUCURSAL'))                  return 'En Proceso';
+      if(E.includes('RETORNANDO'))                             return 'Fallido';
       return null;
     };
     const estadoNuevo = mapEstDS(ultimo.historia, ultimo.estadoCA);
@@ -2023,7 +2021,7 @@ function dsRutaCSV(){
 }
 
 // ══════════════════════════════════════════════════════════════════════
-// DESINSTALACIONES — FUNCIONES NUEVAS v2.8.1
+// DESINSTALACIONES — FUNCIONES NUEVAS v2.8.0
 // Prefijo: dsGestion_, dsRuta_, dsExport_
 // No modifican lógica existente de Envíos ni Rollout
 // ══════════════════════════════════════════════════════════════════════
@@ -2177,7 +2175,7 @@ if(_origCargar){
   };
 }
 
-// ── ALLY — CLASIFICACIÓN EVENTOS CA (v2.8.1) ─────────────────────────────
+// ── ALLY — CLASIFICACIÓN EVENTOS CA (v2.8.0) ─────────────────────────────
 // Funciones aisladas — NO tocar Desinstalaciones ni Hoja de Ruta
 // Resuelven el problema de clasificar PREIMPOSICION/INGRESO como AVISO, no ALERTA
 
@@ -2269,7 +2267,7 @@ El envío no registra avances recientes. Requiere seguimiento.`,
 };
 
 // ══════════════════════════════════════════════════════════════════════
-// ETAPA 1 — DESINSTALACIONES + ALLY INTERNO (v2.8.1)
+// ETAPA 1 — DESINSTALACIONES + ALLY INTERNO (v2.8.0)
 // Grupo interno: Ángel / Luciana / Marcelo / Ally
 // NO envía a merchants todavía
 // ══════════════════════════════════════════════════════════════════════
@@ -2322,11 +2320,27 @@ function allyDesinst_render(template, vars = {}) {
 }
 
 // ── 1. Resumen post auto-tracking desinstalaciones ───────────────────────
-async function allyDesinst_reporteAutoTracking({ procesados, actualizados, errores, alertas }) {
+async function allyDesinst_reporteAutoTracking({ procesados, actualizados, errores, alertas, terminales }) {
   const fecha = new Date().toLocaleDateString('es-AR', {
     weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric'
   });
   const hora = new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+
+  // Bloque terminales entregadas por CA
+  let terminalesBloque = null;
+  if(terminales?.length){
+    const lines = terminales.map(t => [
+      ``,
+      `📦 OT ${t.ot}`,
+      `🏪 ${t.cuenta || '—'}`,
+      `📍 ${t.ciudad || '—'}`,
+      `🚛 ${t.nro_seguimiento || '—'}`,
+      `📊 SLA Merchant: ${t.sla_merchant_dias !== null && t.sla_merchant_dias !== undefined ? t.sla_merchant_dias+'d' : '—'}`,
+      `📊 SLA CA: ${t.sla_ca_dias !== null && t.sla_ca_dias !== undefined ? t.sla_ca_dias+'d' : '—'}`,
+    ].join('\n')).join('\n');
+    terminalesBloque = `\n✅ TERMINALES ENTREGADAS POR CA HOY${lines}`;
+  }
+
   const msg = [
     `📊 Auto-tracking Desinstalaciones`,
     ``,
@@ -2335,6 +2349,7 @@ async function allyDesinst_reporteAutoTracking({ procesados, actualizados, error
     actualizados  ? `✅ Actualizadas: ${actualizados}`  : null,
     errores       ? `❌ Errores: ${errores}`             : null,
     alertas?.length ? `\n⚠️ OTs con alerta:\n${alertas.slice(0,5).map(a => `• OT ${a.ot} — ${a.estado}`).join('\n')}` : null,
+    terminalesBloque,
   ].filter(Boolean).join('\n');
   return allyDesinst_enviarMensaje(msg, 'reporte_autotracking');
 }
@@ -2534,7 +2549,7 @@ function _dsBadgeCAAmba(ot) {
   return '';
 }
 
-console.log('[Alleata v2.8.1] OK');
+console.log('[Alleata v2.8.0] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -4701,7 +4716,7 @@ async function autoActualizarTracking(){
         const detalle = ultimo.estadoCA ? `${ultimo.historia} — ${ultimo.estadoCA}` : ultimo.historia;
 
         // Detectar alertas especiales
-        // Detectar alertas usando clasificador CA (v2.8.1)
+        // Detectar alertas usando clasificador CA (v2.8.0)
         // Solo ALERTA para eventos de problema real — AVISO para tránsito normal
         const textoEvento = (ultimo.estadoCA + ' ' + ultimo.historia).toUpperCase();
         const _tipoEventoCA = allyClasificarEventoCA(textoEvento);
@@ -7290,7 +7305,7 @@ function dsClasificarLogistica(log){
 }
 
 
-// ── WhatsApp helpers Desinstalaciones — v2.8.1 ─────────────────────────
+// ── WhatsApp helpers Desinstalaciones — v2.8.0 ─────────────────────────
 function dsEscapeHtml(v){return String(v??'').replace(/[&<>'\"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[m]));}
 function dsTelefonoWa(raw){let n=String(raw||'').replace(/\D/g,'');if(!n)return '';if(n.startsWith('00'))n=n.slice(2);if(n.startsWith('0'))n=n.replace(/^0+/,'');if(!n.startsWith('54')&&(n.startsWith('9')||n.startsWith('11')||n.startsWith('15')||n.length<=11))n='54'+n;return n;}
 function dsNombreContacto(ot){const base=String(ot.contacto_nombre||ot.nombre_contacto||ot.nombre||ot.comercio||ot.cuenta||'').trim();if(!base)return '';const limpio=base.replace(/\s+-\s+SUC\s+-.*$/i,'').replace(/\s+-\s+\d+.*$/,'').trim();return limpio.split(/\s+/).slice(0,2).join(' ');}
@@ -8093,7 +8108,7 @@ async function autoTrackingDesinstalaciones(){
 
 
 async function dsAutoTracking(){
-  // AUTO-TRACKING DESINSTALACIONES v2.8.1
+  // AUTO-TRACKING DESINSTALACIONES v2.8.0
   // NO Envíos, NO Ally, NO wasender, NO Railway, NO processAllyRules
   console.log('[DS AT START] dsAutoTracking iniciado', new Date().toISOString());
   abrirModalAutoTracking();
@@ -8173,7 +8188,7 @@ async function dsAutoTracking(){
       console.log('[MATCH CA] INGRESO genérico | historia:', historia, '| estadoCA:', estadoCA, '| ea:', ea);
       return { caKey:'INGRESO_CORREO', nuevoEstado: ea.includes('DESPACH') ? 'En Proceso' : null };
     }
-    if(any('ENTREGADO', 'ENTREGA OK') || normCA(estadoCA).includes('ENTREGADO'))
+    if(any('ENTREGADO', 'ENTREGA OK'))
       return { caKey:'ENTREGADO',       nuevoEstado: 'Terminal recuperada' };
     if(any('DEVUELTO', 'DEVOLUCION'))
       return { caKey:'DEVUELTO',        nuevoEstado: 'Fallido' };
@@ -8264,8 +8279,14 @@ async function dsAutoTracking(){
       // PASO 1: Guardar SIEMPRE historial + pieza + SLA
       const updTracking = { historial_logistica: historialCA, updated_at: new Date().toISOString() };
       if(pieza)        updTracking.pieza_ca            = pieza;
-      if(merchantSLA)  updTracking.sla_merchant_estado  = merchantSLA.estado;
-      if(logisticoSLA) updTracking.sla_logistico_estado = logisticoSLA.estado;
+      if(merchantSLA){
+        updTracking.sla_merchant_estado = merchantSLA.estado;
+        updTracking.sla_merchant_dias   = merchantSLA.dias;
+      }
+      if(logisticoSLA){
+        updTracking.sla_logistico_estado = logisticoSLA.estado;
+        updTracking.sla_ca_dias          = logisticoSLA.dias;
+      }
 
       console.log('[DS AT UPDATE TRACKING]', ot.id, updTracking);
 
@@ -8373,7 +8394,23 @@ async function dsAutoTracking(){
     if(!esCA) return false;
     return est.includes('fallido')||est.includes('extraviada')||est.includes('no contactado');
   }).map(o=>({ot:o.ot,estado:o.estado}));
-  allyDesinst_reporteAutoTracking({procesados:ots.length,actualizados:act,errores:err,alertas:_alertasAT})
+
+  // Terminales entregadas por CA en esta corrida
+  const _terminalesAT = (DesinModule.datos||[]).filter(o => {
+    const est = (o.estado||'').toLowerCase();
+    const log = (o.logistica||'').toUpperCase();
+    const esCA = log.includes('CORREO') || log.includes('ARGENTINO');
+    return esCA && (est === 'terminal recuperada');
+  }).map(o => ({
+    ot: o.ot,
+    cuenta: o.cuenta || o.comercio,
+    ciudad: o.ciudad,
+    nro_seguimiento: o.nro_seguimiento,
+    sla_merchant_dias: o.sla_merchant_dias,
+    sla_ca_dias: o.sla_ca_dias,
+  }));
+
+  allyDesinst_reporteAutoTracking({procesados:ots.length,actualizados:act,errores:err,alertas:_alertasAT,terminales:_terminalesAT})
     .catch(()=>{});
 }
 
