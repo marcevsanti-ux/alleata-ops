@@ -7738,7 +7738,7 @@ async function importDesinstalaciones(e){
 
     // 4. Mapeo de columnas
     const iSFId     = colAny('Id. de orden de trabajo','Id de orden de trabajo','ID Orden de Trabajo','sf_id');
-    const iOT       = colAny('Numero de orden de trabajo','Numero de orden','Numero OT','OT','numero ot');
+    const iOT       = colAny('Número de orden de trabajo','Numero de orden de trabajo','Numero de orden','Numero OT','numero ot');
     const iResp     = colAny('Responsable','responsable de la ot','responsable ot');
     const iCuenta   = colAny('Cuenta: Nombre','Cuenta','cuenta sf');
     const iComercio = colAny('Nombre del comercio','Nombre comercio','Comercio');
@@ -7751,7 +7751,7 @@ async function importDesinstalaciones(e){
     const iObsEstado= colAny('Observación sobre estado de OT','Observacion sobre estado de OT','Observación OT','Observacion OT');
     const iCosto    = colAny('Costo de envio','Costo envio','Costo de envío','costo envio');
     const iModif    = colAny('Fecha de la ultima modificacion','Fecha ultima modificacion','Ultima modificacion');
-    const iEstadoSF = colAny('Estado');
+    const iEstadoSF = colAny('Estado  ↑','Estado de la OT','Estado SF','Estado'); // matchea exacto 'estado' antes del parcial
     // Col [25] en nuevo Excel: 'Logística' (con tilde) — agregar como primer target
     const iLogistica= colAny('Logística','Logistica','Logistico','Logistica de Correo','Log');
 
@@ -7862,23 +7862,20 @@ async function importDesinstalaciones(e){
     // Detectar formato del archivo:
     // - Si tiene columna Logística → formato viejo → filtrar ALLEATA + CA con PROMESA DESPACHO
     // - Si no tiene columna Logística → formato nuevo (reporte SF simplificado) → filtrar solo estado=Despachado
-    const iLogisticaCol = colAny('Logística','Logistica','logistica');
-    const iStatusGR     = colAny('Status Gestion Retiros','Status Gestión Retiros','status gestion retiros');
-    const iEstadoCol    = colAny('Estado  ↑','Estado','estado');
-    const tieneLogistica = iLogisticaCol >= 0;
+    const tieneLogistica = iLogistica >= 0;
 
     const enrichedFiltrado = enriched.filter(({logistica, r}) => {
       if(tieneLogistica){
         // Formato viejo: ALLEATA siempre + CA con PROMESA DESPACHO
         if(logistica === 'ALLEATA') return true;
         if(logistica === 'CORREO ARGENTINO'){
-          const sg = svN(r, iStatusGR) || '';
+          const sg = svN(r, iStatusG) || '';
           return sg.toUpperCase().includes('PROMESA DESPACHO');
         }
         return false;
       } else {
         // Formato nuevo (sin col Logística): solo estado = Despachado
-        const est = (svN(r, iEstadoCol) || '').toLowerCase();
+        const est = (svN(r, iEstadoSF) || '').toLowerCase();
         return est === 'despachado';
       }
     });
