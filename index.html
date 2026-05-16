@@ -342,6 +342,10 @@ tr:hover td{background:var(--surface2);}
       <div class="active-bar"></div><span class="nav-icon-wrap">⏱</span> Horas
       <span class="nav-badge" id="nb-horas">—</span>
     </div>
+    <div class="nav-item" data-mod="sf" id="nav-sf" onclick="goTo('sf')" style="display:none">
+      <div class="active-bar"></div><span class="nav-icon-wrap">☁️</span> SF-Integración
+      <span class="nav-badge" id="nb-sf">—</span>
+    </div>
     <div class="nav-section" id="nav-section-config" style="display:none">Configuración</div>
     <div class="nav-item" data-mod="ajustes" id="nav-ajustes" style="display:none" onclick="goTo('ajustes')">
       <div class="active-bar"></div><span class="nav-icon-wrap">⚙️</span> Ajustes
@@ -380,6 +384,68 @@ tr:hover td{background:var(--surface2);}
     <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.8.4</div>
   </div>
   <div class="content">
+
+    <!-- SF-INTEGRACIÓN -->
+    <div class="module" id="mod-sf">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+        <div>
+          <h2 style="font-size:20px;font-weight:800;color:#fff;margin:0">☁️ SF — Integración</h2>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:3px">Salesforce UAT · Solo lectura</div>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center">
+          <div id="sf-last-sync" style="font-size:11px;color:var(--text-muted);font-family:'JetBrains Mono',monospace"></div>
+          <button class="btn btn-sm" onclick="sfSync()" id="sf-sync-btn">↺ Sync ahora</button>
+        </div>
+      </div>
+
+      <!-- Stats -->
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px">
+        <div class="card" style="padding:16px">
+          <div style="font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px">Total activas</div>
+          <div id="sf-stat-total" style="font-size:28px;font-weight:800;color:var(--teal);margin-top:4px">—</div>
+        </div>
+        <div class="card" style="padding:16px">
+          <div style="font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px">Despachado</div>
+          <div id="sf-stat-despachado" style="font-size:28px;font-weight:800;color:var(--blue);margin-top:4px">—</div>
+        </div>
+        <div class="card" style="padding:16px">
+          <div style="font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px">En Proceso</div>
+          <div id="sf-stat-proceso" style="font-size:28px;font-weight:800;color:var(--yellow);margin-top:4px">—</div>
+        </div>
+        <div class="card" style="padding:16px">
+          <div style="font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px">Retirar Terminal</div>
+          <div id="sf-stat-retiro" style="font-size:28px;font-weight:800;color:var(--purple);margin-top:4px">—</div>
+        </div>
+      </div>
+
+      <!-- Tabla OTs -->
+      <div class="card" style="padding:0;overflow:hidden">
+        <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+          <div style="font-size:13px;font-weight:600;color:var(--text)">OTs activas — Correo Argentino</div>
+          <input class="input" id="sf-search" placeholder="Buscar OT, cuenta, tracking..." style="width:240px;padding:6px 10px;font-size:12px" oninput="sfFilterTable()">
+        </div>
+        <div style="overflow-x:auto">
+          <table style="width:100%;border-collapse:collapse;font-size:12px">
+            <thead>
+              <tr style="background:var(--navy-800)">
+                <th style="padding:10px 14px;text-align:left;color:var(--text-muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap">OT</th>
+                <th style="padding:10px 14px;text-align:left;color:var(--text-muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Tipo</th>
+                <th style="padding:10px 14px;text-align:left;color:var(--text-muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Estado SF</th>
+                <th style="padding:10px 14px;text-align:left;color:var(--text-muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Cuenta</th>
+                <th style="padding:10px 14px;text-align:left;color:var(--text-muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Tracking envío</th>
+                <th style="padding:10px 14px;text-align:left;color:var(--text-muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Estado CA</th>
+                <th style="padding:10px 14px;text-align:left;color:var(--text-muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Fecha despacho</th>
+                <th style="padding:10px 14px;text-align:left;color:var(--text-muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Responsable</th>
+              </tr>
+            </thead>
+            <tbody id="sf-tbody">
+              <tr><td colspan="8" style="padding:40px;text-align:center;color:var(--text-muted)">Cargando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <!-- /SF-INTEGRACIÓN -->
 
     <!-- HOME -->
     <div class="module active" id="mod-home">
@@ -2723,6 +2789,8 @@ function showApp(){
     if(navAlly) navAlly.style.display='flex';
     const navDistri=document.getElementById('nav-distri');
     if(navDistri) navDistri.style.display='flex';
+    const navSF=document.getElementById('nav-sf');
+    if(navSF) navSF.style.display='flex';
     document.getElementById('nav-ajustes').style.display='flex';
     document.getElementById('nav-section-config').style.display='block';
   }
@@ -2784,6 +2852,7 @@ function goTo(mod){
   if(mod==='distri')cargarDistri();
   if(mod==='horas')renderHoras();
   if(mod==='ajustes'){loadUsers();loadSimsDbStats();loadConfigSLA();_auditPage=0;loadAuditLog();}
+  if(mod==='sf') cargarSFIntegracion();
 }
 
 function refreshCurrentModule(){
@@ -8707,6 +8776,111 @@ function dsGeoExportarPDF() {
   const provSlug = provSel ? provSel.replace(/\s+/g,'_').toLowerCase() : 'todas';
   const dateSlug = now.toISOString().slice(0,10);
   doc.save(`alleata_geo_desinstalaciones_${provSlug}_${dateSlug}.pdf`);
+}
+
+// ── SF-Integración ────────────────────────────────────────────────────────────
+const SF_SYNC_SECRET = '123456';
+const SF_AGENT_URL   = 'https://alleata-agent-production.up.railway.app';
+let _sfData = [];
+
+async function cargarSFIntegracion() {
+  document.getElementById('sf-tbody').innerHTML =
+    '<tr><td colspan="8" style="padding:40px;text-align:center;color:var(--text-muted)">Cargando OTs desde SF...</td></tr>';
+  try {
+    const res = await fetch(`${SF_AGENT_URL}/automations/sf-workorders?entorno=uat&limit=100`, {
+      headers: { 'x-automation-secret': SF_SYNC_SECRET }
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Error al cargar');
+    _sfData = data.workorders || [];
+    sfRenderStats(_sfData);
+    sfRenderTable(_sfData);
+    const lastSync = _sfData[0]?.ultimo_sync;
+    if (lastSync) {
+      document.getElementById('sf-last-sync').textContent = 'Último sync: ' +
+        new Date(lastSync).toLocaleString('es-AR',{timeZone:'America/Argentina/Buenos_Aires',day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+    }
+    const nb = document.getElementById('nb-sf');
+    if (nb) nb.textContent = _sfData.length;
+  } catch (err) {
+    document.getElementById('sf-tbody').innerHTML =
+      `<tr><td colspan="8" style="padding:40px;text-align:center;color:var(--red)">${err.message}</td></tr>`;
+  }
+}
+
+function sfRenderStats(rows) {
+  document.getElementById('sf-stat-total').textContent      = rows.length;
+  document.getElementById('sf-stat-despachado').textContent = rows.filter(r=>r.status==='Despachado').length;
+  document.getElementById('sf-stat-proceso').textContent    = rows.filter(r=>r.status==='En Proceso').length;
+  document.getElementById('sf-stat-retiro').textContent     = rows.filter(r=>r.status==='Retirar Terminal').length;
+}
+
+const SF_STATUS_COLORS = {
+  'Despachado':'var(--blue)', 'En Proceso':'var(--yellow)',
+  'Retirar Terminal':'var(--purple)', 'En Sucursal de Correo':'var(--orange)'
+};
+
+function sfRenderTable(rows) {
+  const tbody = document.getElementById('sf-tbody');
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="8" style="padding:40px;text-align:center;color:var(--text-muted)">Sin OTs activas</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map(r => {
+    const sc = SF_STATUS_COLORS[r.status] || 'var(--text-muted)';
+    const fecha = r.fecha_despacho ? r.fecha_despacho.substring(0,10) : '—';
+    const tracking = r.tracking_envio
+      ? `<a href="https://www.correoargentino.com.ar/formularios/e-commerce?codigo=${r.tracking_envio}" target="_blank"
+           style="color:var(--teal);font-family:'JetBrains Mono',monospace;font-size:11px">${r.tracking_envio.slice(-8)}</a>` : '—';
+    const estadoCA = r.estado_ca_envio
+      ? `<span style="font-size:10px;padding:2px 7px;border-radius:10px;background:rgba(29,191,142,.1);color:var(--teal)">${r.estado_ca_envio}</span>`
+      : '<span style="color:var(--text-muted);font-size:11px">—</span>';
+    return `<tr style="border-top:1px solid var(--border);transition:background .15s" onmouseover="this.style.background='var(--navy-800)'" onmouseout="this.style.background=''">
+      <td style="padding:10px 14px;font-family:'JetBrains Mono',monospace;font-weight:600;color:var(--text);white-space:nowrap">${r.workorder_number||'—'}</td>
+      <td style="padding:10px 14px;color:var(--text-muted);white-space:nowrap;max-width:160px;overflow:hidden;text-overflow:ellipsis">${r.record_type||'—'}</td>
+      <td style="padding:10px 14px;white-space:nowrap"><span style="font-size:10px;padding:2px 8px;border-radius:10px;border:1px solid ${sc};color:${sc}">${r.status||'—'}</span></td>
+      <td style="padding:10px 14px;color:var(--text);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.cuenta||'—'}</td>
+      <td style="padding:10px 14px">${tracking}</td>
+      <td style="padding:10px 14px">${estadoCA}</td>
+      <td style="padding:10px 14px;color:var(--text-muted);white-space:nowrap;font-family:'JetBrains Mono',monospace;font-size:11px">${fecha}</td>
+      <td style="padding:10px 14px;color:var(--text-muted);white-space:nowrap">${r.responsable||'—'}</td>
+    </tr>`;
+  }).join('');
+}
+
+function sfFilterTable() {
+  const q = document.getElementById('sf-search').value.toLowerCase();
+  if (!q) { sfRenderTable(_sfData); return; }
+  const filtered = _sfData.filter(r =>
+    (r.workorder_number||'').toLowerCase().includes(q) ||
+    (r.cuenta||'').toLowerCase().includes(q) ||
+    (r.tracking_envio||'').toLowerCase().includes(q) ||
+    (r.record_type||'').toLowerCase().includes(q) ||
+    (r.responsable||'').toLowerCase().includes(q)
+  );
+  sfRenderStats(filtered);
+  sfRenderTable(filtered);
+}
+
+async function sfSync() {
+  const btn = document.getElementById('sf-sync-btn');
+  btn.disabled = true; btn.textContent = 'Sincronizando...';
+  try {
+    const res = await fetch(`${SF_AGENT_URL}/automations/run/sf_sync`, {
+      method:'POST', headers:{'x-automation-secret':SF_SYNC_SECRET}
+    });
+    const data = await res.json();
+    if (data.ok) {
+      btn.textContent = `✅ ${data.upserted} OTs`;
+      setTimeout(()=>{ btn.textContent='↺ Sync ahora'; btn.disabled=false; cargarSFIntegracion(); }, 2000);
+    } else {
+      btn.textContent = '❌ Error';
+      setTimeout(()=>{ btn.textContent='↺ Sync ahora'; btn.disabled=false; }, 3000);
+    }
+  } catch(err) {
+    btn.textContent = '❌ Error';
+    setTimeout(()=>{ btn.textContent='↺ Sync ahora'; btn.disabled=false; }, 3000);
+  }
 }
 </script>
 <!-- MODAL COTIZADOR CA -->
