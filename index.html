@@ -9,7 +9,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v2.8.6</title>
+<title>Alleata · Operaciones v2.8.7</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -303,7 +303,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.8.6 · 17 may 2026
+      v2.8.7 · 17 may 2026
     </div>
   </div>
 </div>
@@ -367,7 +367,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.8.6 · 17 may 2026
+      v2.8.7 · 17 may 2026
     </div>
   </div>
 </nav>
@@ -381,7 +381,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <div class="topbar-right" id="topbar-date"></div>
     <button onclick="refreshCurrentModule()" title="Actualizar" style="background:none;border:1px solid var(--border2);color:var(--text-muted);border-radius:7px;padding:4px 10px;cursor:pointer;font-size:13px;margin-left:10px;transition:all .2s" onmouseover="this.style.color='var(--teal)';this.style.borderColor='var(--teal)'" onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border2)'">↺</button>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.8.6</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.8.7</div>
   </div>
   <div class="content">
 
@@ -393,7 +393,10 @@ tr:hover td{background:var(--surface2);}
           <div style="font-size:12px;color:var(--text-muted);margin-top:3px">Salesforce UAT · Solo lectura</div>
         </div>
         <div style="display:flex;gap:10px;align-items:center">
-          <div id="sf-last-sync" style="font-size:11px;color:var(--text-muted);font-family:'JetBrains Mono',monospace"></div>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px">
+            <div id="sf-last-sync" style="font-size:11px;color:var(--text-muted);font-family:'JetBrains Mono',monospace"></div>
+            <div id="sf-next-sync" style="font-size:11px;color:var(--teal);font-family:'JetBrains Mono',monospace"></div>
+          </div>
           <button class="btn btn-sm" onclick="sfSync()" id="sf-sync-btn">↺ Sync ahora</button>
         </div>
       </div>
@@ -2615,7 +2618,7 @@ function _dsBadgeCAAmba(ot) {
   return '';
 }
 
-console.log('[Alleata v2.8.6] OK');
+console.log('[Alleata v2.8.7] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -8783,9 +8786,55 @@ const SF_SYNC_SECRET = '123456';
 const SF_AGENT_URL   = 'https://alleata-agent-production.up.railway.app';
 let _sfData = [];
 
+// Calcula próximo SF Sync (cada :02 y :32, Lun-Vie 07-22h, Sáb 08-18h)
+function sfProximoCron() {
+  const ahora = new Date();
+  const tz = 'America/Argentina/Buenos_Aires';
+  const local = new Date(ahora.toLocaleString('en-US', { timeZone: tz }));
+  const dia = local.getDay(); // 0=Dom, 6=Sáb
+  const hora = local.getHours();
+  const min = local.getMinutes();
+
+  // Domingo no corre
+  if (dia === 0) return '⏸ No corre hoy (domingo)';
+
+  const esSabado = dia === 6;
+  const horaMin = esSabado ? 8 : 7;
+  const horaMax = esSabado ? 18 : 22;
+
+  // Próximo :02 o :32
+  let proxMin, proxHora = hora;
+  if (min < 2)       { proxMin = 2; proxHora = hora; }
+  else if (min < 32) { proxMin = 32; proxHora = hora; }
+  else               { proxMin = 2; proxHora = hora + 1; }
+
+  // Si la próxima hora está fuera del rango
+  if (proxHora > horaMax || proxHora < horaMin) {
+    if (dia === 5) return '⏸ Próximo: lunes 07:02';
+    if (dia === 6) return '⏸ Próximo: lunes 07:02';
+    const manana = proxHora < horaMin ? horaMin : horaMin;
+    return `⏸ Próximo: ${String(manana).padStart(2,'0')}:02`;
+  }
+
+  const pad = n => String(n).padStart(2,'0');
+  const diff = (proxHora * 60 + proxMin) - (hora * 60 + min);
+  const enMin = diff <= 0 ? 30 - (min - 2) % 30 : diff;
+  return `⏱ Próx. sync: ${pad(proxHora)}:${pad(proxMin)} (en ${enMin} min)`;
+}
+
+function sfActualizarProximoCron() {
+  const el = document.getElementById('sf-next-sync');
+  if (el) el.textContent = sfProximoCron();
+}
+
 async function cargarSFIntegracion() {
   document.getElementById('sf-tbody').innerHTML =
     '<tr><td colspan="8" style="padding:40px;text-align:center;color:var(--text-muted)">Cargando OTs desde SF...</td></tr>';
+
+  sfActualizarProximoCron();
+  if (!window._sfCronInterval) {
+    window._sfCronInterval = setInterval(sfActualizarProximoCron, 60000);
+  }
   try {
     const res = await fetch(`${SF_AGENT_URL}/automations/sf-workorders?entorno=uat&limit=100`, {
       headers: { 'x-automation-secret': SF_SYNC_SECRET }
