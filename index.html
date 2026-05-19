@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v2.9.0</title>
+<title>Alleata · Operaciones v2.9.1</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -304,7 +304,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.9.0 · 19 may 2026
+      v2.9.1 · 19 may 2026
     </div>
   </div>
 </div>
@@ -372,7 +372,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.9.0 · 19 may 2026
+      v2.9.1 · 19 may 2026
     </div>
   </div>
 </nav>
@@ -386,7 +386,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <div class="topbar-right" id="topbar-date"></div>
     <button onclick="refreshCurrentModule()" title="Actualizar" style="background:none;border:1px solid var(--border2);color:var(--text-muted);border-radius:7px;padding:4px 10px;cursor:pointer;font-size:13px;margin-left:10px;transition:all .2s" onmouseover="this.style.color='var(--teal)';this.style.borderColor='var(--teal)'" onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border2)'">↺</button>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.9.0</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.9.1</div>
   </div>
   <div class="content">
 
@@ -2728,7 +2728,7 @@ function _dsBadgeCAAmba(ot) {
   return '';
 }
 
-console.log('[Alleata v2.9.0] OK');
+console.log('[Alleata v2.9.1] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -9066,26 +9066,46 @@ async function sfSync() {
 
 // ══════════════════════════════════════════════════════════
 // MÓDULO ENVÍOS MERCHANTS — temporal hasta integración SF
-// Datos en localStorage: mch_guias (array JSON)
-// Para eliminar: borrar nav-item, mod-merchants, y este bloque
+// Datos en Supabase tabla: merchants_guias (compartida entre usuarios)
+// Para eliminar: borrar nav-item, mod-merchants, este bloque, y hacer DROP TABLE merchants_guias
+// SQL de creación:
+//   create table if not exists merchants_guias (
+//     id uuid primary key default gen_random_uuid(),
+//     sf_id text unique,
+//     ot text, cuenta text, track text, estado_ot text,
+//     ciudad text, obs text,
+//     estado text default 'Sin datos',
+//     ultimo_evento text, ultimo_evento_fecha text,
+//     updated_at timestamptz,
+//     created_at timestamptz default now()
+//   );
+//   alter table merchants_guias enable row level security;
+//   create policy "merchants_all" on merchants_guias for all using (true) with check (true);
 // ══════════════════════════════════════════════════════════
 
-const MCH_KEY = 'mch_guias_v1';
+let _mchCache = null; // cache en memoria para la sesión
 
-function mchGetGuias(){ try{ return JSON.parse(localStorage.getItem(MCH_KEY)||'[]'); }catch(e){ return []; } }
-function mchSaveGuias(arr){ localStorage.setItem(MCH_KEY, JSON.stringify(arr)); }
+async function mchGetGuias(){
+  if(_mchCache) return _mchCache;
+  const { data, error } = await sb.from('merchants_guias').select('*').order('created_at', {ascending:false});
+  if(error){ console.error('mchGetGuias:', error); return []; }
+  _mchCache = data || [];
+  return _mchCache;
+}
 
-function initMerchants(){
-  mchFiltrar();
-  mchUpdateStats();
-  mchUpdateBadge();
-  const guias = mchGetGuias();
+function mchInvalidateCache(){ _mchCache = null; }
+
+async function initMerchants(){
+  mchInvalidateCache();
+  const guias = await mchGetGuias();
+  mchRenderTabla(guias);
+  mchUpdateStatsFromData(guias);
+  mchUpdateBadgeFromData(guias);
   const empty = document.getElementById('mch-empty');
   if(empty) empty.style.display = guias.length === 0 ? 'flex' : 'none';
 }
 
-function mchUpdateBadge(){
-  const guias = mchGetGuias();
+function mchUpdateBadgeFromData(guias){
   const activas = guias.filter(g => g.estado !== 'Entregado' && g.estado !== 'Devuelto').length;
   const nb = document.getElementById('nb-merchants');
   if(nb) nb.textContent = activas || '0';
@@ -9093,8 +9113,7 @@ function mchUpdateBadge(){
   if(dc) dc.textContent = guias.length + ' guías';
 }
 
-function mchUpdateStats(){
-  const guias = mchGetGuias();
+function mchUpdateStatsFromData(guias){
   const set = (id, val) => { const el=document.getElementById(id); if(el) el.textContent=val; };
   set('mch-stat-total',     guias.length);
   set('mch-stat-transito',  guias.filter(g=>g.estado==='En tránsito').length);
@@ -9102,7 +9121,7 @@ function mchUpdateStats(){
   set('mch-stat-sucursal',  guias.filter(g=>g.estado==='En sucursal').length);
   set('mch-stat-devuelto',  guias.filter(g=>g.estado==='Devuelto').length);
   set('mch-stat-sin',       guias.filter(g=>!g.estado||g.estado==='Sin datos').length);
-  mchUpdateBadge();
+  mchUpdateBadgeFromData(guias);
 }
 
 function mchMapearEstado(historia, estadoCA){
@@ -9126,7 +9145,6 @@ async function mchImportarExcel(event){
     const ws = wb.Sheets[wb.SheetNames[0]];
     const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
 
-    // Buscar fila de encabezados (contiene "Id. de orden de trabajo")
     let headerRow = -1;
     for(let i=0;i<rows.length;i++){
       if(rows[i].some(c=>(c+'').includes('Id. de orden de trabajo'))){ headerRow=i; break; }
@@ -9144,22 +9162,15 @@ async function mchImportarExcel(event){
     const cCiudad  = col('Ciudad');
     const cObs     = col('Observaciones');
 
-    const existentes = mchGetGuias();
-    const existMap = {};
-    existentes.forEach(g=>{ if(g.sf_id) existMap[g.sf_id]=true; });
-
-    let nuevas = 0, dupes = 0;
-    const nuevasGuias = [...existentes];
-
+    const toInsert = [];
     for(let i=headerRow+1; i<rows.length; i++){
       const row = rows[i];
       if(!row || row.every(c=>!c)) continue;
       const sfId = (row[cSfId]||'').toString().trim();
       const track = (row[cTrack]||'').toString().trim();
       if(!sfId && !track) continue;
-      if(sfId && existMap[sfId]){ dupes++; continue; }
-      nuevasGuias.push({
-        sf_id:    sfId,
+      toInsert.push({
+        sf_id:    sfId || null,
         ot:       (row[cOT]||'').toString().replace(/\.0$/,'').trim(),
         cuenta:   (row[cCuenta]||'').toString().trim(),
         track:    track,
@@ -9169,26 +9180,34 @@ async function mchImportarExcel(event){
         estado:   'Sin datos',
         ultimo_evento: '',
         ultimo_evento_fecha: '',
-        updated_at: ''
+        updated_at: new Date().toISOString()
       });
-      nuevas++;
     }
 
-    mchSaveGuias(nuevasGuias);
-    mchFiltrar();
-    mchUpdateStats();
-    if(msg) msg.textContent = `✅ ${nuevas} guías importadas${dupes?' · '+dupes+' ya existían':''}`;
+    if(toInsert.length === 0){ if(msg) msg.textContent='⚠️ No encontré filas válidas'; return; }
+
+    // upsert por sf_id para no duplicar
+    const { error, count } = await sb.from('merchants_guias')
+      .upsert(toInsert, { onConflict: 'sf_id', ignoreDuplicates: true });
+
+    if(error){ if(msg) msg.textContent='❌ Error guardando: '+error.message; console.error(error); return; }
+
+    mchInvalidateCache();
+    const guias = await mchGetGuias();
+    mchRenderTabla(guias);
+    mchUpdateStatsFromData(guias);
+    if(msg) msg.textContent = `✅ ${toInsert.length} filas procesadas · ${guias.length} guías en total`;
     const empty = document.getElementById('mch-empty');
-    if(empty) empty.style.display = nuevasGuias.length===0?'flex':'none';
+    if(empty) empty.style.display = guias.length===0?'flex':'none';
   } catch(err){
     console.error(err);
-    if(msg) msg.textContent = '❌ Error procesando el archivo: '+err.message;
+    if(msg) msg.textContent = '❌ Error: '+err.message;
   }
   event.target.value='';
 }
 
-function mchFiltrar(){
-  const guias = mchGetGuias();
+async function mchFiltrar(){
+  const guias = await mchGetGuias();
   const q = (document.getElementById('mch-buscar')?.value||'').toLowerCase();
   const fEst = document.getElementById('mch-f-estado')?.value||'';
   const filtered = guias.filter(g=>{
@@ -9215,16 +9234,13 @@ function mchRenderTabla(guias){
   const tbody = document.getElementById('mch-table-body');
   const empty = document.getElementById('mch-empty');
   if(!tbody) return;
-  const allGuias = mchGetGuias();
-  if(!guias) guias = allGuias;
-  if(guias.length === 0){
+  if(!guias || guias.length === 0){
     tbody.innerHTML='';
     if(empty) empty.style.display='flex';
     return;
   }
   if(empty) empty.style.display='none';
-  tbody.innerHTML = guias.map((g,i)=>{
-    const realIdx = allGuias.findIndex(x=>(x.sf_id&&x.sf_id===g.sf_id)||(x.track&&x.track===g.track));
+  tbody.innerHTML = guias.map((g)=>{
     const trackLink = g.track
       ? `<a href="https://www.correoargentino.com.ar/formularios/e-commerce?id=${encodeURIComponent(g.track)}" target="_blank" style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--blue);text-decoration:none" title="Ver en CA">${g.track} 🔗</a>`
       : '<span style="color:var(--text-muted);font-size:11px">—</span>';
@@ -9242,31 +9258,32 @@ function mchRenderTabla(guias){
       </td>
       <td style="font-size:11px;color:var(--text-muted);font-family:'JetBrains Mono',monospace">${g.ultimo_evento_fecha||'—'}</td>
       <td>
-        <button onclick="mchTrackOne(${realIdx})" style="background:var(--surface2);border:1px solid var(--border2);color:var(--text-muted);font-size:11px;padding:3px 8px;border-radius:5px;cursor:pointer" id="mch-tb-${realIdx}" title="Consultar tracking CA">🔍</button>
+        <button onclick="mchTrackOne('${g.id}','${(g.track||'').replace(/'/g,'')}')" style="background:var(--surface2);border:1px solid var(--border2);color:var(--text-muted);font-size:11px;padding:3px 8px;border-radius:5px;cursor:pointer" id="mch-tb-${g.id}" title="Consultar tracking CA">🔍</button>
       </td>
     </tr>`;
   }).join('');
 }
 
-async function mchTrackOne(idx){
-  const guias = mchGetGuias();
-  const g = guias[idx];
-  if(!g||!g.track){ showTrackingToast('⚠️ Sin número de tracking','yellow'); return; }
-  const btn = document.getElementById(`mch-tb-${idx}`);
+async function mchTrackOne(id, track){
+  if(!track){ showTrackingToast('⚠️ Sin número de tracking','yellow'); return; }
+  const btn = document.getElementById(`mch-tb-${id}`);
   if(btn){ btn.textContent='⏳'; btn.disabled=true; }
   try {
-    const { eventos, pieza } = await fetchTrackingCA(g.track);
+    const { eventos, pieza } = await fetchTrackingCA(track);
     if(eventos && eventos.length > 0){
       const ultimo = eventos[0];
-      guias[idx].estado = mchMapearEstado(ultimo.historia, ultimo.estadoCA);
-      guias[idx].ultimo_evento = ultimo.estadoCA ? `${ultimo.historia} — ${ultimo.estadoCA}` : ultimo.historia;
-      guias[idx].ultimo_evento_fecha = ultimo.fecha;
-      guias[idx].updated_at = new Date().toISOString();
-      mchSaveGuias(guias);
-      mchFiltrar();
-      mchUpdateStats();
-      // Mostrar modal de tracking existente
-      mostrarModalTrackingCA(g.track, { eventos, pieza }, 'ok');
+      const updateData = {
+        estado: mchMapearEstado(ultimo.historia, ultimo.estadoCA),
+        ultimo_evento: ultimo.estadoCA ? `${ultimo.historia} — ${ultimo.estadoCA}` : ultimo.historia,
+        ultimo_evento_fecha: ultimo.fecha,
+        updated_at: new Date().toISOString()
+      };
+      await sb.from('merchants_guias').update(updateData).eq('id', id);
+      mchInvalidateCache();
+      mostrarModalTrackingCA(track, { eventos, pieza }, 'ok');
+      const guias = await mchGetGuias();
+      mchRenderTabla(guias);
+      mchUpdateStatsFromData(guias);
     } else {
       showTrackingToast('Sin eventos en CA','yellow');
     }
@@ -9278,7 +9295,7 @@ async function mchTrackOne(idx){
 }
 
 async function mchActualizarTodos(){
-  const guias = mchGetGuias();
+  const guias = await mchGetGuias();
   const pendientes = guias.filter(g=>g.track && g.estado !== 'Entregado' && g.estado !== 'Devuelto');
   if(pendientes.length === 0){ showTrackingToast('No hay guías activas para actualizar','yellow'); return; }
   const btn = document.getElementById('mch-btn-update');
@@ -9286,40 +9303,43 @@ async function mchActualizarTodos(){
   let ok=0, err=0;
   for(let i=0; i<pendientes.length; i++){
     const g = pendientes[i];
-    const realIdx = guias.findIndex(x=>(x.sf_id&&x.sf_id===g.sf_id)||(x.track&&x.track===g.track));
     if(btn) btn.textContent=`⏳ ${i+1}/${pendientes.length}`;
     try {
       const { eventos } = await fetchTrackingCA(g.track);
       if(eventos && eventos.length > 0){
         const ultimo = eventos[0];
-        guias[realIdx].estado = mchMapearEstado(ultimo.historia, ultimo.estadoCA);
-        guias[realIdx].ultimo_evento = ultimo.estadoCA ? `${ultimo.historia} — ${ultimo.estadoCA}` : ultimo.historia;
-        guias[realIdx].ultimo_evento_fecha = ultimo.fecha;
-        guias[realIdx].updated_at = new Date().toISOString();
+        await sb.from('merchants_guias').update({
+          estado: mchMapearEstado(ultimo.historia, ultimo.estadoCA),
+          ultimo_evento: ultimo.estadoCA ? `${ultimo.historia} — ${ultimo.estadoCA}` : ultimo.historia,
+          ultimo_evento_fecha: ultimo.fecha,
+          updated_at: new Date().toISOString()
+        }).eq('id', g.id);
         ok++;
       }
     } catch(e){ err++; }
-    // pequeña pausa para no saturar el proxy
     await new Promise(r=>setTimeout(r,400));
   }
-  mchSaveGuias(guias);
-  mchFiltrar();
-  mchUpdateStats();
+  mchInvalidateCache();
+  const guias2 = await mchGetGuias();
+  mchRenderTabla(guias2);
+  mchUpdateStatsFromData(guias2);
   if(btn){ btn.textContent='🔄 Actualizar tracking'; btn.disabled=false; }
   showTrackingToast(`✅ ${ok} actualizada${ok!==1?'s':''}${err?' · '+err+' error':''}`, ok>0?'green':'yellow');
 }
 
-function mchLimpiarFiltros(){
+async function mchLimpiarFiltros(){
   const b=document.getElementById('mch-buscar'); if(b) b.value='';
   const e=document.getElementById('mch-f-estado'); if(e) e.value='';
-  mchFiltrar();
+  await mchFiltrar();
 }
 
-function mchLimpiarTodo(){
+async function mchLimpiarTodo(){
   if(!confirm('¿Vaciar todas las guías Merchants? Esta acción no se puede deshacer.')) return;
-  localStorage.removeItem(MCH_KEY);
-  mchFiltrar();
-  mchUpdateStats();
+  const { error } = await sb.from('merchants_guias').delete().neq('id','00000000-0000-0000-0000-000000000000');
+  if(error){ showTrackingToast('❌ Error al vaciar','red'); return; }
+  mchInvalidateCache();
+  mchRenderTabla([]);
+  mchUpdateStatsFromData([]);
   const empty=document.getElementById('mch-empty');
   if(empty) empty.style.display='flex';
   const msg=document.getElementById('mch-import-msg');
