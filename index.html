@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v2.9.6</title>
+<title>Alleata · Operaciones v2.9.7</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -304,7 +304,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.9.6 · 19 may 2026
+      v2.9.7 · 19 may 2026
     </div>
   </div>
 </div>
@@ -372,7 +372,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.9.6 · 19 may 2026
+      v2.9.7 · 19 may 2026
     </div>
   </div>
 </nav>
@@ -386,7 +386,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <div class="topbar-right" id="topbar-date"></div>
     <button onclick="refreshCurrentModule()" title="Actualizar" style="background:none;border:1px solid var(--border2);color:var(--text-muted);border-radius:7px;padding:4px 10px;cursor:pointer;font-size:13px;margin-left:10px;transition:all .2s" onmouseover="this.style.color='var(--teal)';this.style.borderColor='var(--teal)'" onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border2)'">↺</button>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.9.6</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.9.7</div>
   </div>
   <div class="content">
 
@@ -1398,6 +1398,7 @@ tr:hover td{background:var(--surface2);}
             <th>Estado OT</th>
             <th>Último evento CA</th>
             <th>Fecha</th>
+            <th style="text-align:center">SLA</th>
             <th>Contacto</th>
             <th></th>
           </tr>
@@ -2732,7 +2733,7 @@ function _dsBadgeCAAmba(ot) {
   return '';
 }
 
-console.log('[Alleata v2.9.6] OK');
+console.log('[Alleata v2.9.7] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -9225,10 +9226,14 @@ async function mchFiltrar(){
   const q = (document.getElementById('mch-buscar')?.value||'').toLowerCase();
   const fEst = document.getElementById('mch-f-estado')?.value||'';
   const filtered = guias.filter(g=>{
+    // Ocultar entregados salvo que se filtre explícitamente por ese estado
+    if(g.estado === 'Entregado' && fEst !== 'Entregado') return false;
     if(fEst && g.estado !== fEst) return false;
     if(q && !['cuenta','ot','track','ciudad','estado','ultimo_evento'].some(k=>(g[k]||'').toLowerCase().includes(q))) return false;
     return true;
   });
+  // Ordenar por SLA descendente (más días primero)
+  filtered.sort((a,b) => mchCalcSLA(b) - mchCalcSLA(a));
   mchRenderTabla(filtered);
 }
 
@@ -9242,6 +9247,44 @@ function mchEstadoBadge(estado){
   };
   const style = map[estado]||map['Sin datos'];
   return `<span style="font-size:11px;padding:2px 8px;border-radius:12px;font-weight:600;${style}">${estado||'Sin datos'}</span>`;
+}
+
+function mchCalcSLA(g){
+  // Busca la fecha del último evento CA (ultimo_evento_fecha) o created_at como fallback
+  // Punto de inicio: created_at (fecha de importación = despacho)
+  // Punto actual: hoy
+  // Días hábiles (Lun–Vie)
+  const inicio = g.created_at ? new Date(g.created_at) : null;
+  if(!inicio) return -1;
+  const hoy = new Date();
+  let dias = 0;
+  const cur = new Date(inicio);
+  cur.setHours(0,0,0,0);
+  const fin = new Date(hoy);
+  fin.setHours(0,0,0,0);
+  while(cur < fin){
+    const dow = cur.getDay();
+    if(dow !== 0 && dow !== 6) dias++;
+    cur.setDate(cur.getDate()+1);
+  }
+  return dias;
+}
+
+function mchSLABadge(g){
+  const dias = mchCalcSLA(g);
+  if(dias < 0) return '<span style="color:var(--text-muted);font-size:11px">—</span>';
+  let color, bg, border;
+  if(dias <= 3){
+    color='#10b981'; bg='rgba(16,185,129,.15)'; border='rgba(16,185,129,.3)';
+  } else if(dias <= 5){
+    color='#f59e0b'; bg='rgba(245,158,11,.15)'; border='rgba(245,158,11,.3)';
+  } else {
+    color='#ef4444'; bg='rgba(239,68,68,.15)'; border='rgba(239,68,68,.3)';
+  }
+  return `<div style="text-align:center">
+    <span style="font-size:14px;font-weight:700;color:${color}">${dias}</span>
+    <div style="font-size:9px;color:${color};opacity:.8">días</div>
+  </div>`;
 }
 
 function mchRenderTabla(guias){
@@ -9271,6 +9314,7 @@ function mchRenderTabla(guias){
         ${g.ultimo_evento?`<div style="font-size:10px;color:var(--text-muted);margin-top:3px">${g.ultimo_evento}</div>`:''}
       </td>
       <td style="font-size:11px;color:var(--text-muted);font-family:'JetBrains Mono',monospace">${g.ultimo_evento_fecha||'—'}</td>
+      <td style="text-align:center;min-width:54px">${mchSLABadge(g)}</td>
       <td>
         ${g.contacto
           ? `<div style="font-size:12px;font-weight:500;color:var(--text)">${g.contacto}</div>
