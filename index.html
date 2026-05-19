@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v2.9.8</title>
+<title>Alleata · Operaciones v2.9.9</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -304,7 +304,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.9.8 · 19 may 2026
+      v2.9.9 · 19 may 2026
     </div>
   </div>
 </div>
@@ -372,7 +372,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.9.8 · 19 may 2026
+      v2.9.9 · 19 may 2026
     </div>
   </div>
 </nav>
@@ -386,7 +386,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <div class="topbar-right" id="topbar-date"></div>
     <button onclick="refreshCurrentModule()" title="Actualizar" style="background:none;border:1px solid var(--border2);color:var(--text-muted);border-radius:7px;padding:4px 10px;cursor:pointer;font-size:13px;margin-left:10px;transition:all .2s" onmouseover="this.style.color='var(--teal)';this.style.borderColor='var(--teal)'" onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border2)'">↺</button>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.9.8</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.9.9</div>
   </div>
   <div class="content">
 
@@ -1394,11 +1394,12 @@ tr:hover td{background:var(--surface2);}
           <tr>
             <th>OT / Comercio</th>
             <th>Tracking</th>
-            <th>Ciudad</th>
+            <th>Ciudad / Provincia</th>
             <th>Estado OT</th>
             <th>Último evento CA</th>
             <th>Fecha</th>
             <th style="text-align:center">SLA</th>
+            <th>Obs. Cliente</th>
             <th>Contacto</th>
             <th></th>
           </tr>
@@ -2733,7 +2734,7 @@ function _dsBadgeCAAmba(ot) {
   return '';
 }
 
-console.log('[Alleata v2.9.8] OK');
+console.log('[Alleata v2.9.9] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -9165,8 +9166,10 @@ async function mchImportarExcel(event){
     const cTrack   = col('N° de seguimiento');
     const cEstadoOT= col('Estado');
     const cCiudad  = col('Ciudad');
-    const cObs     = col('Observaciones');
+    const cObs     = col('Observaciones generales');
     const cContacto= col('Contacto');
+    const cObsCliente = col('Observaciones Generales');
+    const cProvincia  = col('Provincia');
 
     const toInsert = [];
     for(let i=headerRow+1; i<rows.length; i++){
@@ -9181,9 +9184,11 @@ async function mchImportarExcel(event){
         cuenta:   (row[cCuenta]||'').toString().trim(),
         track:    track,
         estado_ot:(row[cEstadoOT]||'').toString().trim(),
-        ciudad:   (row[cCiudad]||'').toString().trim(),
-        obs:      (row[cObs]||'').toString().trim(),
-        contacto: cContacto>=0?(row[cContacto]||'').toString().trim():'',
+        ciudad:    (row[cCiudad]||'').toString().trim(),
+        provincia: cProvincia>=0?(row[cProvincia]||'').toString().trim():'',
+        obs:       (row[cObs]||'').toString().trim(),
+        obs_cliente: cObsCliente>=0?(row[cObsCliente]||'').toString().trim():'',
+        contacto:  cContacto>=0?(row[cContacto]||'').toString().trim():'',
         estado:   'Sin datos',
         ultimo_evento: '',
         ultimo_evento_fecha: '',
@@ -9331,7 +9336,10 @@ function mchRenderTabla(guias){
         ${g.ot?`<div style="font-size:11px;color:var(--text-muted);font-family:'JetBrains Mono',monospace">OT ${g.ot}</div>`:''}
       </td>
       <td>${trackLink}</td>
-      <td style="font-size:12px">${g.ciudad||'—'}</td>
+      <td style="font-size:12px">
+        <div>${g.ciudad||'—'}</div>
+        ${g.provincia?`<div style="font-size:10px;color:var(--text-muted);margin-top:2px">${g.provincia}</div>`:''}
+      </td>
       <td><span style="font-size:11px;color:var(--text-muted)">${g.estado_ot||'—'}</span></td>
       <td>
         ${mchEstadoBadge(g.estado)}
@@ -9339,6 +9347,11 @@ function mchRenderTabla(guias){
       </td>
       <td style="font-size:11px;color:var(--text-muted);font-family:'JetBrains Mono',monospace">${g.ultimo_evento_fecha||'—'}</td>
       <td style="text-align:center;min-width:54px">${mchSLABadge(g)}</td>
+      <td style="max-width:200px">
+        ${g.obs_cliente
+          ? `<span style="font-size:11px;color:var(--text-muted);line-height:1.4;display:block" title="${g.obs_cliente.replace(/"/g,'&quot;')}">${g.obs_cliente.length>80?g.obs_cliente.slice(0,80)+'…':g.obs_cliente}</span>`
+          : '<span style="color:var(--text-muted);font-size:11px">—</span>'}
+      </td>
       <td>
         ${g.contacto
           ? `<div style="font-size:12px;font-weight:500;color:var(--text)">${g.contacto}</div>
