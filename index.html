@@ -3188,10 +3188,86 @@ async function loadOpsPanel(isAdmin){
   renderChartBarras('chart-entregas','Entregas pendientes',estadosData);
 
   // ── GRÁFICO 4: Desinstalaciones por estado (dona) ──
-  const desByEst={};
-  desins.forEach(d=>{const s=d.estado||'Sin estado';desByEst[s]=(desByEst[s]||0)+1;});
-  const DES_COLORS={'Pendiente':'#f59e0b','En Proceso':'#1a9fd4','Despachado':'#8b5cf6','Terminal recuperada':'#10b981','Extraviada':'#ef4444','Retira Cliente':'#f97316'};
-  renderChartDona('chart-desins','Desinstalaciones',desByEst,DES_COLORS,desins.length);
+  // Gráfico Desinstalaciones — Quarter actual desde SF via Railway
+  const DES_COLORS={'Pendiente':'#f59e0b','En Proceso':'#1a9fd4','Despachado':'#8b5cf6','Exitoso':'#1dbf8e','Cancelado':'#ef4444','Extraviada':'#6b7280','Reprogramar':'#f97316','Retira Cliente':'#a78bfa'};
+  const MESES_ES=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  (async()=>{
+    const el=document.getElementById('chart-desins');
+    if(!el)return;
+    el.innerHTML='<div class="ops-chart-title">Desinstalaciones SF</div><div style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:11px">Cargando...</div>';
+    try{
+      // Calcular quarter actual
+      const hoy=new Date();
+      const mesActual=hoy.getMonth(); // 0-based
+      const qActual=Math.floor(mesActual/3); // 0=Q1,1=Q2,2=Q3,3=Q4
+      const mesInicioQ=qActual*3; // mes inicio del quarter (0-based)
+      const mesesTranscurridos=mesActual-mesInicioQ+1; // cuántos meses del quarter ya pasaron
+      const qNombre=`Q${qActual+1} ${hoy.getFullYear()}`;
+
+      const r=await fetch(`${ALLY_RAILWAY_BASE}/automations/sf-stats/desinstalaciones?meses=${mesesTranscurridos}`,{headers:{'x-automation-secret':'123456'}});
+      const j=await r.json();
+      if(!j.ok||!j.totalGeneral){
+        el.innerHTML=`<div class="ops-chart-title">Desinstalaciones ${qNombre}</div><div style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:11px">Sin datos SF</div>`;
+        return;
+      }
+
+      // Dona del quarter
+      const entries=Object.entries(j.totalPorEstado).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]);
+      const total=j.totalGeneral;
+      const COLORS_LIST=['#f59e0b','#1a9fd4','#1dbf8e','#ef4444','#8b5cf6','#f97316','#6b7280','#a78bfa'];
+      const cx=55,cy=55,r2=42,ri=27;
+      let angle=-Math.PI/2,paths='';
+      entries.forEach(([key,val],i)=>{
+        const sweep=(val/total)*2*Math.PI;
+        const color=DES_COLORS[key]||COLORS_LIST[i%COLORS_LIST.length];
+        const x1=cx+r2*Math.cos(angle),y1=cy+r2*Math.sin(angle);
+        const x2=cx+r2*Math.cos(angle+sweep),y2=cy+r2*Math.sin(angle+sweep);
+        const xi1=cx+ri*Math.cos(angle),yi1=cy+ri*Math.sin(angle);
+        const xi2=cx+ri*Math.cos(angle+sweep),yi2=cy+ri*Math.sin(angle+sweep);
+        const large=sweep>Math.PI?1:0;
+        paths+=`<path d="M${x1.toFixed(1)},${y1.toFixed(1)} A${r2},${r2} 0 ${large},1 ${x2.toFixed(1)},${y2.toFixed(1)} L${xi2.toFixed(1)},${yi2.toFixed(1)} A${ri},${ri} 0 ${large},0 ${xi1.toFixed(1)},${yi1.toFixed(1)} Z" fill="${color}" opacity="0.9"/>`;
+        angle+=sweep;
+      });
+
+      // Leyenda
+      const leyenda=entries.map(([key,val],i)=>{
+        const color=DES_COLORS[key]||COLORS_LIST[i%COLORS_LIST.length];
+        const pct=Math.round(val/total*100);
+        return`<div style="display:flex;align-items:center;gap:4px;margin-bottom:2px">
+          <div style="width:7px;height:7px;border-radius:50%;background:${color};flex-shrink:0"></div>
+          <span style="font-size:9px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:65px" title="${key}">${key.length>10?key.slice(0,10)+'…':key}</span>
+          <span style="font-size:9px;font-weight:700;color:#fff;margin-left:auto">${val}</span>
+        </div>`;
+      }).join('');
+
+      // Tabla mensual
+      const allEstados=[...new Set(j.meses.flatMap(m=>Object.keys(m.estados)))].sort();
+      const topEstados=allEstados.slice(0,4); // máx 4 columnas
+      const filas=j.meses.map(m=>{
+        const nom=MESES_ES[m.mes-1];
+        const celdas=topEstados.map(est=>`<td style="text-align:right;padding:2px 4px;font-size:9px;font-family:'JetBrains Mono',monospace;color:${DES_COLORS[est]||'var(--text-muted)'}">${m.estados[est]||0}</td>`).join('');
+        return`<tr><td style="padding:2px 4px;font-size:9px;color:var(--text-muted)">${nom}</td>${celdas}<td style="text-align:right;padding:2px 4px;font-size:9px;font-weight:700;color:#fff">${m.total}</td></tr>`;
+      }).join('');
+      const headers=topEstados.map(e=>`<th style="text-align:right;padding:2px 4px;font-size:8px;color:var(--text-muted);font-weight:600;white-space:nowrap">${e.length>6?e.slice(0,6)+'…':e}</th>`).join('');
+
+      el.innerHTML=`
+        <div class="ops-chart-title">Desinstalaciones ${qNombre}</div>
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+          <svg width="110" height="110" viewBox="0 0 110 110" style="flex-shrink:0">
+            ${paths}
+            <text x="55" y="51" text-anchor="middle" fill="#fff" font-size="16" font-weight="900" font-family="JetBrains Mono,monospace">${total}</text>
+            <text x="55" y="63" text-anchor="middle" fill="#888" font-size="8">total</text>
+          </svg>
+          <div style="flex:1;min-width:0">${leyenda}</div>
+        </div>
+        <table style="width:100%;border-collapse:collapse;border-top:1px solid var(--border)">
+          <thead><tr><th style="padding:2px 4px;font-size:8px;color:var(--text-muted);text-align:left">Mes</th>${headers}<th style="text-align:right;padding:2px 4px;font-size:8px;color:var(--text-muted)">Total</th></tr></thead>
+          <tbody>${filas}</tbody>
+        </table>`;
+    }catch(e){
+      el.innerHTML='<div class="ops-chart-title">Desinstalaciones SF</div><div style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:11px">Error SF</div>';
+    }
+  })();
 
   // ── KPIs ABAJO ──
   const cambios=directas.filter(e=>!ESTADOS_CERRADOS.includes(e.estado)&&(e.tipo||'').toUpperCase().includes('CAMBIO')).length;
