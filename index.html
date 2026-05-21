@@ -3264,6 +3264,9 @@ async function loadOpsPanel(isAdmin){
           <thead><tr><th style="padding:2px 4px;font-size:8px;color:var(--text-muted);text-align:left">Mes</th>${headers}<th style="text-align:right;padding:2px 4px;font-size:8px;color:var(--text-muted)">Total</th></tr></thead>
           <tbody>${filas}</tbody>
         </table>`;
+      // Ranking geo del quarter actual
+      const fInicioQActual=new Date(hoy.getFullYear(),mesInicioQ,1).toISOString().slice(0,10)+'T00:00:00Z';
+      await renderGeoRanking('chart-desins', fInicioQActual, null);
     }catch(e){
       el.innerHTML='<div class="ops-chart-title">Desinstalaciones SF</div><div style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:11px">Error SF</div>';
     }
@@ -3339,6 +3342,8 @@ async function loadOpsPanel(isAdmin){
             <thead><tr><th style="padding:2px 4px;font-size:8px;color:var(--text-muted);text-align:left">Mes</th>${headers}<th style="text-align:right;padding:2px 4px;font-size:8px;color:var(--text-muted)">Total</th></tr></thead>
             <tbody>${filas}</tbody>
           </table>`;
+        // Ranking geo del quarter cerrado
+        await renderGeoRanking(`chart-desins-q${q+1}`, fInicio, fFin);
       }catch(e2){
         card.innerHTML=`<div class="ops-chart-title">Desinstalaciones ${qNombre}</div><div style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:11px">Error SF</div>`;
       }
@@ -3572,6 +3577,57 @@ function renderChartDona(containerId, titulo, data, colorMap, total){
       </div>
       <div style="flex:1;min-width:0">${leyenda}</div>
     </div>`;
+}
+
+
+// ── Ranking geo provincias/ciudades para widget de desinstalaciones ──────────
+async function renderGeoRanking(containerId, fechaInicio, fechaFin) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  const params = fechaFin
+    ? `fechaInicio=${encodeURIComponent(fechaInicio)}&fechaFin=${encodeURIComponent(fechaFin)}`
+    : `meses=${fechaInicio}`; // si no hay fecha usa meses
+  try {
+    const r = await fetch(`${ALLY_RAILWAY_BASE}/automations/sf-stats/desinstalaciones-geo?${params}`, {headers:{'x-automation-secret':'123456'}});
+    const j = await r.json();
+    if (!j.ok || !j.provincias.length) {
+      el.innerHTML += '<div style="font-size:10px;color:var(--text-muted);margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">Sin datos de provincias</div>';
+      return;
+    }
+    const top = j.provincias.slice(0, 8);
+    const maxVal = top[0].total;
+    const rows = top.map((p, i) => {
+      const pct = Math.round(p.total / j.totalGeneral * 100);
+      const barW = Math.round(p.total / maxVal * 100);
+      const ciudadesHTML = p.ciudades.map(c =>
+        `<div style="display:flex;justify-content:space-between;padding:2px 8px;font-size:9px;color:var(--text-muted)">
+          <span>└ ${c.nombre}</span><span style="font-weight:700;color:#fff">${c.total}</span>
+        </div>`
+      ).join('');
+      return `<div class="geo-prov-row" style="margin-bottom:4px;cursor:pointer" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">
+        <div style="display:flex;align-items:center;gap:6px">
+          <span style="font-size:9px;color:var(--text-muted);width:14px;text-align:right">${i+1}</span>
+          <div style="flex:1">
+            <div style="display:flex;justify-content:space-between;margin-bottom:2px">
+              <span style="font-size:10px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px">${p.nombre}</span>
+              <span style="font-size:10px;font-weight:700;color:var(--teal)">${p.total} <span style="color:var(--text-muted);font-weight:400">(${pct}%)</span></span>
+            </div>
+            <div style="height:4px;background:var(--border);border-radius:2px">
+              <div style="height:4px;width:${barW}%;background:var(--teal);border-radius:2px;transition:width .3s"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div style="display:none;background:var(--surface);border-radius:6px;margin:2px 0 6px 20px;padding:4px 0">${ciudadesHTML}</div>`;
+    }).join('');
+
+    const geo = document.createElement('div');
+    geo.style.cssText = 'margin-top:10px;padding-top:8px;border-top:1px solid var(--border)';
+    geo.innerHTML = `<div style="font-size:10px;font-weight:600;color:var(--text-muted);margin-bottom:6px;letter-spacing:.03em">PENDIENTES POR PROVINCIA <span style="font-weight:400">(click → ciudades)</span></div>${rows}`;
+    el.appendChild(geo);
+  } catch(e) {
+    console.error('renderGeoRanking error', e);
+  }
 }
 
 function renderChartBarras(containerId, titulo, data){
