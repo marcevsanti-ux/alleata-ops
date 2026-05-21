@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v2.9.9</title>
+<title>Alleata · Operaciones v3.0.0</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -304,7 +304,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.9.9 · 19 may 2026
+      v3.0.0 · 21 may 2026
     </div>
   </div>
 </div>
@@ -372,7 +372,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v2.9.9 · 19 may 2026
+      v3.0.0 · 21 may 2026
     </div>
   </div>
 </nav>
@@ -386,7 +386,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <div class="topbar-right" id="topbar-date"></div>
     <button onclick="refreshCurrentModule()" title="Actualizar" style="background:none;border:1px solid var(--border2);color:var(--text-muted);border-radius:7px;padding:4px 10px;cursor:pointer;font-size:13px;margin-left:10px;transition:all .2s" onmouseover="this.style.color='var(--teal)';this.style.borderColor='var(--teal)'" onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border2)'">↺</button>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v2.9.9</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v3.0.0</div>
   </div>
   <div class="content">
 
@@ -497,7 +497,7 @@ tr:hover td{background:var(--surface2);}
       </div>
 
       <!-- GRÁFICOS TOP -->
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;margin-bottom:20px" id="ops-charts-grid">
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;margin-bottom:20px" id="ops-charts-grid">
         <div class="ops-chart-card" id="chart-instaladas"></div>
         <div class="ops-chart-card" id="chart-precolecta"></div>
         <div class="ops-chart-card" id="chart-entregas"></div>
@@ -2734,7 +2734,7 @@ function _dsBadgeCAAmba(ot) {
   return '';
 }
 
-console.log('[Alleata v2.9.9] OK');
+console.log('[Alleata v3.0.0] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -3266,6 +3266,82 @@ async function loadOpsPanel(isAdmin){
         </table>`;
     }catch(e){
       el.innerHTML='<div class="ops-chart-title">Desinstalaciones SF</div><div style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:11px">Error SF</div>';
+    }
+  })();
+
+  // Quarters anteriores al actual — se agregan dinámicamente
+  (async()=>{
+    const hoy=new Date();
+    const mesActual=hoy.getMonth();
+    const qActual=Math.floor(mesActual/3);
+    const anio=hoy.getFullYear();
+    const MESES_ES2=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+    const COLORS_LIST2=['#f59e0b','#1a9fd4','#1dbf8e','#ef4444','#8b5cf6','#f97316','#6b7280','#a78bfa'];
+    const grid=document.getElementById('ops-charts-grid');
+    if(!grid||qActual===0)return; // Q1 no tiene quarters anteriores
+
+    for(let q=0;q<qActual;q++){
+      const qNombre=`Q${q+1} ${anio}`;
+      const mesInicio=q*3; // 0-based
+      const mesFin=mesInicio+2;
+      // Fechas inicio y fin del quarter
+      const fInicio=`${anio}-${String(mesInicio+1).padStart(2,'0')}-01T00:00:00Z`;
+      const fFin=new Date(anio,mesFin+1,0,23,59,59).toISOString().slice(0,10)+'T23:59:59Z';
+
+      // Crear card placeholder
+      const card=document.createElement('div');
+      card.className='ops-chart-card';
+      card.id=`chart-desins-q${q+1}`;
+      card.innerHTML=`<div class="ops-chart-title">Desinstalaciones ${qNombre}</div><div style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:11px">Cargando...</div>`;
+      grid.appendChild(card);
+
+      try{
+        const r=await fetch(`${ALLY_RAILWAY_BASE}/automations/sf-stats/desinstalaciones?fechaInicio=${fInicio}&fechaFin=${fFin}`,{headers:{'x-automation-secret':'123456'}});
+        const j=await r.json();
+        if(!j.ok||!j.totalGeneral){card.innerHTML=`<div class="ops-chart-title">Desinstalaciones ${qNombre}</div><div style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:11px">Sin datos</div>`;continue;}
+
+        const entries=Object.entries(j.totalPorEstado).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]);
+        const total=j.totalGeneral;
+        const cx=55,cy=55,r2=42,ri=27;
+        let angle=-Math.PI/2,paths='';
+        entries.forEach(([key,val],i)=>{
+          const sweep=(val/total)*2*Math.PI;
+          const color=DES_COLORS[key]||COLORS_LIST2[i%COLORS_LIST2.length];
+          const x1=cx+r2*Math.cos(angle),y1=cy+r2*Math.sin(angle);
+          const x2=cx+r2*Math.cos(angle+sweep),y2=cy+r2*Math.sin(angle+sweep);
+          const xi1=cx+ri*Math.cos(angle),yi1=cy+ri*Math.sin(angle);
+          const xi2=cx+ri*Math.cos(angle+sweep),yi2=cy+ri*Math.sin(angle+sweep);
+          const large=sweep>Math.PI?1:0;
+          paths+=`<path d="M${x1.toFixed(1)},${y1.toFixed(1)} A${r2},${r2} 0 ${large},1 ${x2.toFixed(1)},${y2.toFixed(1)} L${xi2.toFixed(1)},${yi2.toFixed(1)} A${ri},${ri} 0 ${large},0 ${xi1.toFixed(1)},${yi1.toFixed(1)} Z" fill="${color}" opacity="0.9"/>`;
+          angle+=sweep;
+        });
+        const leyenda=entries.map(([key,val],i)=>{
+          const color=DES_COLORS[key]||COLORS_LIST2[i%COLORS_LIST2.length];
+          return`<div style="display:flex;align-items:center;gap:4px;margin-bottom:2px"><div style="width:7px;height:7px;border-radius:50%;background:${color};flex-shrink:0"></div><span style="font-size:9px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:65px" title="${key}">${key.length>10?key.slice(0,10)+'…':key}</span><span style="font-size:9px;font-weight:700;color:#fff;margin-left:auto">${val}</span></div>`;
+        }).join('');
+        const topEstados=[...new Set(j.meses.flatMap(m=>Object.keys(m.estados)))].slice(0,4);
+        const headers=topEstados.map(e=>`<th style="text-align:right;padding:2px 4px;font-size:8px;color:var(--text-muted);font-weight:600;white-space:nowrap">${e.length>6?e.slice(0,6)+'…':e}</th>`).join('');
+        const filas=j.meses.map(m=>{
+          const nom=MESES_ES2[m.mes-1];
+          const celdas=topEstados.map(est=>`<td style="text-align:right;padding:2px 4px;font-size:9px;font-family:'JetBrains Mono',monospace;color:${DES_COLORS[est]||'var(--text-muted)'}">${m.estados[est]||0}</td>`).join('');
+          return`<tr><td style="padding:2px 4px;font-size:9px;color:var(--text-muted)">${nom}</td>${celdas}<td style="text-align:right;padding:2px 4px;font-size:9px;font-weight:700;color:#fff">${m.total}</td></tr>`;
+        }).join('');
+        card.innerHTML=`
+          <div class="ops-chart-title">Desinstalaciones ${qNombre}</div>
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+            <svg width="110" height="110" viewBox="0 0 110 110" style="flex-shrink:0">${paths}
+              <text x="55" y="51" text-anchor="middle" fill="#fff" font-size="16" font-weight="900" font-family="JetBrains Mono,monospace">${total}</text>
+              <text x="55" y="63" text-anchor="middle" fill="#888" font-size="8">total</text>
+            </svg>
+            <div style="flex:1;min-width:0">${leyenda}</div>
+          </div>
+          <table style="width:100%;border-collapse:collapse;border-top:1px solid var(--border)">
+            <thead><tr><th style="padding:2px 4px;font-size:8px;color:var(--text-muted);text-align:left">Mes</th>${headers}<th style="text-align:right;padding:2px 4px;font-size:8px;color:var(--text-muted)">Total</th></tr></thead>
+            <tbody>${filas}</tbody>
+          </table>`;
+      }catch(e2){
+        card.innerHTML=`<div class="ops-chart-title">Desinstalaciones ${qNombre}</div><div style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:11px">Error SF</div>`;
+      }
     }
   })();
 
