@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v3.0.1</title>
+<title>Alleata · Operaciones v3.0.2</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -304,7 +304,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v3.0.1 · 22 may 2026
+      v3.0.2 · 22 may 2026
     </div>
   </div>
 </div>
@@ -355,6 +355,9 @@ tr:hover td{background:var(--surface2);}
     <div class="nav-item" data-mod="ajustes" id="nav-ajustes" style="display:none" onclick="goTo('ajustes')">
       <div class="active-bar"></div><span class="nav-icon-wrap">⚙️</span> Ajustes
     </div>
+    <div class="nav-item" data-mod="retencion" id="nav-retencion" onclick="goTo('retencion')">
+      <div class="active-bar"></div><span class="nav-icon-wrap">🛡️</span> Retención
+    </div>
     <div class="nav-item" data-mod="distri" id="nav-distri" onclick="goTo('distri')" style="display:none">
       <div class="active-bar"></div><span class="nav-icon-wrap">🚚</span> Distribuidores
     </div>
@@ -372,7 +375,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v3.0.1 · 22 may 2026
+      v3.0.2 · 22 may 2026
     </div>
   </div>
 </nav>
@@ -386,7 +389,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <div class="topbar-right" id="topbar-date"></div>
     <button onclick="refreshCurrentModule()" title="Actualizar" style="background:none;border:1px solid var(--border2);color:var(--text-muted);border-radius:7px;padding:4px 10px;cursor:pointer;font-size:13px;margin-left:10px;transition:all .2s" onmouseover="this.style.color='var(--teal)';this.style.borderColor='var(--teal)'" onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border2)'">↺</button>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v3.0.1</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v3.0.2</div>
   </div>
   <div class="content">
 
@@ -1470,6 +1473,66 @@ tr:hover td{background:var(--surface2);}
 </div>
 
 <!-- ══ MÓDULO DISTRIBUIDORES ══════════════════════════════════════════════════════ -->
+<div class="module" id="mod-retencion">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px">
+    <div>
+      <div style="font-size:16px;font-weight:900;color:var(--text)">🛡️ Retención de Cuentas</div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:2px" id="ret-ultima-act">Cargando último análisis...</div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <div style="display:flex;gap:6px">
+        <button id="ret-btn-todos"    class="btn btn-sm ret-filter-btn active" onclick="retFiltrar('todos')">Todos</button>
+        <button id="ret-btn-rojo"     class="btn btn-sm ret-filter-btn" onclick="retFiltrar('rojo')"    style="background:rgba(239,68,68,.15);border-color:rgba(239,68,68,.3);color:#f87171">🔴 Alto</button>
+        <button id="ret-btn-amarillo" class="btn btn-sm ret-filter-btn" onclick="retFiltrar('amarillo')" style="background:rgba(234,179,8,.12);border-color:rgba(234,179,8,.3);color:#fbbf24">🟡 Medio</button>
+        <button id="ret-btn-verde"    class="btn btn-sm ret-filter-btn" onclick="retFiltrar('verde')"   style="background:rgba(29,191,142,.1);border-color:rgba(29,191,142,.2);color:var(--teal)">🟢 OK</button>
+      </div>
+      <input id="ret-search" class="input" placeholder="Buscar cuenta..." style="width:180px;font-size:12px;padding:6px 10px" oninput="retBuscar(this.value)">
+      <button class="btn btn-sm" onclick="retRunScorer()" id="ret-run-btn" title="Re-calcular scores ahora">↻ Actualizar</button>
+    </div>
+  </div>
+
+  <!-- KPI strip -->
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px" id="ret-kpis">
+    <div class="ops-stat-card" style="text-align:center">
+      <div class="ops-stat-val" id="ret-kpi-total" style="font-size:22px">—</div>
+      <div class="ops-stat-label">Total analizadas</div>
+    </div>
+    <div class="ops-stat-card" style="text-align:center;border-color:rgba(239,68,68,.3)">
+      <div class="ops-stat-val" id="ret-kpi-rojo" style="font-size:22px;color:#f87171">—</div>
+      <div class="ops-stat-label">🔴 Riesgo alto</div>
+    </div>
+    <div class="ops-stat-card" style="text-align:center;border-color:rgba(234,179,8,.3)">
+      <div class="ops-stat-val" id="ret-kpi-amarillo" style="font-size:22px;color:#fbbf24">—</div>
+      <div class="ops-stat-label">🟡 Riesgo medio</div>
+    </div>
+    <div class="ops-stat-card" style="text-align:center;border-color:rgba(29,191,142,.2)">
+      <div class="ops-stat-val" id="ret-kpi-verde" style="font-size:22px;color:var(--teal)">—</div>
+      <div class="ops-stat-label">🟢 Sin riesgo</div>
+    </div>
+  </div>
+
+  <!-- Tabla -->
+  <div style="overflow-x:auto">
+    <table style="width:100%;border-collapse:collapse;font-size:12px">
+      <thead>
+        <tr style="border-bottom:1px solid var(--border)">
+          <th style="text-align:left;padding:8px 10px;color:var(--text-muted);font-weight:600;cursor:pointer" onclick="retSortBy('nivel')">Riesgo ↕</th>
+          <th style="text-align:left;padding:8px 10px;color:var(--text-muted);font-weight:600;cursor:pointer" onclick="retSortBy('cuenta_nombre')">Cuenta ↕</th>
+          <th style="text-align:left;padding:8px 10px;color:var(--text-muted);font-weight:600;cursor:pointer" onclick="retSortBy('score')">Score ↕</th>
+          <th style="text-align:left;padding:8px 10px;color:var(--text-muted);font-weight:600">Estado SF</th>
+          <th style="text-align:right;padding:8px 10px;color:var(--text-muted);font-weight:600;cursor:pointer" onclick="retSortBy('vol_30')">Vol 30d ↕</th>
+          <th style="text-align:right;padding:8px 10px;color:var(--text-muted);font-weight:600;cursor:pointer" onclick="retSortBy('vol_90')">Vol 90d ↕</th>
+          <th style="text-align:left;padding:8px 10px;color:var(--text-muted);font-weight:600">Señales</th>
+        </tr>
+      </thead>
+      <tbody id="ret-tbody">
+        <tr><td colspan="7" style="text-align:center;padding:40px;color:var(--text-muted)">Cargando...</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div id="ret-pager" style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;font-size:11px;color:var(--text-muted)"></div>
+</div>
+
 <div class="module" id="mod-distri">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
     <div>
@@ -2734,7 +2797,189 @@ function _dsBadgeCAAmba(ot) {
   return '';
 }
 
-console.log('[Alleata v3.0.1] OK');
+
+// ═══════════════════════════════════════════════════════════════════
+//  MÓDULO RETENCIÓN — Score de riesgo de baja por cuenta
+// ═══════════════════════════════════════════════════════════════════
+
+const RET = {
+  data:      [],   // todos los scores
+  filtered:  [],   // después de filtro nivel + búsqueda
+  nivelActivo: 'todos',
+  busqueda:    '',
+  sortKey:     'score',
+  sortDir:     -1,   // -1 desc, 1 asc
+  page:        0,
+  perPage:     50,
+};
+
+const RET_FLAG_LABELS = {
+  estado_critico:        'Estado CRÍTICO',
+  estado_seguimiento:    'SEGUIMIENTO',
+  sin_transacciones_30d: 'Sin transacciones',
+  sub_tipo_bajo_90d:     'Vol BAJO 90d',
+  sub_tipo_bajo_60d:     'Vol BAJO 60d',
+  sub_tipo_bajo_30d:     'Vol BAJO 30d',
+  caida_vol_50pct:       'Caída >50%',
+  vol_mes_cero:          'Vol $0 este mes',
+  vol_30d_bajo:          'Vol <$30K',
+};
+
+async function cargarRetencion() {
+  const tbody = document.getElementById('ret-tbody');
+  tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--text-muted)">Cargando scores...</td></tr>';
+
+  try {
+    const { data, error } = await sbClient
+      .from('risk_scores')
+      .select('*')
+      .order('score', { ascending: false });
+
+    if (error) throw error;
+
+    RET.data     = data || [];
+    RET.page     = 0;
+    retAplicarFiltros();
+    retUpdateKPIs();
+    retUpdateUltimaAct();
+    retRenderTabla();
+  } catch (e) {
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--text-muted)">Error cargando: ${e.message}</td></tr>`;
+  }
+}
+
+function retUpdateKPIs() {
+  const d = RET.data;
+  document.getElementById('ret-kpi-total').textContent    = d.length.toLocaleString('es-AR');
+  document.getElementById('ret-kpi-rojo').textContent     = d.filter(r=>r.nivel==='rojo').length.toLocaleString('es-AR');
+  document.getElementById('ret-kpi-amarillo').textContent = d.filter(r=>r.nivel==='amarillo').length.toLocaleString('es-AR');
+  document.getElementById('ret-kpi-verde').textContent    = d.filter(r=>r.nivel==='verde').length.toLocaleString('es-AR');
+}
+
+function retUpdateUltimaAct() {
+  const el = document.getElementById('ret-ultima-act');
+  if (!RET.data.length) { el.textContent = 'Sin datos aún — ejecutá el scorer'; return; }
+  const ult = RET.data[0]?.ultima_actualizacion;
+  if (!ult) return;
+  const d = new Date(ult);
+  el.textContent = `Último análisis: ${d.toLocaleDateString('es-AR')} ${d.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'})}`;
+}
+
+function retAplicarFiltros() {
+  let r = [...RET.data];
+  if (RET.nivelActivo !== 'todos') r = r.filter(x => x.nivel === RET.nivelActivo);
+  if (RET.busqueda)  r = r.filter(x => (x.cuenta_nombre||'').toLowerCase().includes(RET.busqueda));
+  // Sort
+  r.sort((a,b) => {
+    const va = a[RET.sortKey] ?? '';
+    const vb = b[RET.sortKey] ?? '';
+    if (typeof va === 'number') return (va - vb) * RET.sortDir;
+    return String(va).localeCompare(String(vb)) * RET.sortDir;
+  });
+  RET.filtered = r;
+}
+
+function retRenderTabla() {
+  const tbody = document.getElementById('ret-tbody');
+  const start = RET.page * RET.perPage;
+  const rows  = RET.filtered.slice(start, start + RET.perPage);
+
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--text-muted)">Sin resultados</td></tr>';
+    retRenderPager();
+    return;
+  }
+
+  const nivelDot = { rojo:'🔴', amarillo:'🟡', verde:'🟢' };
+  const fmtPeso  = n => n != null ? '$'+Math.round(n).toLocaleString('es-AR') : '—';
+
+  tbody.innerHTML = rows.map(r => {
+    const flags  = (r.flags||[]).map(f=>`<span style="font-size:9px;background:rgba(255,255,255,.06);border:1px solid var(--border);border-radius:4px;padding:1px 5px;color:var(--text-muted)">${RET_FLAG_LABELS[f]||f}</span>`).join(' ');
+    const scoreColor = r.nivel==='rojo' ? '#f87171' : r.nivel==='amarillo' ? '#fbbf24' : 'var(--teal)';
+    const rowBg = r.nivel==='rojo' ? 'rgba(239,68,68,.04)' : '';
+    return `<tr style="border-bottom:1px solid var(--border);background:${rowBg}">
+      <td style="padding:8px 10px;font-size:13px">${nivelDot[r.nivel]||'⚪'}</td>
+      <td style="padding:8px 10px;font-weight:600;color:var(--text);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.cuenta_nombre||''}">${r.cuenta_nombre||'—'}</td>
+      <td style="padding:8px 10px"><span style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:${scoreColor}">${r.score}</span></td>
+      <td style="padding:8px 10px;color:var(--text-muted);font-size:11px">${r.estado_sf||'—'}</td>
+      <td style="padding:8px 10px;text-align:right;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-muted)">${fmtPeso(r.vol_30)}</td>
+      <td style="padding:8px 10px;text-align:right;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-muted)">${fmtPeso(r.vol_90)}</td>
+      <td style="padding:8px 10px">${flags}</td>
+    </tr>`;
+  }).join('');
+
+  retRenderPager();
+}
+
+function retRenderPager() {
+  const pager = document.getElementById('ret-pager');
+  const total = RET.filtered.length;
+  const pages = Math.ceil(total / RET.perPage);
+  const start = RET.page * RET.perPage + 1;
+  const end   = Math.min((RET.page+1) * RET.perPage, total);
+  pager.innerHTML = `
+    <span>${total ? start+' – '+end+' de '+total.toLocaleString('es-AR') : '0 resultados'}</span>
+    <div style="display:flex;gap:6px">
+      <button class="btn btn-sm" onclick="retChangePage(-1)" ${RET.page===0?'disabled':''}>‹ Ant</button>
+      <button class="btn btn-sm" onclick="retChangePage(1)"  ${RET.page>=pages-1?'disabled':''}>Sig ›</button>
+    </div>`;
+}
+
+function retChangePage(delta) {
+  const pages = Math.ceil(RET.filtered.length / RET.perPage);
+  RET.page = Math.max(0, Math.min(RET.page + delta, pages - 1));
+  retRenderTabla();
+}
+
+function retFiltrar(nivel) {
+  RET.nivelActivo = nivel;
+  RET.page = 0;
+  document.querySelectorAll('.ret-filter-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('ret-btn-' + nivel)?.classList.add('active');
+  retAplicarFiltros();
+  retRenderTabla();
+}
+
+function retBuscar(val) {
+  RET.busqueda = val.toLowerCase().trim();
+  RET.page = 0;
+  retAplicarFiltros();
+  retRenderTabla();
+}
+
+function retSortBy(key) {
+  if (RET.sortKey === key) RET.sortDir *= -1;
+  else { RET.sortKey = key; RET.sortDir = -1; }
+  RET.page = 0;
+  retAplicarFiltros();
+  retRenderTabla();
+}
+
+async function retRunScorer() {
+  const btn = document.getElementById('ret-run-btn');
+  btn.textContent = '⏳';
+  btn.disabled = true;
+  try {
+    const res = await fetch(`${ALLY_RAILWAY_BASE}/automations/risk-scorer/run`, {
+      method: 'POST',
+      headers: { 'x-automation-secret': '123456' }
+    });
+    if (res.ok) {
+      const j = await res.json();
+      await cargarRetencion();
+      btn.textContent = '✅';
+      setTimeout(() => { btn.textContent = '↻ Actualizar'; btn.disabled = false; }, 2000);
+    } else {
+      btn.textContent = '❌';
+      setTimeout(() => { btn.textContent = '↻ Actualizar'; btn.disabled = false; }, 2000);
+    }
+  } catch(e) {
+    btn.textContent = '❌';
+    setTimeout(() => { btn.textContent = '↻ Actualizar'; btn.disabled = false; }, 2000);
+  }
+}
+
+console.log('[Alleata v3.0.2] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -2948,7 +3193,7 @@ function buildDashCards(modulos,isAdmin){
   loadOpsPanel(isAdmin);
 }
 
-const MOD_INFO={home:'Dashboard',sims:'Verificador SIMs',envios:'Envíos',rollout:'Rollout',desinstalaciones:'Desinstalaciones',merchants:'Envíos Merchants',horas:'Control de Horas',ajustes:'Ajustes',ally:'Configuración Ally',distri:'Distribuidores'};
+const MOD_INFO={home:'Dashboard',sims:'Verificador SIMs',envios:'Envíos',rollout:'Rollout',desinstalaciones:'Desinstalaciones',merchants:'Envíos Merchants',horas:'Control de Horas',retencion:'Retención de Cuentas',ajustes:'Ajustes',ally:'Configuración Ally',distri:'Distribuidores'};
 
 function goTo(mod){
   const el=document.getElementById('nav-'+mod);
@@ -2974,6 +3219,7 @@ function goTo(mod){
   if(mod==='horas')renderHoras();
   if(mod==='ajustes'){loadUsers();loadSimsDbStats();loadConfigSLA();_auditPage=0;loadAuditLog();}
   if(mod==='sf') cargarSFIntegracion();
+  if(mod==='retencion') cargarRetencion();
 }
 
 function refreshCurrentModule(){
