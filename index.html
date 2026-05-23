@@ -3496,7 +3496,10 @@ async function loadOpsPanel(isAdmin){
       const mesesTranscurridos=mesActual-mesInicioQ+1; // cuántos meses del quarter ya pasaron
       const qNombre=`Q${qActual+1} ${hoy.getFullYear()}`;
 
-      const r=await fetch(`${ALLY_RAILWAY_BASE}/automations/sf-stats/desinstalaciones?meses=${mesesTranscurridos}`,{headers:{'x-automation-secret':'123456'}});
+      // Usar fechaInicio/fechaFin del quarter actual para filtrar correctamente
+      const fInicioQ = new Date(hoy.getFullYear(), mesInicioQ, 1).toISOString();
+      const fFinQ    = new Date(hoy.getFullYear(), mesInicioQ + 3, 0, 23, 59, 59).toISOString();
+      const r=await fetch(`${ALLY_RAILWAY_BASE}/automations/sf-stats/desinstalaciones?fechaInicio=${fInicioQ}&fechaFin=${fFinQ}`,{headers:{'x-automation-secret':'123456'}});
       const j=await r.json();
       if(!j.ok||!j.totalGeneral){
         el.innerHTML=`<div class="ops-chart-title">Desinstalaciones ${qNombre}</div><div style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:11px">Sin datos SF</div>`;
