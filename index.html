@@ -404,6 +404,8 @@ tr:hover td{background:var(--surface2);}
           <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px">
             <div id="sf-last-sync" style="font-size:11px;color:var(--text-muted);font-family:'JetBrains Mono',monospace"></div>
             <div id="sf-next-sync" style="font-size:11px;color:var(--teal);font-family:'JetBrains Mono',monospace"></div>
+            <div id="sf-last-ca-tracker" style="font-size:11px;color:var(--text-muted);font-family:'JetBrains Mono',monospace"></div>
+            <div id="sf-next-ca-tracker" style="font-size:11px;color:var(--blue);font-family:'JetBrains Mono',monospace"></div>
           </div>
           <button class="btn btn-sm" onclick="sfSync()" id="sf-sync-btn">↺ Sync ahora</button>
         </div>
@@ -849,6 +851,38 @@ tr:hover td{background:var(--surface2);}
 
     <!-- AJUSTES -->
     <div class="module" id="mod-ajustes">
+
+      <!-- Horarios CA Tracker -->
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-title">⏱ Horarios CA Tracker — Actualización hacia SF</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:16px;line-height:1.6">
+          Configurá en qué horarios corre el CA Tracker automático (actualiza estados y cierra OTs en SF).
+          Formato: horas separadas por coma. Ejemplo: <code style="background:var(--navy-700);padding:1px 5px;border-radius:4px">9,13,18</code>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:14px">
+          <div style="background:var(--navy-700);border-radius:10px;padding:14px 16px">
+            <div style="font-size:11px;font-weight:700;color:var(--text);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Lun – Vie</div>
+            <input id="cron-lv" type="text" class="input" placeholder="9,13,18"
+              style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:600;text-align:center" />
+          </div>
+          <div style="background:var(--navy-700);border-radius:10px;padding:14px 16px">
+            <div style="font-size:11px;font-weight:700;color:var(--text);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Sábado</div>
+            <input id="cron-sab" type="text" class="input" placeholder="14"
+              style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:600;text-align:center" />
+          </div>
+          <div style="background:var(--navy-700);border-radius:10px;padding:14px 16px">
+            <div style="font-size:11px;font-weight:700;color:var(--text);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Domingo</div>
+            <input id="cron-dom" type="text" class="input" placeholder="vacío = no corre"
+              style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:600;text-align:center" />
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <button onclick="guardarCronHorarios()" style="background:var(--grad);color:#fff;border:none;padding:9px 22px;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;cursor:pointer;border-radius:8px">
+            💾 Guardar horarios
+          </button>
+          <div id="cron-horarios-msg" style="font-size:12px;color:var(--text-muted)"></div>
+        </div>
+      </div>
 
       <!-- Actualizar base SIMs (solo admin) -->
       <div class="card" style="margin-bottom:16px">
@@ -3229,7 +3263,7 @@ function goTo(mod){
   if(mod==='ally')cargarAlly();
   if(mod==='distri')cargarDistri();
   if(mod==='horas')renderHoras();
-  if(mod==='ajustes'){loadUsers();loadSimsDbStats();loadConfigSLA();_auditPage=0;loadAuditLog();}
+  if(mod==='ajustes'){loadUsers();loadSimsDbStats();loadConfigSLA();_auditPage=0;loadAuditLog();cargarCronHorarios();}
   if(mod==='sf') cargarSFIntegracion();
   if(mod==='retencion') cargarRetencion();
 }
@@ -7248,6 +7282,27 @@ function closeModal(id){const el=document.getElementById(id);el.classList.remove
 
 // ── AJUSTES ──
 
+function cargarCronHorarios() {
+  const h = sfGetCronHorarios();
+  const el = id => document.getElementById(id);
+  if (el('cron-lv'))  el('cron-lv').value  = h.lv.join(',');
+  if (el('cron-sab')) el('cron-sab').value = h.sab.join(',');
+  if (el('cron-dom')) el('cron-dom').value = h.dom.join(',');
+}
+
+function guardarCronHorarios() {
+  const parsear = id => {
+    const v = (document.getElementById(id)?.value || '').trim();
+    if (!v) return [];
+    return v.split(',').map(x => parseInt(x.trim(), 10)).filter(n => !isNaN(n) && n >= 0 && n <= 23);
+  };
+  const horarios = { lv: parsear('cron-lv'), sab: parsear('cron-sab'), dom: parsear('cron-dom') };
+  localStorage.setItem('sf_cron_horarios', JSON.stringify(horarios));
+  const msg = document.getElementById('cron-horarios-msg');
+  if (msg) { msg.style.color = 'var(--teal)'; msg.textContent = '✅ Horarios guardados'; setTimeout(() => msg.textContent = '', 3000); }
+  sfActualizarProximoCron();
+}
+
 // ── AUDITORÍA ──
 let _auditPage=0;
 const AUDIT_PAGE_SIZE=50;
@@ -9394,9 +9449,53 @@ function sfProximoCron() {
   return `⏱ Próx. sync: ${pad(proxHora)}:${pad(proxMin)} (en ${enMin} min)`;
 }
 
+// Horarios CA Tracker por defecto (configurables desde Ajustes)
+// Formato: { lv: [9,13,18], sab: [14], dom: [] }
+function sfGetCronHorarios() {
+  try {
+    const saved = localStorage.getItem('sf_cron_horarios');
+    if (saved) return JSON.parse(saved);
+  } catch(e) {}
+  return { lv: [9,13,18], sab: [14], dom: [] };
+}
+
+function sfProximoCaTracker() {
+  const horarios = sfGetCronHorarios();
+  const ahora = new Date();
+  // Convertir a ART (UTC-3)
+  const art = new Date(ahora.toLocaleString('en-US', {timeZone:'America/Argentina/Buenos_Aires'}));
+  const dow = art.getDay(); // 0=dom,1=lun..6=sab
+  const hora = art.getHours();
+  const min  = art.getMinutes();
+  const pad  = n => String(n).padStart(2,'0');
+
+  // Horarios según día
+  let horasHoy = dow === 0 ? horarios.dom : dow === 6 ? horarios.sab : horarios.lv;
+  
+  // Buscar próxima hora hoy
+  const proxHoy = horasHoy.find(h => h > hora || (h === hora && min < 1));
+  if (proxHoy !== undefined) {
+    const diff = (proxHoy * 60) - (hora * 60 + min);
+    return `📡 Próx. CA Tracker: ${pad(proxHoy)}:00 (en ${diff} min)`;
+  }
+
+  // Buscar próximo día con horarios
+  for (let d = 1; d <= 7; d++) {
+    const nextDow = (dow + d) % 7;
+    const nextHoras = nextDow === 0 ? horarios.dom : nextDow === 6 ? horarios.sab : horarios.lv;
+    if (nextHoras.length > 0) {
+      const dias = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+      return `📡 Próx. CA Tracker: ${dias[nextDow]} ${pad(nextHoras[0])}:00`;
+    }
+  }
+  return '📡 CA Tracker: sin horarios configurados';
+}
+
 function sfActualizarProximoCron() {
   const el = document.getElementById('sf-next-sync');
   if (el) el.textContent = sfProximoCron();
+  const elCa = document.getElementById('sf-next-ca-tracker');
+  if (elCa) elCa.textContent = sfProximoCaTracker();
 }
 
 async function cargarSFIntegracion() {
@@ -9419,15 +9518,33 @@ async function cargarSFIntegracion() {
     const lastSync = _sfData[0]?.ultimo_sync;
     if (lastSync) {
       document.getElementById('sf-last-sync').textContent = 'Último sync: ' +
-        new Date(lastSync).toLocaleString('es-AR',{timeZone:'America/Argentina/Buenos_Aires',day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+        new Date(lastSync).toLocaleString('es-AR',{timeZone:'America/Argentina/Buenos_Aires',day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false});
     }
     const nb = document.getElementById('nb-sf');
     if (nb) nb.textContent = _sfData.length;
-    sfCargarLogs();
+    sfCargarLogs().then(() => sfActualizarUltimoCaTracker());
   } catch (err) {
     document.getElementById('sf-tbody').innerHTML =
       `<tr><td colspan="8" style="padding:40px;text-align:center;color:var(--red)">${err.message}</td></tr>`;
   }
+}
+
+async function sfActualizarUltimoCaTracker() {
+  try {
+    const res = await fetch(`${SF_AGENT_URL}/automations/sf-sync-log?limit=5`, {
+      headers: { 'x-automation-secret': SF_SYNC_SECRET }
+    });
+    const data = await res.json();
+    const ultimo = (data.logs || []).find(l => l.tipo === 'ca_tracker');
+    const el = document.getElementById('sf-last-ca-tracker');
+    if (el && ultimo) {
+      const fecha = new Date(ultimo.created_at).toLocaleString('es-AR',{
+        timeZone:'America/Argentina/Buenos_Aires',
+        day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false
+      });
+      el.textContent = `Último CA Tracker Actualización hacia SF: ${fecha}`;
+    }
+  } catch(e) {}
 }
 
 function sfRenderStats(rows) {
