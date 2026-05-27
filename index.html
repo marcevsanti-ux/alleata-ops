@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v3.1.2</title>
+<title>Alleata · Operaciones v3.1.3</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -304,7 +304,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v3.1.2 · 27 may 2026
+      v3.1.3 · 27 may 2026
     </div>
   </div>
 </div>
@@ -379,7 +379,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v3.1.2 · 27 may 2026
+      v3.1.3 · 27 may 2026
     </div>
   </div>
 </nav>
@@ -393,7 +393,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <div class="topbar-right" id="topbar-date"></div>
     <button onclick="refreshCurrentModule()" title="Actualizar" style="background:none;border:1px solid var(--border2);color:var(--text-muted);border-radius:7px;padding:4px 10px;cursor:pointer;font-size:13px;margin-left:10px;transition:all .2s" onmouseover="this.style.color='var(--teal)';this.style.borderColor='var(--teal)'" onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border2)'">↺</button>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v3.1.2</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v3.1.3</div>
   </div>
   <div class="content">
 
@@ -1769,19 +1769,20 @@ async function initInstalaciones() {
     const logisticasUnicas = [...new Set(todos.map(r=>r.logistica).filter(Boolean))];
     console.log('[Instalaciones] record_types disponibles:', tiposUnicos);
     console.log('[Instalaciones] logísticas disponibles:', logisticasUnicas);
-    // Log exacto para debug
-    console.log('[Instalaciones] Muestra:', JSON.stringify(todos.slice(0,3).map(r=>({ot:r.workorder_number,tipo:r.record_type,log:r.logistica}))));
-    const normalize = s => (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    // Valores exactos confirmados en consola
+    console.log('[Instalaciones] tipos:', [...new Set(todos.map(r=>r.record_type).filter(Boolean))]);
+    console.log('[Instalaciones] logísticas:', [...new Set(todos.map(r=>r.logistica).filter(Boolean))]);
+    const TIPOS_OK = ['instalación equipo + simcard','instalación simcard','asistencia técnica','instalacion equipo + simcard','instalacion simcard','asistencia tecnica'];
     _instTodos = todos.filter(r => {
-      const log  = normalize(r.logistica);
-      const tipo = normalize(r.record_type);
-      const esAlleata = log.includes('alleata');
-      const esTipoOk  = tipo.includes('instalaci') || tipo.includes('asistencia') || tipo.includes('tecni');
+      const log  = (r.logistica   || '').toUpperCase().trim();
+      const tipo = (r.record_type || '').toLowerCase().trim();
+      const esAlleata = log === 'ALLEATA';
+      const esTipoOk  = TIPOS_OK.some(t => tipo.includes(t.split(' ')[0]));
       return esAlleata && esTipoOk;
     });
     console.log(`[Instalaciones] Total: ${todos.length} → filtradas: ${_instTodos.length}`);
 
-    instActualizarEnvBadge();
+        instActualizarEnvBadge();
     instPopularSelectores();
     instFiltrar();
     instActualizarBadgeSidebar(_instTodos.length);
@@ -3583,7 +3584,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v3.1.2] OK');
+console.log('[Alleata v3.1.3] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
