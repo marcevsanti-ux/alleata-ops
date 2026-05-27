@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v3.1.0</title>
+<title>Alleata · Operaciones v3.1.1</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -304,7 +304,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v3.1.0 · 27 may 2026
+      v3.1.1 · 27 may 2026
     </div>
   </div>
 </div>
@@ -379,7 +379,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v3.1.0 · 27 may 2026
+      v3.1.1 · 27 may 2026
     </div>
   </div>
 </nav>
@@ -393,7 +393,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <div class="topbar-right" id="topbar-date"></div>
     <button onclick="refreshCurrentModule()" title="Actualizar" style="background:none;border:1px solid var(--border2);color:var(--text-muted);border-radius:7px;padding:4px 10px;cursor:pointer;font-size:13px;margin-left:10px;transition:all .2s" onmouseover="this.style.color='var(--teal)';this.style.borderColor='var(--teal)'" onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border2)'">↺</button>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v3.1.0</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v3.1.1</div>
   </div>
   <div class="content">
 
@@ -3029,7 +3029,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v3.1.0] OK');
+console.log('[Alleata v3.1.1] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -3264,7 +3264,7 @@ function goTo(mod){
   if(mod==='rollout')initRollout();
   if(mod==='desinstalaciones'&&!DesinModule.cargado)cargarDesinstalaciones();
   if(mod==='merchants')initMerchants();
-  if(mod==='instalaciones')initInstalaciones();
+  if(mod==='instalaciones'){window.scrollTo(0,0);initInstalaciones();}
   if(mod==='ally')cargarAlly();
   if(mod==='distri')cargarDistri();
   if(mod==='horas')renderHoras();
@@ -10105,9 +10105,6 @@ async function mchLimpiarTodo(){
       ⏳ Consultando tarifas CA...
     </div>
     <div id="cotizadorError" style="display:none;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);border-radius:8px;padding:12px;font-size:12px;color:#ef4444;margin-top:8px"></div>
-  </div>
-</div>
-
 
 <!-- ── HTML DEL MÓDULO ── -->
 <div class="module" id="mod-instalaciones">
@@ -10271,8 +10268,7 @@ let _instFiltrado = [];
 // ── Init ─────────────────────────────────────────────────────
 async function initInstalaciones() {
   const tbody = document.getElementById('inst-tbody');
-  const msg   = document.getElementById('inst-loading-msg');
-  if (msg) msg.textContent = 'Cargando OTs desde Salesforce…';
+  if (tbody) tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:40px;color:var(--text-muted)"><span id="inst-loading-msg">Cargando OTs desde Salesforce…</span></td></tr>';
 
   const icon = document.getElementById('inst-refresh-icon');
   if (icon) icon.style.animation = 'spin 0.7s linear infinite';
@@ -10310,9 +10306,10 @@ async function initInstalaciones() {
     if (syncEl) syncEl.textContent = 'Sync: ' + new Date().toLocaleTimeString('es-AR');
 
   } catch (err) {
-    console.error('[Instalaciones]', err);
+    console.error('[Instalaciones] ERROR DETALLADO:', err);
+    const msg2 = err.message || String(err);
     if (tbody) tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:40px;color:var(--red)">
-      ⚠ Error: ${err.message || err}</td></tr>`;
+      ⚠ Error: ${msg2}<br><small style="color:var(--text-muted)">Ver consola para detalles</small></td></tr>`;
   } finally {
     if (icon) icon.style.animation = '';
   }
@@ -10658,6 +10655,9 @@ document.addEventListener('keydown', e => {
   }
 });
 </script>
+
+  </div>
+</div>
 
 </body>
 </html>
