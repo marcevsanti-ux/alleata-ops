@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v3.1.3</title>
+<title>Alleata · Operaciones v3.1.6</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -304,7 +304,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v3.1.3 · 27 may 2026
+      v3.1.6 · 27 may 2026
     </div>
   </div>
 </div>
@@ -379,7 +379,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v3.1.3 · 27 may 2026
+      v3.1.6 · 27 may 2026
     </div>
   </div>
 </nav>
@@ -393,7 +393,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <div class="topbar-right" id="topbar-date"></div>
     <button onclick="refreshCurrentModule()" title="Actualizar" style="background:none;border:1px solid var(--border2);color:var(--text-muted);border-radius:7px;padding:4px 10px;cursor:pointer;font-size:13px;margin-left:10px;transition:all .2s" onmouseover="this.style.color='var(--teal)';this.style.borderColor='var(--teal)'" onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border2)'">↺</button>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v3.1.3</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v3.1.6</div>
   </div>
   <div class="content">
 
@@ -1755,32 +1755,26 @@ async function initInstalaciones() {
   if (icon) icon.style.animation = 'spin 0.7s linear infinite';
 
   try {
-    // Mismo endpoint que usa SF-Integración — sin límite para traer todas
-    const res = await fetch(`${SF_AGENT_URL}/automations/sf-workorders?entorno=uat&limit=2000`, {
-      headers: { 'x-automation-secret': SF_SYNC_SECRET }
-    });
-    const json = await res.json();
-    if (!res.ok) throw new Error(json.error || 'Error al cargar OTs');
-
-    // Filtrar client-side: logistica Alleata + tipos instalacion/asistencia
-    const todos = json.workorders || [];
-    // Log para debug — ver valores reales en consola
-    const tiposUnicos = [...new Set(todos.map(r=>r.record_type).filter(Boolean))];
-    const logisticasUnicas = [...new Set(todos.map(r=>r.logistica).filter(Boolean))];
-    console.log('[Instalaciones] record_types disponibles:', tiposUnicos);
-    console.log('[Instalaciones] logísticas disponibles:', logisticasUnicas);
-    // Valores exactos confirmados en consola
-    console.log('[Instalaciones] tipos:', [...new Set(todos.map(r=>r.record_type).filter(Boolean))]);
-    console.log('[Instalaciones] logísticas:', [...new Set(todos.map(r=>r.logistica).filter(Boolean))]);
-    const TIPOS_OK = ['instalación equipo + simcard','instalación simcard','asistencia técnica','instalacion equipo + simcard','instalacion simcard','asistencia tecnica'];
-    _instTodos = todos.filter(r => {
-      const log  = (r.logistica   || '').toUpperCase().trim();
-      const tipo = (r.record_type || '').toLowerCase().trim();
-      const esAlleata = log === 'ALLEATA';
-      const esTipoOk  = TIPOS_OK.some(t => tipo.includes(t.split(' ')[0]));
-      return esAlleata && esTipoOk;
-    });
-    console.log(`[Instalaciones] Total: ${todos.length} → filtradas: ${_instTodos.length}`);
+    // Query directa Supabase — paginada, igual que cargarDesinstalaciones
+    let _allRows = [];
+    let _from = 0;
+    const _PAGE = 500;
+    while (true) {
+      const { data: pg, error: pgErr } = await sb
+        .from('sf_workorders')
+        .select('id,sf_id,workorder_number,record_type,status,responsable,propietario_cuenta,cuenta,logistica,tracking_envio,tracking_devolucion,fecha_despacho,costo_envio,direccion,direccion_formula,ciudad,provincia,codigo_postal,entre_calles,horario,horario_entrega,contacto_celular,telefono_secundario,email_destino,n_terminal,n_simcard,chip,terminal_id,razon_cambio,motivo_cambio,estado_ca_envio,historia_ca_envio,eventos_ca_envio,ultimo_evento_envio,ultimo_evento_envio_fecha,estado_ca_dev,historia_ca_dev,eventos_ca_dev,ultimo_evento_dev,ultimo_evento_dev_fecha,observacion_corta,observacion_resumen,datos_envio,usuario_cajero,contrasena_cajero,semaforo,prioridad,entorno,ultimo_sync,created_at')
+        .in('record_type', ['Instalación Equipo + Simcard','Instalación Simcard','Asistencia Técnica'])
+        .eq('logistica', 'ALLEATA')
+        .order('created_at', { ascending: false })
+        .range(_from, _from + _PAGE - 1);
+      if (pgErr) throw pgErr;
+      if (!pg || pg.length === 0) break;
+      _allRows.push(...pg);
+      if (pg.length < _PAGE) break;
+      _from += _PAGE;
+    }
+    _instTodos = _allRows;
+    console.log(`[Instalaciones] Supabase directo: ${_instTodos.length} OTs`);
 
         instActualizarEnvBadge();
     instPopularSelectores();
@@ -3584,7 +3578,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v3.1.3] OK');
+console.log('[Alleata v3.1.6] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
