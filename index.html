@@ -10278,31 +10278,28 @@ async function initInstalaciones() {
   if (icon) icon.style.animation = 'spin 0.7s linear infinite';
 
   try {
-    const { data, error } = await sb
-      .from('sf_workorders')
-      .select(`id,sf_id,workorder_number,record_type,status,
-               responsable,propietario_cuenta,cuenta,logistica,
-               tracking_envio,tracking_devolucion,fecha_despacho,costo_envio,
-               direccion,direccion_formula,ciudad,provincia,codigo_postal,
-               entre_calles,horario,horario_entrega,contacto_celular,
-               telefono_secundario,email_destino,
-               n_terminal,n_simcard,chip,terminal_id,
-               razon_cambio,motivo_cambio,
-               estado_ca_envio,historia_ca_envio,eventos_ca_envio,
-               ultimo_evento_envio,ultimo_evento_envio_fecha,
-               estado_ca_dev,historia_ca_dev,eventos_ca_dev,
-               ultimo_evento_dev,ultimo_evento_dev_fecha,
-               observacion_corta,observacion_resumen,datos_envio,
-               usuario_cajero,contrasena_cajero,
-               semaforo,prioridad,entorno,
-               ultimo_sync,created_at`)
-      .eq('logistica', 'Alleata')
-      .in('record_type', INST_TIPOS)
-      .order('created_at', { ascending: false });
+    // Mismo endpoint que usa SF-Integración — sin límite para traer todas
+    const res = await fetch(`${SF_AGENT_URL}/automations/sf-workorders?entorno=uat&limit=2000`, {
+      headers: { 'x-automation-secret': SF_SYNC_SECRET }
+    });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error || 'Error al cargar OTs');
 
-    if (error) throw error;
-
-    _instTodos = data || [];
+    // Filtrar client-side: logistica Alleata + tipos instalacion/asistencia
+    const todos = json.workorders || [];
+    // Log para debug — ver valores reales en consola
+    const tiposUnicos = [...new Set(todos.map(r=>r.record_type).filter(Boolean))];
+    const logisticasUnicas = [...new Set(todos.map(r=>r.logistica).filter(Boolean))];
+    console.log('[Instalaciones] record_types disponibles:', tiposUnicos);
+    console.log('[Instalaciones] logísticas disponibles:', logisticasUnicas);
+    _instTodos = todos.filter(r => {
+      const log = (r.logistica || '').toLowerCase();
+      const tipo = (r.record_type || '').toLowerCase();
+      const esAlleata = log.includes('alleata');
+      const esTipoOk  = tipo.includes('instalaci') || tipo.includes('asistencia');
+      return esAlleata && esTipoOk;
+    });
+    console.log(`[Instalaciones] Total: ${todos.length} → filtradas: ${_instTodos.length}`);
 
     instActualizarEnvBadge();
     instPopularSelectores();
