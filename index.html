@@ -9829,7 +9829,7 @@ async function mchFiltrar(){
   mchRenderTabla(filtered);
 }
 
-function mchEstadoBadge(estado){
+function mchEstadoBadge(estado, ultimoEvento){
   const map = {
     'Entregado':   'background:rgba(16,185,129,.15);color:#10b981;border:1px solid rgba(16,185,129,.3)',
     'En tránsito': 'background:rgba(26,159,212,.15);color:#1a9fd4;border:1px solid rgba(26,159,212,.3)',
@@ -9838,7 +9838,19 @@ function mchEstadoBadge(estado){
     'Sin datos':   'background:rgba(128,128,128,.1);color:var(--text-muted);border:1px solid var(--border)',
   };
   const style = map[estado]||map['Sin datos'];
-  return `<span style="font-size:11px;padding:2px 8px;border-radius:12px;font-weight:600;${style}">${estado||'Sin datos'}</span>`;
+  const chip = `<span style="font-size:11px;padding:2px 8px;border-radius:12px;font-weight:600;${style}">${estado||'Sin datos'}</span>`;
+  // Sub-estado: mostrar ultimo_evento debajo del chip cuando está en tránsito
+  if(estado === 'En tránsito' && ultimoEvento) {
+    const ue = ultimoEvento.toUpperCase();
+    // Detectar sub-estado relevante y color
+    let subColor = '#1a9fd4';
+    if(ue.includes('ENTREGADO') || ue.includes('ENTREGA EN SUCURSAL') || ue.includes('ENTREGA EFECTUADA')) subColor = '#10b981';
+    else if(ue.includes('CADUCA') || ue.includes('PLAZO VENCIDO') || ue.includes('DEVOLUCION') || ue.includes('DEVUELTO')) subColor = '#ef4444';
+    else if(ue.includes('INTENTO DE ENTREGA') || ue.includes('DOMICILIO CERRADO') || ue.includes('ESPERA EN SUCURSAL')) subColor = '#f59e0b';
+    const subLabel = ultimoEvento.length > 22 ? ultimoEvento.slice(0,22)+'…' : ultimoEvento;
+    return chip + `<div style="font-size:9px;font-weight:600;color:${subColor};margin-top:3px;text-transform:uppercase;letter-spacing:.3px">${subLabel}</div>`;
+  }
+  return chip;
 }
 
 function mchCalcSLA(g){
@@ -9929,8 +9941,7 @@ function mchRenderTabla(guias){
       </td>
       <td><span style="font-size:11px;color:var(--text-muted)">${g.estado_ot||'—'}</span></td>
       <td>
-        ${mchEstadoBadge(g.estado)}
-        ${g.ultimo_evento?`<div style="font-size:10px;color:var(--text-muted);margin-top:3px">${g.ultimo_evento}</div>`:''}
+        ${mchEstadoBadge(g.estado, g.ultimo_evento)}
       </td>
       <td style="font-size:11px;color:var(--text-muted);font-family:'JetBrains Mono',monospace">${g.ultimo_evento_fecha||'—'}</td>
       <td style="text-align:center;min-width:54px">${mchSLABadge(g)}</td>
