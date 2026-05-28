@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v3.2.0</title>
+<title>Alleata · Operaciones v3.2.1</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -304,7 +304,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v3.2.0 · 27 may 2026
+      v3.2.1 · 27 may 2026
     </div>
   </div>
 </div>
@@ -379,7 +379,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v3.2.0 · 27 may 2026
+      v3.2.1 · 27 may 2026
     </div>
   </div>
 </nav>
@@ -394,14 +394,21 @@ tr:hover td{background:var(--surface2);}
     <div class="topbar-right" id="topbar-date"></div>
     <button onclick="refreshCurrentModule()" title="Actualizar" style="background:none;border:1px solid var(--border2);color:var(--text-muted);border-radius:7px;padding:4px 10px;cursor:pointer;font-size:13px;margin-left:10px;transition:all .2s" onmouseover="this.style.color='var(--teal)';this.style.borderColor='var(--teal)'" onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border2)'">↺</button>
     <!-- SF Sync global — solo admin -->
-    <button id="global-sf-sync-btn" onclick="globalSFSync()" title="Sincronizar OTs desde Salesforce"
-      style="display:none;align-items:center;gap:5px;background:rgba(29,191,142,.1);border:1px solid rgba(29,191,142,.3);color:var(--teal);border-radius:7px;padding:4px 12px;cursor:pointer;font-size:11px;font-weight:600;margin-left:10px;transition:all .2s"
-      onmouseover="this.style.background='rgba(29,191,142,.2)'" onmouseout="this.style.background='rgba(29,191,142,.1)'">
-      <svg id="global-sf-sync-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
-      SF Sync
-    </button>
-    <div id="global-sf-sync-status" style="font-size:10px;color:var(--text-muted);margin-left:8px;font-family:'JetBrains Mono',monospace;display:none"></div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v3.2.0</div>
+    <div id="global-sf-sync-wrap" style="display:none;align-items:center;gap:8px;margin-left:12px;padding:4px 10px 4px 12px;background:rgba(255,255,255,.04);border:1px solid var(--border2);border-radius:9px;">
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:1px">
+        <div id="sf-last-sync" style="font-size:9px;color:var(--text-muted);font-family:'JetBrains Mono',monospace"></div>
+        <div id="sf-next-sync" style="font-size:9px;color:var(--teal);font-family:'JetBrains Mono',monospace"></div>
+        <div id="sf-last-ca-tracker" style="font-size:9px;color:var(--text-muted);font-family:'JetBrains Mono',monospace"></div>
+        <div id="sf-next-ca-tracker" style="font-size:9px;color:var(--blue);font-family:'JetBrains Mono',monospace"></div>
+      </div>
+      <button id="global-sf-sync-btn" onclick="globalSFSync()" title="Sincronizar OTs desde Salesforce"
+        style="display:flex;align-items:center;gap:5px;background:rgba(29,191,142,.1);border:1px solid rgba(29,191,142,.3);color:var(--teal);border-radius:7px;padding:5px 12px;cursor:pointer;font-size:11px;font-weight:600;white-space:nowrap;transition:all .2s"
+        onmouseover="this.style.background='rgba(29,191,142,.2)'" onmouseout="this.style.background='rgba(29,191,142,.1)'">
+        <svg id="global-sf-sync-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+        SF Sync
+      </button>
+    </div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v3.2.1</div>
   </div>
   <div class="content">
 
@@ -412,15 +419,7 @@ tr:hover td{background:var(--surface2);}
           <h2 style="font-size:20px;font-weight:800;color:#fff;margin:0">☁️ SF — Integración</h2>
           <div style="font-size:12px;color:var(--text-muted);margin-top:3px">Salesforce UAT · Solo lectura</div>
         </div>
-        <div style="display:flex;gap:10px;align-items:center">
-          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px">
-            <div id="sf-last-sync" style="font-size:11px;color:var(--text-muted);font-family:'JetBrains Mono',monospace"></div>
-            <div id="sf-next-sync" style="font-size:11px;color:var(--teal);font-family:'JetBrains Mono',monospace"></div>
-            <div id="sf-last-ca-tracker" style="font-size:11px;color:var(--text-muted);font-family:'JetBrains Mono',monospace"></div>
-            <div id="sf-next-ca-tracker" style="font-size:11px;color:var(--blue);font-family:'JetBrains Mono',monospace"></div>
-          </div>
-          <button class="btn btn-sm" onclick="sfSync()" id="sf-sync-btn">↺ Sync ahora</button>
-        </div>
+        <div style="font-size:11px;color:var(--text-muted)">El sync se controla desde el botón <strong style="color:var(--teal)">SF Sync</strong> en el topbar.</div>
       </div>
 
       <!-- Stats -->
@@ -3752,7 +3751,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v3.2.0] OK');
+console.log('[Alleata v3.2.1] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -10381,7 +10380,10 @@ async function globalSFSync() {
     });
     const data = await res.json();
     if (data.ok || data.upserted !== undefined) {
-      if (status) status.textContent = `✅ ${data.upserted ?? '?'} OTs`;
+      // Actualizar el último sync en el topbar
+      const lastSyncEl = document.getElementById('sf-last-sync');
+      if (lastSyncEl) lastSyncEl.textContent = 'Último sync: ' + new Date().toLocaleString('es-AR',{day:'2-digit',month:'numeric',hour:'2-digit',minute:'2-digit'});
+      sfActualizarProximoCron();
       // Refrescar el módulo activo si es instalaciones o desinstalaciones
       const mod = document.querySelector('.nav-item.active')?.dataset?.mod;
       if (mod === 'instalaciones') initInstalaciones();
@@ -10404,15 +10406,22 @@ async function globalSFSync() {
 }
 
 function mostrarSFSyncSiAdmin() {
-  const btn = document.getElementById('global-sf-sync-btn');
-  if (!btn) return;
+  const wrap = document.getElementById('global-sf-sync-wrap');
+  if (!wrap) return;
   const isAdmin = currentProfile?.rol === 'admin';
-  btn.style.display = isAdmin ? 'flex' : 'none';
+  wrap.style.display = isAdmin ? 'flex' : 'none';
+  // Arrancar el cron de próximo sync si es admin
+  if (isAdmin && !window._sfCronInterval) {
+    sfActualizarProximoCron();
+    window._sfCronInterval = setInterval(sfActualizarProximoCron, 60000);
+  }
 }
 
 async function sfSync() {
+  // Redirigir al sync global del topbar
+  return globalSFSync();
   const btn = document.getElementById('sf-sync-btn');
-  btn.disabled = true; btn.textContent = 'Sincronizando...';
+  if (btn) { btn.disabled = true; btn.textContent = 'Sincronizando...'; }
   try {
     const res = await fetch(`${SF_AGENT_URL}/automations/run/sf_sync`, {
       method:'POST', headers:{'x-automation-secret':SF_SYNC_SECRET}
