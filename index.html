@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v3.1.8</title>
+<title>Alleata · Operaciones v3.1.9</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -304,7 +304,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v3.1.8 · 27 may 2026
+      v3.1.9 · 27 may 2026
     </div>
   </div>
 </div>
@@ -379,7 +379,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v3.1.8 · 27 may 2026
+      v3.1.9 · 27 may 2026
     </div>
   </div>
 </nav>
@@ -393,7 +393,15 @@ tr:hover td{background:var(--surface2);}
     </div>
     <div class="topbar-right" id="topbar-date"></div>
     <button onclick="refreshCurrentModule()" title="Actualizar" style="background:none;border:1px solid var(--border2);color:var(--text-muted);border-radius:7px;padding:4px 10px;cursor:pointer;font-size:13px;margin-left:10px;transition:all .2s" onmouseover="this.style.color='var(--teal)';this.style.borderColor='var(--teal)'" onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border2)'">↺</button>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v3.1.8</div>
+    <!-- SF Sync global — solo admin -->
+    <button id="global-sf-sync-btn" onclick="globalSFSync()" title="Sincronizar OTs desde Salesforce"
+      style="display:none;align-items:center;gap:5px;background:rgba(29,191,142,.1);border:1px solid rgba(29,191,142,.3);color:var(--teal);border-radius:7px;padding:4px 12px;cursor:pointer;font-size:11px;font-weight:600;margin-left:10px;transition:all .2s"
+      onmouseover="this.style.background='rgba(29,191,142,.2)'" onmouseout="this.style.background='rgba(29,191,142,.1)'">
+      <svg id="global-sf-sync-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+      SF Sync
+    </button>
+    <div id="global-sf-sync-status" style="font-size:10px;color:var(--text-muted);margin-left:8px;font-family:'JetBrains Mono',monospace;display:none"></div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v3.1.9</div>
   </div>
   <div class="content">
 
@@ -1645,6 +1653,7 @@ tr:hover td{background:var(--surface2);}
           <option value="Instalación Equipo + Simcard">Equipo + SIM</option>
           <option value="Instalación Simcard">Simcard</option>
           <option value="Asistencia Técnica">Asistencia Técnica</option>
+          <option value="Cambio de Terminal">Cambio de Terminal</option>
         </select>
       </div>
       <div style="display:flex;flex-direction:column;gap:4px;min-width:150px">
@@ -1763,7 +1772,7 @@ async function initInstalaciones() {
       const { data: pg, error: pgErr } = await sb
         .from('sf_workorders')
         .select('id,sf_id,workorder_number,record_type,status,responsable,propietario_cuenta,cuenta,logistica,tracking_envio,tracking_devolucion,fecha_despacho,costo_envio,direccion,direccion_formula,ciudad,provincia,codigo_postal,entre_calles,horario,horario_entrega,contacto_celular,telefono_secundario,email_destino,n_terminal,n_simcard,chip,terminal_id,razon_cambio,motivo_cambio,estado_ca_envio,historia_ca_envio,eventos_ca_envio,ultimo_evento_envio,ultimo_evento_envio_fecha,estado_ca_dev,historia_ca_dev,eventos_ca_dev,ultimo_evento_dev,ultimo_evento_dev_fecha,observacion_corta,observacion_resumen,datos_envio,usuario_cajero,contrasena_cajero,semaforo,prioridad,entorno,ultimo_sync,created_at')
-        .in('record_type', ['Instalación Equipo + Simcard','Instalación Simcard','Asistencia Técnica'])
+        .in('record_type', ['Instalación Equipo + Simcard','Instalación Simcard','Asistencia Técnica','Cambio de Terminal'])
         .eq('logistica', 'ALLEATA')
         .order('created_at', { ascending: false })
         .range(_from, _from + _PAGE - 1);
@@ -3743,7 +3752,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v3.1.8] OK');
+console.log('[Alleata v3.1.9] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -3919,6 +3928,8 @@ function showApp(){
     if(navDistri) navDistri.style.display='flex';
     const navSF=document.getElementById('nav-sf');
     if(navSF) navSF.style.display='flex';
+    // SF Sync global en topbar — solo admins
+    mostrarSFSyncSiAdmin();
     document.getElementById('nav-ajustes').style.display='flex';
     document.getElementById('nav-section-config').style.display='block';
   }
@@ -10353,6 +10364,51 @@ async function sfCargarLogs() {
   } catch(err) {
     tbody.innerHTML = `<tr><td colspan="8" style="padding:20px;text-align:center;color:var(--red)">${err.message}</td></tr>`;
   }
+}
+
+// ── SF Sync Global (topbar) ──────────────────────────────────
+async function globalSFSync() {
+  const btn    = document.getElementById('global-sf-sync-btn');
+  const icon   = document.getElementById('global-sf-sync-icon');
+  const status = document.getElementById('global-sf-sync-status');
+  if (!btn) return;
+  btn.disabled = true;
+  if (icon) icon.style.animation = 'spin 0.7s linear infinite';
+  if (status) { status.style.display = 'block'; status.textContent = 'Sincronizando…'; }
+  try {
+    const res  = await fetch(`${SF_AGENT_URL}/automations/run/sf_sync`, {
+      method: 'POST', headers: { 'x-automation-secret': SF_SYNC_SECRET }
+    });
+    const data = await res.json();
+    if (data.ok || data.upserted !== undefined) {
+      if (status) status.textContent = `✅ ${data.upserted ?? '?'} OTs`;
+      // Refrescar el módulo activo si es instalaciones o desinstalaciones
+      const mod = document.querySelector('.nav-item.active')?.dataset?.mod;
+      if (mod === 'instalaciones') initInstalaciones();
+      if (mod === 'desinstalaciones') cargarDesinstalaciones();
+      if (mod === 'rollout') cargarRollout?.();
+      if (mod === 'merchants') initMerchants?.();
+      setTimeout(() => { if (status) status.style.display = 'none'; }, 4000);
+    } else {
+      if (status) status.textContent = '⚠ Error';
+      setTimeout(() => { if (status) status.style.display = 'none'; }, 3000);
+    }
+  } catch (err) {
+    console.error('[SF Sync global]', err);
+    if (status) status.textContent = '⚠ ' + (err.message || 'Error');
+    setTimeout(() => { if (status) status.style.display = 'none'; }, 3000);
+  } finally {
+    btn.disabled = false;
+    if (icon) icon.style.animation = '';
+  }
+}
+
+function mostrarSFSyncSiAdmin() {
+  const btn = document.getElementById('global-sf-sync-btn');
+  if (!btn) return;
+  // Mostrar solo si el usuario es admin
+  if (currentUser?.rol === 'admin') btn.style.display = 'inline-flex';
+  else btn.style.display = 'none';
 }
 
 async function sfSync() {
