@@ -765,19 +765,52 @@ async function loadEnTransito(){
 async function mostrarOTScaneada(sfId){
   const status=document.getElementById('rutaScanStatus');
   status.textContent='🔍 Buscando OT...';
-  const{data:ot,error}=await sb.from('envios').select('*').eq('sf_id',sfId).single();
-  if(error||!ot){
-    showScanFeedback('OT no encontrada: '+sfId,'error');
-    return;
+
+  // Primero buscar en sf_workorders (instalaciones Alleata)
+  let ot=null, esSFWorkorder=false;
+  const{data:sfOT,error:sfErr}=await sb.from('sf_workorders')
+    .select('id,sf_id,workorder_number,record_type,status,logistica,cuenta,nombre_comercio,direccion_formula,direccion,localidad,ciudad,provincia,codigo_postal,contacto_celular,horario,horario_entrega,responsable')
+    .eq('sf_id',sfId).eq('logistica','ALLEATA').maybeSingle();
+
+  if(sfOT && !sfErr){
+    // Normalizar campos para reutilizar la card
+    ot={
+      id:            sfOT.id,
+      sf_id:         sfOT.sf_id,
+      ot_numero:     sfOT.workorder_number,
+      tipo:          sfOT.record_type,
+      estado:        sfOT.status,
+      cuenta:        sfOT.cuenta,
+      nombre_comercio: sfOT.nombre_comercio,
+      direccion_completa: sfOT.direccion_formula||sfOT.direccion||'',
+      ciudad:        sfOT.ciudad,
+      provincia:     sfOT.provincia,
+      contacto:      sfOT.contacto_celular,
+      horario:       sfOT.horario||sfOT.horario_entrega,
+      _esSFWorkorder: true,
+    };
+    esSFWorkorder=true;
+  } else {
+    // Fallback: buscar en tabla envios (logística CA)
+    const{data:envOT,error:envErr}=await sb.from('envios').select('*').eq('sf_id',sfId).single();
+    if(envErr||!envOT){ showScanFeedback('OT no encontrada: '+sfId,'error'); return; }
+    ot=envOT;
   }
-  if(['En Tránsito','En tránsito','Despachado','Entregado'].includes(ot.estado)){
-    showScanFeedback('OT '+ot.ot_numero+' ya está en '+ot.estado,'warn');
-    return;
+
+  // Validar estado
+  if(esSFWorkorder){
+    if(ot.estado==='Despachado'){
+      showScanFeedback('OT '+ot.ot_numero+' ya está Despachada','warn'); return;
+    }
+    if(ot.estado!=='Pre-Colecta'){
+      showScanFeedback('OT '+ot.ot_numero+' · estado: '+ot.estado,'warn'); return;
+    }
+  } else {
+    if(['En Tránsito','En tránsito','Despachado','Entregado'].includes(ot.estado)){
+      showScanFeedback('OT '+ot.ot_numero+' ya está en '+ot.estado,'warn'); return;
+    }
   }
-  if(ot.estado!=='Pre-Colecta'){
-    showScanFeedback('OT '+ot.ot_numero+' · estado: '+ot.estado,'warn');
-    return;
-  }
+
   otScaneadaActual=ot;
   const z=getZona(ot.ciudad,ot.provincia);
   const km=getDistKm(ot.ciudad);
@@ -807,24 +840,47 @@ async function mostrarOTScaneada(sfId){
 async function aceptarOT(){
   if(!otScaneadaActual)return;
   const btn=document.querySelector('#otScaneadaCard button');
-  btn.disabled=true;btn.textContent='⏳ Aceptando...';
-  const{error}=await sb.from('envios').update({
-    estado:'Despachado',
-    ultimo_evento:'Despachado por logística Alleata',
-    ultimo_evento_fecha:new Date().toISOString().slice(0,10)
-  }).eq('id',otScaneadaActual.id);
-  if(error){btn.disabled=false;btn.textContent='✅ Aceptar OT';alert('Error: '+error.message);return;}
+  btn.disabled=true;btn.textContent='⏳ Despachando...';
 
-  // Agregar a ruta del día y recalcular km
-  rutaDelDia.push({...otScaneadaActual});
-  await guardarRutaDiaria();
+  try{
+    if(otScaneadaActual._esSFWorkorder){
+      // OT de instalaciones Alleata — usar endpoint Railway que actualiza SF + Supabase
+      const tecnico=currentProfile?.nombre||currentUser?.email||'Técnico';
+      const res=await fetch(ALLY_URL+'/automations/despachar-ot',{
+        method:'POST',
+        headers:{'Content-Type':'application/json','x-automation-secret':'123456'},
+        body:JSON.stringify({ sf_id:otScaneadaActual.sf_id, tecnico })
+      });
+      const data=await res.json();
+      if(!data.ok) throw new Error(data.error||'Error al despachar');
+      showScanFeedback('✅ OT '+otScaneadaActual.ot_numero+' despachada en SF','ok');
+    } else {
+      // OT de Correo Argentino — actualizar tabla envios como antes
+      const{error}=await sb.from('envios').update({
+        estado:'Despachado',
+        ultimo_evento:'Despachado por logística Alleata',
+        ultimo_evento_fecha:new Date().toISOString().slice(0,10)
+      }).eq('id',otScaneadaActual.id);
+      if(error) throw new Error(error.message);
+      showScanFeedback('✅ OT '+otScaneadaActual.ot_numero+' despachada — Logística Alleata','ok');
+    }
 
-  const otParaNotif={...otScaneadaActual};
-  cancelarOTScaneada();
-  await loadEnTransito();
-  showScanFeedback('✅ OT '+otParaNotif.ot_numero+' despachada — Logística Alleata','ok');
-  await notificarAlly(otParaNotif, 'en_transito');
-  otScaneadaActual=null;
+    // Agregar a ruta del día
+    rutaDelDia.push({...otScaneadaActual});
+    await guardarRutaDiaria();
+
+    const otParaNotif={...otScaneadaActual};
+    cancelarOTScaneada();
+    await loadEnTransito();
+    await notificarAlly(otParaNotif,'en_transito');
+    otScaneadaActual=null;
+
+  }catch(err){
+    btn.disabled=false;
+    btn.textContent='✅ Aceptar OT';
+    showScanFeedback('⚠️ Error: '+err.message,'error');
+    console.error('[aceptarOT]',err);
+  }
 }
 
 function cancelarOTScaneada(){
