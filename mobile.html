@@ -870,15 +870,23 @@ async function aceptarOT(){
     await guardarRutaDiaria();
 
     const otParaNotif={...otScaneadaActual};
+    otScaneadaActual=null;
     cancelarOTScaneada();
     await loadEnTransito();
     await notificarAlly(otParaNotif,'en_transito');
-    otScaneadaActual=null;
+
+    // Reiniciar scanner para la siguiente OT
+    rutaScannerActive=true;
+    if(!_scannerInterval)_scannerInterval=setInterval(_doScan,350);
+    document.getElementById('rutaScanStatus').textContent='📷 Cámara activa — apuntá al QR del rótulo';
 
   }catch(err){
     btn.disabled=false;
     btn.textContent='✅ Aceptar OT';
     showScanFeedback('⚠️ Error: '+err.message,'error');
+    // Reiniciar scanner también en caso de error
+    rutaScannerActive=true;
+    if(!_scannerInterval)_scannerInterval=setInterval(_doScan,350);
     console.error('[aceptarOT]',err);
   }
 }
