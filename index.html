@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v3.1.6</title>
+<title>Alleata · Operaciones v3.1.7</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -304,7 +304,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v3.1.6 · 27 may 2026
+      v3.1.7 · 27 may 2026
     </div>
   </div>
 </div>
@@ -379,7 +379,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v3.1.6 · 27 may 2026
+      v3.1.7 · 27 may 2026
     </div>
   </div>
 </nav>
@@ -393,7 +393,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <div class="topbar-right" id="topbar-date"></div>
     <button onclick="refreshCurrentModule()" title="Actualizar" style="background:none;border:1px solid var(--border2);color:var(--text-muted);border-radius:7px;padding:4px 10px;cursor:pointer;font-size:13px;margin-left:10px;transition:all .2s" onmouseover="this.style.color='var(--teal)';this.style.borderColor='var(--teal)'" onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border2)'">↺</button>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v3.1.6</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v3.1.7</div>
   </div>
   <div class="content">
 
@@ -1954,7 +1954,10 @@ function instRenderTabla() {
       <td>${instEstadoBadge(r)}</td>
       <td style="color:var(--text-muted);font-size:11px;max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.ultimo_evento_envio||'—'}</td>
       <td class="mono">${fecha}</td>
-      <td><button class="btn-ghost btn-sm" onclick="event.stopPropagation();instAbrirModal('${r.id}')" style="font-size:11px;padding:4px 10px">Ver</button></td>
+      <td style="white-space:nowrap">
+        <button class="btn-ghost btn-sm" onclick="event.stopPropagation();instAbrirModal('${r.id}')" style="font-size:11px;padding:4px 10px">Ver</button>
+        <button class="btn-ghost btn-sm" onclick="event.stopPropagation();printRotuloInstalacion('${r.id}')" style="font-size:11px;padding:4px 7px;margin-left:4px;color:var(--teal);border-color:rgba(29,191,142,.3)" title="Imprimir rótulo">🖨️</button>
+      </td>
     </tr>`;
   }).join('');
 }
@@ -2133,6 +2136,136 @@ document.addEventListener('keydown', e => {
     if (bg && bg.style.display !== 'none') instCerrarModal();
   }
 });
+
+// ── Imprimir rótulo Instalaciones ─────────────────────────────
+async function printRotuloInstalacion(id) {
+  // Buscar en cache primero, si no va a Supabase
+  let r = _instTodos.find(x => x.id === id);
+  if (!r) {
+    const { data } = await sb.from('sf_workorders').select('*').eq('id', id).single();
+    if (!data) return;
+    r = data;
+  }
+
+  const tipo = r.record_type || '—';
+  const tipoCode = tipo.toUpperCase().includes('SIMCARD') ? 'INS' :
+                   tipo.toUpperCase().includes('ASISTENCIA') ? 'AST' :
+                   tipo.toUpperCase().includes('CAMBIO') ? 'CAM' : 'OT';
+
+  const ciudadZ = (r.ciudad || '').toLowerCase();
+  const provZ   = (r.provincia || '').toLowerCase();
+  let zonaCode = 'FUERA', zonaColor = '#ef4444';
+  if (provZ.includes('ciudad autónoma') || provZ.includes('caba')) { zonaCode = 'CABA'; zonaColor = '#1a9fd4'; }
+  else if (['san isidro','vicente lópez','vicente lopez','tigre','pilar','escobar','san fernando','malvinas argentinas','san miguel','san martín','san martin','jose c. paz','josé c. paz','general rodriguez','general rodríguez'].some(n => ciudadZ.includes(n))) { zonaCode = 'ZN'; zonaColor = '#10b981'; }
+  else if (['lomas de zamora','lanús','lanus','avellaneda','quilmes','berazategui','florencio varela','almirante brown','ezeiza','esteban echeverría','esteban echeverria','la plata','guernica','monte grande','temperley','banfield'].some(n => ciudadZ.includes(n))) { zonaCode = 'ZS'; zonaColor = '#f59e0b'; }
+  else if (['la matanza','morón','moron','hurlingham','ituzaingó','ituzaingo','merlo','moreno','tres de febrero','luján','lujan','ramos mejía','ramos mejia','san justo','haedo','castelar','palomar','ciudadela','tapiales','villa luzuriaga','aldo bonzi','gregorio laferrere'].some(n => ciudadZ.includes(n))) { zonaCode = 'ZO'; zonaColor = '#8b5cf6'; }
+
+  const dir = r.direccion_formula || r.direccion || '';
+  const direccionQR = encodeURIComponent(`${dir} ${r.ciudad || ''} ${r.provincia || ''} Argentina`);
+  const mapsUrl  = `https://www.google.com/maps/search/?api=1&query=${direccionQR}`;
+  const rutaUrl  = `https://marcevsanti-ux.github.io/alleata-ops/mobile.html?ot=${r.sf_id || r.id}`;
+
+  function makeQRDataUrl(text, size) {
+    const tmp = document.createElement('div');
+    tmp.style.cssText = 'position:absolute;left:-9999px;top:-9999px;';
+    document.body.appendChild(tmp);
+    new QRCode(tmp, { text, width: size, height: size, colorDark: '#000', colorLight: '#fff', correctLevel: QRCode.CorrectLevel.M });
+    const canvas = tmp.querySelector('canvas');
+    let dataUrl = '';
+    if (canvas) dataUrl = canvas.toDataURL('image/png');
+    document.body.removeChild(tmp);
+    return dataUrl;
+  }
+
+  const qrGeoSrc  = makeQRDataUrl(mapsUrl, 75);
+  const qrRutaSrc = makeQRDataUrl(rutaUrl, 68);
+
+  const horario = r.horario || r.horario_entrega || '—';
+  const turnos = [r.turno_manana ? 'Mañana' : '', r.turno_tarde ? 'Tarde' : ''].filter(Boolean).join(' / ');
+
+  const w = window.open('', '_blank', 'width=430,height=700');
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
+  <title>Rótulo OT ${r.workorder_number || '—'}</title>
+  <style>
+    @page{ size:100mm 150mm; margin:0; }
+    *{margin:0;padding:0;box-sizing:border-box;}
+    html,body{width:100mm;font-family:'Arial',sans-serif;background:#fff;font-size:10px;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+    .rotulo{width:100mm;height:150mm;padding:3mm;display:flex;flex-direction:column;}
+    .hdr{display:flex;align-items:center;justify-content:space-between;border-bottom:1.5px solid #000;padding-bottom:1.5mm;margin-bottom:2mm;}
+    .hdr-logo{font-size:16px;font-weight:900;letter-spacing:-1px;color:#1dbf8e !important;}
+    .hdr-info{font-size:6.5px;line-height:1.5;color:#444;text-align:right;}
+    .tipo{font-size:9px;font-weight:700;text-align:center;border:1.5px solid #000;padding:1.5mm;margin-bottom:2mm;}
+    .ot-block{display:flex;align-items:center;justify-content:space-between;border:2.5px solid #000;padding:2mm 3mm;margin-bottom:2mm;}
+    .ot-num{font-size:28px;font-weight:900;letter-spacing:-1px;line-height:1;}
+    .qr-ruta{text-align:center;flex-shrink:0;}
+    .qr-ruta-lbl{font-size:6px;font-weight:700;margin-top:2px;text-transform:uppercase;}
+    .dest{font-size:11px;font-weight:900;text-align:center;text-transform:uppercase;background:#f0f0f0 !important;padding:2mm;margin-bottom:2mm;line-height:1.3;border:1px solid #ccc;}
+    .row{display:flex;align-items:baseline;gap:2mm;margin-bottom:1.2mm;}
+    .lbl{font-weight:700;font-size:9px;min-width:26mm;color:#555;text-transform:uppercase;}
+    .val{font-size:11px;font-weight:700;color:#000;}
+    .divider{border-top:1.5px solid #000;margin:2mm 0 1.5mm;}
+    .bottom{display:flex;gap:2mm;align-items:flex-start;flex:1;}
+    .qr-geo{display:flex;flex-direction:column;align-items:center;gap:1mm;flex-shrink:0;}
+    .qr-geo-lbl{font-size:6px;font-weight:700;text-align:center;text-transform:uppercase;}
+    .obs-wrap{flex:1;min-width:0;display:flex;flex-direction:column;}
+    .obs-lbl{font-size:9px;font-weight:700;text-transform:uppercase;margin-bottom:1mm;}
+    .obs-val{font-size:9px;flex:1;border:1px solid #ccc;padding:1.5mm;word-break:break-word;line-height:1.4;}
+    .badges{display:flex;flex-direction:column;gap:2mm;align-items:center;flex-shrink:0;}
+    .tipo-badge{font-size:20px;font-weight:900;background:#000 !important;color:#fff !important;padding:3mm 4mm;text-align:center;min-width:14mm;line-height:1;}
+    .zona-badge{font-size:12px;font-weight:900;padding:2mm 3mm;text-align:center;min-width:14mm;border:2.5px solid;line-height:1;}
+    .footer{border-top:1.5px solid #000;padding-top:1.5mm;margin-top:2mm;}
+    .footer-lbl{font-size:7px;font-weight:700;color:#555;text-transform:uppercase;}
+    .footer-val{font-size:7.5px;background:#000 !important;color:#fff !important;padding:1mm 2mm;display:inline-block;margin-top:0.5mm;}
+    .btn-print{display:block;width:95mm;margin:5px auto 0;padding:8px;background:#1dbf8e;color:#fff;border:none;font-size:13px;font-weight:700;cursor:pointer;border-radius:5px;font-family:Arial,sans-serif;}
+    @media print{.btn-print{display:none!important;}}
+  </style>
+  </head><body>
+  <div class="rotulo">
+    <div class="hdr">
+      <div class="hdr-logo">alleata</div>
+      <div class="hdr-info">Andrés Moretti e Hijos S.A.<br>Logística Alleata &nbsp;·&nbsp; (+54 11) 4103-4600</div>
+    </div>
+    <div class="tipo">TIPO DE O.T.: &nbsp; ${tipo}</div>
+    <div class="ot-block">
+      <div class="ot-num">O.T.: ${r.workorder_number || '—'}</div>
+      <div class="qr-ruta">
+        <img src="${qrRutaSrc}" width="68" height="68" style="display:block;">
+        <div class="qr-ruta-lbl">Escanear Ruta</div>
+      </div>
+    </div>
+    <div class="dest">${r.cuenta || r.nombre_comercio || '—'}</div>
+    <div class="row"><span class="lbl">Dirección</span><span class="val">${dir || '—'}</span></div>
+    <div class="row"><span class="lbl">C.P.</span><span class="val">${r.codigo_postal || '—'}</span></div>
+    <div class="row"><span class="lbl">Localidad</span><span class="val">${r.localidad || r.ciudad || '—'}</span></div>
+    <div class="row"><span class="lbl">Provincia</span><span class="val">${r.provincia || '—'}</span></div>
+    <div class="row"><span class="lbl">Contacto</span><span class="val">${r.contacto_celular || '—'}</span></div>
+    <div class="row"><span class="lbl">Horario</span><span class="val">${horario}${turnos ? ' (' + turnos + ')' : ''}</span></div>
+    <div class="row"><span class="lbl">Nombre Fantasía</span><span class="val">${r.nombre_comercio || '—'}</span></div>
+    <div class="divider"></div>
+    <div class="bottom">
+      <div class="qr-geo">
+        <img src="${qrGeoSrc}" width="75" height="75" style="display:block;">
+        <div class="qr-geo-lbl">Geo&shy;ubicación</div>
+      </div>
+      <div class="obs-wrap">
+        <div class="obs-lbl">Observaciones</div>
+        <div class="obs-val">${r.observacion_corta || ''}</div>
+      </div>
+      <div class="badges">
+        <div class="tipo-badge">${tipoCode}</div>
+        <div class="zona-badge" style="color:${zonaColor};border-color:${zonaColor};background:${zonaColor}15">${zonaCode}</div>
+      </div>
+    </div>
+    <div class="footer">
+      <div class="footer-lbl">Remitente</div>
+      <div class="footer-val">Logística Alleata &nbsp;·&nbsp; Andrés Moretti e Hijos S.A.</div>
+    </div>
+  </div>
+  <button class="btn-print" onclick="window.print()">🖨️ Imprimir rótulo</button>
+  <script>window.onafterprint=()=>window.close();<\/script>
+  </body></html>`);
+  w.document.close();
+}
 </script>
 
   </div>
@@ -3578,7 +3711,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v3.1.6] OK');
+console.log('[Alleata v3.1.7] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
