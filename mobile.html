@@ -772,6 +772,7 @@ async function mostrarOTScaneada(sfId){
     .select('id,sf_id,workorder_number,record_type,status,logistica,cuenta,nombre_comercio,direccion_formula,direccion,localidad,ciudad,provincia,codigo_postal,contacto_celular,horario,horario_entrega,responsable')
     .eq('sf_id',sfId).eq('logistica','ALLEATA').maybeSingle();
 
+  if(sfErr) console.warn('[mostrarOTScaneada] sf_workorders error:', sfErr.message);
   if(sfOT && !sfErr){
     // Normalizar campos para reutilizar la card
     ot={
@@ -793,7 +794,11 @@ async function mostrarOTScaneada(sfId){
   } else {
     // Fallback: buscar en tabla envios (logística CA)
     const{data:envOT,error:envErr}=await sb.from('envios').select('*').eq('sf_id',sfId).single();
-    if(envErr||!envOT){ showScanFeedback('OT no encontrada: '+sfId,'error'); return; }
+    if(envErr||!envOT){
+    showScanFeedback('OT '+sfId.slice(-6)+' no encontrada — hacé SF Sync desde el portal','error');
+    rutaScannerActive=true;
+    return;
+  }
     ot=envOT;
   }
 
@@ -846,13 +851,17 @@ async function aceptarOT(){
     if(otScaneadaActual._esSFWorkorder){
       // OT de instalaciones Alleata — usar endpoint Railway que actualiza SF + Supabase
       const tecnico=currentProfile?.nombre||currentUser?.email||'Técnico';
+      const sfId = otScaneadaActual.sf_id;
+      const tecnicoNombre = (currentProfile?.nombre||currentUser?.email||'Operador').trim();
+      console.log('[despachar-ot] sf_id='+sfId+' tecnico='+tecnicoNombre);
+      if(!sfId) throw new Error('OT sin SF ID — no se puede despachar');
       const res=await fetch(ALLY_URL+'/automations/despachar-ot',{
         method:'POST',
         headers:{'Content-Type':'application/json','x-automation-secret':'123456'},
-        body:JSON.stringify({ sf_id:otScaneadaActual.sf_id, tecnico })
+        body:JSON.stringify({ sf_id:sfId, tecnico:tecnicoNombre })
       });
       const data=await res.json();
-      if(!data.ok) throw new Error(data.error||'Error al despachar');
+      if(!data.ok) throw new Error(data.error||'Error '+res.status);
       showScanFeedback('✅ OT '+otScaneadaActual.ot_numero+' despachada en SF','ok');
     } else {
       // OT de Correo Argentino — actualizar tabla envios como antes
