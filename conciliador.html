@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Conciliador Moretti · v1.0.0</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:       #0a0e1a;
+    --surface:  #111827;
+    --surface2: #1a2235;
+    --border:   rgba(255,255,255,.08);
+    --teal:     #00e5a0;
+    --blue:     #3b82f6;
+    --yellow:   #fbbf24;
+    --red:      #f87171;
+    --text:     #f0f4ff;
+    --muted:    #6b7a99;
+    --mono:     'DM Mono', monospace;
+    --sans:     'DM Sans', sans-serif;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    padding: 0;
+  }
+
+  /* ── Header ── */
+  .header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 16px 32px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .header-logo {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--teal);
+    letter-spacing: .08em;
+  }
+  .header-sep { color: var(--border); font-size: 20px; }
+  .header-title { font-size: 13px; color: var(--muted); }
+  .header-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+  .badge-count {
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    display: none;
+  }
+  .badge-count.visible { display: inline-block; }
+  .badge-total   { background: rgba(59,130,246,.15); color: var(--blue); border: 1px solid rgba(59,130,246,.3); }
+  .badge-matched { background: rgba(0,229,160,.15); color: var(--teal); border: 1px solid rgba(0,229,160,.3); }
+  .badge-missing { background: rgba(248,113,113,.15); color: var(--red); border: 1px solid rgba(248,113,113,.3); }
+
+  /* ── Main ── */
+  .main { max-width: 1200px; margin: 0 auto; padding: 40px 32px; }
+
+  /* ── Upload zone ── */
+  .upload-zone {
+    border: 2px dashed rgba(0,229,160,.3);
+    border-radius: 16px;
+    padding: 48px;
+    text-align: center;
+    cursor: pointer;
+    transition: all .2s;
+    background: rgba(0,229,160,.02);
+    position: relative;
+    margin-bottom: 32px;
+  }
+  .upload-zone:hover, .upload-zone.drag { border-color: var(--teal); background: rgba(0,229,160,.05); }
+  .upload-zone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+  .upload-icon { font-size: 36px; margin-bottom: 12px; }
+  .upload-title { font-size: 15px; font-weight: 600; margin-bottom: 6px; }
+  .upload-sub { font-size: 13px; color: var(--muted); }
+  .upload-sub span { color: var(--teal); font-family: var(--mono); }
+
+  /* ── Progress ── */
+  .progress-wrap { display: none; margin-bottom: 24px; }
+  .progress-wrap.visible { display: block; }
+  .progress-label { font-size: 12px; color: var(--muted); margin-bottom: 8px; display: flex; justify-content: space-between; }
+  .progress-bar-bg { background: var(--surface2); border-radius: 4px; height: 6px; overflow: hidden; }
+  .progress-bar { background: linear-gradient(90deg, var(--teal), var(--blue)); height: 100%; border-radius: 4px; transition: width .3s; width: 0%; }
+
+  /* ── Stats ── */
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 24px;
+    display: none;
+  }
+  .stats-row.visible { display: grid; }
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 20px;
+  }
+  .stat-num { font-family: var(--mono); font-size: 28px; font-weight: 500; }
+  .stat-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; margin-top: 4px; }
+  .stat-card--total  .stat-num { color: var(--blue); }
+  .stat-card--match  .stat-num { color: var(--teal); }
+  .stat-card--miss   .stat-num { color: var(--red); }
+  .stat-card--rate   .stat-num { color: var(--yellow); }
+
+  /* ── Toolbar ── */
+  .toolbar {
+    display: none;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+  }
+  .toolbar.visible { display: flex; }
+  .filter-btn {
+    padding: 7px 14px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 500;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all .15s;
+    font-family: var(--sans);
+  }
+  .filter-btn:hover { border-color: rgba(255,255,255,.2); color: var(--text); }
+  .filter-btn.active { background: var(--surface2); color: var(--text); border-color: rgba(255,255,255,.2); }
+  .filter-btn.active-match { background: rgba(0,229,160,.1); color: var(--teal); border-color: rgba(0,229,160,.3); }
+  .filter-btn.active-miss  { background: rgba(248,113,113,.1); color: var(--red); border-color: rgba(248,113,113,.3); }
+  .search-input {
+    flex: 1; min-width: 200px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 12px;
+    padding: 7px 12px;
+    font-family: var(--sans);
+    outline: none;
+    transition: border-color .15s;
+  }
+  .search-input:focus { border-color: rgba(0,229,160,.4); }
+  .export-btn {
+    margin-left: auto;
+    padding: 7px 16px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    border: none;
+    background: var(--teal);
+    color: #0a0e1a;
+    cursor: pointer;
+    font-family: var(--sans);
+    transition: opacity .15s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .export-btn:hover { opacity: .85; }
+
+  /* ── Table ── */
+  .table-wrap {
+    display: none;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .table-wrap.visible { display: block; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  thead tr { background: var(--surface2); }
+  th {
+    padding: 10px 14px;
+    text-align: left;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    white-space: nowrap;
+    border-bottom: 1px solid var(--border);
+  }
+  tbody tr { border-bottom: 1px solid rgba(255,255,255,.04); transition: background .1s; }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: rgba(255,255,255,.02); }
+  td { padding: 10px 14px; vertical-align: middle; }
+  td.mono { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+
+  .pill-match {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 11px; font-weight: 600;
+    padding: 3px 10px; border-radius: 20px;
+    background: rgba(0,229,160,.12); color: var(--teal);
+    border: 1px solid rgba(0,229,160,.25);
+    white-space: nowrap; max-width: 280px;
+    overflow: hidden; text-overflow: ellipsis;
+  }
+  .pill-miss {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 11px;
+    padding: 3px 10px; border-radius: 20px;
+    background: rgba(248,113,113,.08); color: var(--red);
+    border: 1px solid rgba(248,113,113,.2);
+  }
+  .pill-multi {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 11px; font-weight: 600;
+    padding: 3px 10px; border-radius: 20px;
+    background: rgba(251,191,36,.1); color: var(--yellow);
+    border: 1px solid rgba(251,191,36,.25);
+  }
+
+  .ticket-ref {
+    font-family: var(--mono); font-size: 10px;
+    color: var(--muted); margin-top: 3px;
+  }
+
+  /* ── Empty ── */
+  .empty-state {
+    text-align: center; padding: 60px 20px;
+    color: var(--muted); font-size: 13px;
+    display: none;
+  }
+  .empty-state.visible { display: block; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <span class="header-logo">alleata</span>
+  <span class="header-sep">/</span>
+  <span class="header-title">Conciliador de Transferencias</span><span style="font-size:10px;color:var(--muted);font-family:var(--mono);margin-left:8px">v1.0.0</span>
+  <div class="header-right">
+    <button id="syncBtn" onclick="syncTicketsSF()" style="
+      display:flex;align-items:center;gap:6px;
+      background:rgba(0,229,160,.1);border:1px solid rgba(0,229,160,.3);
+      color:var(--teal);border-radius:8px;padding:6px 14px;
+      cursor:pointer;font-size:12px;font-weight:600;font-family:var(--sans);
+      transition:all .2s" onmouseover="this.style.background='rgba(0,229,160,.2)'"
+      onmouseout="this.style.background='rgba(0,229,160,.1)'">
+      <svg id="syncIcon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+      Sync Tickets SF
+    </button>
+    <span id="syncStatus" style="font-size:11px;color:var(--muted);font-family:var(--mono)"></span>
+    <span class="badge-count badge-total"  id="h-total"></span>
+    <span class="badge-count badge-matched" id="h-matched"></span>
+    <span class="badge-count badge-missing" id="h-missing"></span>
+  </div>
+</div>
+
+<div class="main">
+
+  <!-- Upload -->
+  <div class="upload-zone" id="dropzone">
+    <input type="file" id="fileInput" accept=".xlsx,.xls" />
+    <div class="upload-icon">📊</div>
+    <div class="upload-title">Arrastrá o hacé click para subir el Excel</div>
+    <div class="upload-sub">Columna <span>DESCRIPCION</span> con formato <span>TRANSFERENCIA DE TERCEROS (NOMBRE)</span></div>
+  </div>
+
+  <!-- Progress -->
+  <div class="progress-wrap" id="progressWrap">
+    <div class="progress-label">
+      <span id="progressText">Procesando…</span>
+      <span id="progressPct">0%</span>
+    </div>
+    <div class="progress-bar-bg"><div class="progress-bar" id="progressBar"></div></div>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-row" id="statsRow">
+    <div class="stat-card stat-card--total">
+      <div class="stat-num" id="s-total">0</div>
+      <div class="stat-label">Total filas</div>
+    </div>
+    <div class="stat-card stat-card--match">
+      <div class="stat-num" id="s-matched">0</div>
+      <div class="stat-label">Matcheadas</div>
+    </div>
+    <div class="stat-card stat-card--miss">
+      <div class="stat-num" id="s-missing">0</div>
+      <div class="stat-label">Sin match</div>
+    </div>
+    <div class="stat-card stat-card--rate">
+      <div class="stat-num" id="s-rate">0%</div>
+      <div class="stat-label">Tasa de match</div>
+    </div>
+  </div>
+
+  <!-- Toolbar -->
+  <div class="toolbar" id="toolbar">
+    <button class="filter-btn active" id="f-all"   onclick="setFilter('all')">Todas</button>
+    <button class="filter-btn" id="f-match" onclick="setFilter('match')">✅ Matcheadas</button>
+    <button class="filter-btn" id="f-miss"  onclick="setFilter('miss')">❌ Sin match</button>
+    <button class="filter-btn" id="f-multi" onclick="setFilter('multi')">⚠️ Múltiples</button>
+    <input class="search-input" id="searchInput" placeholder="Buscar nombre, cuenta, ticket…" oninput="renderTable()">
+    <button class="export-btn" onclick="exportExcel()">⬇ Exportar Excel</button>
+  </div>
+
+  <!-- Table -->
+  <div class="table-wrap" id="tableWrap">
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Fecha</th>
+          <th>Descripción / Nombre extraído</th>
+          <th>Importe</th>
+          <th>Cuenta matcheada</th>
+          <th>Ticket</th>
+          <th>Estado</th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+
+  <div class="empty-state" id="emptyState">No hay filas que coincidan con el filtro.</div>
+
+</div>
+
+<script>
+// ── CORS check ───────────────────────────────────────────
+if (window.location.protocol === 'file:') {
+  document.body.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:center;min-height:100vh;background:#0a0e1a;font-family:'DM Sans',sans-serif">
+      <div style="text-align:center;max-width:480px;padding:40px">
+        <div style="font-size:40px;margin-bottom:16px">⚠️</div>
+        <div style="font-size:18px;font-weight:700;color:#f0f4ff;margin-bottom:12px">Necesita servidor HTTP</div>
+        <div style="font-size:13px;color:#6b7a99;line-height:1.6;margin-bottom:24px">
+          Este archivo no puede abrirse directamente desde el disco.<br>
+          Usá una de estas opciones:
+        </div>
+        <div style="text-align:left;background:#111827;border-radius:10px;padding:20px;font-size:12px;font-family:'DM Mono',monospace;color:#00e5a0;line-height:2">
+          <div style="color:#6b7a99;margin-bottom:8px"># Opción 1 — Python (recomendado)</div>
+          cd Downloads<br>
+          python -m http.server 8080<br>
+          <div style="color:#6b7a99;margin:12px 0 8px"># Luego abrí en Chrome:</div>
+          http://localhost:8080/conciliador_alleata.html
+        </div>
+        <div style="margin-top:16px;font-size:11px;color:#6b7a99">
+          O subilo a GitHub Pages para acceso permanente.
+        </div>
+      </div>
+    </div>`;
+}
+
+// ── Config Supabase ───────────────────────────────────────
+// ── moretti-core config ──────────────────────────────────
+const SUPA_URL       = 'https://njkstpfmcfhqxdadqbdy.supabase.co';
+const SUPA_KEY       = 'sb_publishable_W3fP-CCb0m-B0v5tdaHQCg_2L43Rx5J';
+const RAILWAY_URL    = 'https://alleata-agent-production.up.railway.app';
+const RAILWAY_SECRET = '123456';
+const FECHA_DESDE = '2025-10-01';
+
+const { createClient } = supabase;
+const sb = createClient(SUPA_URL, SUPA_KEY);
+
+// ── State ──────────────────────────────────────────────────
+let allRows    = [];   // { rowNum, fecha, descripcion, nombre, importe, matches: [] }
+let currentFilter = 'all';
+
+// ── Drag & drop ───────────────────────────────────────────
+const dropzone = document.getElementById('dropzone');
+dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('drag'); });
+dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag'));
+dropzone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropzone.classList.remove('drag');
+  const file = e.dataTransfer.files[0];
+  if (file) processFile(file);
+});
+document.getElementById('fileInput').addEventListener('change', e => {
+  if (e.target.files[0]) processFile(e.target.files[0]);
+});
+
+// ── Procesar Excel ────────────────────────────────────────
+async function processFile(file) {
+  dropzone.style.display = 'none';
+
+  const data = await file.arrayBuffer();
+  const wb   = XLSX.read(data, { type: 'array', cellDates: true });
+  const ws   = wb.Sheets[wb.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+
+  // Encontrar columnas
+  const header = rows[0].map(h => String(h).trim().toUpperCase());
+  const colDesc   = header.findIndex(h => h.includes('DESCRIPCION') || h.includes('DESCRIPCIÓN'));
+  const colFecha  = header.findIndex(h => h.includes('FECHA'));
+  const colImporte= header.findIndex(h => h.includes('IMPORTE'));
+
+  if (colDesc === -1) {
+    alert('No se encontró la columna DESCRIPCION en el Excel.');
+    dropzone.style.display = '';
+    return;
+  }
+
+  // Extraer filas con nombre entre ()
+  const dataRows = rows.slice(1).filter(r => r[colDesc]);
+  const parsed = dataRows.map((r, i) => {
+    const desc  = String(r[colDesc] || '');
+    const m     = desc.match(/\((.+?)\)/);
+    const nombre = m ? m[1].trim() : null;
+    let fecha = r[colFecha];
+    if (fecha instanceof Date) fecha = fecha.toLocaleDateString('es-AR');
+    return {
+      rowNum: i + 2,
+      fecha:  String(fecha || ''),
+      descripcion: desc,
+      nombre,
+      importe: r[colImporte] || '',
+      matches: [],
+    };
+  }).filter(r => r.nombre);
+
+  // Buscar en Supabase en batches
+  showProgress(true);
+  const BATCH = 20;
+  const total = parsed.length;
+
+  for (let i = 0; i < total; i += BATCH) {
+    const batch = parsed.slice(i, i + BATCH);
+    const nombres = batch.map(r => r.nombre);
+
+    // Una query por nombre con ilike
+    await Promise.all(batch.map(async row => {
+      const { data: porTercero } = await sb
+        .from('tickets')
+        .select('name, account_name, nombre_tercero, importe, fecha_transferencia')
+        .ilike('nombre_tercero', `%${row.nombre}%`)
+        .gte('created_at', FECHA_DESDE)
+        .limit(5);
+
+      const { data: porPDF } = await sb
+        .from('tickets')
+        .select('name, account_name, nombre_tercero, importe, fecha_transferencia')
+        .ilike('texto_pdf', `%${row.nombre}%`)
+        .gte('created_at', FECHA_DESDE)
+        .is('nombre_tercero', null)
+        .limit(3);
+
+      const combined = [...(porTercero||[]), ...(porPDF||[])];
+      const vistos = new Set();
+      row.matches = combined.filter(r => {
+        if (vistos.has(r.name)) return false;
+        vistos.add(r.name);
+        return true;
+      });
+    }));
+
+    const pct = Math.round(((i + BATCH) / total) * 100);
+    updateProgress(Math.min(pct, 100), i + BATCH, total);
+  }
+
+  allRows = parsed;
+  showProgress(false);
+  renderStats();
+  renderTable();
+  showUI();
+}
+
+// ── Progress ──────────────────────────────────────────────
+function showProgress(v) {
+  document.getElementById('progressWrap').classList.toggle('visible', v);
+}
+function updateProgress(pct, done, total) {
+  document.getElementById('progressBar').style.width = pct + '%';
+  document.getElementById('progressPct').textContent = pct + '%';
+  document.getElementById('progressText').textContent = `Buscando… ${done} de ${total}`;
+}
+
+// ── Stats ─────────────────────────────────────────────────
+function renderStats() {
+  const total   = allRows.length;
+  const matched = allRows.filter(r => r.matches.length === 1).length;
+  const multi   = allRows.filter(r => r.matches.length > 1).length;
+  const miss    = allRows.filter(r => r.matches.length === 0).length;
+  const rate    = total ? Math.round(((matched + multi) / total) * 100) : 0;
+
+  document.getElementById('s-total').textContent   = total;
+  document.getElementById('s-matched').textContent = matched + multi;
+  document.getElementById('s-missing').textContent = miss;
+  document.getElementById('s-rate').textContent    = rate + '%';
+
+  document.getElementById('h-total').textContent   = `${total} filas`;
+  document.getElementById('h-matched').textContent = `${matched+multi} matcheadas`;
+  document.getElementById('h-missing').textContent = `${miss} sin match`;
+  ['h-total','h-matched','h-missing'].forEach(id =>
+    document.getElementById(id).classList.add('visible'));
+}
+
+// ── Filter ────────────────────────────────────────────────
+function setFilter(f) {
+  currentFilter = f;
+  document.querySelectorAll('.filter-btn').forEach(b => {
+    b.classList.remove('active','active-match','active-miss');
+  });
+  const btn = document.getElementById('f-' + (f==='multi'?'multi':f==='match'?'match':f==='miss'?'miss':'all'));
+  if (btn) {
+    if (f === 'match') btn.classList.add('active-match');
+    else if (f === 'miss') btn.classList.add('active-miss');
+    else btn.classList.add('active');
+  }
+  renderTable();
+}
+
+// ── Table ──────────────────────────────────────────────────
+function renderTable() {
+  const q = (document.getElementById('searchInput').value || '').toLowerCase();
+  const filtered = allRows.filter(r => {
+    if (currentFilter === 'match' && r.matches.length !== 1) return false;
+    if (currentFilter === 'miss'  && r.matches.length !== 0) return false;
+    if (currentFilter === 'multi' && r.matches.length < 2)   return false;
+    if (q) {
+      const hay = [r.nombre, r.descripcion,
+        ...r.matches.map(m => m.account_name + ' ' + m.name)
+      ].join(' ').toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+
+  const tbody = document.getElementById('tbody');
+  const empty = document.getElementById('emptyState');
+
+  if (!filtered.length) {
+    tbody.innerHTML = '';
+    empty.classList.add('visible');
+    document.getElementById('tableWrap').classList.remove('visible');
+    return;
+  }
+  empty.classList.remove('visible');
+  document.getElementById('tableWrap').classList.add('visible');
+
+  const fmt = v => {
+    if (!v) return '—';
+    const n = Number(v);
+    return isNaN(n) ? v : '$' + n.toLocaleString('es-AR');
+  };
+
+  tbody.innerHTML = filtered.map(r => {
+    let accountCell = '', ticketCell = '', statusCell = '';
+
+    if (r.matches.length === 0) {
+      accountCell = `<span class="pill-miss">❌ Sin match</span>`;
+      ticketCell  = '—';
+      statusCell  = `<span class="pill-miss">Pendiente</span>`;
+    } else if (r.matches.length === 1) {
+      const m = r.matches[0];
+      accountCell = `<span class="pill-match">✅ ${m.account_name || '—'}</span>`;
+      ticketCell  = `<span class="ticket-ref">${m.name}</span>`;
+      statusCell  = `<span class="pill-match">Match</span>`;
+    } else {
+      accountCell = r.matches.map(m =>
+        `<div><span class="pill-multi">⚠️ ${m.account_name || '—'}</span></div>`
+      ).join('');
+      ticketCell = r.matches.map(m =>
+        `<div class="ticket-ref">${m.name}</div>`
+      ).join('');
+      statusCell = `<span class="pill-multi">Múltiple (${r.matches.length})</span>`;
+    }
+
+    return `<tr>
+      <td class="mono">${r.rowNum}</td>
+      <td class="mono">${r.fecha}</td>
+      <td>
+        <div style="font-weight:500">${r.nombre}</div>
+        <div style="font-size:10px;color:var(--muted);margin-top:2px">${r.descripcion}</div>
+      </td>
+      <td class="mono">${fmt(r.importe)}</td>
+      <td>${accountCell}</td>
+      <td>${ticketCell}</td>
+      <td>${statusCell}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ── Export Excel ──────────────────────────────────────────
+function exportExcel() {
+  const exportData = allRows.map(r => ({
+    'Fila':        r.rowNum,
+    'Fecha':       r.fecha,
+    'Descripción': r.descripcion,
+    'Nombre':      r.nombre || '',
+    'Importe':     r.importe,
+    'Cuenta':      r.matches.map(m => m.account_name).join(' | ') || '',
+    'Ticket':      r.matches.map(m => m.name).join(' | ') || '',
+    'Estado':      r.matches.length === 0 ? 'Sin match'
+                 : r.matches.length === 1 ? 'Match'
+                 : `Múltiple (${r.matches.length})`,
+  }));
+
+  const ws = XLSX.utils.json_to_sheet(exportData);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Conciliacion');
+
+  // Colorear celdas de estado
+  const today = new Date().toISOString().slice(0,10).replace(/-/g,'');
+  XLSX.writeFile(wb, `conciliacion_alleata_${today}.xlsx`);
+}
+
+// ── Show UI ───────────────────────────────────────────────
+function showUI() {
+  document.getElementById('statsRow').classList.add('visible');
+  document.getElementById('toolbar').classList.add('visible');
+}
+// ── Sync Tickets SF ───────────────────────────────────────
+async function syncTicketsSF() {
+  const btn    = document.getElementById('syncBtn');
+  const icon   = document.getElementById('syncIcon');
+  const status = document.getElementById('syncStatus');
+  btn.disabled = true;
+  icon.style.animation = 'spin .7s linear infinite';
+  status.textContent = 'Conectando con SF…';
+
+  // Keyframes de spin
+  if (!document.getElementById('spin-style')) {
+    const s = document.createElement('style');
+    s.id = 'spin-style';
+    s.textContent = '@keyframes spin { to { transform: rotate(360deg); } }';
+    document.head.appendChild(s);
+  }
+
+  try {
+    status.textContent = 'Sincronizando tickets… puede tardar 1-2 min';
+    const res  = await fetch(RAILWAY_URL + '/automations/sync-tickets', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-automation-secret': RAILWAY_SECRET
+      },
+      body: JSON.stringify({ limit: 1000 })
+    });
+    const data = await res.json();
+
+    if (data.ok) {
+      status.textContent = `✅ ${data.upserted} tickets sincronizados (${data.withPDF} con PDF)`;
+      status.style.color = 'var(--teal)';
+      // Si hay un Excel cargado, re-procesar automáticamente
+      if (allRows.length > 0) {
+        status.textContent += ' — re-procesando…';
+        await rematchAll();
+        status.textContent = `✅ Sync OK: ${data.upserted} tickets. Match actualizado.`;
+      }
+      setTimeout(() => { status.textContent = ''; status.style.color = 'var(--muted)'; }, 8000);
+    } else {
+      status.textContent = '⚠ ' + (data.error || 'Error en sync');
+      status.style.color = 'var(--red)';
+    }
+  } catch(err) {
+    status.textContent = '⚠ ' + err.message;
+    status.style.color = 'var(--red)';
+  } finally {
+    btn.disabled = false;
+    icon.style.animation = '';
+  }
+}
+
+// Re-match todas las filas ya cargadas contra los tickets actualizados
+async function rematchAll() {
+  const total = allRows.length;
+  showProgress(true);
+  const BATCH = 20;
+  for (let i = 0; i < total; i += BATCH) {
+    const batch = allRows.slice(i, i + BATCH);
+    await Promise.all(batch.map(async row => {
+      const { data: porTercero } = await sb
+        .from('tickets')
+        .select('name, account_name, nombre_tercero, importe, fecha_transferencia')
+        .ilike('nombre_tercero', `%${row.nombre}%`)
+        .gte('created_at', FECHA_DESDE)
+        .limit(5);
+
+      const { data: porPDF } = await sb
+        .from('tickets')
+        .select('name, account_name, nombre_tercero, importe, fecha_transferencia')
+        .ilike('texto_pdf', `%${row.nombre}%`)
+        .gte('created_at', FECHA_DESDE)
+        .is('nombre_tercero', null)
+        .limit(3);
+
+      const combined = [...(porTercero||[]), ...(porPDF||[])];
+      const vistos = new Set();
+      row.matches = combined.filter(r => {
+        if (vistos.has(r.name)) return false;
+        vistos.add(r.name);
+        return true;
+      });
+    }));
+    updateProgress(Math.round(((i+BATCH)/total)*100), i+BATCH, total);
+  }
+  showProgress(false);
+  renderStats();
+  renderTable();
+}
+
+</script>
+</body>
+</html>
