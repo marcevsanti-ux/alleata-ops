@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Conciliador Moretti · v1.0.0</title>
+<title>Conciliador Moretti · v1.1.0</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
@@ -246,7 +246,7 @@
 <div class="header">
   <span class="header-logo">alleata</span>
   <span class="header-sep">/</span>
-  <span class="header-title">Conciliador de Transferencias</span><span style="font-size:10px;color:var(--muted);font-family:var(--mono);margin-left:8px">v1.0.0</span>
+  <span class="header-title">Conciliador de Transferencias</span><span style="font-size:10px;color:var(--muted);font-family:var(--mono);margin-left:8px">v1.1.0</span>
   <div class="header-right">
     <button id="syncBtn" onclick="syncTicketsSF()" style="
       display:flex;align-items:center;gap:6px;
@@ -558,21 +558,37 @@ function renderTable() {
   tbody.innerHTML = filtered.map(r => {
     let accountCell = '', ticketCell = '', statusCell = '';
 
+    const fmtDate = d => d ? new Date(d).toLocaleDateString('es-AR') : '—';
+    const fmtAmt  = v => v ? '$' + Number(v).toLocaleString('es-AR') : '—';
+
     if (r.matches.length === 0) {
       accountCell = `<span class="pill-miss">❌ Sin match</span>`;
       ticketCell  = '—';
       statusCell  = `<span class="pill-miss">Pendiente</span>`;
     } else if (r.matches.length === 1) {
       const m = r.matches[0];
-      accountCell = `<span class="pill-match">✅ ${m.account_name || '—'}</span>`;
-      ticketCell  = `<span class="ticket-ref">${m.name}</span>`;
+      accountCell = `
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <span class="pill-match">✅ ${m.account_name || '—'}</span>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:2px">
+            ${m.importe ? `<span style="font-size:10px;color:var(--teal);font-family:var(--mono)">${fmtAmt(m.importe)}</span>` : ''}
+            ${m.fecha_transferencia ? `<span style="font-size:10px;color:var(--muted);font-family:var(--mono)">📅 ${fmtDate(m.fecha_transferencia)}</span>` : ''}
+            ${m.banco ? `<span style="font-size:10px;color:var(--muted)">🏦 ${m.banco}</span>` : ''}
+          </div>
+          ${m.motivo ? `<div style="font-size:10px;color:var(--muted);font-style:italic;max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${m.motivo}">${m.motivo}</div>` : ''}
+        </div>`;
+      ticketCell  = `<span class="ticket-ref" style="font-size:11px;color:var(--blue)">${m.name}</span>`;
       statusCell  = `<span class="pill-match">Match</span>`;
     } else {
       accountCell = r.matches.map(m =>
-        `<div><span class="pill-multi">⚠️ ${m.account_name || '—'}</span></div>`
+        `<div style="margin-bottom:6px">
+          <span class="pill-multi">⚠️ ${m.account_name || '—'}</span>
+          ${m.importe ? `<span style="font-size:10px;color:var(--muted);margin-left:6px;font-family:var(--mono)">${fmtAmt(m.importe)}</span>` : ''}
+          ${m.motivo ? `<div style="font-size:10px;color:var(--muted);font-style:italic">${m.motivo}</div>` : ''}
+        </div>`
       ).join('');
       ticketCell = r.matches.map(m =>
-        `<div class="ticket-ref">${m.name}</div>`
+        `<div class="ticket-ref" style="color:var(--blue)">${m.name}</div>`
       ).join('');
       statusCell = `<span class="pill-multi">Múltiple (${r.matches.length})</span>`;
     }
