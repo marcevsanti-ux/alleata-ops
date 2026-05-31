@@ -243,6 +243,26 @@
 </head>
 <body>
 
+<!-- ===== LOGIN GATE ===== -->
+<div id="loginGate" style="position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:var(--bg)">
+  <div style="width:340px;max-width:90vw;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:32px">
+    <div style="text-align:center;margin-bottom:24px">
+      <span style="font-family:var(--mono);font-size:22px;font-weight:600;color:var(--teal)">alleata</span>
+      <div style="font-size:12px;color:var(--muted);margin-top:6px;font-family:var(--sans)">Conciliador · acceso</div>
+    </div>
+    <input id="lg-email" type="email" placeholder="Email" autocomplete="username"
+      style="width:100%;margin-bottom:12px;padding:11px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--text);font-family:var(--sans);font-size:14px;outline:none">
+    <input id="lg-pass" type="password" placeholder="Contraseña" autocomplete="current-password"
+      style="width:100%;margin-bottom:16px;padding:11px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--text);font-family:var(--sans);font-size:14px;outline:none">
+    <button id="lg-btn" onclick="doLogin()"
+      style="width:100%;padding:11px;background:var(--teal);border:none;border-radius:10px;color:#05221a;font-weight:600;font-family:var(--sans);font-size:14px;cursor:pointer">Ingresar</button>
+    <div id="lg-error" style="margin-top:12px;font-size:12px;color:var(--red);font-family:var(--sans);text-align:center;min-height:16px"></div>
+  </div>
+</div>
+
+<!-- app: oculta hasta autenticar -->
+<div id="appRoot" style="display:none">
+
 <div class="header">
   <span class="header-logo">alleata</span>
   <span class="header-sep">/</span>
@@ -262,6 +282,7 @@
     <span class="badge-count badge-total"  id="h-total"></span>
     <span class="badge-count badge-matched" id="h-matched"></span>
     <span class="badge-count badge-missing" id="h-missing"></span>
+    <button onclick="doLogout()" title="Cerrar sesión" style="background:none;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:6px 12px;cursor:pointer;font-size:12px;font-family:var(--sans);margin-left:8px">Salir</button>
   </div>
 </div>
 
@@ -336,6 +357,8 @@
 
 </div>
 
+</div><!-- /appRoot -->
+
 <script>
 // ── CORS check ───────────────────────────────────────────
 if (window.location.protocol === 'file:') {
@@ -372,6 +395,78 @@ const FECHA_DESDE = '2025-10-01';
 
 const { createClient } = supabase;
 const sb = createClient(SUPA_URL, SUPA_KEY);
+
+// ── AUTH GATE ──────────────────────────────────────────────
+// Módulo requerido para usar esta app
+const REQUIRED_MODULE = 'conciliacion';
+let CURRENT_USER = null;     // { id, email }
+let CURRENT_PROFILE = null;  // fila de profiles
+
+async function doLogin() {
+  const email = document.getElementById('lg-email').value.trim();
+  const pass  = document.getElementById('lg-pass').value;
+  const errEl = document.getElementById('lg-error');
+  const btn   = document.getElementById('lg-btn');
+  errEl.textContent = '';
+  if (!email || !pass) { errEl.textContent = 'Completá email y contraseña.'; return; }
+  btn.disabled = true; btn.textContent = 'Ingresando...';
+  try {
+    const { data, error } = await sb.auth.signInWithPassword({ email, password: pass });
+    if (error) throw error;
+    await afterLogin(data.user);
+  } catch (e) {
+    errEl.textContent = 'Email o contraseña incorrectos.';
+    btn.disabled = false; btn.textContent = 'Ingresar';
+  }
+}
+
+async function afterLogin(user) {
+  const errEl = document.getElementById('lg-error');
+  const btn   = document.getElementById('lg-btn');
+  // Traer perfil + módulos
+  const { data: prof, error } = await sb
+    .from('profiles')
+    .select('id, email, nombre, rol, modulos')
+    .eq('id', user.id)
+    .single();
+  if (error || !prof) {
+    await sb.auth.signOut();
+    if (errEl) errEl.textContent = 'Tu usuario no tiene perfil habilitado.';
+    if (btn) { btn.disabled = false; btn.textContent = 'Ingresar'; }
+    return;
+  }
+  // Validar módulo (admin entra siempre)
+  const mods = Array.isArray(prof.modulos) ? prof.modulos : [];
+  const tieneAcceso = prof.rol === 'admin' || mods.includes(REQUIRED_MODULE);
+  if (!tieneAcceso) {
+    await sb.auth.signOut();
+    if (errEl) errEl.textContent = 'No tenés permiso para acceder a Conciliación.';
+    if (btn) { btn.disabled = false; btn.textContent = 'Ingresar'; }
+    return;
+  }
+  CURRENT_USER = { id: user.id, email: user.email };
+  CURRENT_PROFILE = prof;
+  // Mostrar app, ocultar login
+  document.getElementById('loginGate').style.display = 'none';
+  document.getElementById('appRoot').style.display = '';
+}
+
+async function doLogout() {
+  await sb.auth.signOut();
+  location.reload();
+}
+
+// Permitir Enter en el formulario de login
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && document.getElementById('loginGate').style.display !== 'none') doLogin();
+});
+
+// Al cargar: si ya hay sesión activa, saltar el login
+(async function checkSession() {
+  const { data } = await sb.auth.getSession();
+  if (data?.session?.user) await afterLogin(data.session.user);
+})();
+
 
 // ── State ──────────────────────────────────────────────────
 let allRows    = [];   // { rowNum, fecha, descripcion, nombre, importe, matches: [] }
