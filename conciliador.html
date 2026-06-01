@@ -390,7 +390,6 @@ if (window.location.protocol === 'file:') {
 const SUPA_URL       = 'https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPA_KEY       = 'sb_publishable_W3fP-CCb0m-B0v5tdaHQCg_2L43Rx5J';
 const RAILWAY_URL    = 'https://alleata-agent-production.up.railway.app';
-const RAILWAY_SECRET = '123456';
 const FECHA_DESDE = '2025-10-01';
 
 const { createClient } = supabase;
@@ -751,11 +750,15 @@ async function syncTicketsSF() {
 
   try {
     status.textContent = 'Sincronizando tickets… puede tardar 1-2 min';
+    // Token del usuario logueado (Ana) → identidad real, sin secret hardcodeado
+    const { data: sess } = await sb.auth.getSession();
+    const token = sess?.session?.access_token;
+    if (!token) { status.textContent = '⚠️ Sesión expirada, volvé a entrar.'; return; }
     const res  = await fetch(RAILWAY_URL + '/automations/sync-tickets', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-automation-secret': RAILWAY_SECRET
+        'Authorization': 'Bearer ' + token
       },
       body: JSON.stringify({ limit: 1000 })
     });
