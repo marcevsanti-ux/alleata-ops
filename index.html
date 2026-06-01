@@ -4026,10 +4026,20 @@ setInterval(updateDate,60000);updateDate();
 let _rlData=[];
 let _rlEstadoFiltro='';
 
+// Criterio Rollout: la OT es un "Cambio" (tipo contiene 'cambio')
+// Y el campo Perfil es NAPSE. No es un tipo de OT propio.
+function esRollout(e){
+  const tipo=(e.tipo||'').toLowerCase();
+  const perfil=(e.perfil||'').trim().toUpperCase();
+  return tipo.includes('cambio') && perfil==='NAPSE';
+}
+
 async function initRollout(){
-  const{data,error}=await sb.from('envios').select('*').ilike('tipo','%rollout%').order('created_at',{ascending:false});
+  // Traemos candidatos por tipo en la query y afinamos perfil en JS
+  // (AND de dos ilike sobre columnas distintas no es directo en supabase-js)
+  const{data,error}=await sb.from('envios').select('*').ilike('tipo','%cambio%').order('created_at',{ascending:false});
   if(error){console.error('Rollout load error:',error);return;}
-  _rlData=data||[];
+  _rlData=(data||[]).filter(esRollout);
   rlActualizarKPIs();
   rlPopularFiltroResp();
   rlRenderTabla();
@@ -4140,9 +4150,10 @@ async function loadBadges(){
   const desCount=(des||[]).filter(d=>!['Terminal recuperada','Extraviada'].includes(d.estado)).length;
   const nbEnv=document.getElementById('nb-envios');if(nbEnv)nbEnv.textContent=envCount;
   const nbDes=document.getElementById('nb-desins');if(nbDes)nbDes.textContent=desCount;
-  sb.from('envios').select('id',{count:'exact',head:true}).ilike('tipo','%rollout%').then(({count})=>{
-    const nbRo=document.getElementById('nb-rollout');if(nbRo)nbRo.textContent=count||0;
-    const dc=document.querySelector('[data-mod="rollout"] .dash-card-stat');if(dc)dc.textContent=(count||0)+' OTs';
+  sb.from('envios').select('tipo,perfil').ilike('tipo','%cambio%').then(({data})=>{
+    const count=(data||[]).filter(e=>(e.perfil||'').trim().toUpperCase()==='NAPSE').length;
+    const nbRo=document.getElementById('nb-rollout');if(nbRo)nbRo.textContent=count;
+    const dc=document.querySelector('[data-mod="rollout"] .dash-card-stat');if(dc)dc.textContent=count+' OTs';
   });
   if(document.getElementById('dc-envios'))document.getElementById('dc-envios').textContent=envCount+' activos';
   if(document.getElementById('dc-desinstalaciones'))document.getElementById('dc-desinstalaciones').textContent=desCount+' activas';
@@ -4166,7 +4177,7 @@ async function loadOpsPanel(isAdmin){
   if(wm) wm.textContent= isAdmin ? '👥 Panel del Equipo' : 'Hola, '+nombre+' 👋';
 
   // QUERIES — admin ve todo, operador filtra por su nombre
-  let envQ=sb.from('envios').select('id,ot_numero,tipo,responsable,estado,estado_devolucion,fecha,created_at,track,track_devolucion,logistica').not('estado','eq','null');
+  let envQ=sb.from('envios').select('id,ot_numero,tipo,perfil,responsable,estado,estado_devolucion,fecha,created_at,track,track_devolucion,logistica').not('estado','eq','null');
   if(!isAdmin) envQ=envQ.ilike('responsable','%'+primerNombre+'%');
   const{data:envios=[]}=await envQ;
   const desins=[];{let _f=0;const _P=1000;
@@ -4378,7 +4389,7 @@ async function loadOpsPanel(isAdmin){
 
   // ── KPIs ABAJO ──
   const cambios=directas.filter(e=>!ESTADOS_CERRADOS.includes(e.estado)&&(e.tipo||'').toUpperCase().includes('CAMBIO')).length;
-  const rollouts=directas.filter(e=>!ESTADOS_CERRADOS.includes(e.estado)&&(e.tipo||'').toUpperCase().includes('ROLLOUT')).length;
+  const rollouts=directas.filter(e=>!ESTADOS_CERRADOS.includes(e.estado)&&(e.tipo||'').toLowerCase().includes('cambio')&&(e.perfil||'').trim().toUpperCase()==='NAPSE').length;
   const desinsActivas=desins.filter(d=>!['Terminal recuperada','Extraviada'].includes(d.estado)).length;
   const totalActivos=directas.filter(e=>!ESTADOS_CERRADOS.includes(e.estado)).length;
   const slaRojo=desins.filter(d=>d.sla_estado==='critico').length;
@@ -4943,6 +4954,7 @@ async function importSF(e){
     const iPassCajero=col('Contraseña Cajero');
     const iMotivoDes=col('Motivo de desinstalación')>=0?col('Motivo de desinstalación'):col('Motivo de desinstalacion')>=0?col('Motivo de desinstalacion'):col('Motivo');
     const iPropietario=col('Propietario de cuenta');
+    const iPerfil=col('Perfil');
 
     // Soporte para archivo "Pre-Colecta todas las Logísticas"
     // La columna Logística usa merge de celdas — propagar valor hacia abajo
@@ -5018,7 +5030,8 @@ async function importSF(e){
         usuario_cajero:iUsuarioCajero>=0?String(r[iUsuarioCajero]||'').trim()||undefined:undefined,
         password_cajero:iPassCajero>=0?String(r[iPassCajero]||'').trim()||undefined:undefined,
         motivo_desinstalacion:iMotivoDes>=0?String(r[iMotivoDes]||'').trim()||null:null,
-        propietario_cuenta:iPropietario>=0?String(r[iPropietario]||'').trim()||undefined:undefined
+        propietario_cuenta:iPropietario>=0?String(r[iPropietario]||'').trim()||undefined:undefined,
+        perfil:iPerfil>=0?String(r[iPerfil]||'').trim()||undefined:undefined
       };
       // Limpiar campos undefined para no sobreescribir con null en el upsert base
       Object.keys(item).forEach(k=>item[k]===undefined&&delete item[k]);
@@ -10389,7 +10402,7 @@ async function globalSFSync() {
       const mod = document.querySelector('.nav-item.active')?.dataset?.mod;
       if (mod === 'instalaciones') initInstalaciones();
       if (mod === 'desinstalaciones') cargarDesinstalaciones();
-      if (mod === 'rollout') cargarRollout?.();
+      if (mod === 'rollout') initRollout?.();
       if (mod === 'merchants') initMerchants?.();
       setTimeout(() => { if (status) status.style.display = 'none'; }, 4000);
     } else {
