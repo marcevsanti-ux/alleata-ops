@@ -8624,8 +8624,10 @@ async function cargarDesinstalaciones(){
     const primerNombre=nombreCompleto.split(' ')[0]; // "Gonzalo Marvaldi" → "Gonzalo"
     // C5: todos los usuarios con módulo 'desinstalaciones' ven TODAS las OTs
     // No se filtra por operador_id — la visibilidad está controlada por RLS + perfil
-    // Lee de sf_workorders — excluye Exitoso y Fallido
-    let baseQuery=sb.from('sf_workorders').select('*').ilike('record_type','%esinstalac%').not('status','in','("Exitoso","Fallido")');
+    // Lee de sf_workorders — alineado con reporte SF Desinstalaciones pendientes
+    // Incluye: Pendiente, En Proceso, Despachado, Reprogramar, Fallido, Retirar Terminal, Extraviada
+    // Excluye: Exitoso, Cancelado
+    let baseQuery=sb.from('sf_workorders').select('*').ilike('record_type','%esinstalac%').not('status','in','("Exitoso","Cancelado")');
     const rawData=[];let _f=0;const _P=1000;
     while(true){
       const{data:pg,error}=await baseQuery.range(_f,_f+_P-1);
