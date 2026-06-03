@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v3.2.4</title>
+<title>Alleata · Operaciones v3.2.5</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -304,7 +304,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v3.2.4 · 02 jun 2026
+      v3.2.5 · 02 jun 2026
     </div>
   </div>
 </div>
@@ -376,7 +376,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v3.2.4 · 02 jun 2026
+      v3.2.5 · 02 jun 2026
     </div>
   </div>
 </nav>
@@ -405,7 +405,7 @@ tr:hover td{background:var(--surface2);}
         SF Sync
       </button>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v3.2.4</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v3.2.5</div>
   </div>
   <div class="content">
 
@@ -1268,18 +1268,7 @@ tr:hover td{background:var(--surface2);}
     <!-- Import Desinstalaciones SF -->
     <div id="dsImportArea" style="margin-bottom:14px;background:var(--navy-700);border-radius:10px;padding:14px 18px;">
       <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-        <label id="dsImportLabel" style="background:var(--grad);color:#fff;border:none;padding:8px 18px;font-family:'Inter',sans-serif;font-size:12px;font-weight:700;cursor:pointer;border-radius:8px;display:inline-flex;align-items:center;gap:7px;white-space:nowrap;">
-          📂 Importar desde Salesforce
-          <input type="file" id="dsFileInput" accept=".xlsx,.xls" style="display:none" onchange="importDesinstalaciones(event)">
-        </label>
-        <div style="display:flex;align-items:center;gap:6px;padding:6px 12px;background:var(--navy-600);border-radius:7px;flex:1;min-width:200px;">
-          <span style="font-size:11px;color:var(--text-muted);white-space:nowrap;">📊 Reporte SF:</span>
-          <a id="btn-ver-reporte" href="https://alleata.lightning.force.com/lightning/r/Report/00ORm00000CRTa5MAH/view"
-             target="_blank" style="font-size:11px;color:var(--blue);text-decoration:none;font-weight:500;white-space:nowrap;"
-             onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">
-            Desinstalaciones Pendientes ↗
-          </a>
-        </div>
+        <!-- Importar desde SF y Reporte SF eliminados — datos vienen de sf_workorders -->
         <button id="btnDsAutoTracking" onclick="dsAutoTracking()"
           style="background:rgba(26,159,212,.15);border:1px solid rgba(26,159,212,.4);color:var(--blue);padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;white-space:nowrap;"
           onmouseover="this.style.background='rgba(26,159,212,.25)'" onmouseout="this.style.background='rgba(26,159,212,.15)'">
@@ -3749,7 +3738,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v3.2.4] OK');
+console.log('[Alleata v3.2.5] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -8635,14 +8624,33 @@ async function cargarDesinstalaciones(){
     const primerNombre=nombreCompleto.split(' ')[0]; // "Gonzalo Marvaldi" → "Gonzalo"
     // C5: todos los usuarios con módulo 'desinstalaciones' ven TODAS las OTs
     // No se filtra por operador_id — la visibilidad está controlada por RLS + perfil
-    let baseQuery=sb.from('v_ordenes_con_sla').select('*').eq('tipo','desinstalacion');
-    const data=[];let _f=0;const _P=1000;
+    // Lee de sf_workorders — excluye Exitoso y Fallido
+    let baseQuery=sb.from('sf_workorders').select('*').ilike('record_type','%esinstalac%').not('status','in','("Exitoso","Fallido")');
+    const rawData=[];let _f=0;const _P=1000;
     while(true){
       const{data:pg,error}=await baseQuery.range(_f,_f+_P-1);
       if(error)throw error;
       if(!pg||pg.length===0)break;
-      data.push(...pg);if(pg.length<_P)break;_f+=_P;
+      rawData.push(...pg);if(pg.length<_P)break;_f+=_P;
     }
+    // Normalizar columnas sf_workorders → nombres que espera el módulo
+    const data = rawData.map(r=>({
+      ...r,
+      ot:           r.workorder_number,
+      estado:       r.status,
+      comercio:     r.nombre_comercio,
+      cuenta:       r.cuenta,
+      logistica:    r.logistica,
+      ciudad:       r.ciudad,
+      provincia:    r.provincia,
+      cp:           r.codigo_postal,
+      nro_seguimiento: r.tracking_envio,
+      responsable:  r.responsable,
+      contacto:     r.contacto_celular,
+      direccion:    r.direccion_formula || r.direccion,
+      tipo:         r.record_type,
+      perfil:       r.perfil,
+    }));
     const error=null;
     if(error)throw error;
     DesinModule.datos=data||[];DesinModule.cargado=true;
