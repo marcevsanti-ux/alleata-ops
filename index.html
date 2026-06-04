@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v3.2.6</title>
+<title>Alleata · Operaciones v3.2.7</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -304,7 +304,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v3.2.6 · 02 jun 2026
+      v3.2.7 · 02 jun 2026
     </div>
   </div>
 </div>
@@ -376,7 +376,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v3.2.6 · 02 jun 2026
+      v3.2.7 · 02 jun 2026
     </div>
   </div>
 </nav>
@@ -405,7 +405,7 @@ tr:hover td{background:var(--surface2);}
         SF Sync
       </button>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v3.2.6</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v3.2.7</div>
   </div>
   <div class="content">
 
@@ -3730,7 +3730,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v3.2.6] OK');
+console.log('[Alleata v3.2.7] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -4013,11 +4013,24 @@ function esRollout(e){
 }
 
 async function initRollout(){
-  // Traemos candidatos por tipo en la query y afinamos perfil en JS
-  // (AND de dos ilike sobre columnas distintas no es directo en supabase-js)
-  const{data,error}=await sb.from('envios').select('*').ilike('tipo','%cambio%').order('created_at',{ascending:false});
+  // Lee de sf_workorders: Cambio de Terminal + Perfil NAPSE
+  const{data,error}=await sb.from('sf_workorders').select('*')
+    .eq('record_type','Cambio de Terminal')
+    .eq('perfil','NAPSE')
+    .or('status.eq.Despachado,status.eq.Retirar Terminal,and(status.eq.Pre-Colecta,logistica.eq.ALLEATA)')
+    .order('sf_last_modified',{ascending:false});
   if(error){console.error('Rollout load error:',error);return;}
-  _rlData=(data||[]).filter(esRollout);
+  // Normalizar columnas para compatibilidad con el render existente
+  _rlData=(data||[]).map(r=>({...r,
+    ot_numero: r.workorder_number,
+    tipo: r.record_type,
+    estado: r.status,
+    track: r.tracking_envio,
+    cuenta: r.cuenta,
+    ciudad: r.ciudad,
+    provincia: r.provincia,
+    responsable: r.responsable,
+  }));
   rlActualizarKPIs();
   rlPopularFiltroResp();
   rlRenderTabla();
