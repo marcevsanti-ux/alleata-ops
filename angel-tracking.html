@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Seguimiento OTs — Angel Flores</title>
+<style>
+:root {
+  --navy-900:#0d1b2a;--navy-800:#112236;--navy-700:#162d45;--navy-600:#1a3550;
+  --teal:#1dbf8e;--blue:#1a9fd4;--orange:#f59e0b;--red:#ef4444;--purple:#8b5cf6;
+  --text:#e8edf2;--text-muted:#7a8fa6;--border:rgba(255,255,255,.08);
+  --grad:linear-gradient(135deg,#1dbf8e,#1a9fd4);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'JetBrains Mono',monospace;background:var(--navy-900);color:var(--text);min-height:100vh;}
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+/* TOPBAR */
+.topbar{background:var(--navy-800);border-bottom:1px solid var(--border);padding:12px 20px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+.topbar-title{font-size:13px;font-weight:700;color:var(--text)}
+.topbar-sub{font-size:10px;color:var(--text-muted);margin-top:1px}
+.topbar-right{display:flex;gap:8px;align-items:center}
+.badge-ca{font-size:9px;font-weight:700;padding:3px 8px;border-radius:20px;background:rgba(239,68,68,.15);color:#E30613;border:1px solid rgba(239,68,68,.25);letter-spacing:.06em}
+
+/* STATS BAR */
+.stats-bar{display:flex;gap:8px;padding:12px 20px;background:var(--navy-800);border-bottom:1px solid var(--border);flex-wrap:wrap}
+.stat-chip{padding:5px 12px;border-radius:20px;font-size:11px;font-weight:700;border:1px solid var(--border);cursor:pointer;transition:all .15s;user-select:none;white-space:nowrap}
+.stat-chip:hover{border-color:rgba(255,255,255,.2)}
+.stat-chip.active{background:rgba(255,255,255,.06)}
+.stat-chip.all{color:var(--text)}
+.stat-chip.en-proceso{color:var(--blue);border-color:rgba(26,159,212,.3)}
+.stat-chip.en-proceso.active{background:rgba(26,159,212,.08)}
+.stat-chip.despachado{color:var(--teal);border-color:rgba(29,191,142,.3)}
+.stat-chip.despachado.active{background:rgba(29,191,142,.08)}
+.stat-chip.pendiente{color:var(--orange);border-color:rgba(245,158,11,.3)}
+.stat-chip.pendiente.active{background:rgba(245,158,11,.08)}
+.stat-chip.sin-tracking{color:var(--red);border-color:rgba(239,68,68,.3)}
+.stat-chip.sin-tracking.active{background:rgba(239,68,68,.08)}
+
+/* TOOLBAR */
+.toolbar{padding:10px 20px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.search-input{background:var(--navy-800);border:1px solid var(--border);border-radius:8px;padding:7px 12px;font-size:12px;color:var(--text);font-family:'JetBrains Mono',monospace;width:260px;outline:none;transition:border-color .15s}
+.search-input:focus{border-color:rgba(29,191,142,.4)}
+.search-input::placeholder{color:var(--text-muted)}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;border:1px solid var(--border);background:var(--navy-700);color:var(--text);font-family:'JetBrains Mono',monospace;transition:all .15s;white-space:nowrap}
+.btn:hover{background:var(--navy-600)}
+.btn.primary{background:linear-gradient(135deg,#1dbf8e22,#1a9fd422);border-color:rgba(29,191,142,.4);color:var(--teal)}
+.btn.primary:hover{background:linear-gradient(135deg,#1dbf8e33,#1a9fd433)}
+.btn.running{opacity:.6;cursor:not-allowed}
+.spacer{flex:1}
+.last-update{font-size:10px;color:var(--text-muted)}
+
+/* TABLE */
+.table-wrap{overflow-x:auto;padding:0 20px 20px}
+table{width:100%;border-collapse:collapse;font-size:11px}
+thead tr{background:var(--navy-700)}
+th{padding:8px 10px;text-align:left;color:var(--text-muted);font-weight:700;font-size:9px;text-transform:uppercase;letter-spacing:.08em;white-space:nowrap;border-bottom:1px solid var(--border)}
+td{padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:top}
+tr:hover td{background:rgba(255,255,255,.02)}
+tr.hidden-row{display:none}
+
+/* STATUS BADGES */
+.estado{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:12px;font-size:9px;font-weight:700;white-space:nowrap}
+.estado.en-proceso{background:rgba(26,159,212,.12);color:var(--blue);border:1px solid rgba(26,159,212,.25)}
+.estado.despachado{background:rgba(29,191,142,.12);color:var(--teal);border:1px solid rgba(29,191,142,.25)}
+.estado.pendiente{background:rgba(245,158,11,.12);color:var(--orange);border:1px solid rgba(245,158,11,.25)}
+.estado.entregado{background:rgba(29,191,142,.2);color:#0f6e56;border:1px solid rgba(29,191,142,.4)}
+.estado.devuelto{background:rgba(239,68,68,.12);color:var(--red);border:1px solid rgba(239,68,68,.25)}
+.estado.en-camino{background:rgba(139,92,246,.12);color:var(--purple);border:1px solid rgba(139,92,246,.25)}
+.estado.en-sucursal{background:rgba(245,158,11,.2);color:#d97706;border:1px solid rgba(245,158,11,.4)}
+.estado.sin-tracking{background:rgba(239,68,68,.08);color:#ef444477;border:1px solid rgba(239,68,68,.15)}
+
+.track-link{color:var(--blue);text-decoration:none;font-size:10px;font-family:'JetBrains Mono',monospace}
+.track-link:hover{text-decoration:underline}
+.track-empty{color:var(--text-muted);font-size:10px}
+.ot-num{font-weight:700;color:var(--text);font-size:11px}
+.cuenta-txt{font-size:10px;color:var(--text-muted);margin-top:2px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ciudad-txt{font-size:10px;color:var(--text-muted)}
+.obs-txt{font-size:9px;color:var(--orange);max-width:200px;line-height:1.4;margin-top:2px}
+.ca-evento{font-size:9px;color:var(--text-muted);margin-top:3px;line-height:1.5}
+.ca-evento strong{color:var(--text)}
+.ca-fecha{font-size:9px;color:var(--text-muted)}
+
+/* PROGRESS */
+.progress-bar{height:2px;background:var(--border);border-radius:1px;overflow:hidden;margin:0 20px 4px}
+.progress-fill{height:100%;background:var(--grad);border-radius:1px;transition:width .3s}
+.progress-label{font-size:9px;color:var(--text-muted);padding:0 20px 8px;display:none}
+
+/* SPINNER */
+.spin{display:inline-block;width:10px;height:10px;border:1.5px solid rgba(29,191,142,.3);border-top-color:var(--teal);border-radius:50%;animation:spin .6s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* EMPTY */
+.empty-state{text-align:center;padding:60px;color:var(--text-muted)}
+.empty-icon{font-size:32px;margin-bottom:10px}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div>
+    <div class="topbar-title">📦 Seguimiento de Retiros — Angel Flores</div>
+    <div class="topbar-sub">Desinstalaciones · Correo Argentino · <span id="fecha-hoy"></span></div>
+  </div>
+  <div class="topbar-right">
+    <span class="badge-ca">CORREO ARGENTINO</span>
+    <span style="font-size:9px;color:var(--text-muted)" id="last-update-top"></span>
+  </div>
+</div>
+
+<div class="stats-bar" id="stats-bar">
+  <div class="stat-chip all active" onclick="filterEstado('all',this)">Todas <span id="cnt-all">64</span></div>
+  <div class="stat-chip en-proceso" onclick="filterEstado('en-proceso',this)">En Proceso <span id="cnt-en-proceso">0</span></div>
+  <div class="stat-chip despachado" onclick="filterEstado('despachado',this)">Despachado <span id="cnt-despachado">0</span></div>
+  <div class="stat-chip pendiente" onclick="filterEstado('pendiente',this)">Pendiente <span id="cnt-pendiente">0</span></div>
+  <div class="stat-chip sin-tracking" onclick="filterEstado('sin-tracking',this)">Sin tracking <span id="cnt-sin-tracking">0</span></div>
+</div>
+
+<div class="toolbar">
+  <input class="search-input" id="search" placeholder="🔍 Buscar OT, cuenta, ciudad..." oninput="applyFilters()">
+  <div class="spacer"></div>
+  <span class="last-update" id="last-update"></span>
+  <button class="btn primary" id="btn-autotrack" onclick="runAutotracking()">
+    <span id="btn-icon">⚡</span> Auto-tracking CA
+  </button>
+</div>
+
+<div class="progress-bar"><div class="progress-fill" id="prog-fill" style="width:0%"></div></div>
+<div class="progress-label" id="prog-label"></div>
+
+<div class="table-wrap">
+<table id="main-table">
+  <thead>
+    <tr>
+      <th>OT</th>
+      <th>Estado SF</th>
+      <th>Estado CA</th>
+      <th>Cuenta</th>
+      <th>Ciudad / Zona</th>
+      <th>Tracking CA</th>
+      <th>Último evento CA</th>
+      <th>Observaciones</th>
+    </tr>
+  </thead>
+  <tbody id="tbody"></tbody>
+</table>
+<div class="empty-state" id="empty-state" style="display:none">
+  <div class="empty-icon">🔍</div>
+  <div>No hay resultados para este filtro</div>
+</div>
+</div>
+
+<script>
+const AGENT_URL = 'https://alleata-agent-production.up.railway.app';
+const AGENT_SECRET = '123456';
+const CA_TRACK_URL = 'https://www.correoargentino.com.ar/formularios/olvw?id=';
+
+const OTS_RAW = [{"ot":"00021421","tracking":"00012267784A9EMI5CI1801","cuenta":"DEL CAMPO PATRICIA - SUC - 0001","ciudad":"ROSARIO","estado_sf":"En Proceso","observaciones":"","direccion":"MENDOZA 3783 (local 6)","zona":"INTERIOR","fecha":"29/5/2026","gestion":"Contactado","status_gestion":"PROMESA DESPACHO CORREO ARGENTINO"},{"ot":"00021426","tracking":"00012267786748I1EC11301","cuenta":"GENSON JUAN CARLOS - SUC - 0001","ciudad":"Laprida","estado_sf":"En Proceso","observaciones":"","direccion":"COMISIONADO VILLAR 1394","zona":"PBA","fecha":"29/5/2026","gestion":"Contactado","status_gestion":"PROMESA DESPACHO CORREO ARGENTINO"},{"ot":"00021429","tracking":"00012267781A55G15C8A501","cuenta":"FERNANDEZ SIXTO SERGIO - SUC - 0001","ciudad":"San Justo","estado_sf":"En Proceso","observaciones":"","direccion":"2575 Independencia","zona":"INTERIOR","fecha":"29/5/2026","gestion":"Contactado","status_gestion":"PROMESA DESPACHO CORREO ARGENTINO"},{"ot":"00021431","tracking":"00012267787A1IE281CC001","cuenta":"REYES ZUAZO FACUNDO EZEQUIEL - SUC - 0001","ciudad":"CENTENARIO","estado_sf":"Despachado","observaciones":"","direccion":"CUBA 1465 Dpto:LOC 2 M:207 - BARRIO : VISTA HERMOSA","zona":"INTERIOR","fecha":"29/5/2026","gestion":"Contactado","status_gestion":"PROMESA DESPACHO CORREO ARGENTINO"},{"ot":"00021443","tracking":"00012267781G3P6CI2AC301","cuenta":"CAMPO FIRLOT SAS - SUC - 0001","ciudad":"Maipú","estado_sf":"En Proceso","observaciones":"SE RECIBIRÁ CON ESTE MISMO RÓTULO UNA SEGUNDA TERMINAL DEL MISMO CLIENTE QUE NUNCA SE LE RETIRÓ.","direccion":"9 DE JULIO 1693","zona":"INTERIOR","fecha":"1/6/2026","gestion":"Contactado","status_gestion":"PROMESA DESPACHO CORREO ARGENTINO"},{"ot":"00021446","tracking":"00012267780AC7G0T2C1901","cuenta":"TELLO MIGUEL ANGEL - SUC - 0001","ciudad":"Mendoza","estado_sf":"En Proceso","observaciones":"","direccion":"256 General Paz\nMERCADO CENTRAL LOCAL 36","zona":"INTERIOR","fecha":"1/6/2026","gestion":"Contactado","status_gestion":"PROMESA DESPACHO CORREO ARGENTINO"},{"ot":"00021459","tracking":"000122677830M2X4953C801","cuenta":"OLGUERA ROJAS MARISOL - SUC - 0001","ciudad":"Pico Truncado","estado_sf":"En Proceso","observaciones":"","direccion":"Barrio 3 de febrero Marta crowe 456 , Altos del vista hermosa, Caleta Olivia, Santa Cruz.","zona":"INTERIOR","fecha":"1/6/2026","gestion":"Contactado","status_gestion":"PROMESA DESPACHO CORREO ARGENTINO"},{"ot":"00021467","tracking":"00012267780GM56CP0CC501","cuenta":"LOPEZ HERNAN FRANCO - SUC - 0001","ciudad":"Comandante Luis Piedra buena","estado_sf":"En Proceso","observaciones":"","direccion":"Avenida 21 de Noviembre 454","zona":"INTERIOR","fecha":"2/6/2026","gestion":"Contactado","status_gestion":"PROMESA DESPACHO CORREO ARGENTINO"},{"ot":"00021472","tracking":"0001226778405PLC2EE1901","cuenta":"MENDEZ LUIS ALBERTO - SUC - 0001","ciudad":"VIEDMA","estado_sf":"En Proceso","observaciones":"","direccion":"25 DE MAYO 718","zona":"INTERIOR","fecha":"2/6/2026","gestion":"Contactado","status_gestion":"PROMESA DESPACHO CORREO ARGENTINO"},{"ot":"00021473","tracking":"00012267781APCT4T31C801","cuenta":"VELASQUEZ JOAQUIN FORTUNATO - SUC - 0001","ciudad":"La Paz","estado_sf":"En Proceso","observaciones":"","direccion":"3 de febrero y boulevard 25 de mayo","zona":"INTERIOR","fecha":"2/6/2026","gestion":"Contactado","status_gestion":"PROMESA DESPACHO CORREO ARGENTINO"},{"ot":"00021540","tracking":"00012267785ATE4344AC601","cuenta":"GUALLAN NORMA GABRIELA - SUC - 0001","ciudad":"Las Flores","estado_sf":"En Proceso","observaciones":"","direccion":"402 Avenida Presidente Perón","zona":"PBA","fecha":"2/6/2026","gestion":"Contactado","status_gestion":"PROMESA DESPACHO CORREO ARGENTINO"},{"ot":"00021547","tracking":"00012267785GA3E1T2E1401","cuenta":"ZACARIAS LETICIA MERCEDES - SUC - 0001","ciudad":"Salta","estado_sf":"En Proceso","observaciones":"","direccion":"ZUVIRIA 1151","zona":"INTERIOR","fecha":"3/6/2026","gestion":"Contactado","status_gestion":"PROMESA DESPACHO CORREO ARGENTINO"},{"ot":"00021555","tracking":"00012267781A9640159A901","cuenta":"FARIAS MARIA EUGENIA - SUC - 0001","ciudad":"Río Tercero","estado_sf":"Despachado","observaciones":"","direccion":"78 Garibaldi","zona":"INTERIOR","fecha":"3/6/2026","gestion":"Contactado","status_gestion":"PROMESA DESPACHO CORREO ARGENTINO"},{"ot":"00021559","tracking":"00012267789G00139AG1901","cuenta":"MUSSO DANA Y VILLALBA ANA FAUSTINA SH .1 - SUC - 0001","ciudad":"San Martín de los Andes","estado_sf":"En Proceso","observaciones":"CLIENTE ENVIARÁ UNA SEGUNDA TERMINAL CON ESTE RÓTULO.","direccion":"601 Avenida San Martín","zona":"INTERIOR","fecha":"3/6/2026","gestion":"Contactado","status_gestion":"PROMESA DESPACHO CORREO ARGENTINO"},{"ot":"00021561","tracking":"000122677817A1T553EC301","cuenta":"LEDESMA SONIA MARILEN - SUC - 0001","ciudad":"Pirané","estado_sf":"En Proceso","observaciones":"","direccion":"1048 Avenida Pringles","zona":"INTERIOR","fecha":"3/6/2026","gestion":"Contactado","status_gestion":"PROMESA DESPACHO CORREO ARGENTINO"},{"ot":"00021219","tracking":"00012267783A20TGICGC501","cuenta":"DEAMBROGGI MELANIA LUCIA - SUC - 0001","ciudad":"Pozo del Molle","estado_sf":"En Proceso","observaciones":"","direccion":"RIVADAVIA ESQ 25 DE MAYO LOCAL 3","zona":"INTERIOR","fecha":"14/5/2026","gestion":"Contactado","status_gestion":"PROMESA DESPACHO CORREO ARGENTINO"},{"ot":"00021227","tracking":"000122677840PPM3CLI1001","cuenta":"DE ZAN MARIA JORGELINA - SUC - 0001","ciudad":"san Antonio","estado_sf":"En Proceso","observaciones":"","direccion":"Shopping altos del gualeguay local 7","zona":"INTERIOR","fecha":"15/5/2026","gestion":"Contactado","status_gestion":"PROMESA DESPACHO CORREO ARGENTINO"},{"ot":"00021236","tracking":"000122677870TTX1A34C101","cuenta":"SEWALD DANIEL - SUC - 0001","ciudad":"Villa Regina","estado_sf":"En Proceso","observaciones":"","direccion":"Manzanos 144 Bo Namuncura","zona":"INTERIOR","fecha":"15/5/2026","gestion":"Contactado","status_gestion":"PROMESA DESPACHO CORREO ARGENTINO"},{"ot":"00021243","tracking":"00012267780AI3735II1301","cuenta":"CAÑIZA MARCELO FABIAN - SUC - 0001","ciudad":"FORMOSA","estado_sf":"En Proceso","observaciones":"","direccion":"Junín 5055","zona":"INTERIOR","fecha":"15/5/2026","gestion":"Contactado","status_gestion":"PROMESA DESPACHO CORREO ARGENTINO"},{"ot":"00021328","tracking":"00012267782ATGPL1E90601","cuenta":"ANIDO VERONICA - SUC - 0002","ciudad":"Venado Tuerto","estado_sf":"En Proceso","observaciones":"","direccion":"2105 Castelli","zona":"INTERIOR","fecha":"19/5/2026","gestion":"Contactado","status_gestion":"PROMESA DESPACHO CORREO ARGENTINO"},{"ot":"00021337","tracking":"000122677873XX73M5PC501","cuenta":"CHIODIN JORGELINA MARIELA - SUC - 0001","ciudad":"San Lorenzo","estado_sf":"En Proceso","observaciones":"","direccion":"SGTO. CABRAL 595","zona":"INTERIOR","fecha":"20/5/2026","gestion":"Contactado","status_gestion":"PROMESA DESPACHO CORREO ARGENTINO"},{"ot":"00021402","tracking":"00012267785GP3L4LL41501","cuenta":"BASSO PABLO - SUC - 0001","ciudad":"Baradero","estado_sf":"En Proceso","observaciones":"","direccion":"Libertad 873","zona":"PBA","fecha":"27/5/2026","gestion":"Contactado","status_gestion":"PROMESA DESPACHO CORREO ARGENTINO"},{"ot":"00021413","tracking":"0001226778500PPG8I01501","cuenta":"GUGLIELMONE ROMINA SOLEDAD - SUC - 0001","ciudad":"CONCORDIA","estado_sf":"Despachado","observaciones":"","direccion":"Urdinarrain 137 bis","zona":"INTERIOR","fecha":"28/5/2026","gestion":"Contactado","status_gestion":"PROMESA DESPACHO CORREO ARGENTINO"},{"ot":"00020927","tracking":"00012267788364TE85GC001","cuenta":"ALMIRON LEONARDO - SUC - 0001","ciudad":"Cipolletti","estado_sf":"En Proceso","observaciones":"","direccion":"87 General Roca","zona":"INTERIOR","fecha":"7/5/2026","gestion":"Contactado","status_gestion":"PROMESA DESPACHO CORREO ARGENTINO"},{"ot":"00020928","tracking":"00012267788364TE85GC001","cuenta":"ALMIRON LEONARDO - SUC - 0002","ciudad":"Cipolletti","estado_sf":"En Proceso","observaciones":"","direccion":"fray mamerto esquiu 1147","zona":"INTERIOR","fecha":"7/5/2026","gestion":"Contactado","status_gestion":"PROMESA DESPACHO CORREO ARGENTINO"},{"ot":"00020964","tracking":"0001226778679314IE0C801","cuenta":"VARGAS VALERIA DANIELA - SUC - 0001","ciudad":"Rincón de los Sauces","estado_sf":"Despachado","observaciones":"","direccion":"CLUB HIPICO RIO COLORADO 0","zona":"INTERIOR","fecha":"8/5/2026","gestion":"Contactado","status_gestion":"PROMESA DESPACHO CORREO ARGENTINO"},{"ot":"00020982","tracking":"00012267782GTML0MEG1801","cuenta":"NORIEGA SABRINA DEBORA - SUC - 0001","ciudad":"Rosario","estado_sf":"Despachado","observaciones":"","direccion":"935 Junín","zona":"INTERIOR","fecha":"11/5/2026","gestion":"Contactado","status_gestion":"PROMESA DESPACHO CORREO ARGENTINO"},{"ot":"00020663","tracking":"0001226778770A5APIEC901","cuenta":"BALCEDA DIEGO AGUSTIN - SUC - 0001","ciudad":"Río Gallegos","estado_sf":"Despachado","observaciones":"","direccion":"san martín 188","zona":"INTERIOR","fecha":"24/4/2026","gestion":"Contactado","status_gestion":"PROMESA DESPACHO CORREO ARGENTINO"},{"ot":"00020705","tracking":"","cuenta":"RULOFF RICARDO ALBERTO - SUC - 0001","ciudad":"Formosa","estado_sf":"Pendiente","observaciones":"CANCELADO RÓTULO 26/05. CLIENTE NO DESPACHÓ LA TERMINAL.","direccion":"AV 12 DE OCTUBRE 771 BARRIO 12 DE OCTUBRE","zona":"INTERIOR","fecha":"27/4/2026","gestion":"Contactado","status_gestion":"PROMESA DESPACHO CORREO ARGENTINO"},{"ot":"00020709","tracking":"00012267787GGX7ITCCC901","cuenta":"CASTREJE BRIAN DAVID - SUC - 0001","ciudad":"Sierras Bayas","estado_sf":"Despachado","observaciones":"CLIENTE ENVIÓ UNA SEGUNDA TERMINAL QUE NO TIENE OT DE DESINSTALACIÓN, LLEGARÁ CON EL MISMO N° DE SEGUIMIENTO 00012267787GGX7ITCCC901","direccion":"2219 Julio Argentino Roca","zona":"PBA","fecha":"27/4/2026","gestion":"Contactado","status_gestion":"PROMESA DESPACHO CORREO ARGENTINO"},{"ot":"00020429","tracking":"","cuenta":"QRICO SAS - SUC - 0001","ciudad":"Ushuaia","estado_sf":"Pendiente","observaciones":"RÓTULO CANCELADO 20/05. CLIENTE NO DESPACHÓ LA TERMINAL.","direccion":"344 Marcos Zar Sur","zona":"INTERIOR","fecha":"14/4/2026","gestion":"Contactado","status_gestion":"PROMESA DESPACHO CORREO ARGENTINO"},{"ot":"00020430","tracking":"","cuenta":"QRICO SAS - SUC - 0002","ciudad":"Ushuaia","estado_sf":"Pendiente","observaciones":"RÓTULO CANCELADO 20/05. CLIENTE NO DESPACHÓ LA TERMINAL.","direccion":"196 Agente Abel Cardenas","zona":"INTERIOR","fecha":"14/4/2026","gestion":"Contactado","status_gestion":"PROMESA DESPACHO CORREO ARGENTINO"},{"ot":"00020474","tracking":"","cuenta":"MARTIN JESUS GABRIEL - SUC - 0001","ciudad":"El Milagro","estado_sf":"En Proceso","observaciones":"CANCELADO RÓTULO 25/05. CLIENTE NO DESPACHÓ LA TERMINAL.","direccion":"AVENIDA 9 DE JULIO 535","zona":"INTERIOR","fecha":"14/4/2026","gestion":"Contactado","status_gestion":"PROMESA DESPACHO CORREO ARGENTINO"},{"ot":"00020479","tracking":"","cuenta":"RIOS FRANCO GABRIEL - SUC - 0001","ciudad":"Barrio El Retazo","estado_sf":"Pendiente","observaciones":"CANCELADO RÓTULO 26/05. CLIENTE NO DESPACHÓ LA TERMINAL.","direccion":"893 Calle Pacholzuck","zona":"INTERIOR","fecha":"14/4/2026","gestion":"Contactado","status_gestion":"PROMESA DESPACHO CORREO ARGENTINO"},{"ot":"00020271","tracking":"","cuenta":"LEWIS IRENE JOSEFINA - SUC - 0001","ciudad":"Salta","estado_sf":"Pendiente","observaciones":"CANCELADO RÓTULO 26/05. CLIENTE NO DESPACHÓ LA TERMINAL.","direccion":"AVENIDA SARMIENTO 115","zona":"INTERIOR","fecha":"7/4/2026","gestion":"Contactado","status_gestion":"PROMESA DESPACHO CORREO ARGENTINO"},{"ot":"00020338","tracking":"","cuenta":"RAMIREZ DE LEON ORFELINA - SUC - 0001","ciudad":"Río Gallegos","estado_sf":"Pendiente","observaciones":"CANCELADO RÓTULO 26/05. CLIENTE NO DESPACHÓ LA TERMINAL.","direccion":"498 Bernardino Rivadavia","zona":"","fecha":"10/4/2026","gestion":"Contactado","status_gestion":"PROMESA DESPACHO CORREO ARGENTINO"},{"ot":"00020388","tracking":"","cuenta":"GORING DANIELA - SUC - 0001","ciudad":"Río Grande","estado_sf":"Pendiente","observaciones":"CANCELADO RÓTULO 26/05. CLIENTE NO DESPACHÓ LA TERMINAL.","direccion":"Bernardo O'Higgins 184 RIO GRANDE","zona":"INTERIOR","fecha":"13/4/2026","gestion":"Contactado","status_gestion":"PROMESA DESPACHO CORREO ARGENTINO"},{"ot":"00019987","tracking":"0001226778078IAEXIT0501","cuenta":"LABRAÑA ROBERTO RUBEN - SUC - 0001","ciudad":"Villa Regina","estado_sf":"En Proceso","observaciones":"","direccion":"AVENIDA 9 DE JULIO 124","zona":"INTERIOR","fecha":"23/3/2026","gestion":"Contactado","status_gestion":"PROMESA DESPACHO CORREO ARGENTINO"},{"ot":"00019998","tracking":"00012267785G55XLE4AC801","cuenta":"GOMEZ LEONARDO MARCELO - SUC - 0001","ciudad":"Comodoro rivadavia","estado_sf":"En Proceso","observaciones":"","direccion":"CALLE 2432 KM.8 976\nLOCAL 18","zona":"INTERIOR","fecha":"23/3/2026","gestion":"Contactado","status_gestion":"PROMESA DESPACHO CORREO ARGENTINO"},{"ot":"00020094","tracking":"000122677867A3IE0ET0801","cuenta":"APONTE SEBASTIAN EMMANUEL - SUC - 0001","ciudad":"San Antonio de Areco","estado_sf":"En Proceso","observaciones":"","direccion":"477 Alsina","zona":"INTERIOR","fecha":"27/3/2026","gestion":"Contactado","status_gestion":"PROMESA DESPACHO CORREO ARGENTINO"},{"ot":"00020125","tracking":"00012267784G94XIILX0901","cuenta":"CAGNOLI JUAN FRANCISCO - SUC - 0001","ciudad":"Gualeguaychú","estado_sf":"En Proceso","observaciones":"","direccion":"765 3 de Caballeria","zona":"INTERIOR","fecha":"30/3/2026","gestion":"Contactado","status_gestion":"PROMESA DESPACHO CORREO ARGENTINO"},{"ot":"00020164","tracking":"000122677880713E1IP0101","cuenta":"THEN ROSARIO SHAKIRA ADELAIDA - SUC - 0001","ciudad":"Las Grutas","estado_sf":"Despachado","observaciones":"","direccion":"73 Avenida Intendente Breciano","zona":"INTERIOR","fecha":"31/3/2026","gestion":"Contactado","status_gestion":"PROMESA DESPACHO CORREO ARGENTINO"},{"ot":"00019800","tracking":"00012267785AX794XA1C801","cuenta":"CASTAGNET MARIA ANGELICA - SUC - 0001","ciudad":"Rada Tilly","estado_sf":"Despachado","observaciones":"","direccion":"541 Combate Naval de Quilmes","zona":"INTERIOR","fecha":"13/3/2026","gestion":"Contactado","status_gestion":"PROMESA DESPACHO CORREO ARGENTINO"},{"ot":"00019852","tracking":"","cuenta":"JLG SAS - SUC - 0001","ciudad":"Puerto Madryn","estado_sf":"Pendiente","observaciones":"CANCELADO RÓTULO 26/05. CLIENTE NO DESPACHÓ LA TERMINAL.","direccion":"1293 Vito Roca","zona":"INTERIOR","fecha":"17/3/2026","gestion":"Contactado","status_gestion":"PROMESA DESPACHO CORREO ARGENTINO"},{"ot":"00019942","tracking":"","cuenta":"MANJARES SCATACO SRL - SUC - 0001","ciudad":"General Pico","estado_sf":"En Proceso","observaciones":"00012267787GCE7I41PA001","direccion":"Calle 5 esquina 22, kiosko en la esquina, sin número","zona":"INTERIOR","fecha":"20/3/2026","gestion":"Contactado","status_gestion":"PROMESA DESPACHO CORREO ARGENTINO"},{"ot":"00019952","tracking":"00012267783037LCG2IC401","cuenta":"LLAMPA NOELIA ROXANA - SUC - 0001","ciudad":"Gobernador Gregores","estado_sf":"En Proceso","observaciones":"","direccion":"Pasaje Rita Morales 34","zona":"INTERIOR","fecha":"20/3/2026","gestion":"Contactado","status_gestion":"PROMESA DESPACHO CORREO ARGENTINO"},{"ot":"00019957","tracking":"00012267784774X51GPA901","cuenta":"ZITKOSKI BRUNO AUGUSTO - SUC - 0001","ciudad":"PUERTO IGUAZU","estado_sf":"En Proceso","observaciones":"","direccion":"AV PANCHO RAMIREZ 50 BARRIO BELEN PUERTO IGUAZU","zona":"INTERIOR","fecha":"20/3/2026","gestion":"Contactado","status_gestion":"PROMESA DESPACHO CORREO ARGENTINO"},{"ot":"00019449","tracking":"","cuenta":"VERDE LIMPIO S.R.L. - SUC - 0001","ciudad":"Bahía Blanca","estado_sf":"Pendiente","observaciones":"CANCELADO RÓTULO 26/05. CLIENTE NO DESPACHÓ LA TERMINAL.","direccion":"592 Rufino Luro Cambaceres","zona":"INTERIOR","fecha":"26/2/2026","gestion":"Contactado","status_gestion":"PROMESA DESPACHO CORREO ARGENTINO"},{"ot":"00019457","tracking":"","cuenta":"JONAD S. A. S - SUC - 0001","ciudad":"Mendoza","estado_sf":"Pendiente","observaciones":"CANCELADO RÓTULO 26/05. CLIENTE NO DESPACHÓ LA TERMINAL.","direccion":"459 Berutti","zona":"INTERIOR","fecha":"26/2/2026","gestion":"Contactado","status_gestion":"PROMESA DESPACHO CORREO ARGENTINO"},{"ot":"00019469","tracking":"","cuenta":"BENTIVOGLIO MARIA CRISTINA - SUC - 0003","ciudad":"MAR DEL PLATA SUR","estado_sf":"Pendiente","observaciones":"SE CANCELÓ RÓTULO 26/05. CLIENTE NO DESPACHÓ LA TERMINAL.","direccion":"Vertiz 4189 esquina Lanzilota\n/600 Mar del Plata","zona":"INTERIOR","fecha":"27/2/2026","gestion":"Contactado","status_gestion":"PROMESA DESPACHO CORREO ARGENTINO"},{"ot":"00019180","tracking":"","cuenta":"AGUERO AGUSTINA PAOLA .2 - SUC - 0001","ciudad":"Purmamarca","estado_sf":"Pendiente","observaciones":"CANCELADO RÓTULO 26/05. CLIENTE NO DESPACHÓ LA TERMINAL.","direccion":"212 Lavalle","zona":"INTERIOR","fecha":"19/2/2026","gestion":"Contactado","status_gestion":"PROMESA DESPACHO CORREO ARGENTINO"},{"ot":"00019224","tracking":"","cuenta":"MONZON MARIA LETIZIA - SUC - 0001","ciudad":"Corrientes","estado_sf":"Pendiente","observaciones":"SE CANCELÓ RÓTULO 12/05 PORQUE CLIENTE NO CUMPLIÓ EN EL DESPCAHO POR CORREO, ME COMUNICARÁ A FINALES DE MAYO PARA CONTINUAR CON LA NUEVA GESTIÓN.","direccion":"885 Salta","zona":"INTERIOR","fecha":"20/2/2026","gestion":"Contactado","status_gestion":"PROMESA DESPACHO CORREO ARGENTINO"},{"ot":"00019228","tracking":"","cuenta":"ANDRADA CRISTIAN ALEJANDRO - SUC - 0001","ciudad":"Villa Santa Cruz del Lago","estado_sf":"Pendiente","observaciones":"CANCELADO RÓTULO 26/05. CLIENTE NO DESPACHÓ LA TERMINAL.","direccion":"456 Avenida los Olmos","zona":"INTERIOR","fecha":"20/2/2026","gestion":"Contactado","status_gestion":"PROMESA DESPACHO CORREO ARGENTINO"},{"ot":"00019315","tracking":"","cuenta":"ROSAS PABLO ARIEL - SUC - 0001","ciudad":"Ingeniero Jacobacci","estado_sf":"En Proceso","observaciones":"CANCELADO RÓTULO 19/05","direccion":"358 Belisario Roldan","zona":"INTERIOR","fecha":"20/2/2026","gestion":"Contactado","status_gestion":"PROMESA DESPACHO CORREO ARGENTINO"},{"ot":"00019340","tracking":"","cuenta":"GARCIA NAZARENA - SUC - 0001","ciudad":"Mar del plata","estado_sf":"En Proceso","observaciones":"CANCELADO RÓTULO 04/06. CLIENTE NO DESPACHÓ LA TERMINAL.","direccion":"Talcahuano 496","zona":"INTERIOR","fecha":"20/2/2026","gestion":"Contactado","status_gestion":"PROMESA DESPACHO CORREO ARGENTINO"},{"ot":"00019008","tracking":"","cuenta":"GONZALEZ MARIANELA FABRICIA - SUC - 0001","ciudad":"Punta Alta","estado_sf":"Pendiente","observaciones":"CLIENTE ENVÍO UNA SEGUNDA TERMINAL QUE ESTÁ A NOMBRE DE CARLOS JAVIER SCHAAB QUE NO TIENE OT DE DESINSTALACIÓN. N° SEGUIMIENTO CORREO ARG 000122677827L01L7E2C701","direccion":"948 Bernardo de Irigoyen","zona":"INTERIOR","fecha":"9/2/2026","gestion":"Contactado","status_gestion":"PROMESA DESPACHO CORREO ARGENTINO"},{"ot":"00019027","tracking":"","cuenta":"PEREZ CARLOS ALBERTO - SUC - 0001","ciudad":"San antonio oeste","estado_sf":"En Proceso","observaciones":"CANCELADO RÓTULO 19/05. ENVIADA CONSTANCIA LIBRE DEUDA 19/05 POR SOLICITUD DEL CLIENTE.","direccion":"Automovil club argentino 2495","zona":"INTERIOR","fecha":"9/2/2026","gestion":"Contactado","status_gestion":"PROMESA DESPACHO CORREO ARGENTINO"},{"ot":"00018360","tracking":"","cuenta":"MUÑOZ CORTES JUAN CARLOS - SUC - 0001","ciudad":"Posadas","estado_sf":"Pendiente","observaciones":"CANCELADO RÓTULO 26/05. CLIENTE NO DESPACHÓ LA TERMINAL.","direccion":"8630 Avenida Alicia Moreau de Justo","zona":"INTERIOR","fecha":"6/1/2026","gestion":"Contactado","status_gestion":"PROMESA DESPACHO CORREO ARGENTINO"},{"ot":"00018597","tracking":"000122677880A0GAPE4C201","cuenta":"CINTIA NATIVIDAD ACUÑA - SUC - 0002","ciudad":"Allen","estado_sf":"Despachado","observaciones":"","direccion":"137 Eva Perón","zona":"INTERIOR","fecha":"16/1/2026","gestion":"Contactado","status_gestion":"PROMESA DESPACHO CORREO ARGENTINO"},{"ot":"00018696","tracking":"","cuenta":"CONDORI BONIFAZ DIEGO - SUC - 0001","ciudad":"Centenario","estado_sf":"Pendiente","observaciones":"CANCELADO RÓTULO 04/06. CLIENTE NO DESPACHÓ LA TERMINAL.","direccion":"Canadá 2136","zona":"INTERIOR","fecha":"21/1/2026","gestion":"Contactado","status_gestion":"PROMESA DESPACHO CORREO ARGENTINO"},{"ot":"00017586","tracking":"00012267780ATCLE4L6A201","cuenta":"OTAEGUI PIERI FERNANDO DAVID - SUC - 0001","ciudad":"Río Grande","estado_sf":"En Proceso","observaciones":"","direccion":"1017 Sara Rosa Delich","zona":"INTERIOR","fecha":"18/11/2025","gestion":"Contactado","status_gestion":"PROMESA DESPACHO CORREO ARGENTINO"},{"ot":"00008082","tracking":"0001226778135PLE9I4C501","cuenta":"HENKE MALDONADO CARLOS BENEDICTO - SUC - 0001","ciudad":"","estado_sf":"En Proceso","observaciones":"","direccion":"","zona":"INTERIOR","fecha":"11/12/2024","gestion":"Contactado","status_gestion":"PROMESA DESPACHO CORREO ARGENTINO"},{"ot":"00018585","tracking":"00012267788GAEX5L3IC401","cuenta":"LA VERACE S. A. S. - SUC - 0001","ciudad":"Salta","estado_sf":"En Proceso","observaciones":"","direccion":"1489 Avenida del Bicentenario de la Batalla de Salta","zona":"INTERIOR","fecha":"15/1/2026","gestion":"Contactado","status_gestion":"PROMESA DESPACHO CORREO ARGENTINO"},{"ot":"00018598","tracking":"0001226778507L1013I1301","cuenta":"AFED YAMILA MAGALI - SUC - 0001","ciudad":"Verónica","estado_sf":"En Proceso","observaciones":"","direccion":"28 E 23 Y 25 0","zona":"INTERIOR","fecha":"16/1/2026","gestion":"Contactado","status_gestion":"PROMESA DESPACHO CORREO ARGENTINO"}];
+
+// State
+let ots = OTS_RAW.map(o => ({...o, estado_ca: null, ultimo_evento: null, ultimo_fecha: null}));
+let filtroEstado = 'all';
+
+// ── RENDER ────────────────────────────────────────────────────────────────────
+function estadoClass(e) {
+  if (!e) return 'pendiente';
+  const eu = e.toLowerCase();
+  if (eu.includes('entregado') || eu.includes('entrega ok')) return 'entregado';
+  if (eu.includes('devuelto') || eu.includes('devolucion')) return 'devuelto';
+  if (eu.includes('sucursal')) return 'en-sucursal';
+  if (eu.includes('camino') || eu.includes('distribuidor') || eu.includes('clasificac') || eu.includes('procesamiento')) return 'en-camino';
+  if (eu.includes('tránsito') || eu.includes('transito')) return 'en-camino';
+  if (eu === 'en proceso') return 'en-proceso';
+  if (eu === 'despachado') return 'despachado';
+  if (eu === 'pendiente') return 'pendiente';
+  return 'pendiente';
+}
+
+function estadoLabel(e) {
+  if (!e) return '—';
+  return e;
+}
+
+function renderRow(o, idx) {
+  const sinTracking = !o.tracking;
+  const caClass = o.estado_ca ? estadoClass(o.estado_ca) : (sinTracking ? 'sin-tracking' : 'pendiente');
+  const caLabel = o.estado_ca || (sinTracking ? 'Sin tracking' : '—');
+  const sfClass = estadoClass(o.estado_sf);
+
+  return `<tr id="row-${idx}" data-ot="${o.ot}" data-estado="${o.estado_sf.toLowerCase().replace(/ /g,'-')}" data-ca="${caClass}" data-sin="${sinTracking?'1':'0'}">
+    <td>
+      <div class="ot-num">${o.ot}</div>
+      <div class="cuenta-txt" title="${o.cuenta}">${o.cuenta}</div>
+      <div style="font-size:9px;color:var(--text-muted);margin-top:2px">${o.fecha}</div>
+    </td>
+    <td><span class="estado ${sfClass}">${o.estado_sf}</span></td>
+    <td><span class="estado ${caClass}" id="ca-badge-${idx}">${caLabel}</span></td>
+    <td>
+      <div style="font-size:11px;color:var(--text)">${o.ciudad||'—'}</div>
+      <div class="ciudad-txt">${o.zona||''}</div>
+    </td>
+    <td>
+      ${o.tracking
+        ? `<a class="track-link" href="${CA_TRACK_URL}${o.tracking}" target="_blank">${o.tracking.substring(0,16)}…</a>`
+        : `<span class="track-empty">Sin tracking</span>`}
+    </td>
+    <td id="ca-evento-${idx}">
+      ${o.ultimo_evento
+        ? `<div class="ca-evento"><strong>${o.ultimo_evento}</strong></div><div class="ca-fecha">${o.ultimo_fecha||''}</div>`
+        : `<span style="color:var(--text-muted);font-size:10px">—</span>`}
+    </td>
+    <td>
+      ${o.observaciones ? `<div class="obs-txt">${o.observaciones.substring(0,120)}${o.observaciones.length>120?'…':''}</div>` : '<span style="color:var(--text-muted);font-size:10px">—</span>'}
+    </td>
+  </tr>`;
+}
+
+function renderAll() {
+  const tbody = document.getElementById('tbody');
+  tbody.innerHTML = ots.map((o,i) => renderRow(o,i)).join('');
+  updateStats();
+  applyFilters();
+}
+
+function updateStats() {
+  const enProceso = ots.filter(o=>o.estado_sf==='En Proceso').length;
+  const despachado = ots.filter(o=>o.estado_sf==='Despachado').length;
+  const pendiente = ots.filter(o=>o.estado_sf==='Pendiente').length;
+  const sinTrack = ots.filter(o=>!o.tracking).length;
+  document.getElementById('cnt-all').textContent = ots.length;
+  document.getElementById('cnt-en-proceso').textContent = enProceso;
+  document.getElementById('cnt-despachado').textContent = despachado;
+  document.getElementById('cnt-pendiente').textContent = pendiente;
+  document.getElementById('cnt-sin-tracking').textContent = sinTrack;
+}
+
+// ── FILTERS ───────────────────────────────────────────────────────────────────
+function filterEstado(estado, el) {
+  filtroEstado = estado;
+  document.querySelectorAll('.stat-chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  applyFilters();
+}
+
+function applyFilters() {
+  const q = document.getElementById('search').value.toLowerCase().trim();
+  let visible = 0;
+  ots.forEach((o, i) => {
+    const row = document.getElementById(`row-${i}`);
+    if (!row) return;
+    let show = true;
+    if (filtroEstado === 'sin-tracking') show = !o.tracking;
+    else if (filtroEstado !== 'all') show = o.estado_sf.toLowerCase().replace(/ /g,'-') === filtroEstado;
+    if (show && q) {
+      const haystack = `${o.ot} ${o.cuenta} ${o.ciudad} ${o.tracking} ${o.estado_sf}`.toLowerCase();
+      show = haystack.includes(q);
+    }
+    row.classList.toggle('hidden-row', !show);
+    if (show) visible++;
+  });
+  document.getElementById('empty-state').style.display = visible === 0 ? 'block' : 'none';
+}
+
+// ── AUTOTRACKING ──────────────────────────────────────────────────────────────
+function mapearEstadoCA(historia) {
+  if (!historia) return null;
+  const h = historia.toUpperCase();
+  if (h.includes('ENTREGADO') || h.includes('ENTREGA OK')) return 'Entregado';
+  if (h.includes('DEVUELTO') || h.includes('DEVOLUCION')) return 'Devuelto';
+  if (h.includes('EN ESPERA EN SUCURSAL') || h.includes('SUCURSAL')) return 'En sucursal';
+  if (h.includes('EN PODER DEL DISTRIBUIDOR') || h.includes('DISTRIBUIDOR')) return 'En camino';
+  if (h.includes('CENTRO DE PROCESAMIENTO') || h.includes('CLASIFICAC')) return 'En camino';
+  if (h.includes('INGRESO AL CORREO') || h.includes('INGRESO')) return 'En tránsito';
+  return 'En tránsito';
+}
+
+async function runAutotracking() {
+  const btn = document.getElementById('btn-autotrack');
+  const icon = document.getElementById('btn-icon');
+  if (btn.classList.contains('running')) return;
+  btn.classList.add('running');
+  icon.innerHTML = '<span class="spin"></span>';
+
+  const conTracking = ots.filter(o => o.tracking);
+  const progFill = document.getElementById('prog-fill');
+  const progLabel = document.getElementById('prog-label');
+  progLabel.style.display = 'block';
+  progLabel.textContent = `Consultando ${conTracking.length} OTs en Correo Argentino...`;
+
+  let procesadas = 0;
+
+  for (const o of conTracking) {
+    const idx = ots.indexOf(o);
+    try {
+      const res = await fetch(`${AGENT_URL}/automations/run/ca_status_checker_one`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-automation-secret': AGENT_SECRET },
+        body: JSON.stringify({ tracking: o.tracking, ot: o.ot })
+      });
+      const data = await res.json();
+      if (data && (data.estado || data.ultimo_evento || data.historia_ca)) {
+        ots[idx].estado_ca     = data.estado || mapearEstadoCA(data.historia_ca || data.ultimo_evento);
+        ots[idx].ultimo_evento = data.historia_ca || data.ultimo_evento || data.estado;
+        ots[idx].ultimo_fecha  = data.ultimo_evento_fecha || '';
+        // Update row in place
+        const badge = document.getElementById(`ca-badge-${idx}`);
+        const eventoEl = document.getElementById(`ca-evento-${idx}`);
+        if (badge) {
+          const cls = estadoClass(ots[idx].estado_ca);
+          badge.className = `estado ${cls}`;
+          badge.textContent = ots[idx].estado_ca;
+        }
+        if (eventoEl && ots[idx].ultimo_evento) {
+          eventoEl.innerHTML = `<div class="ca-evento"><strong>${ots[idx].ultimo_evento}</strong></div><div class="ca-fecha">${ots[idx].ultimo_fecha}</div>`;
+        }
+      }
+    } catch(e) {
+      console.warn(`Error tracking ${o.ot}:`, e.message);
+    }
+    procesadas++;
+    const pct = Math.round((procesadas / conTracking.length) * 100);
+    progFill.style.width = pct + '%';
+    progLabel.textContent = `${procesadas} / ${conTracking.length} OTs consultadas...`;
+    await new Promise(r => setTimeout(r, 120));
+  }
+
+  progFill.style.width = '100%';
+  progLabel.textContent = `✓ Tracking completado — ${conTracking.length} OTs actualizadas`;
+  const now = new Date().toLocaleTimeString('es-AR', {hour:'2-digit',minute:'2-digit'});
+  document.getElementById('last-update').textContent = `Actualizado ${now}`;
+  document.getElementById('last-update-top').textContent = `últ. ${now}`;
+  btn.classList.remove('running');
+  icon.textContent = '⚡';
+  updateStats();
+  setTimeout(() => { progLabel.style.display = 'none'; progFill.style.width = '0%'; }, 4000);
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+document.getElementById('fecha-hoy').textContent = new Date().toLocaleDateString('es-AR', {weekday:'long', day:'2-digit', month:'long', year:'numeric'});
+renderAll();
+</script>
+</body>
+</html>
