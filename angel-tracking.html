@@ -198,54 +198,72 @@ function processFile(file) {
   reader.onload = function(e) {
     try {
       const content = e.target.result;
-      // Parse as HTML table (SF exports .xls as HTML)
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(content, 'text/html');
-      const rows = doc.querySelectorAll('tr');
-      if (!rows.length) { alert('No se encontraron datos en el archivo.'); return; }
 
-      // Get headers from first row
-      const headers = [];
-      rows[0].querySelectorAll('th,td').forEach(c => headers.push(c.textContent.trim()));
+      // Regex-based parser — works with SF's malformed HTML-as-XLS
+      function extractCells(rowHtml, tag) {
+        const re = new RegExp('<' + tag + '[^>]*>([\\s\\S]*?)<\/' + tag + '>', 'gi');
+        const cells = [];
+        let m;
+        while ((m = re.exec(rowHtml)) !== null) {
+          cells.push(m[1].replace(/<[^>]+>/g,'').trim().replace(/\s+/g,' '));
+        }
+        return cells;
+      }
 
-      // Map column names to indices
+      const trRe = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
+      const trBlocks = [];
+      let tm;
+      while ((tm = trRe.exec(content)) !== null) trBlocks.push(tm[0]);
+
+      if (!trBlocks.length) { alert('No se encontraron filas en el archivo. Verificá el formato.'); return; }
+
+      // Headers from first row (th or td)
+      const rawHeaders = extractCells(trBlocks[0], 'th');
+      const headers = rawHeaders.length ? rawHeaders : extractCells(trBlocks[0], 'td');
+      if (!headers.length) { alert('No se encontraron encabezados.'); return; }
+
+      // Map column indices
       const idx = {
-        fecha:       findCol(headers, ['Fecha de creación','fecha de creacion']),
-        sfId:        findCol(headers, ['Id. de orden de trabajo']),
-        estado:      findCol(headers, ['Estado']),
-        cuenta:      findCol(headers, ['Nombre de la cuenta']),
-        ot:          findCol(headers, ['Número de orden de trabajo','numero de orden']),
-        logistica:   findCol(headers, ['Logística','logistica']),
-        zona:        findCol(headers, ['Categoría Zona','categoria zona']),
-        gestion:     findCol(headers, ['Gestión Retiros','gestion retiros']),
-        tracking:    findCol(headers, ['N° de seguimiento','n de seguimiento','seguimiento']),
-        observaciones: findCol(headers, ['Observaciones generales','observaciones']),
-        direccion:   findCol(headers, ['Dirección de envío (Calle)','direccion']),
-        ciudad:      findCol(headers, ['Dirección de envío (Ciudad)','ciudad']),
-        responsable: findCol(headers, ['Responsable de la OT','responsable']),
-        statusGestion: findCol(headers, ['Status Gestión Retiros','status gestion']),
+        fecha:         findCol(headers, ['Fecha de creaci']),
+        estado:        findCol(headers, ['Estado']),
+        cuenta:        findCol(headers, ['Nombre de la cuenta','cuenta']),
+        ot:            findCol(headers, ['mero de orden de trabajo','Numero de orden','Número de orden']),
+        zona:          findCol(headers, ['zona','Zona']),
+        gestion:       findCol(headers, ['Gesti']),
+        tracking:      findCol(headers, ['seguimiento']),
+        observaciones: findCol(headers, ['Observaciones','observaciones']),
+        direccion:     findCol(headers, ['Calle','calle']),
+        ciudad:        findCol(headers, ['Ciudad','ciudad']),
+        responsable:   findCol(headers, ['Responsable','responsable']),
       };
 
+      // If OT column not found by partial, try exact positions (SF report col 4)
+      if (idx.ot < 0) idx.ot = 4;
+      if (idx.tracking < 0) idx.tracking = 8;
+      if (idx.estado < 0) idx.estado = 2;
+      if (idx.cuenta < 0) idx.cuenta = 3;
+      if (idx.ciudad < 0) idx.ciudad = 12;
+      if (idx.zona < 0) idx.zona = 6;
+      if (idx.fecha < 0) idx.fecha = 0;
+      if (idx.observaciones < 0) idx.observaciones = 10;
+
       const data = [];
-      for (let i = 1; i < rows.length; i++) {
-        const cells = rows[i].querySelectorAll('td');
+      for (let i = 1; i < trBlocks.length; i++) {
+        const cells = extractCells(trBlocks[i], 'td');
         if (!cells.length) continue;
-        const get = (j) => j >= 0 && j < cells.length ? cells[j].textContent.trim() : '';
+        const get = (j) => (j >= 0 && j < cells.length) ? cells[j] : '';
         const otNum = get(idx.ot);
-        if (!otNum) continue;
+        if (!otNum || otNum.length < 3) continue;
         data.push({
-          ot:           otNum,
-          tracking:     get(idx.tracking),
-          cuenta:       get(idx.cuenta),
-          ciudad:       get(idx.ciudad),
-          estado_sf:    get(idx.estado),
+          ot:            otNum,
+          tracking:      get(idx.tracking),
+          cuenta:        get(idx.cuenta),
+          ciudad:        get(idx.ciudad),
+          estado_sf:     get(idx.estado),
           observaciones: get(idx.observaciones),
-          direccion:    get(idx.direccion),
-          zona:         get(idx.zona),
-          fecha:        get(idx.fecha),
-          responsable:  get(idx.responsable),
-          // CA state
-          estado_ca:    null,
+          zona:          get(idx.zona),
+          fecha:         get(idx.fecha),
+          estado_ca:     null,
           ultimo_evento: null,
           ultimo_fecha:  null,
         });
