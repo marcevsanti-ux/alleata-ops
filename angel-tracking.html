@@ -429,15 +429,15 @@ async function runAutotracking() {
   for (const o of conTracking) {
     const idx = ots.indexOf(o);
     try {
-      const res = await fetch(`${AGENT_URL}/automations/run/ca_status_checker_one`, {
+      const res = await fetch(`${AGENT_URL}/ca/tracking`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-automation-secret': AGENT_SECRET },
         body: JSON.stringify({ tracking: o.tracking, ot: o.ot })
       });
       const data = await res.json();
-      if (data && (data.estado || data.ultimo_evento || data.historia_ca)) {
-        ots[idx].estado_ca     = data.estado || mapearEstadoCA(data.historia_ca || data.ultimo_evento);
-        ots[idx].ultimo_evento = data.historia_ca || data.ultimo_evento || data.estado;
+      if (data && data.ok && (data.estado || data.historia_ca)) {
+        ots[idx].estado_ca     = data.estado || mapearEstadoCA(data.historia_ca);
+        ots[idx].ultimo_evento = data.historia_ca || data.estado;
         ots[idx].ultimo_fecha  = data.ultimo_evento_fecha || '';
         const badge    = document.getElementById(`ca-badge-${idx}`);
         const eventoEl = document.getElementById(`ca-evento-${idx}`);
