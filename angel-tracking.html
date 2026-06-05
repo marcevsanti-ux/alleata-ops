@@ -79,7 +79,7 @@ tr.hidden-row{display:none}
 .estado.sin-tracking{background:rgba(239,68,68,.08);color:rgba(239,68,68,.5);border:1px solid rgba(239,68,68,.15)}
 .estado.placeholder{background:transparent;color:var(--text-muted);border:1px solid var(--border)}
 
-.track-link{color:var(--blue);text-decoration:none;font-size:10px;font-family:'JetBrains Mono',monospace}
+.track-link{color:var(--blue);text-decoration:none;font-size:10px;font-family:'JetBrains Mono',monospace;word-break:break-all}
 .track-link:hover{text-decoration:underline}
 .track-empty{color:var(--text-muted);font-size:10px}
 .ot-num{font-weight:700;color:var(--text);font-size:11px}
@@ -108,7 +108,7 @@ tr.hidden-row{display:none}
 <!-- TOPBAR -->
 <div class="topbar">
   <div>
-    <div class="topbar-title">📦 Seguimiento de Retiros — Angel Flores</div>
+    <div class="topbar-title">📦 Seguimiento de Retiros — Angel Flores <span style="font-size:9px;color:var(--text-muted);font-weight:400;margin-left:6px">v1.0.2</span></div>
     <div class="topbar-sub" id="topbar-sub">Desinstalaciones · Correo Argentino · <span id="fecha-hoy"></span></div>
   </div>
   <div class="topbar-right">
@@ -342,7 +342,7 @@ function renderRow(o, idx) {
     </td>
     <td>
       ${o.tracking
-        ? `<a class="track-link" href="${CA_TRACK_URL}${o.tracking}" target="_blank" onclick="event.stopPropagation()">${o.tracking.substring(0,18)}…</a>`
+        ? `<a class="track-link" href="${CA_TRACK_URL}${o.tracking}" target="_blank" onclick="event.stopPropagation()">${o.tracking}</a>`
         : `<span class="track-empty">—</span>`}
     </td>
     <td id="ca-evento-${idx}">
@@ -435,7 +435,7 @@ async function runAutotracking() {
         body: JSON.stringify({ tracking: o.tracking, ot: o.ot })
       });
       const data = await res.json();
-      if (data && data.ok && (data.estado || data.historia_ca)) {
+      if (data && (data.ok !== false) && (data.estado || data.historia_ca)) {
         ots[idx].estado_ca     = data.estado || mapearEstadoCA(data.historia_ca);
         ots[idx].ultimo_evento = data.historia_ca || data.estado;
         ots[idx].ultimo_fecha  = data.ultimo_evento_fecha || '';
@@ -449,7 +449,11 @@ async function runAutotracking() {
           eventoEl.innerHTML = `<div class="ca-evento"><strong>${ots[idx].ultimo_evento}</strong></div><div class="ca-fecha">${ots[idx].ultimo_fecha}</div>`;
         }
       }
-    } catch(e) { console.warn(`Error tracking ${o.ot}:`, e.message); }
+    } catch(e) {
+      console.warn(`Error tracking ${o.ot}:`, e.message);
+      const badge = document.getElementById(`ca-badge-${idx}`);
+      if(badge){ badge.className='estado sin-tracking'; badge.textContent='Error CA'; }
+    }
 
     procesadas++;
     progFill.style.width  = Math.round((procesadas / conTracking.length) * 100) + '%';
