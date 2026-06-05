@@ -155,6 +155,8 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;min-h
 .dash-card[data-mod="devoluciones"]::after{background:linear-gradient(90deg,var(--orange),var(--yellow));}
 .dash-card[data-mod="horas"]::after{background:linear-gradient(90deg,var(--purple),var(--blue));}
 .dash-card[data-mod="ajustes"]::after{background:linear-gradient(90deg,var(--navy-400),var(--navy-300));}
+.dash-card[data-mod="terminales"]::after{background:linear-gradient(90deg,#f59e0b,#ef4444);}
+.dash-card[data-mod="terminales"] .dash-card-stat{color:#f59e0b;}
 .dash-card.locked{opacity:.3;cursor:not-allowed;}
 .dash-card-icon{font-size:22px;margin-bottom:10px;}
 .dash-card-title{font-size:14px;font-weight:700;margin-bottom:3px;color:var(--text);}
@@ -358,6 +360,9 @@ tr:hover td{background:var(--surface2);}
     </div>
     <div class="nav-item" data-mod="retencion" id="nav-retencion" onclick="goTo('retencion')">
       <div class="active-bar"></div><span class="nav-icon-wrap">🛡️</span> Retención
+    </div>
+    <div class="nav-item" data-mod="terminales" id="nav-terminales" onclick="goTo('terminales')">
+      <div class="active-bar"></div><span class="nav-icon-wrap">🖥️</span> Terminales
     </div>
     <div class="nav-item" data-mod="distri" id="nav-distri" onclick="goTo('distri')" style="display:none">
       <div class="active-bar"></div><span class="nav-icon-wrap">🚚</span> Distribuidores
@@ -1534,6 +1539,122 @@ tr:hover td{background:var(--surface2);}
   <div id="distri-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px">
     <div style="text-align:center;padding:60px;color:var(--text-muted);grid-column:1/-1">
       <div style="font-size:32px;margin-bottom:8px">⏳</div>Cargando...
+    </div>
+  </div>
+</div>
+
+
+<!-- ── MÓDULO TERMINALES ── -->
+<div class="module" id="mod-terminales">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px">
+    <div>
+      <div style="font-size:16px;font-weight:900;color:var(--text)">🖥️ Terminales — Logicalis</div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:2px">Importá el reporte de Logicalis y actualizá los equipos en Salesforce</div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <span id="term-version-badge" style="font-size:9px;font-weight:700;letter-spacing:.08em;padding:2px 8px;border-radius:20px;background:rgba(245,158,11,.15);color:#f59e0b;border:1px solid rgba(245,158,11,.3)">LOGICALIS</span>
+    </div>
+  </div>
+
+  <!-- CAMPOS FIJOS -->
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;margin-bottom:20px">
+    <div style="background:var(--navy-800);border:1px solid var(--border);border-radius:8px;padding:10px 14px">
+      <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Ubicacion__c</div>
+      <div style="font-size:13px;font-weight:700;color:var(--teal)">BARRACAS</div>
+    </div>
+    <div style="background:var(--navy-800);border:1px solid var(--border);border-radius:8px;padding:10px 14px">
+      <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Estado__c</div>
+      <div style="font-size:13px;font-weight:700;color:var(--teal)">DISPONIBLE</div>
+    </div>
+    <div style="background:var(--navy-800);border:1px solid var(--border);border-radius:8px;padding:10px 14px">
+      <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">CAMBIO_DE_BATERIA__c</div>
+      <div style="font-size:13px;font-weight:700;color:var(--teal)">SÍ</div>
+    </div>
+    <div style="background:var(--navy-800);border:1px solid var(--border);border-radius:8px;padding:10px 14px">
+      <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Perfil__c</div>
+      <div style="font-size:13px;font-weight:700;color:var(--teal)">NAPSE</div>
+    </div>
+  </div>
+
+  <!-- STEP 1: DROP ZONE -->
+  <div id="term-step1">
+    <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;display:flex;align-items:center;gap:6px">
+      <span style="width:18px;height:18px;border-radius:50%;background:rgba(29,191,142,.15);border:1px solid rgba(29,191,142,.3);font-size:10px;font-weight:700;color:var(--teal);display:inline-flex;align-items:center;justify-content:center">1</span>
+      Cargar reporte Excel
+    </div>
+    <div id="term-drop-zone" onclick="document.getElementById('term-file-input').click()"
+      style="border:1.5px dashed var(--border);border-radius:10px;padding:40px 20px;text-align:center;cursor:pointer;transition:border-color .2s,background .2s;background:var(--navy-800)">
+      <div style="font-size:32px;margin-bottom:8px">📊</div>
+      <div style="font-size:13px;color:var(--text-muted);margin-bottom:4px">Arrastrá el Excel de Logicalis o hacé clic para seleccionar</div>
+      <div style="font-size:11px;color:var(--text-muted)">Informe Facturación Logicalis · solapa <strong style="color:var(--text)">Detalle Despacho</strong> · .xlsx</div>
+      <input type="file" id="term-file-input" accept=".xlsx,.xls" style="display:none" onchange="termHandleFile(event)">
+    </div>
+  </div>
+
+  <!-- STEP 2: PREVIEW -->
+  <div id="term-step2" style="display:none;margin-top:20px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;display:flex;align-items:center;gap:6px">
+        <span style="width:18px;height:18px;border-radius:50%;background:rgba(29,191,142,.15);border:1px solid rgba(29,191,142,.3);font-size:10px;font-weight:700;color:var(--teal);display:inline-flex;align-items:center;justify-content:center">2</span>
+        Series detectadas
+      </div>
+      <button class="btn-ghost btn-sm" onclick="termReset()">↩ Otro archivo</button>
+    </div>
+    <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap">
+      <div style="background:var(--navy-800);border:1px solid var(--border);border-radius:8px;padding:8px 16px;min-width:100px">
+        <div style="font-size:20px;font-weight:900;color:#f59e0b" id="term-stat-total">0</div>
+        <div style="font-size:11px;color:var(--text-muted)">series</div>
+      </div>
+      <div style="background:var(--navy-800);border:1px solid var(--border);border-radius:8px;padding:8px 16px;min-width:100px">
+        <div style="font-size:20px;font-weight:900;color:var(--teal)" id="term-stat-mes">—</div>
+        <div style="font-size:11px;color:var(--text-muted)">período</div>
+      </div>
+      <div style="background:var(--navy-800);border:1px solid var(--border);border-radius:8px;padding:8px 16px;min-width:100px">
+        <div style="font-size:20px;font-weight:900;color:var(--text)" id="term-stat-modelo">—</div>
+        <div style="font-size:11px;color:var(--text-muted)">modelo</div>
+      </div>
+    </div>
+    <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;max-height:220px;overflow-y:auto">
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead>
+          <tr style="background:var(--navy-700)">
+            <th style="padding:7px 10px;text-align:left;color:var(--text-muted);font-weight:600;font-size:10px;text-transform:uppercase;letter-spacing:.5px;width:36px">#</th>
+            <th style="padding:7px 10px;text-align:left;color:var(--text-muted);font-weight:600;font-size:10px;text-transform:uppercase;letter-spacing:.5px">N° de Serie</th>
+            <th style="padding:7px 10px;text-align:left;color:var(--text-muted);font-weight:600;font-size:10px;text-transform:uppercase;letter-spacing:.5px">Modelo</th>
+          </tr>
+        </thead>
+        <tbody id="term-series-tbody"></tbody>
+      </table>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
+      <button class="btn btn-sm" onclick="termExportCSV()" style="display:flex;align-items:center;gap:6px">
+        ⬇ Exportar CSV
+      </button>
+      <button class="btn btn-primary btn-sm" id="term-btn-update" onclick="termUpdateSF()" style="display:flex;align-items:center;gap:6px">
+        ☁ Actualizar en Salesforce
+      </button>
+    </div>
+  </div>
+
+  <!-- STEP 3: PROGRESS -->
+  <div id="term-step3" style="display:none;margin-top:20px">
+    <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;display:flex;align-items:center;gap:6px">
+      <span style="width:18px;height:18px;border-radius:50%;background:rgba(29,191,142,.15);border:1px solid rgba(29,191,142,.3);font-size:10px;font-weight:700;color:var(--teal);display:inline-flex;align-items:center;justify-content:center">3</span>
+      Actualizando en Salesforce
+    </div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+      <span style="font-size:12px;color:var(--text-muted)" id="term-prog-label">Iniciando...</span>
+      <div style="display:flex;gap:8px">
+        <span id="term-badge-ok" style="display:none;font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;background:rgba(29,191,142,.15);color:var(--teal);border:1px solid rgba(29,191,142,.3)">✓ <span id="term-cnt-ok">0</span></span>
+        <span id="term-badge-err" style="display:none;font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;background:rgba(239,68,68,.15);color:#ef4444;border:1px solid rgba(239,68,68,.3)">✗ <span id="term-cnt-err">0</span></span>
+      </div>
+    </div>
+    <div style="height:4px;background:var(--border);border-radius:2px;overflow:hidden;margin-bottom:12px">
+      <div id="term-prog-fill" style="height:100%;width:0%;background:linear-gradient(90deg,var(--teal),var(--blue));border-radius:2px;transition:width .3s"></div>
+    </div>
+    <div id="term-log" style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-muted);background:var(--navy-800);border:1px solid var(--border);border-radius:8px;padding:10px 12px;max-height:180px;overflow-y:auto;line-height:1.7"></div>
+    <div id="term-done-row" style="display:none;margin-top:12px">
+      <button class="btn btn-sm" onclick="termReset()">✓ Finalizar</button>
     </div>
   </div>
 </div>
@@ -3912,6 +4033,7 @@ function buildDashCards(modulos,isAdmin){
     {mod:'desinstalaciones',icon:'📦',title:'Desinstalaciones',desc:'Logística inversa',stat:'cargando...'},
     {mod:'merchants',icon:'🏪',title:'Envíos Merchants',desc:'Tracking guías CA',stat:'cargando...'},
     {mod:'horas',icon:'⏱',title:'Horas',desc:'Registro diario',stat:'cargando...'},
+    {mod:'terminales',icon:'🖥️',title:'Terminales',desc:'Reporte Logicalis → Salesforce',stat:'Logicalis'},
   ];
   if(isAdmin)all.push({mod:'ajustes',icon:'⚙️',title:'Ajustes',desc:'Usuarios y permisos',stat:'gestión'});
   const grid=document.getElementById('dashGrid');
@@ -3928,7 +4050,7 @@ function buildDashCards(modulos,isAdmin){
   loadOpsPanel(isAdmin);
 }
 
-const MOD_INFO={home:'Dashboard',sims:'Verificador SIMs',envios:'Envíos',rollout:'Rollout',desinstalaciones:'Desinstalaciones',merchants:'Envíos Merchants',instalaciones:'Instalaciones SF',horas:'Control de Horas',retencion:'Retención de Cuentas',ajustes:'Ajustes',ally:'Configuración Ally',distri:'Distribuidores'};
+const MOD_INFO={home:'Dashboard',sims:'Verificador SIMs',envios:'Envíos',rollout:'Rollout',desinstalaciones:'Desinstalaciones',merchants:'Envíos Merchants',instalaciones:'Instalaciones SF',horas:'Control de Horas',retencion:'Retención de Cuentas',ajustes:'Ajustes',ally:'Configuración Ally',distri:'Distribuidores',terminales:'Terminales — Logicalis'};
 
 function goTo(mod){
   const el=document.getElementById('nav-'+mod);
@@ -3956,6 +4078,7 @@ function goTo(mod){
   if(mod==='ajustes'){loadUsers();loadSimsDbStats();loadConfigSLA();_auditPage=0;loadAuditLog();cargarCronHorarios();}
   if(mod==='sf') cargarSFIntegracion();
   if(mod==='retencion') cargarRetencion();
+  if(mod==='terminales') termInit();
 }
 
 function refreshCurrentModule(){
@@ -10899,6 +11022,156 @@ async function mchLimpiarTodo(){
 
   </div>
 </div>
+
+<!-- ── MÓDULO TERMINALES JS ── -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+(function(){
+  const AGENT_URL = 'https://alleata-agent-production.up.railway.app';
+  const AGENT_SECRET = '123456';
+  let termSeries = [];
+
+  window.termInit = function(){
+    termReset(true);
+    // drag & drop
+    const dz = document.getElementById('term-drop-zone');
+    if(dz.__termBound) return;
+    dz.__termBound = true;
+    dz.addEventListener('dragover', e=>{ e.preventDefault(); dz.style.borderColor='var(--teal)'; dz.style.background='rgba(29,191,142,.05)'; });
+    dz.addEventListener('dragleave', ()=>{ dz.style.borderColor=''; dz.style.background=''; });
+    dz.addEventListener('drop', e=>{ e.preventDefault(); dz.style.borderColor=''; dz.style.background=''; termHandleFileRaw(e.dataTransfer.files[0]); });
+  };
+
+  window.termReset = function(soft){
+    termSeries = [];
+    document.getElementById('term-step2').style.display = 'none';
+    document.getElementById('term-step3').style.display = 'none';
+    document.getElementById('term-step1').style.display = 'block';
+    if(!soft) document.getElementById('term-file-input').value = '';
+    const btn = document.getElementById('term-btn-update');
+    if(btn) btn.disabled = false;
+  };
+
+  window.termHandleFile = function(evt){ termHandleFileRaw(evt.target.files[0]); };
+
+  function termHandleFileRaw(file){
+    if(!file) return;
+    if(typeof XLSX === 'undefined'){ alert('Cargando librería Excel, intentá nuevamente en 2 segundos.'); return; }
+    const reader = new FileReader();
+    reader.onload = function(e){
+      try{
+        const wb = XLSX.read(e.target.result, {type:'array'});
+        let series = [], mes = '—', modelo = '—';
+        const priority = ['Detalle Despacho','Informe Final'];
+        for(const sName of priority){
+          if(!wb.SheetNames.includes(sName)) continue;
+          const ws = wb.Sheets[sName];
+          const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+          let hIdx=-1, sIdx=-1, mIdx=-1;
+          for(let i=0;i<rows.length;i++){
+            const row = rows[i].map(v=>String(v).trim().toLowerCase());
+            const si = row.findIndex(c=>c==='serie'||c==='n° de serie'||c==='numero de serie'||c==='n de serie');
+            if(si>-1){ hIdx=i; sIdx=si; const mi=row.findIndex(c=>c==='modelo'||c.includes('model')); if(mi>-1) mIdx=mi; break; }
+          }
+          if(hIdx>-1 && sIdx>-1){
+            for(let i=hIdx+1;i<rows.length;i++){
+              const v = String(rows[i][sIdx]||'').trim();
+              const m = mIdx>-1 ? String(rows[i][mIdx]||'').trim() : 'D7 Axium';
+              if(v.length>10) series.push({serie:v, modelo:m||'D7 Axium'});
+            }
+            const mr = rows.find(r=>String(r[1]||'').toLowerCase().includes('mes'));
+            if(mr){ const mv=String(mr[2]||'').trim(); if(mv) mes=mv; }
+            const yr = rows.find(r=>String(r[1]||'').toLowerCase().includes('año'));
+            if(yr){ const yv=String(yr[2]||'').trim(); if(yv) mes+=' '+yv; }
+          }
+          if(series.length>0){ if(series[0].modelo) modelo=series[0].modelo; break; }
+        }
+        if(series.length===0){ alert('No se encontraron series en el archivo. Verificá que sea el reporte de Logicalis.'); return; }
+        termSeries = series;
+        document.getElementById('term-stat-total').textContent = series.length;
+        document.getElementById('term-stat-mes').textContent = mes;
+        document.getElementById('term-stat-modelo').textContent = modelo;
+        const tbody = document.getElementById('term-series-tbody');
+        tbody.innerHTML = series.map((s,i)=>`<tr style="border-bottom:1px solid var(--border)">
+          <td style="padding:6px 10px;color:var(--text-muted)">${i+1}</td>
+          <td style="padding:6px 10px;font-family:'JetBrains Mono',monospace;color:var(--text)">${s.serie}</td>
+          <td style="padding:6px 10px;color:var(--text-muted)">${s.modelo}</td>
+        </tr>`).join('');
+        document.getElementById('term-step1').style.display='none';
+        document.getElementById('term-step2').style.display='block';
+      }catch(err){ alert('Error leyendo el archivo: '+err.message); }
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  window.termExportCSV = function(){
+    const csv = 'N° de Serie,Modelo,Ubicacion__c,Estado__c,CAMBIO_DE_BATERIA__c,Perfil__c\n' +
+      termSeries.map(s=>`${s.serie},${s.modelo},BARRACAS,DISPONIBLE,SÍ,NAPSE`).join('\n');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+    a.download = 'terminales_logicalis.csv';
+    a.click();
+  };
+
+  window.termUpdateSF = async function(){
+    if(!termSeries.length){ alert('No hay series cargadas.'); return; }
+    document.getElementById('term-step2').style.display='none';
+    document.getElementById('term-step3').style.display='block';
+    const log = document.getElementById('term-log');
+    const progFill = document.getElementById('term-prog-fill');
+    const progLabel = document.getElementById('term-prog-label');
+    const badgeOk = document.getElementById('term-badge-ok');
+    const badgeErr = document.getElementById('term-badge-err');
+    const cntOk = document.getElementById('term-cnt-ok');
+    const cntErr = document.getElementById('term-cnt-err');
+    log.innerHTML='';
+    let ok=0, err=0;
+    const total = termSeries.length;
+
+    function addLog(msg, cls=''){
+      const d = document.createElement('div');
+      d.style.color = cls==='ok'?'var(--teal)':cls==='err'?'#ef4444':'var(--text-muted)';
+      d.innerHTML = msg;
+      log.appendChild(d);
+      log.scrollTop = log.scrollHeight;
+    }
+
+    addLog(`[info] Enviando ${total} series al agente para actualizar en Salesforce...`);
+
+    try{
+      const res = await fetch(`${AGENT_URL}/terminales/update-sf`, {
+        method:'POST',
+        headers:{ 'Content-Type':'application/json', 'x-automation-secret': AGENT_SECRET },
+        body: JSON.stringify({ series: termSeries.map(s=>s.serie) })
+      });
+      const data = await res.json();
+      if(!res.ok){ throw new Error(data.error || `HTTP ${res.status}`); }
+
+      const results = data.results || [];
+      results.forEach((r,i)=>{
+        const pct = Math.round(((i+1)/total)*100);
+        progFill.style.width = pct+'%';
+        progLabel.textContent = `Procesando ${i+1} / ${total}...`;
+        if(r.ok){ ok++; addLog(`[${i+1}] ✓ ${r.serie}`, 'ok'); }
+        else{ err++; addLog(`[${i+1}] ✗ ${r.serie} — ${r.error||'error'}`, 'err'); }
+        cntOk.textContent = ok; cntErr.textContent = err;
+        if(ok>0) badgeOk.style.display='';
+        if(err>0) badgeErr.style.display='';
+      });
+    }catch(e){
+      addLog(`[error] No se pudo conectar con el agente: ${e.message}`, 'err');
+      err = total;
+      cntErr.textContent = total;
+      badgeErr.style.display='';
+    }
+
+    progFill.style.width='100%';
+    progLabel.textContent = `Actualización completa — ${ok} OK, ${err} errores`;
+    addLog(`[done] ${ok}/${total} terminales actualizadas correctamente.`);
+    document.getElementById('term-done-row').style.display='block';
+  };
+})();
+</script>
 
 </body>
 </html>
