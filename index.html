@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v3.2.14</title>
+<title>Alleata · Operaciones v3.2.15</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -306,7 +306,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v3.2.14 · 04 jun 2026
+      v3.2.15 · 04 jun 2026
     </div>
   </div>
 </div>
@@ -381,7 +381,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v3.2.14 · 04 jun 2026
+      v3.2.15 · 04 jun 2026
     </div>
   </div>
 </nav>
@@ -410,7 +410,7 @@ tr:hover td{background:var(--surface2);}
         SF Sync
       </button>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v3.2.14</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v3.2.15</div>
   </div>
   <div class="content">
 
@@ -1635,15 +1635,19 @@ tr:hover td{background:var(--surface2);}
     <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
       <div style="background:var(--navy-800);border:1px solid var(--border);border-radius:8px;padding:8px 16px">
         <div style="font-size:20px;font-weight:900;color:#f59e0b" id="term-stat-total">0</div>
-        <div style="font-size:11px;color:var(--text-muted)">series</div>
+        <div style="font-size:11px;color:var(--text-muted)">series en Excel</div>
       </div>
       <div style="background:var(--navy-800);border:1px solid var(--border);border-radius:8px;padding:8px 16px">
         <div style="font-size:16px;font-weight:900;color:var(--teal)" id="term-stat-found">0</div>
-        <div style="font-size:11px;color:var(--text-muted)">encontradas en SF</div>
+        <div style="font-size:11px;color:var(--text-muted)" id="term-lbl-found">a actualizar en SF</div>
       </div>
       <div style="background:var(--navy-800);border:1px solid var(--border);border-radius:8px;padding:8px 16px">
-        <div style="font-size:16px;font-weight:900;color:#ef4444" id="term-stat-notfound">0</div>
-        <div style="font-size:11px;color:var(--text-muted)">no encontradas</div>
+        <div style="font-size:16px;font-weight:900;color:#f59e0b" id="term-stat-notfound">0</div>
+        <div style="font-size:11px;color:var(--text-muted)" id="term-lbl-notfound">a crear en SF</div>
+      </div>
+      <div id="term-skip-wrap" style="display:none;background:var(--navy-800);border:1px solid var(--border);border-radius:8px;padding:8px 16px">
+        <div style="font-size:16px;font-weight:900;color:var(--text-muted)" id="term-stat-skipped">0</div>
+        <div style="font-size:11px;color:var(--text-muted)">ya con Perfil NAPSE</div>
       </div>
       <div style="background:var(--navy-800);border:1px solid var(--border);border-radius:8px;padding:8px 16px">
         <div style="font-size:14px;font-weight:900;color:var(--text)" id="term-stat-mes">—</div>
@@ -1654,9 +1658,9 @@ tr:hover td{background:var(--surface2);}
     <!-- Leyenda -->
     <div style="display:flex;gap:16px;margin-bottom:10px;font-size:11px;color:var(--text-muted);flex-wrap:wrap">
       <span>⬜ valor actual en SF</span>
-      <span style="color:var(--teal)">🟢 valor nuevo (cambia)</span>
-      <span style="color:var(--text-muted)">— sin cambio</span>
-      <span style="color:#ef4444">🔴 no encontrada en SF</span>
+      <span style="color:var(--teal)">🟢 a actualizar (cambia)</span>
+      <span style="color:#f59e0b">🟡 a crear en SF</span>
+      <span style="color:var(--text-muted);opacity:.5">⬜ omitida (ya es NAPSE)</span>
     </div>
 
     <!-- Tabla preview -->
@@ -4029,7 +4033,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v3.2.14] OK');
+console.log('[Alleata v3.2.15] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -11329,17 +11333,26 @@ async function mchLimpiarTodo(){
 
   function renderPreview(mes, modelo){
     const f = getFields();
-    const found    = termPreview.filter(r=>r.found).length;
-    const notFound = termPreview.filter(r=>!r.found).length;
+
+    // Filtrar las ya actualizadas (Perfil = NAPSE)
+    const yaActualizadas = termPreview.filter(r=>r.found && r.current?.Perfil__c === 'NAPSE');
+    const toUpdate       = termPreview.filter(r=>r.found && r.current?.Perfil__c !== 'NAPSE');
+    const toCreate       = termPreview.filter(r=>!r.found);
 
     document.getElementById('term-stat-total').textContent    = termPreview.length;
-    document.getElementById('term-stat-found').textContent    = found;
-    document.getElementById('term-stat-notfound').textContent = notFound;
+    document.getElementById('term-stat-found').textContent    = toUpdate.length;
+    document.getElementById('term-stat-notfound').textContent = toCreate.length;
     document.getElementById('term-stat-mes').textContent      = mes;
 
-    // Mapa serie → modelo
-    const modeloMap = {};
-    termSeries.forEach(s=>{ modeloMap[s.serie]=s.modelo; });
+    // Actualizar labels de chips
+    const elFound    = document.getElementById('term-lbl-found');
+    const elNotFound = document.getElementById('term-lbl-notfound');
+    const elSkipped  = document.getElementById('term-stat-skipped');
+    const elSkipWrap = document.getElementById('term-skip-wrap');
+    if(elFound)    elFound.textContent    = 'a actualizar en SF';
+    if(elNotFound) elNotFound.textContent = 'a crear en SF';
+    if(elSkipped)  elSkipped.textContent  = yaActualizadas.length;
+    if(elSkipWrap) elSkipWrap.style.display = yaActualizadas.length > 0 ? '' : 'none';
 
     function cell(actual, nuevo){
       const cambia = actual && actual!=='—' && actual!==nuevo;
@@ -11348,23 +11361,48 @@ async function mchLimpiarTodo(){
               <td style="padding:5px 8px;text-align:center;font-size:10px;font-weight:${cambia?'700':'400'};color:${cambia?'var(--teal)':'var(--text-muted)'}">${cambia?'→ '+nuevo:'—'}</td>`;
     }
 
+    function newCell(val){
+      return `<td style="padding:5px 8px;text-align:center;color:var(--text-muted);border-left:1px solid var(--border);font-size:10px">—</td>
+              <td style="padding:5px 8px;text-align:center;font-size:10px;font-weight:700;color:#f59e0b">${val}</td>`;
+    }
+
+    const today = new Date().toLocaleDateString('es-AR');
+
     const tbody = document.getElementById('term-preview-tbody');
     tbody.innerHTML = termPreview.map((r,i)=>{
-      if(!r.found){
-        return `<tr style="border-bottom:1px solid var(--border);background:rgba(239,68,68,.04)">
+
+      // Ya actualizada (Perfil = NAPSE) → fila atenuada, no se toca
+      if(r.found && r.current?.Perfil__c === 'NAPSE'){
+        return `<tr style="border-bottom:1px solid var(--border);opacity:.35">
           <td style="padding:6px 8px;color:var(--text-muted);font-size:10px">${i+1}</td>
-          <td style="padding:6px 8px;font-family:'JetBrains Mono',monospace;font-size:10px;color:#ef4444">${r.serie}<br><span style="font-size:9px;color:#ef4444;opacity:.7">No encontrada en SF</span></td>
-          <td colspan="8" style="padding:6px 8px;text-align:center;color:#ef4444;font-size:10px;border-left:1px solid var(--border)">— no encontrada —</td>
+          <td style="padding:6px 8px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-muted)">${r.serie}<br>
+            <span style="font-size:9px;color:var(--teal);opacity:.8">✓ ya actualizada (Perfil = NAPSE)</span></td>
+          <td colspan="8" style="padding:6px 8px;text-align:center;color:var(--text-muted);font-size:10px;border-left:1px solid var(--border)">— omitida —</td>
         </tr>`;
       }
-      const c = r.current || {};
-      return `<tr style="border-bottom:1px solid var(--border)">
+
+      // Encontrada y necesita update
+      if(r.found){
+        const c = r.current || {};
+        return `<tr style="border-bottom:1px solid var(--border)">
+          <td style="padding:6px 8px;color:var(--text-muted);font-size:10px">${i+1}</td>
+          <td style="padding:6px 8px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text)">${r.serie}</td>
+          ${cell(c.Ubicacion__c,         f.Ubicacion__c)}
+          ${cell(c.Estado__c,            f.Estado__c)}
+          ${cell(c.CAMBIO_DE_BATERIA__c, f.CAMBIO_DE_BATERIA__c)}
+          ${cell(c.Perfil__c,            f.Perfil__c)}
+        </tr>`;
+      }
+
+      // No encontrada → se va a crear
+      return `<tr style="border-bottom:1px solid var(--border);background:rgba(245,158,11,.04)">
         <td style="padding:6px 8px;color:var(--text-muted);font-size:10px">${i+1}</td>
-        <td style="padding:6px 8px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text)">${r.serie}</td>
-        ${cell(c.Ubicacion__c,         f.Ubicacion__c)}
-        ${cell(c.Estado__c,            f.Estado__c)}
-        ${cell(c.CAMBIO_DE_BATERIA__c, f.CAMBIO_DE_BATERIA__c)}
-        ${cell(c.Perfil__c,            f.Perfil__c)}
+        <td style="padding:6px 8px;font-family:'JetBrains Mono',monospace;font-size:10px;color:#f59e0b">${r.serie}<br>
+          <span style="font-size:9px;color:#f59e0b;opacity:.8">+ crear en SF</span></td>
+        ${newCell(f.Ubicacion__c)}
+        ${newCell(f.Estado__c)}
+        ${newCell(f.CAMBIO_DE_BATERIA__c)}
+        ${newCell(f.Perfil__c)}
       </tr>`;
     }).join('');
   }
@@ -11386,9 +11424,15 @@ async function mchLimpiarTodo(){
   };
 
   window.termUpdateSF = async function(){
-    const toUpdate = termPreview.filter(r=>r.found);
-    if(!toUpdate.length){ alert('No hay terminales encontradas en SF para actualizar.'); return; }
-    const f = getFields();
+    const f         = getFields();
+    const toUpdate  = termPreview.filter(r=> r.found && r.current?.Perfil__c !== 'NAPSE');
+    const toCreate  = termPreview.filter(r=>!r.found);
+    const skippedYa = termPreview.filter(r=> r.found && r.current?.Perfil__c === 'NAPSE');
+
+    if(!toUpdate.length && !toCreate.length){
+      alert('No hay terminales para procesar — todas ya tienen Perfil = NAPSE.');
+      return;
+    }
     hide('term-step3'); show('term-step4');
     const log       = document.getElementById('term-log');
     const progFill  = document.getElementById('term-prog-fill');
@@ -11397,45 +11441,76 @@ async function mchLimpiarTodo(){
     const badgeErr  = document.getElementById('term-badge-err');
     log.innerHTML='';
     let ok=0, err=0;
-    const total=toUpdate.length;
+    const totalOps = toUpdate.length + toCreate.length;
 
     function addLog(msg,cls=''){
       const d=document.createElement('div');
-      d.style.color=cls==='ok'?'var(--teal)':cls==='err'?'#ef4444':'var(--text-muted)';
+      d.style.color=cls==='ok'?'var(--teal)':cls==='err'?'#ef4444':cls==='warn'?'#f59e0b':'var(--text-muted)';
       d.innerHTML=msg; log.appendChild(d); log.scrollTop=log.scrollHeight;
     }
 
-    const skipped = termPreview.filter(r=>!r.found).length;
-    if(skipped>0) addLog(`[info] ${skipped} serie(s) sin match en SF serán omitidas.`);
-    addLog(`[info] Actualizando ${total} terminales — Ubicación:${f.Ubicacion__c} / Estado:${f.Estado__c} / Batería:${f.CAMBIO_DE_BATERIA__c} / Perfil:${f.Perfil__c}`);
+    if(skippedYa.length) addLog(`[info] ${skippedYa.length} omitidas — Perfil ya es NAPSE.`);
+    if(toUpdate.length)  addLog(`[info] ${toUpdate.length} a actualizar en SF.`);
+    if(toCreate.length)  addLog(`[info] ${toCreate.length} a crear en SF.`,'warn');
 
-    try{
-      const res=await fetch(`${AGENT_URL}/terminales/update-sf`,{
-        method:'POST',
-        headers:{'Content-Type':'application/json','x-automation-secret':AGENT_SECRET},
-        body:JSON.stringify({ series:toUpdate.map(r=>r.serie), fields:f })
-      });
-      const data=await res.json();
-      if(!res.ok) throw new Error(data.error||`HTTP ${res.status}`);
-      (data.results||[]).forEach((r,i)=>{
-        progFill.style.width=Math.round(((i+1)/total)*100)+'%';
-        progLabel.textContent=`Procesando ${i+1} / ${total}...`;
-        if(r.ok){ ok++; addLog(`[${i+1}] ✓ ${r.serie}`,'ok'); }
-        else     { err++; addLog(`[${i+1}] ✗ ${r.serie} — ${r.error||'error'}`,'err'); }
-        document.getElementById('term-cnt-ok').textContent=ok;
-        document.getElementById('term-cnt-err').textContent=err;
-        if(ok>0)  badgeOk.style.display='';
-        if(err>0) badgeErr.style.display='';
-      });
-    }catch(e){
-      addLog(`[error] ${e.message}`,'err');
-      err=total;
-      document.getElementById('term-cnt-err').textContent=total;
-      badgeErr.style.display='';
+    // PATCH: terminales encontradas (excluyendo las ya con NAPSE)
+    if(toUpdate.length){
+      try{
+        const res=await fetch(`${AGENT_URL}/terminales/update-sf`,{
+          method:'POST',
+          headers:{'Content-Type':'application/json','x-automation-secret':AGENT_SECRET},
+          body:JSON.stringify({ series:toUpdate.map(r=>r.serie), fields:f })
+        });
+        const data=await res.json();
+        if(!res.ok) throw new Error(data.error||`HTTP ${res.status}`);
+        (data.results||[]).forEach((r)=>{
+          progFill.style.width=Math.round(((ok+err+1)/totalOps)*100)+'%';
+          if(r.ok){ ok++; addLog(`[upd] ✓ ${r.serie}`,'ok'); }
+          else     { err++; addLog(`[upd] ✗ ${r.serie} — ${r.error||'error'}`,'err'); }
+          document.getElementById('term-cnt-ok').textContent=ok;
+          document.getElementById('term-cnt-err').textContent=err;
+          if(ok>0)  badgeOk.style.display='';
+          if(err>0) badgeErr.style.display='';
+        });
+      }catch(e){
+        addLog(`[error] update-sf: ${e.message}`,'err');
+        err+=toUpdate.length;
+      }
     }
+
+    // CREATE: terminales no encontradas en SF
+    if(toCreate.length){
+      try{
+        const today = new Date().toISOString().split('T')[0];
+        const newRecords = toCreate.map(r=>({
+          serie: r.serie,
+          fields: { ...f, Tipo_de_producto__c:'TERMINAL', Nombre_Producto__c:'AXIUM D7', RPN_sw_Version__c:'2.1.1', RPN_end_Date__c:today }
+        }));
+        const res=await fetch(`${AGENT_URL}/terminales/create-sf`,{
+          method:'POST',
+          headers:{'Content-Type':'application/json','x-automation-secret':AGENT_SECRET},
+          body:JSON.stringify({ records: newRecords })
+        });
+        const data=await res.json();
+        if(!res.ok) throw new Error(data.error||`HTTP ${res.status}`);
+        (data.results||[]).forEach((r)=>{
+          progFill.style.width=Math.round(((ok+err+1)/totalOps)*100)+'%';
+          if(r.ok){ ok++; addLog(`[new] ✓ creada: ${r.serie}`,'ok'); }
+          else     { err++; addLog(`[new] ✗ ${r.serie} — ${r.error||'error'}`,'err'); }
+          document.getElementById('term-cnt-ok').textContent=ok;
+          document.getElementById('term-cnt-err').textContent=err;
+          if(ok>0)  badgeOk.style.display='';
+          if(err>0) badgeErr.style.display='';
+        });
+      }catch(e){
+        addLog(`[error] create-sf: ${e.message}`,'err');
+        err+=toCreate.length;
+      }
+    }
+
     progFill.style.width='100%';
-    progLabel.textContent=`Listo — ${ok} OK, ${err} errores, ${skipped} omitidas`;
-    addLog(`[done] ${ok}/${total} terminales actualizadas.`);
+    progLabel.textContent=`Listo — ${ok} OK, ${err} errores, ${skippedYa.length} omitidas`;
+    addLog(`[done] ${ok}/${totalOps} terminales procesadas.`);
     document.getElementById('term-done-row').style.display='block';
   };
 })();
