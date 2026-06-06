@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v3.3.8</title>
+<title>Alleata · Operaciones v3.3.9</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -306,7 +306,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v3.3.8 · 05 jun 2026
+      v3.3.9 · 05 jun 2026
     </div>
   </div>
 </div>
@@ -381,7 +381,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v3.3.8 · 05 jun 2026
+      v3.3.9 · 05 jun 2026
     </div>
   </div>
 </nav>
@@ -410,7 +410,7 @@ tr:hover td{background:var(--surface2);}
         SF Sync
       </button>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v3.3.8</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v3.3.9</div>
   </div>
   <div class="content">
 
@@ -3869,7 +3869,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v3.3.8] OK');
+console.log('[Alleata v3.3.9] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -5960,7 +5960,7 @@ function renderEnviosTable(list){
             : `<button onclick="openCargarTrackRetorno('${e.id}')" style="font-size:10px;color:#f59e0b;background:rgba(245,158,11,.1);border:1px dashed #f59e0b;border-radius:6px;padding:3px 7px;cursor:pointer;white-space:nowrap">+ Cargar tracking</button>`
           }
         </div>`:''}</td>
-      <td class="mono" style="font-size:11px;${(e.logistica||'').toUpperCase()==='CORREO ARGENTINO'?'display:none':''}">${calcDistancia(e.ciudad,e.provincia)}</td>
+      <td class="mono" style="font-size:11px;${(e.logistica||'').toUpperCase()==='CORREO ARGENTINO'?'display:none':''}" data-dist-id="${e.id}">${calcDistancia(e.ciudad,e.provincia,e.cp_dest)}</td>
       <td>
         <div style="font-size:12px">${e.ciudad||'—'}</div>
         <div style="font-size:10px;color:var(--text-muted)">${e.provincia||''}</div>
@@ -6009,6 +6009,15 @@ function renderEnviosTable(list){
     </tr>`;
   }).join('');
   }; // fin renderConDistri
+
+  // Lanzar lookup GeoRef para OTs sin distancia (en paralelo, sin bloquear UI)
+  setTimeout(() => {
+    list.forEach(e => {
+      if((e.logistica||'').toUpperCase()!=='CORREO ARGENTINO') {
+        calcDistanciaAsync(e.id, e.ciudad, e.provincia, e.cp_dest);
+      }
+    });
+  }, 100);
 
   // Cargar nombres de distribuidores asignados
   const ids=[...new Set(list.filter(e=>e.asignado_a).map(e=>e.asignado_a))];
@@ -7079,6 +7088,67 @@ const COORDS_CIUDAD={
   'marcos paz':{lat:-34.779,lng:-58.844},'general rodríguez':{lat:-34.604,lng:-58.956},
   'general rodriguez':{lat:-34.604,lng:-58.956},
 };
+// ── GeoRef Argentina — lookup async de CPs no encontrados en mapa local ──
+const _georefCache = {}; // cp/ciudad → {lat,lng} | null
+
+async function georefLookupCP(cp, ciudad, provincia) {
+  const key = cp || ciudad;
+  if(!key) return null;
+  if(_georefCache[key] !== undefined) return _georefCache[key];
+
+  try {
+    // Intentar por CP primero (sin letra: B1740 → 1740)
+    const cpNum = cp ? String(cp).match(/\d{3,5}/)?.[0] : null;
+    let url = cpNum
+      ? `https://apis.datos.gob.ar/georef/api/localidades?cp=${cpNum}&campos=nombre,centroide&max=1`
+      : `https://apis.datos.gob.ar/georef/api/localidades?nombre=${encodeURIComponent(ciudad)}&provincia=${encodeURIComponent(provincia||'')}&campos=nombre,centroide&max=1`;
+
+    const r = await fetch(url);
+    const d = await r.json();
+    const loc = d?.localidades?.[0];
+    if(loc?.centroide?.lat) {
+      const result = {lat: loc.centroide.lat, lng: loc.centroide.lon};
+      _georefCache[key] = result;
+      return result;
+    }
+    // Fallback: buscar por nombre de ciudad
+    if(cpNum && ciudad) {
+      const r2 = await fetch(`https://apis.datos.gob.ar/georef/api/localidades?nombre=${encodeURIComponent(ciudad)}&campos=nombre,centroide&max=1`);
+      const d2 = await r2.json();
+      const loc2 = d2?.localidades?.[0];
+      if(loc2?.centroide?.lat) {
+        const result = {lat: loc2.centroide.lat, lng: loc2.centroide.lon};
+        _georefCache[key] = result;
+        return result;
+      }
+    }
+  } catch(e) {}
+  _georefCache[key] = null;
+  return null;
+}
+
+// Versión async de calcDistancia — llama a GeoRef si no hay match local
+async function calcDistanciaAsync(id, ciudad, provincia, cp) {
+  const local = calcDistancia(ciudad, provincia, cp);
+  // Si ya tiene resultado del mapa local, no hace falta GeoRef
+  if(!local.includes('?km')) return; // ya tiene valor
+
+  // Llamar GeoRef
+  const coords = await georefLookupCP(cp, ciudad, provincia);
+  if(!coords) return;
+
+  const dist = haversine(CENTRAL_LAT, CENTRAL_LNG, coords.lat, coords.lng);
+  const color = dist<20?'var(--teal)':dist<40?'var(--amber)':'var(--red)';
+  // Actualizar la celda en la tabla si sigue visible
+  const cells = document.querySelectorAll(`[data-dist-id="${id}"]`);
+  cells.forEach(el => {
+    el.innerHTML = `<span style="color:${color};font-weight:700" title="GeoRef">~${Math.round(dist)}km</span>`;
+    // Guardar en caché local para no volver a buscar
+    const cpNum = cp ? String(cp).match(/\d{3,5}/)?.[0] : null;
+    if(cpNum) CP_COORDS[parseInt(cpNum)] = [coords.lat, coords.lng];
+  });
+}
+
 function haversine(lat1,lng1,lat2,lng2){
   const R=6371,dLat=(lat2-lat1)*Math.PI/180,dLng=(lng2-lng1)*Math.PI/180;
   const a=Math.sin(dLat/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
