@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v3.4.9</title>
+<title>Alleata · Operaciones v3.5.1</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -306,7 +306,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v3.4.9 · 05 jun 2026
+      v3.5.1 · 05 jun 2026
     </div>
   </div>
 </div>
@@ -381,7 +381,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v3.4.9 · 05 jun 2026
+      v3.5.1 · 05 jun 2026
     </div>
   </div>
 </nav>
@@ -410,7 +410,7 @@ tr:hover td{background:var(--surface2);}
         SF Sync
       </button>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v3.4.9</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v3.5.1</div>
   </div>
   <div class="content">
 
@@ -3858,7 +3858,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v3.4.9] OK');
+console.log('[Alleata v3.5.1] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -7305,6 +7305,46 @@ async function globalSFSync() {
     btn.disabled = false;
     if (icon) icon.style.animation = '';
   }
+}
+
+
+function sfActualizarProximoCron() {
+  // ART = UTC-3
+  const ahora = new Date();
+  const artOffset = -3 * 60;
+  const diffMin = artOffset + ahora.getTimezoneOffset();
+  const art = new Date(ahora.getTime() + diffMin * 60000);
+  const dia = art.getDay(); // 0=Dom, 1=Lun ... 6=Sáb
+  const h   = art.getHours();
+  const m   = art.getMinutes();
+  const ahMin = h * 60 + m;
+
+  // SF Incremental: L-V cada 10min | Sáb-Dom cada 30min
+  const intervaloMin = (dia >= 1 && dia <= 5) ? 10 : 30;
+  const minHastaSF = intervaloMin - (ahMin % intervaloMin);
+
+  // CA Tracker: L-V 09:00 13:00 18:00 | Sáb 14:00
+  const CA_HORAS = { 1:[9,13,18],2:[9,13,18],3:[9,13,18],4:[9,13,18],5:[9,13,18],6:[14],0:[] };
+  function proximoCA() {
+    for (let d = 0; d < 7; d++) {
+      const dCheck = (dia + d) % 7;
+      const horas  = CA_HORAS[dCheck] || [];
+      for (const hc of horas) {
+        const cronMin = hc * 60;
+        if (d === 0 && cronMin <= ahMin) continue;
+        const hasta = d === 0 ? cronMin - ahMin : (1440 - ahMin) + (d-1)*1440 + cronMin;
+        const DIAS = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+        const diaStr = d===0?'hoy':d===1?'mañana':DIAS[dCheck];
+        return `${diaStr} ${String(hc).padStart(2,'0')}:00 (en ${hasta<60?hasta+'min':Math.round(hasta/60)+'h'})`;
+      }
+    }
+    return '—';
+  }
+
+  const elNextSync = document.getElementById('sf-next-sync');
+  const elNextCA   = document.getElementById('sf-next-ca-tracker');
+  if (elNextSync) elNextSync.textContent = `⏱ Próx. sync: en ${minHastaSF}min (cada ${intervaloMin}min)`;
+  if (elNextCA)   elNextCA.textContent   = `📡 Próx. CA Tracker: ${proximoCA()}`;
 }
 
 function mostrarSFSyncSiAdmin() {
