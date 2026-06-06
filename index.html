@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v3.3.5</title>
+<title>Alleata · Operaciones v3.3.6</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -306,7 +306,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v3.3.5 · 05 jun 2026
+      v3.3.6 · 05 jun 2026
     </div>
   </div>
 </div>
@@ -381,7 +381,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v3.3.5 · 05 jun 2026
+      v3.3.6 · 05 jun 2026
     </div>
   </div>
 </nav>
@@ -410,7 +410,7 @@ tr:hover td{background:var(--surface2);}
         SF Sync
       </button>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v3.3.5</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v3.3.6</div>
   </div>
   <div class="content">
 
@@ -3869,7 +3869,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v3.3.5] OK');
+console.log('[Alleata v3.3.6] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -7069,8 +7069,14 @@ const COORDS_CIUDAD={
   'lujan':{lat:-34.569,lng:-59.109},'ramos mejía':{lat:-34.644,lng:-58.564},
   'ramos mejia':{lat:-34.644,lng:-58.564},'san justo':{lat:-34.681,lng:-58.562},
   'haedo':{lat:-34.643,lng:-58.598},'castelar':{lat:-34.655,lng:-58.642},
-  // Interior
+  // Interior / GBA Sur extendido
   'monte grande':{lat:-34.813,lng:-58.460},'general pico':{lat:-35.656,lng:-63.757},
+  'san francisco solano':{lat:-34.808,lng:-58.309},'solano':{lat:-34.808,lng:-58.309},
+  'quilmes oeste':{lat:-34.721,lng:-58.295},'bernal':{lat:-34.703,lng:-58.285},
+  'bernal oeste':{lat:-34.703,lng:-58.285},'san vicente':{lat:-35.027,lng:-58.413},
+  'cañuelas':{lat:-35.053,lng:-58.757},'canuelas':{lat:-35.053,lng:-58.757},
+  'marcos paz':{lat:-34.779,lng:-58.844},'general rodríguez':{lat:-34.604,lng:-58.956},
+  'general rodriguez':{lat:-34.604,lng:-58.956},
 };
 function haversine(lat1,lng1,lat2,lng2){
   const R=6371,dLat=(lat2-lat1)*Math.PI/180,dLng=(lng2-lng1)*Math.PI/180;
@@ -7087,11 +7093,20 @@ function calcDistancia(ciudad,provincia,cp){
 
   // Try CP_COORDS first (most precise)
   const cpNum = parseCpNum(cp);
-  if(cpNum && CP_COORDS[cpNum]){
-    const c=CP_COORDS[cpNum];
-    const dist=haversine(CENTRAL_LAT,CENTRAL_LNG,c[0],c[1]);
-    const color=dist<20?'var(--teal)':dist<40?'var(--amber)':'var(--red)';
-    return`<span style="color:${color};font-weight:700" title="Por CP ${cpNum}">~${Math.round(dist)}km</span>`;
+  if(cpNum){
+    // Buscar CP exacto, si no el más cercano numéricamente (±50)
+    let cpKey = CP_COORDS[cpNum] ? cpNum : null;
+    if(!cpKey){
+      const keys = Object.keys(CP_COORDS).map(Number).sort((a,b)=>Math.abs(a-cpNum)-Math.abs(b-cpNum));
+      if(keys.length && Math.abs(keys[0]-cpNum) <= 50) cpKey = keys[0];
+    }
+    if(cpKey){
+      const c=CP_COORDS[cpKey];
+      const dist=haversine(CENTRAL_LAT,CENTRAL_LNG,c[0],c[1]);
+      const color=dist<20?'var(--teal)':dist<40?'var(--amber)':'var(--red)';
+      const exact = cpKey===cpNum;
+      return`<span style="color:${color};font-weight:700" title="CP ${cpNum}${exact?'':' → ~'+cpKey}">~${Math.round(dist)}km</span>`;
+    }
   }
 
   // Try city coords
