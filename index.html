@@ -4275,13 +4275,13 @@ async function loadBadges(){
   let envQ=sb.from('sf_workorders')
     .select('id,status,logistica')
     .in('record_type', TIPOS_ENVIO)
-    .in('status',['Pre-Colecta','En Proceso']);
+    .in('status',['Pre-Colecta','Despachado']);
   if(!isAdmin) envQ=envQ.ilike('responsable','%'+pn+'%');
   const{data:envRaw=[]}=await envQ;
-  // Solo contar activos reales (Pre-Colecta+ALLEATA o En Proceso+CORREO ARGENTINO)
+  // Solo contar activos reales
   const env=(envRaw||[]).filter(e=>
-    (e.status==='Pre-Colecta' && e.logistica==='ALLEATA') ||
-    (e.status==='En Proceso' && e.logistica==='CORREO ARGENTINO')
+    (e.status==='Pre-Colecta'||e.status==='Despachado') &&
+    (e.logistica==='ALLEATA'||e.logistica==='CORREO ARGENTINO')
   );
   const des=[];{let _f=0;const _P=1000;
     while(true){
@@ -4975,11 +4975,11 @@ async function loadStatsOperador(){
   const { data:statsRaw } = await sb.from('sf_workorders')
     .select('status,logistica')
     .in('record_type', TIPOS_ENVIO)
-    .in('status',['Pre-Colecta','En Proceso'])
+    .in('status',['Pre-Colecta','Despachado'])
     .ilike('responsable',`%${nombre}%`);
   const data = (statsRaw||[]).filter(e=>
-    (e.status==='Pre-Colecta' && e.logistica==='ALLEATA') ||
-    (e.status==='En Proceso' && e.logistica==='CORREO ARGENTINO')
+    (e.status==='Pre-Colecta'||e.status==='Despachado') &&
+    (e.logistica==='ALLEATA'||e.logistica==='CORREO ARGENTINO')
   );
   if(!data) return;
   // Mapear status → estado para compatibilidad con helpers existentes
@@ -5014,12 +5014,12 @@ async function loadFiltroResponsables(){
   const{data}=await sb.from('sf_workorders')
     .select('responsable,status,logistica')
     .in('record_type', TIPOS_ENVIO)
-    .in('status',['Pre-Colecta','En Proceso'])
+    .in('status',['Pre-Colecta','Despachado'])
     .order('responsable');
   // Filtrar en cliente para asegurar combinaciones correctas
   const dataFilt=(data||[]).filter(e=>
-    (e.status==='Pre-Colecta' && e.logistica==='ALLEATA') ||
-    (e.status==='En Proceso' && e.logistica==='CORREO ARGENTINO')
+    (e.status==='Pre-Colecta'||e.status==='Despachado') &&
+    (e.logistica==='ALLEATA'||e.logistica==='CORREO ARGENTINO')
   );
   const uniq=[...new Set((dataFilt||[]).map(r=>r.responsable).filter(Boolean))];
   const sel=document.getElementById('envFiltroResp');
@@ -5281,7 +5281,7 @@ async function renderEnvios(){
   const filtroEstOrden=document.getElementById('envFiltroEstado')?.value||'';
 
   // OTs de Envíos: Instalación Equipo+Simcard / Instalación Simcard / Asistencia Tecnica
-  // Activos: Pre-Colecta+ALLEATA  ó  En Proceso+CORREO ARGENTINO
+  // Activos: Pre-Colecta o Despachado, logística ALLEATA o CORREO ARGENTINO
   const TIPOS_ENVIO = ['Instalación Equipo + Simcard','Instalación Simcard','Asistencia Tecnica'];
 
   let query=sb.from('sf_workorders')
@@ -5289,16 +5289,16 @@ async function renderEnvios(){
     .in('record_type', TIPOS_ENVIO)
     .order('fecha_despacho',{ascending:false});
 
+  // Estados activos: Pre-Colecta o Despachado, logística ALLEATA o CORREO ARGENTINO
+  const LOGS_ACTIVAS = ['ALLEATA','CORREO ARGENTINO'];
+  const STATUSES_ACTIVOS = ['Pre-Colecta','Despachado'];
+
   if(isLogistica){
-    // Logística ve solo ALLEATA activos
-    query=query.eq('logistica','ALLEATA').eq('status','Pre-Colecta');
+    query=query.eq('logistica','ALLEATA').in('status', STATUSES_ACTIVOS);
   } else if(isAdmin){
     const esCorreo = _canalActivo==='CORREO';
-    if(esCorreo){
-      query=query.eq('logistica','CORREO ARGENTINO').eq('status','En Proceso');
-    } else {
-      query=query.eq('logistica','ALLEATA').eq('status','Pre-Colecta');
-    }
+    query=query.eq('logistica', esCorreo ? 'CORREO ARGENTINO' : 'ALLEATA')
+               .in('status', STATUSES_ACTIVOS);
     const filtroResp=document.getElementById('envFiltroResp')?.value||'';
     const filtroEst=document.getElementById('envFiltroEstado')?.value||'';
     if(filtroResp)query=query.ilike('responsable',`%${filtroResp}%`);
@@ -5306,13 +5306,10 @@ async function renderEnvios(){
   } else {
     // Operador
     const nombre=currentProfile?.nombre||'';
-    query=query.ilike('responsable',`%${nombre}%`);
     const esCorreoOp = _canalActivo==='CORREO';
-    if(esCorreoOp){
-      query=query.eq('logistica','CORREO ARGENTINO').eq('status','En Proceso');
-    } else {
-      query=query.eq('logistica','ALLEATA').eq('status','Pre-Colecta');
-    }
+    query=query.ilike('responsable',`%${nombre}%`)
+               .eq('logistica', esCorreoOp ? 'CORREO ARGENTINO' : 'ALLEATA')
+               .in('status', STATUSES_ACTIVOS);
     const filtroEstOp=document.getElementById('envFiltroEstado')?.value||'';
     if(filtroEstOp) query=query.eq('status',filtroEstOp);
   }
@@ -5656,6 +5653,7 @@ async function backfillSLACA(){
   const { data: pendientesRaw, error } = await sb.from('sf_workorders')
     .select('id,workorder_number,tracking_envio,status,record_type,responsable,sla_ca_dias')
     .in('record_type',['Instalación Equipo + Simcard','Instalación Simcard','Asistencia Tecnica'])
+    .in('status',['Pre-Colecta','Despachado'])
     .eq('logistica','CORREO ARGENTINO')
     .not('tracking_envio','is',null)
     .neq('tracking_envio','')
@@ -6328,7 +6326,7 @@ async function autoActualizarTracking(){
   let query = sb.from('sf_workorders')
     .select('id,tracking_envio,status,record_type,responsable,cuenta,workorder_number,logistica')
     .in('record_type', TIPOS_ENVIO_AT)
-    .eq('status','En Proceso')
+    .in('status',['Pre-Colecta','Despachado'])
     .eq('logistica','CORREO ARGENTINO')
     .not('tracking_envio','is',null)
     .neq('tracking_envio','');
@@ -7904,7 +7902,7 @@ async function cargarDistri(){
   grid.innerHTML='<div style="text-align:center;padding:60px;color:var(--text-muted);grid-column:1/-1"><div style="font-size:32px;margin-bottom:8px">⏳</div>Cargando...</div>';
   const [{data:distris},{data:envios},{data:desins}]=await Promise.all([
     sb.from('distribuidores').select('*').eq('activo',true).order('nombre'),
-    sb.from('sf_workorders').select('id,workorder_number,cuenta,ciudad,provincia,codigo_postal,status,logistica,responsable').in('record_type',['Instalación Equipo + Simcard','Instalación Simcard','Asistencia Tecnica']).in('status',['Pre-Colecta','En Proceso']),
+    sb.from('sf_workorders').select('id,workorder_number,cuenta,ciudad,provincia,codigo_postal,status,logistica,responsable').in('record_type',['Instalación Equipo + Simcard','Instalación Simcard','Asistencia Tecnica']).in('status',['Pre-Colecta','Despachado']),
     sb.from('v_ordenes_con_sla').select('sf_id,ot,comercio,cuenta,ciudad,provincia,cp,estado').not('estado','in','("Terminal recuperada","Extraviada")')
   ]);
   _distri_data=distris||[];
