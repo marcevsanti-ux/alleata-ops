@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v3.4.8</title>
+<title>Alleata · Operaciones v3.4.9</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -306,7 +306,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v3.4.8 · 05 jun 2026
+      v3.4.9 · 05 jun 2026
     </div>
   </div>
 </div>
@@ -381,7 +381,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v3.4.8 · 05 jun 2026
+      v3.4.9 · 05 jun 2026
     </div>
   </div>
 </nav>
@@ -410,7 +410,7 @@ tr:hover td{background:var(--surface2);}
         SF Sync
       </button>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v3.4.8</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v3.4.9</div>
   </div>
   <div class="content">
 
@@ -3858,7 +3858,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v3.4.8] OK');
+console.log('[Alleata v3.4.9] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -7112,6 +7112,22 @@ async function _geoFetch(key, cp, ciudad, provincia){
   const cpNum = cp ? String(cp).match(/\d{3,5}/)?.[0] : null;
 
   async function tryGeoRef(){
+    // Normalizar ciudad: "BUENOS AIRES" → "Buenos Aires", "villa martelli" → "Villa Martelli"
+    const ciudadClean = ciudad
+      ? ciudad.trim().toLowerCase().replace(/\b\w/g, c=>c.toUpperCase())
+      : null;
+    const ciudadNorm = ciudadClean?.toLowerCase();
+    const provParam = provincia ? `&provincia=${encodeURIComponent(provincia)}` : '';
+
+    // Coordenadas hardcodeadas para casos ambiguos frecuentes
+    const KNOWN = {
+      'buenos aires caba': {lat:-34.6037,lng:-58.3816},
+      'capital federal':   {lat:-34.6037,lng:-58.3816},
+      'caba':              {lat:-34.6037,lng:-58.3816},
+    };
+    const knownKey = ciudadNorm + (provincia?.toLowerCase().includes('ciudad')||provincia==='1' ? ' caba' : '');
+    if(KNOWN[knownKey]||KNOWN[ciudadNorm]) return KNOWN[knownKey]||KNOWN[ciudadNorm];
+
     // 1. Por CP
     if(cpNum){
       const r = await fetch(`${GEOREF}/localidades?cp=${cpNum}&campos=nombre,centroide&max=1`);
@@ -7119,26 +7135,26 @@ async function _geoFetch(key, cp, ciudad, provincia){
       const loc = d?.localidades?.[0];
       if(loc?.centroide?.lat) return {lat:loc.centroide.lat, lng:loc.centroide.lon};
     }
-    // 2. Por ciudad
-    if(ciudad){
-      // Normalizar: "Buenos Aires" como ciudad en GBA → buscar como provincia
-      const ciudadNorm = ciudad.toLowerCase().trim();
-      const queryProv = (ciudadNorm==='buenos aires' && provincia)
-        ? `&provincia=${encodeURIComponent(provincia)}`
-        : provincia ? `&provincia=${encodeURIComponent(provincia)}` : '';
-      const r = await fetch(`${GEOREF}/localidades?nombre=${encodeURIComponent(ciudad)}${queryProv}&campos=nombre,centroide&max=3`);
+    // 2. Por ciudad (normalizada) + provincia
+    if(ciudadClean){
+      const r = await fetch(`${GEOREF}/localidades?nombre=${encodeURIComponent(ciudadClean)}${provParam}&campos=nombre,centroide&max=3`);
       const d = await r.json();
-      // Tomar el resultado más específico (evitar duplicados genéricos)
       const locs = d?.localidades||[];
       const loc = locs.find(l=>l.nombre.toLowerCase()===ciudadNorm) || locs[0];
       if(loc?.centroide?.lat) return {lat:loc.centroide.lat, lng:loc.centroide.lon};
     }
     // 3. Por municipio
-    if(ciudad){
-      const prov = provincia ? `&provincia=${encodeURIComponent(provincia)}` : '';
-      const r = await fetch(`${GEOREF}/municipios?nombre=${encodeURIComponent(ciudad)}${prov}&campos=nombre,centroide&max=1`);
+    if(ciudadClean){
+      const r = await fetch(`${GEOREF}/municipios?nombre=${encodeURIComponent(ciudadClean)}${provParam}&campos=nombre,centroide&max=1`);
       const d = await r.json();
       const loc = d?.municipios?.[0];
+      if(loc?.centroide?.lat) return {lat:loc.centroide.lat, lng:loc.centroide.lon};
+    }
+    // 4. Sin filtro de provincia (último recurso)
+    if(ciudadClean && provincia){
+      const r = await fetch(`${GEOREF}/localidades?nombre=${encodeURIComponent(ciudadClean)}&campos=nombre,centroide&max=1`);
+      const d = await r.json();
+      const loc = d?.localidades?.[0];
       if(loc?.centroide?.lat) return {lat:loc.centroide.lat, lng:loc.centroide.lon};
     }
     return null;
