@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v3.4.6</title>
+<title>Alleata · Operaciones v3.4.8</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -306,7 +306,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v3.4.6 · 05 jun 2026
+      v3.4.8 · 05 jun 2026
     </div>
   </div>
 </div>
@@ -381,7 +381,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v3.4.6 · 05 jun 2026
+      v3.4.8 · 05 jun 2026
     </div>
   </div>
 </nav>
@@ -410,7 +410,7 @@ tr:hover td{background:var(--surface2);}
         SF Sync
       </button>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v3.4.6</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v3.4.8</div>
   </div>
   <div class="content">
 
@@ -3858,7 +3858,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v3.4.6] OK');
+console.log('[Alleata v3.4.8] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -5243,6 +5243,13 @@ function normalizarSFWorkorder(r){
     : (r.logistica||'').toUpperCase() === 'ALLEATA'
     ? 'ALLEATA'
     : r.logistica;
+  // Extraer CP de la dirección si codigo_postal está vacío
+  let cpResuelto = r.codigo_postal || null;
+  if(!cpResuelto && r.direccion){
+    const mDir = r.direccion.match(/\b([A-Z]?\d{4,5})\b/);
+    if(mDir) cpResuelto = mDir[1];
+  }
+
   return {
     ...r,
     logistica:          logNorm,
@@ -5251,7 +5258,7 @@ function normalizarSFWorkorder(r){
     estado:             r.status,
     track:              r.tracking_envio,
     fecha:              r.fecha_despacho,
-    cp_dest:            r.codigo_postal,
+    cp_dest:            cpResuelto,
     track_devolucion:   r.tracking_devolucion,
     ultimo_evento:      r.ultimo_evento_envio,
     ultimo_evento_fecha:r.ultimo_evento_envio_fecha,
@@ -7081,13 +7088,18 @@ function detectarZona(ciudad, provincia, cp) {
 const _geoClientCache = new Map();
 
 function calcDistancia(ciudad, provincia, cp) {
+  if(!ciudad && !cp) return '—';
   const key = [cp,ciudad,provincia].filter(Boolean).join('|').toLowerCase();
   if(_geoClientCache.has(key)){
     const km = _geoClientCache.get(key);
-    return km !== null ? _fmtKm(km) : '<span style="color:var(--text-muted);font-size:10px">—</span>';
+    // null = intentó y falló definitivamente; undefined = no intentó aún
+    if(km !== null) return _fmtKm(km);
+    // null: mostrar — sin reintentar
+    return '<span style="color:var(--text-muted);font-size:10px">—</span>';
   }
+  // No está en caché — disparar fetch y mostrar placeholder animado
   _geoFetch(key, cp, ciudad, provincia);
-  return '<span style="color:var(--text-muted);font-size:10px">~?km</span>';
+  return '<span style="color:var(--text-muted);font-size:10px;opacity:.6">⏳</span>';
 }
 function _fmtKm(km){
   const color = km<20?'var(--teal)':km<40?'var(--amber)':'var(--red)';
@@ -7109,10 +7121,16 @@ async function _geoFetch(key, cp, ciudad, provincia){
     }
     // 2. Por ciudad
     if(ciudad){
-      const prov = provincia ? `&provincia=${encodeURIComponent(provincia)}` : '';
-      const r = await fetch(`${GEOREF}/localidades?nombre=${encodeURIComponent(ciudad)}${prov}&campos=nombre,centroide&max=1`);
+      // Normalizar: "Buenos Aires" como ciudad en GBA → buscar como provincia
+      const ciudadNorm = ciudad.toLowerCase().trim();
+      const queryProv = (ciudadNorm==='buenos aires' && provincia)
+        ? `&provincia=${encodeURIComponent(provincia)}`
+        : provincia ? `&provincia=${encodeURIComponent(provincia)}` : '';
+      const r = await fetch(`${GEOREF}/localidades?nombre=${encodeURIComponent(ciudad)}${queryProv}&campos=nombre,centroide&max=3`);
       const d = await r.json();
-      const loc = d?.localidades?.[0];
+      // Tomar el resultado más específico (evitar duplicados genéricos)
+      const locs = d?.localidades||[];
+      const loc = locs.find(l=>l.nombre.toLowerCase()===ciudadNorm) || locs[0];
       if(loc?.centroide?.lat) return {lat:loc.centroide.lat, lng:loc.centroide.lon};
     }
     // 3. Por municipio
@@ -7134,7 +7152,7 @@ async function _geoFetch(key, cp, ciudad, provincia){
       if(ciudad)    params.set('ciudad', ciudad);
       if(provincia) params.set('provincia', provincia);
       const r = await fetch(ALLY_URL+'/automations/geo/distancia?'+params,
-        {headers:{'x-automation-secret':'123456'}, signal: AbortSignal.timeout(3000)});
+        {headers:{'x-automation-secret':'123456'}, signal: AbortSignal.timeout(5000)});
       if(r.ok){
         const d = await r.json();
         if(d.ok && d.km != null){
