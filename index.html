@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v3.3.2</title>
+<title>Alleata · Operaciones v3.3.3</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -306,7 +306,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v3.3.2 · 05 jun 2026
+      v3.3.3 · 05 jun 2026
     </div>
   </div>
 </div>
@@ -381,7 +381,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v3.3.2 · 05 jun 2026
+      v3.3.3 · 05 jun 2026
     </div>
   </div>
 </nav>
@@ -410,7 +410,7 @@ tr:hover td{background:var(--surface2);}
         SF Sync
       </button>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v3.3.2</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v3.3.3</div>
   </div>
   <div class="content">
 
@@ -764,9 +764,9 @@ tr:hover td{background:var(--surface2);}
             <th style="width:32px" id="thChkAll"><input type="checkbox" id="chkAll" onclick="toggleAllEnvios(this)" style="cursor:pointer"></th>
             <th>OT / Cuenta</th>
             <th>Responsable</th>
-            <th>Zona</th>
+            <th id="thZonaEnvios">Zona</th>
             <th>Tracking</th>
-            <th>Distancia</th>
+            <th id="thDistanciaEnvios">Distancia</th>
             <th>Destino</th>
             <th>Costo</th>
             <th>Estado</th>
@@ -1802,9 +1802,9 @@ tr:hover td{background:var(--surface2);}
             <th style="width:32px"><input type="checkbox" id="inst-chk-all" onchange="instSeleccionarTodos(this)" style="cursor:pointer;width:15px;height:15px"></th>
             <th>OT / Cuenta</th>
             <th>Responsable</th>
-            <th>Zona</th>
+            <th id="thZonaEnvios">Zona</th>
             <th>Tracking</th>
-            <th>Distancia</th>
+            <th id="thDistanciaEnvios">Distancia</th>
             <th>Destino</th>
             <th>SF Status</th>
             <th>Estado CA</th>
@@ -3865,7 +3865,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v3.3.2] OK');
+console.log('[Alleata v3.3.3] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -5379,27 +5379,26 @@ function renderLogisticaStats(list){
     if(e.estado==='Entregado')grupos[log].entregado++;
     if(['Fallido','Perdido','Devuelto'].includes(e.estado))grupos[log].problema++;
   });
-  const logColors={'ALLEATA':'#1dbf8e','Correo Argentino':'#1a9fd4'};
-  const logIcons={'ALLEATA':'🚚','Correo Argentino':'📮'};
-  const keys=Object.keys(grupos).sort();
-  // NO renderizar el card grande — los stats van en los cards individuales
-  el.style.display='none';
-  el.innerHTML='';
-
-  // Mini stats dentro del card de Alleata
-  const cardStats=document.getElementById('alleataCardStats');
-  if(cardStats&&grupos['ALLEATA']){
-    const g=grupos['ALLEATA'];
-    cardStats.style.display='flex';
-    cardStats.innerHTML=miniStatsHTML(g);
-  }
-  // Mini stats dentro del card de Correo Argentino
-  const correoStats=document.getElementById('correoCardStats');
-  if(correoStats&&grupos['Correo Argentino']){
-    const g=grupos['Correo Argentino'];
-    correoStats.style.display='flex';
-    correoStats.innerHTML=miniStatsHTML(g);
-  }
+  // Stats: armar un bloque por logística y mostrarlo según canal activo
+  const statsEl = el;
+  const logKeys = Object.keys(grupos).sort();
+  if(!logKeys.length){ statsEl.style.display='none'; return; }
+  const LOG_LABELS = {'ALLEATA':'🗺️ Alleata','Correo Argentino':'📮 Correo Arg.','CABIFY':'🚗 Cabify'};
+  statsEl.style.display='flex';
+  statsEl.style.flexDirection='column';
+  statsEl.style.gap='6px';
+  statsEl.innerHTML = logKeys.map(log => {
+    const g=grupos[log];
+    const mostrar = _canalActivo==='TODOS' || 
+      (_canalActivo==='ALLEATA'&&log==='ALLEATA') ||
+      (_canalActivo==='CORREO'&&log==='Correo Argentino') ||
+      (_canalActivo==='CABIFY'&&log==='CABIFY');
+    if(!mostrar) return '';
+    return `<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <span style="font-size:11px;font-weight:700;color:var(--text-muted);min-width:90px">${LOG_LABELS[log]||log}</span>
+      ${miniStatsHTML(g)}
+    </div>`;
+  }).filter(Boolean).join('');
 }
 
 // ── SLA CORREO ARGENTINO ──
@@ -5927,7 +5926,7 @@ function renderEnviosTable(list){
         <div style="font-size:10px;color:var(--text-muted)">${e.cuenta||''}</div>
       </td>
       <td style="font-size:13px;font-weight:600">${e.responsable||'—'}</td>
-      <td><span style="font-size:11px;font-weight:700;color:${z.color};white-space:nowrap">${z.icon} ${z.zona}</span></td>
+      <td id="td-zona-${e.id}" style="${(e.logistica||'').toUpperCase()==='CORREO ARGENTINO'?'display:none':''}"><span style="font-size:11px;font-weight:700;color:${z.color};white-space:nowrap">${z.icon} ${z.zona}</span></td>
       <td>
         <!-- TRACKING ENVÍO -->
         ${(e.logistica||'').toUpperCase()==='ALLEATA'
@@ -5945,7 +5944,7 @@ function renderEnviosTable(list){
             : `<button onclick="openCargarTrackRetorno('${e.id}')" style="font-size:10px;color:#f59e0b;background:rgba(245,158,11,.1);border:1px dashed #f59e0b;border-radius:6px;padding:3px 7px;cursor:pointer;white-space:nowrap">+ Cargar tracking</button>`
           }
         </div>`:''}</td>
-      <td class="mono" style="font-size:11px">${calcDistancia(e.ciudad,e.provincia)}</td>
+      <td class="mono" style="font-size:11px;${(e.logistica||'').toUpperCase()==='CORREO ARGENTINO'?'display:none':''}">${calcDistancia(e.ciudad,e.provincia)}</td>
       <td>
         <div style="font-size:12px">${e.ciudad||'—'}</div>
         <div style="font-size:10px;color:var(--text-muted)">${e.provincia||''}</div>
@@ -5979,12 +5978,14 @@ function renderEnviosTable(list){
       </td>
       <td>
         <div style="display:flex;gap:5px;flex-wrap:wrap">
-          ${(e.estado==='Entregado'||e.estado==='Entregado por logística Alleata')
-            ? `<button title="OT ya entregada" style="background:var(--surface2);border:1px solid var(--border2);color:var(--text-muted);font-size:11px;padding:4px 7px;border-radius:6px;cursor:not-allowed;opacity:0.35;${isLogistica?'display:none':''}" disabled>🖨️</button>`
-            : `<button title="Imprimir rótulo envío" style="background:var(--surface2);border:1px solid var(--border2);color:var(--teal);font-size:11px;padding:4px 7px;border-radius:6px;cursor:pointer;${isLogistica?'display:none':''}" onclick="printRotulo('${e.id}')">🖨️</button>`
+          ${(e.logistica||'').toUpperCase()==='CORREO ARGENTINO'
+            ? '' // CA: no tiene rótulo Alleata
+            : (e.estado==='Entregado'||e.estado==='Entregado por logística Alleata')
+              ? `<button title="OT ya entregada" style="background:var(--surface2);border:1px solid var(--border2);color:var(--text-muted);font-size:11px;padding:4px 7px;border-radius:6px;cursor:not-allowed;opacity:0.35;${isLogistica?'display:none':''}" disabled>🖨️</button>`
+              : `<button title="Imprimir rótulo envío" style="background:var(--surface2);border:1px solid var(--border2);color:var(--teal);font-size:11px;padding:4px 7px;border-radius:6px;cursor:pointer;${isLogistica?'display:none':''}" onclick="printRotulo('${e.id}')">🖨️</button>`
           }
           <button title="Actualizar observación" style="background:var(--surface2);border:1px solid var(--border2);color:var(--text-muted);font-size:11px;padding:4px 7px;border-radius:6px;cursor:pointer" onclick="openUpdateEvento('${e.id}','${(e.ultimo_evento||'').replace(/'/g,'&#39;')}')">✏️</button>
-          ${e.track&&(e.logistica||'').toUpperCase()!=='ALLEATA'?`<button id="track-btn-${e.id}" title="Consultar CA" style="background:var(--surface2);border:1px solid var(--border2);color:var(--blue);font-size:11px;padding:4px 7px;border-radius:6px;cursor:pointer" onclick="consultarTracking('${e.id}','${e.track}')">🔍</button>`:''}
+          ${e.track&&(e.logistica||'').toUpperCase()!=='ALLEATA'?`<button id="track-btn-${e.id}" title="Actualizar tracking CA" style="background:var(--surface2);border:1px solid var(--border2);color:var(--blue);font-size:11px;padding:4px 7px;border-radius:6px;cursor:pointer" onclick="consultarTracking('${e.id}','${e.track}')">🔍</button>`:''}
           ${tieneRetorno?`<button title="Imprimir rótulo RETORNO" style="background:rgba(245,158,11,.15);border:1px solid #f59e0b;color:#f59e0b;font-size:11px;padding:4px 7px;border-radius:6px;cursor:pointer" onclick="printRotuloDevolucion('${e.id}')">↩️🖨️</button>`:''}
 
         </div>
@@ -6069,7 +6070,17 @@ function setCanalEnvios(canal){
   };
   document.getElementById('envTablaLabel').textContent = LABELS[canal] || 'Envíos';
 
+  actualizarColumnasLogistica(canal);
   renderEnvios();
+}
+
+// Ocultar/mostrar columnas según logística
+function actualizarColumnasLogistica(canal){
+  const esCA = canal==='CORREO';
+  const thDist = document.getElementById('thDistanciaEnvios');
+  const thZona = document.getElementById('thZonaEnvios');
+  if(thDist) thDist.style.display = esCA ? 'none' : '';
+  if(thZona) thZona.style.display = esCA ? 'none' : '';
 }
 
 // Actualizar contadores en pills
