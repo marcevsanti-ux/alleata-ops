@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v3.3.3</title>
+<title>Alleata · Operaciones v3.3.4</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -306,7 +306,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v3.3.3 · 05 jun 2026
+      v3.3.4 · 05 jun 2026
     </div>
   </div>
 </div>
@@ -381,7 +381,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v3.3.3 · 05 jun 2026
+      v3.3.4 · 05 jun 2026
     </div>
   </div>
 </nav>
@@ -410,7 +410,7 @@ tr:hover td{background:var(--surface2);}
         SF Sync
       </button>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v3.3.3</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v3.3.4</div>
   </div>
   <div class="content">
 
@@ -673,6 +673,10 @@ tr:hover td{background:var(--surface2);}
             <button id="pill-CABIFY" onclick="setCanalEnvios('CABIFY')"
               style="padding:6px 14px;border-radius:20px;font-size:12px;font-weight:700;font-family:'Inter',sans-serif;cursor:pointer;transition:all .15s;border:2px solid var(--border2);background:transparent;color:var(--text-muted);">
               🚗 Cabify <span id="pill-cnt-CABIFY" style="opacity:.8;font-size:10px;margin-left:4px"></span>
+            </button>
+            <button id="pill-OTROS" onclick="setCanalEnvios('OTROS')"
+              style="padding:6px 14px;border-radius:20px;font-size:12px;font-weight:700;font-family:'Inter',sans-serif;cursor:pointer;transition:all .15s;border:2px solid var(--border2);background:transparent;color:var(--text-muted);">
+              📦 Otros <span id="pill-cnt-OTROS" style="opacity:.8;font-size:10px;margin-left:4px"></span>
             </button>
           </div>
         </div>
@@ -3865,7 +3869,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v3.3.3] OK');
+console.log('[Alleata v3.3.4] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -5287,6 +5291,7 @@ async function renderEnvios(){
   // Estados activos: Pre-Colecta o Despachado — logística ALLEATA / CORREO ARGENTINO / CABIFY
   const STATUSES_ACTIVOS = ['Pre-Colecta','Despachado'];
   const LOG_MAP = {ALLEATA:'ALLEATA', CORREO:'CORREO ARGENTINO', CABIFY:'CABIFY'};
+  const LOGS_CONOCIDAS = ['ALLEATA','CORREO ARGENTINO','CABIFY'];
   query=query.in('status', STATUSES_ACTIVOS);
 
   if(isLogistica){
@@ -5309,6 +5314,10 @@ async function renderEnvios(){
   const{data:raw}=await query;
   // Normalizar nombres de columnas para compatibilidad con el resto del módulo
   let list=(raw||[]).map(normalizarSFWorkorder);
+  // Filtro OTROS: logísticas no conocidas
+  if(_canalActivo==='OTROS'){
+    list=list.filter(e=>!['ALLEATA','CORREO ARGENTINO','CABIFY'].includes((e.logistica||'').toUpperCase().trim()));
+  }
 
   // Filtro búsqueda local (OT, tracking, cuenta, responsable)
   const buscar=(document.getElementById('envBuscar')?.value||'').trim().toLowerCase();
@@ -5370,35 +5379,51 @@ async function renderEnvios(){
 function renderLogisticaStats(list){
   const el=document.getElementById('envLogisticaStats');
   if(!el)return;
-  const grupos={};
-  list.forEach(e=>{
-    const log=e.logistica||'Correo Argentino';
-    if(!grupos[log])grupos[log]={total:0,transito:0,entregado:0,problema:0};
-    grupos[log].total++;
-    if(['En tránsito','En camino','Despachado','En espera en sucursal'].includes(e.estado))grupos[log].transito++;
-    if(e.estado==='Entregado')grupos[log].entregado++;
-    if(['Fallido','Perdido','Devuelto'].includes(e.estado))grupos[log].problema++;
+  if(!list||!list.length){ el.style.display='none'; return; }
+
+  // Normalizar logística: ALLEATA, CORREO ARGENTINO, CABIFY → conocidas; resto → OTROS
+  const LOG_CONOCIDAS = ['ALLEATA','CORREO ARGENTINO','CABIFY'];
+  const normLog = l => {
+    const u=(l||'').toUpperCase().trim();
+    if(u==='ALLEATA') return 'ALLEATA';
+    if(u==='CORREO ARGENTINO') return 'CORREO ARGENTINO';
+    if(u==='CABIFY') return 'CABIFY';
+    return 'OTROS';
+  };
+
+  // Filtrar lista según canal activo
+  const LOG_MAP = {ALLEATA:'ALLEATA', CORREO:'CORREO ARGENTINO', CABIFY:'CABIFY', OTROS:'OTROS'};
+  const filtrada = _canalActivo==='TODOS'
+    ? list
+    : list.filter(e => normLog(e.logistica) === (LOG_MAP[_canalActivo]||_canalActivo));
+
+  // Contar estados
+  const g = { total:0, precolecta:0, transito:0, despachado:0 };
+  filtrada.forEach(e=>{
+    g.total++;
+    const st=(e.estado||e.status||'').toLowerCase();
+    if(st==='pre-colecta')   g.precolecta++;
+    else if(st==='despachado') g.despachado++;
+    else if(['en tránsito','en camino','en transito','en espera en sucursal'].some(x=>st.includes(x))) g.transito++;
   });
-  // Stats: armar un bloque por logística y mostrarlo según canal activo
-  const statsEl = el;
-  const logKeys = Object.keys(grupos).sort();
-  if(!logKeys.length){ statsEl.style.display='none'; return; }
-  const LOG_LABELS = {'ALLEATA':'🗺️ Alleata','Correo Argentino':'📮 Correo Arg.','CABIFY':'🚗 Cabify'};
-  statsEl.style.display='flex';
-  statsEl.style.flexDirection='column';
-  statsEl.style.gap='6px';
-  statsEl.innerHTML = logKeys.map(log => {
-    const g=grupos[log];
-    const mostrar = _canalActivo==='TODOS' || 
-      (_canalActivo==='ALLEATA'&&log==='ALLEATA') ||
-      (_canalActivo==='CORREO'&&log==='Correo Argentino') ||
-      (_canalActivo==='CABIFY'&&log==='CABIFY');
-    if(!mostrar) return '';
-    return `<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-      <span style="font-size:11px;font-weight:700;color:var(--text-muted);min-width:90px">${LOG_LABELS[log]||log}</span>
-      ${miniStatsHTML(g)}
+
+  el.style.display='flex';
+  el.style.alignItems='center';
+  el.style.gap='8px';
+  el.style.flexWrap='wrap';
+  el.style.padding='10px 0 4px';
+
+  const stat = (val, lbl, col) =>
+    `<div style="background:var(--navy-700);border-radius:10px;padding:10px 18px;text-align:center;min-width:80px">
+      <div style="font-size:22px;font-weight:800;font-family:'JetBrains Mono',monospace;color:${col}">${val}</div>
+      <div style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-top:2px">${lbl}</div>
     </div>`;
-  }).filter(Boolean).join('');
+
+  el.innerHTML =
+    stat(g.total,      'Total',       'var(--text)') +
+    stat(g.precolecta, 'Pre-Colecta', '#f59e0b') +
+    stat(g.transito,   'En Tránsito', '#1a9fd4') +
+    stat(g.despachado, 'Despachado',  '#1dbf8e');
 }
 
 // ── SLA CORREO ARGENTINO ──
@@ -6040,12 +6065,13 @@ function setCanalEnvios(canal){
   _canalActivo = canal;
 
   // Actualizar pills
-  const PILLS = ['TODOS','ALLEATA','CORREO','CABIFY'];
+  const PILLS = ['TODOS','ALLEATA','CORREO','CABIFY','OTROS'];
   const PILL_COLORS = {
     TODOS:   {border:'var(--teal)',   bg:'var(--teal)',   color:'#fff'},
     ALLEATA: {border:'#1dbf8e',       bg:'rgba(29,191,142,.15)', color:'#1dbf8e'},
     CORREO:  {border:'#E30613',       bg:'rgba(227,6,19,.15)',   color:'#E30613'},
     CABIFY:  {border:'#7C3AED',       bg:'rgba(124,58,237,.15)', color:'#a78bfa'},
+    OTROS:   {border:'#64748b',       bg:'rgba(100,116,139,.15)', color:'#94a3b8'},
   };
   PILLS.forEach(p => {
     const el = document.getElementById('pill-'+p);
@@ -6067,6 +6093,7 @@ function setCanalEnvios(canal){
     ALLEATA: 'Logística Alleata',
     CORREO:  'Correo Argentino',
     CABIFY:  'Cabify',
+    OTROS:   'Otros',
   };
   document.getElementById('envTablaLabel').textContent = LABELS[canal] || 'Envíos';
 
@@ -6085,17 +6112,21 @@ function actualizarColumnasLogistica(canal){
 
 // Actualizar contadores en pills
 function actualizarPillCounts(list){
-  const cnt = {TODOS: list.length, ALLEATA:0, CORREO:0, CABIFY:0};
+  const cnt = {TODOS: list.length, ALLEATA:0, CORREO:0, CABIFY:0, OTROS:0};
   list.forEach(e=>{
-    const l=(e.logistica||'').toUpperCase();
+    const l=(e.logistica||'').toUpperCase().trim();
     if(l==='ALLEATA') cnt.ALLEATA++;
     else if(l==='CORREO ARGENTINO') cnt.CORREO++;
     else if(l==='CABIFY') cnt.CABIFY++;
+    else cnt.OTROS++;
   });
   Object.entries(cnt).forEach(([k,v])=>{
     const el=document.getElementById('pill-cnt-'+k);
     if(el) el.textContent = v>0?`(${v})`:'';
   });
+  // Ocultar pill OTROS si no hay OTs en esa categoría
+  const pillOtros=document.getElementById('pill-OTROS');
+  if(pillOtros) pillOtros.style.display = cnt.OTROS>0 ? '' : 'none';
 }
 
 // ── TRACKING CORREO ARGENTINO ──
