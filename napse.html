@@ -198,7 +198,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <div id="login-err" style="display:none" class="alert alert-err"></div>
     <button class="btn" onclick="doLogin()">Ingresar</button>
-    <p style="text-align:center;margin-top:14px;font-size:11px;color:var(--text-muted)">Módulo NAPSE · Alleata Ops v1.18.0</p>
+    <p style="text-align:center;margin-top:14px;font-size:11px;color:var(--text-muted)">Módulo NAPSE · Alleata Ops v1.19.0</p>
   </div>
 </div>
 
@@ -255,7 +255,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       </div>
       <div class="topbar-right">
         <span id="log-meta" style="color:var(--text-mid)"></span>
-        <span>v1.18.0</span>
+        <span>v1.19.0</span>
       </div>
     </div>
 
@@ -333,12 +333,13 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
             </div>
             <div class="field">
               <label class="label">Estado</label>
-              <select class="select" id="f-estado" onchange="runBuscar()">
+              <select class="select" id="f-estado">
                 <option value="">Todos</option>
+                <option value="ERRORS">Solo errores</option>
                 <option value="DENEGADA">DENEGADA</option>
-                <option value="APROBADA">APROBADA</option>
                 <option value="COMERCIO_INVALIDO">COMERCIO INVÁLIDO (03)</option>
                 <option value="NO_OPERA_OFFLINE">NO OPERA OFF-LINE (99)</option>
+                <option value="APROBADA">APROBADA</option>
               </select>
             </div>
             <div class="field">
@@ -1056,7 +1057,14 @@ async function renderBuscar(){
   const fs=document.getElementById('f-store').value.trim();
   const fe=document.getElementById('f-estado').value;
   const fi=document.getElementById('f-iso').value.trim();
-  const ff=document.getElementById('f-fecha').value.trim();
+  const ffRaw=document.getElementById('f-fecha').value.trim();
+  // Normalize date to YYYY-MM-DD regardless of browser locale
+  let ff='';
+  if(ffRaw){
+    const d=new Date(ffRaw);
+    if(!isNaN(d)) ff=d.toISOString().split('T')[0];
+    else ff=ffRaw;
+  }
   const fm=document.getElementById('f-monto').value.trim();
 
   // ── No log loaded → query Supabase ───────────────────────────────────
@@ -1067,6 +1075,7 @@ async function renderBuscar(){
       let q=supa.from('napse_transactions').select('*').order('fecha',{ascending:false}).order('hora',{ascending:false}).limit(500);
       if(fn) q=q.eq('node',fn);
       if(fs) q=q.eq('store',fs);
+      if(fe==='ERRORS') q=q.eq('is_deny',true);
       if(fe==='DENEGADA') q=q.eq('is_deny',true).not('response_message','ilike','%COMERCIO%').not('response_message','ilike','%OFF-LINE%');
       if(fe==='APROBADA') q=q.eq('is_deny',false);
       if(fe==='COMERCIO_INVALIDO') q=q.eq('iso_code','03');
@@ -1092,7 +1101,7 @@ async function renderBuscar(){
       const parts=[];
       if(fn) parts.push(`Node: ${fn}`);
       if(fs) parts.push(`Store: ${fs}`);
-      if(fe) parts.push(fe==='COMERCIO_INVALIDO'?'COMERCIO INVÁLIDO (03)':fe==='NO_OPERA_OFFLINE'?'NO OPERA OFF-LINE (99)':fe);
+      if(fe) parts.push(fe==='COMERCIO_INVALIDO'?'COMERCIO INVÁLIDO (03)':fe==='NO_OPERA_OFFLINE'?'NO OPERA OFF-LINE (99)':fe==='ERRORS'?'Solo errores':fe);
       if(fi) parts.push(`IsoCode: ${fi}`);
       if(ff) parts.push(`Fecha: ${ff}`);
       if(fm) parts.push(`Monto: ${fm}`);
@@ -1107,6 +1116,7 @@ async function renderBuscar(){
   const filtered=transactions.filter(t=>{
     if(fn&&(t.node||'')!==fn) return false;
     if(fs&&(t.store||'')!==fs) return false;
+    if(fe==='ERRORS'&&!t.isDeny) return false;
     if(fe==='DENEGADA'&&!t.isDeny) return false;
     if(fe==='APROBADA'&&t.isDeny) return false;
     if(fe==='COMERCIO_INVALIDO'&&(t.isoCode||'').trim()!=='03') return false;
@@ -1152,7 +1162,7 @@ async function renderBuscar(){
   const parts=[];
   if(fn) parts.push(`Node: ${fn}`);
   if(fs) parts.push(`Store: ${fs}`);
-  if(fe) parts.push(fe==='COMERCIO_INVALIDO'?'COMERCIO INVÁLIDO (03)':fe==='NO_OPERA_OFFLINE'?'NO OPERA OFF-LINE (99)':fe);
+  if(fe) parts.push(fe==='COMERCIO_INVALIDO'?'COMERCIO INVÁLIDO (03)':fe==='NO_OPERA_OFFLINE'?'NO OPERA OFF-LINE (99)':fe==='ERRORS'?'Solo errores':fe);
   if(fi) parts.push(`IsoCode: ${fi}`);
   if(ff) parts.push(`Fecha: ${ff}`);
   if(fm) parts.push(`Monto: ${fm}`);
