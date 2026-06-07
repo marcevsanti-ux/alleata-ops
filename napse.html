@@ -195,7 +195,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <div id="login-err" style="display:none" class="alert alert-err"></div>
     <button class="btn" onclick="doLogin()">Ingresar</button>
-    <p style="text-align:center;margin-top:14px;font-size:11px;color:var(--text-muted)">Módulo NAPSE · Alleata Ops v1.5.0</p>
+    <p style="text-align:center;margin-top:14px;font-size:11px;color:var(--text-muted)">Módulo NAPSE · Alleata Ops v1.6.0</p>
   </div>
 </div>
 
@@ -252,7 +252,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       </div>
       <div class="topbar-right">
         <span id="log-meta" style="color:var(--text-mid)"></span>
-        <span>v1.5.0</span>
+        <span>v1.6.0</span>
       </div>
     </div>
 
@@ -357,7 +357,8 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
           <table>
             <thead>
               <tr>
-                <th>Hora</th>
+                <th>Fecha</th>
+                  <th>Hora</th>
                 <th>Estado</th>
                 <th>Node</th>
                 <th>Store</th>
@@ -630,14 +631,18 @@ function parseLog(text, filename){
     if(!isDeny && !maskedCard && !isoCode) continue;
     
     const responseMessage=getField(respBlock,'responseMessage')||'';
+    // Store line range for log extraction
+    const lineStart=blockStart;
+    const lineEnd=Math.min(lines.length-1, i+15);
     transactions.push({
+      lineStart, lineEnd,
       ts,isDeny,node,store,isoCode,maskedCard,serialNumber,businessNumber,responseMessage,
       hostName,issuerName,rrn,ticket,trxRef,clientDate,
       antifraudTimeout,opRejected,...req0200
     });
   }
 
-  P={transactions,errors,filename,totalLines};
+  P={transactions,errors,filename,totalLines,allLines:lines};
   afterParse();
 }
 
@@ -666,6 +671,33 @@ function afterParse(){
 }
 
 // ── BUSCAR ────────────────────────────────────────────────────────────────
+function downloadExtract(lineStart, lineEnd, ts, node, store){
+  if(!P.allLines||!P.allLines.length){
+    alert('Las líneas del log no están disponibles. Recargá el log.');
+    return;
+  }
+  // Expand context: 10 lines before block start, 20 lines after response
+  const from = Math.max(0, lineStart - 10);
+  const to   = Math.min(P.allLines.length - 1, lineEnd + 20);
+  const extract = P.allLines.slice(from, to + 1).join('\n');
+  const header = [
+    '=== EXTRACTO DE LOG VTOL — ALLEATA OPS ===',
+    'Generado: ' + new Date().toLocaleString('es-AR'),
+    'Archivo:  ' + P.filename,
+    'Node:     ' + node + '  |  Store: ' + store,
+    'Timestamp: ' + ts.replace(/-/g,' '),
+    'Líneas:   ' + from + ' a ' + to + ' (de ' + P.allLines.length + ')',
+    '==========================================',
+    ''
+  ].join('\n');
+  const blob = new Blob([header + extract], {type:'text/plain;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'vtol-extract-' + ts + '-node' + node + '.txt';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
 function runBuscar(){
   renderBuscar();
 }
@@ -704,7 +736,9 @@ function renderBuscar(){
     const isoDesc=ISO[iso]||iso;
     const af=t.antifraudTimeout?'<span class="antifraud-tag">⚠ Timeout</span>':'<span style="color:var(--text-muted);font-size:11px">—</span>';
     const ticketBtn=t.isDeny?`<button class="btn-copy" onclick="goTicket('${t.ts}','${t.node}','${t.store}')">Ver ticket</button>`:'—';
+    const extractBtn=`<button class="btn-copy" style="background:rgba(26,159,212,.1);color:#7dd3f0;border-color:rgba(26,159,212,.2)" onclick="downloadExtract(${t.lineStart},${t.lineEnd},'${(t.ts||'').replace(/[: ]/g,'-')}','${t.node||''}','${t.store||''}')">⬇ Log</button>`;
     return `<tr class="${t.isDeny?'row-deny':''}">
+      <td class="mono" style="color:var(--text-muted);font-size:11px">${(t.ts||'—').split(' ')[0]||'—'}</td>
       <td class="mono">${(t.ts||'—').split(' ')[1]||t.ts||'—'}</td>
       <td>${(()=>{
         const msg=(t.responseMessage||'').toUpperCase();
@@ -721,7 +755,7 @@ function renderBuscar(){
       <td class="mono">${t.businessNumber||'—'}</td>
       <td class="mono">${t.amount||'—'}</td>
       <td>${af}</td>
-      <td>${ticketBtn}</td>
+      <td style="white-space:nowrap">${ticketBtn} ${extractBtn}</td>
     </tr>`;
   });
 
