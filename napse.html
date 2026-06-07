@@ -198,7 +198,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <div id="login-err" style="display:none" class="alert alert-err"></div>
     <button class="btn" onclick="doLogin()">Ingresar</button>
-    <p style="text-align:center;margin-top:14px;font-size:11px;color:var(--text-muted)">Módulo NAPSE · Alleata Ops v1.17.0</p>
+    <p style="text-align:center;margin-top:14px;font-size:11px;color:var(--text-muted)">Módulo NAPSE · Alleata Ops v1.18.0</p>
   </div>
 </div>
 
@@ -255,7 +255,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       </div>
       <div class="topbar-right">
         <span id="log-meta" style="color:var(--text-mid)"></span>
-        <span>v1.17.0</span>
+        <span>v1.18.0</span>
       </div>
     </div>
 
@@ -635,15 +635,12 @@ function setView(v){
   document.getElementById('crumb-sub').style.display=sub[v]?'inline':'none';
   if(v==='historial') refreshHistorial();
   // If no log loaded and trying to access log-dependent views, show hint
-  if((v==='buscar'||v==='tickets'||v==='errores')&&!P.filename){
-    // Show empty state with hint
-    if(v==='buscar'){
-      document.getElementById('buscar-body').innerHTML='<tr><td colspan="13" style="text-align:center;padding:3rem;color:var(--text-muted)">📂 Cargá un log primero para buscar transacciones</td></tr>';
-      document.getElementById('buscar-count').textContent='';
-      document.getElementById('filter-summary').textContent='';
-    }
-    if(v==='tickets') document.getElementById('tickets-list').innerHTML='<div class="empty"><span class="empty-icon">📂</span>Cargá un log primero para ver los tickets</div>';
-    if(v==='errores') document.getElementById('errores-content').innerHTML='<div class="empty"><span class="empty-icon">📂</span>Cargá un log primero para ver los errores del sistema</div>';
+  if((v==='buscar')&&!P.filename){
+    renderBuscar(); // queries Supabase
+  }
+  if((v==='tickets'||v==='errores')&&!P.filename){
+    if(v==='tickets') document.getElementById('tickets-list').innerHTML='<div class="empty"><span class="empty-icon">📂</span>Cargá un log para ver los tickets generados</div>';
+    if(v==='errores') document.getElementById('errores-content').innerHTML='<div class="empty"><span class="empty-icon">📂</span>Cargá un log para ver los errores del sistema</div>';
   }
 }
 
@@ -1012,6 +1009,8 @@ function renderHistorialRows(rows){
 }
 
 async function initApp(){
+  // Auto-populate Buscar error from Supabase
+  renderBuscar();
   // Load historial counts for nav badge
   try {
     const {count} = await supa
@@ -1047,7 +1046,11 @@ function clearFilters(){
   renderBuscar();
 }
 
-function renderBuscar(){
+function buildBuscarRow(t){
+
+}
+
+async function renderBuscar(){
   const {transactions}=P;
   const fn=document.getElementById('f-node').value.trim();
   const fs=document.getElementById('f-store').value.trim();
@@ -1056,6 +1059,51 @@ function renderBuscar(){
   const ff=document.getElementById('f-fecha').value.trim();
   const fm=document.getElementById('f-monto').value.trim();
 
+  // ── No log loaded → query Supabase ───────────────────────────────────
+  if(!P.filename){
+    document.getElementById('buscar-body').innerHTML='<tr><td colspan="13" style="text-align:center;padding:2rem;color:var(--text-muted)">Buscando en historial...</td></tr>';
+    document.getElementById('buscar-count').textContent='';
+    try {
+      let q=supa.from('napse_transactions').select('*').order('fecha',{ascending:false}).order('hora',{ascending:false}).limit(500);
+      if(fn) q=q.eq('node',fn);
+      if(fs) q=q.eq('store',fs);
+      if(fe==='DENEGADA') q=q.eq('is_deny',true).not('response_message','ilike','%COMERCIO%').not('response_message','ilike','%OFF-LINE%');
+      if(fe==='APROBADA') q=q.eq('is_deny',false);
+      if(fe==='COMERCIO_INVALIDO') q=q.eq('iso_code','03');
+      if(fe==='NO_OPERA_OFFLINE') q=q.eq('iso_code','99');
+      if(fi) q=q.eq('iso_code',fi);
+      if(ff) q=q.eq('fecha',ff);
+      if(fm) q=q.eq('amount',parseFloat(fm));
+      const {data,error}=await q;
+      if(error) throw error;
+      const rows=(data||[]).map(t=>buildBuscarRow({
+        ts: (t.fecha||'')+(t.hora?' '+t.hora:''),
+        isDeny: t.is_deny,
+        responseMessage: t.response_message||'',
+        node: t.node, store: t.store,
+        isoCode: t.iso_code, maskedCard: t.masked_card,
+        issuerName: t.issuer_name, hostName: t.host_name,
+        serialNumber: t.serial_number, businessNumber: t.business_number,
+        amount: t.amount, antifraudTimeout: t.antifraud_timeout,
+        lineStart:0, lineEnd:0, line0200:0
+      }));
+      document.getElementById('buscar-body').innerHTML=rows.length?rows.join(''):'<tr><td colspan="13" style="text-align:center;padding:2rem;color:var(--text-muted)">Sin resultados en el historial</td></tr>';
+      document.getElementById('buscar-count').textContent=`${(data||[]).length} registros del historial`;
+      const parts=[];
+      if(fn) parts.push(`Node: ${fn}`);
+      if(fs) parts.push(`Store: ${fs}`);
+      if(fe) parts.push(fe==='COMERCIO_INVALIDO'?'COMERCIO INVÁLIDO (03)':fe==='NO_OPERA_OFFLINE'?'NO OPERA OFF-LINE (99)':fe);
+      if(fi) parts.push(`IsoCode: ${fi}`);
+      if(ff) parts.push(`Fecha: ${ff}`);
+      if(fm) parts.push(`Monto: ${fm}`);
+      document.getElementById('filter-summary').textContent=parts.length?'Filtros activos (historial): '+parts.join(' · '):'Mostrando historial completo';
+    } catch(e){
+      document.getElementById('buscar-body').innerHTML=`<tr><td colspan="13" style="text-align:center;padding:2rem;color:var(--red)">Error: ${e.message}</td></tr>`;
+    }
+    return;
+  }
+
+  // ── Log loaded → filter in memory ────────────────────────────────────
   const filtered=transactions.filter(t=>{
     if(fn&&(t.node||'')!==fn) return false;
     if(fs&&(t.store||'')!==fs) return false;
