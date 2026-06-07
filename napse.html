@@ -195,7 +195,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <div id="login-err" style="display:none" class="alert alert-err"></div>
     <button class="btn" onclick="doLogin()">Ingresar</button>
-    <p style="text-align:center;margin-top:14px;font-size:11px;color:var(--text-muted)">Módulo NAPSE · Alleata Ops v1.4.0</p>
+    <p style="text-align:center;margin-top:14px;font-size:11px;color:var(--text-muted)">Módulo NAPSE · Alleata Ops v1.5.0</p>
   </div>
 </div>
 
@@ -252,7 +252,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       </div>
       <div class="topbar-right">
         <span id="log-meta" style="color:var(--text-mid)"></span>
-        <span>v1.4.0</span>
+        <span>v1.5.0</span>
       </div>
     </div>
 
@@ -334,7 +334,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
                 <option value="">Todos</option>
                 <option value="DENEGADA">DENEGADA</option>
                 <option value="APROBADA">APROBADA</option>
-                <option value="COMERCIO_INVALIDO">COMERCIO INVÁLIDO</option>
+                <option value="COMERCIO_INVALIDO">COMERCIO INVÁLIDO (03)</option>
               </select>
             </div>
             <div class="field">
@@ -560,9 +560,9 @@ function parseLog(text, filename){
     const line=lines[i];
     if(!line.includes('28 responseMessage')) continue;
     const lineUpper=line.toUpperCase();
-    if(!lineUpper.includes('DENEGADA')&&!lineUpper.includes('APROBADA')) continue;
+    if(!lineUpper.includes('DENEGADA')&&!lineUpper.includes('APROBADA')&&!lineUpper.includes('COMERCIO INVALIDO')) continue;
 
-    const isDeny=lineUpper.includes('DENEGADA');
+    const isDeny=lineUpper.includes('DENEGADA')||lineUpper.includes('COMERCIO INVALIDO');
     const ts=getTs(line);
 
     // The block of fields for this response starts at "Counting responses from VTOL"
@@ -629,8 +629,9 @@ function parseLog(text, filename){
     // Skip duplicate APROBADA entries without card data (intermediate response blocks)
     if(!isDeny && !maskedCard && !isoCode) continue;
     
+    const responseMessage=getField(respBlock,'responseMessage')||'';
     transactions.push({
-      ts,isDeny,node,store,isoCode,maskedCard,serialNumber,businessNumber,
+      ts,isDeny,node,store,isoCode,maskedCard,serialNumber,businessNumber,responseMessage,
       hostName,issuerName,rrn,ticket,trxRef,clientDate,
       antifraudTimeout,opRejected,...req0200
     });
@@ -705,7 +706,12 @@ function renderBuscar(){
     const ticketBtn=t.isDeny?`<button class="btn-copy" onclick="goTicket('${t.ts}','${t.node}','${t.store}')">Ver ticket</button>`:'—';
     return `<tr class="${t.isDeny?'row-deny':''}">
       <td class="mono">${(t.ts||'—').split(' ')[1]||t.ts||'—'}</td>
-      <td>${t.isDeny?'<span class="badge badge-red">DENEGADA</span>':'<span class="badge badge-green">APROBADA</span>'}</td>
+      <td>${(()=>{
+        const msg=(t.responseMessage||'').toUpperCase();
+        if(msg.includes('COMERCIO INVALIDO')) return '<span class="badge badge-orange">COMERCIO INVÁLIDO</span>';
+        if(t.isDeny) return '<span class="badge badge-red">DENEGADA</span>';
+        return '<span class="badge badge-green">APROBADA</span>';
+      })()}</td>
       <td class="mono">${t.node||'—'}</td>
       <td class="mono">${t.store||'—'}</td>
       <td title="${isoDesc}"><span class="badge ${t.isDeny?'badge-red':'badge-gray'}">${iso}</span></td>
