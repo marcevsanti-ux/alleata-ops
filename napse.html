@@ -401,7 +401,41 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
 </div>
 
 <script>
-const ISO = {'00':'Aprobada','03':'Comercio inválido','04':'Retener tarjeta','05':'No autorizada — tarjeta inválida/no configurada en Payway','06':'Error','12':'Transacción inválida','13':'Monto inválido','14':'Nro. tarjeta inválido','33':'Tarjeta vencida','34':'Sospecha de fraude','41':'Tarjeta perdida','43':'Tarjeta robada','51':'Fondos insuficientes','54':'Tarjeta vencida','55':'PIN incorrecto','57':'Transacción no permitida','91':'Emisor no disponible','96':'Error del sistema'};
+const ISO = {
+  '00':'Aprobada',
+  '01':'Referir al emisor',
+  '03':'Comercio inválido — verificar configuración del comercio en Payway',
+  '04':'Retener tarjeta',
+  '05':'No autorizada — tarjeta inválida/no configurada en Payway',
+  '06':'Error general',
+  '07':'Retener tarjeta (condición especial)',
+  '12':'Transacción inválida',
+  '13':'Monto inválido',
+  '14':'Número de tarjeta inválido',
+  '19':'Reintentar transacción',
+  '25':'Registro no encontrado',
+  '30':'Error de formato',
+  '33':'Tarjeta vencida',
+  '34':'Sospecha de fraude',
+  '36':'Tarjeta restringida',
+  '38':'Exceso de intentos de PIN',
+  '41':'Tarjeta perdida — retener',
+  '43':'Tarjeta robada — retener',
+  '51':'Fondos insuficientes',
+  '54':'Tarjeta vencida',
+  '55':'PIN incorrecto',
+  '57':'Transacción no permitida para esta tarjeta',
+  '58':'Transacción no permitida en esta terminal',
+  '61':'Excede límite de monto',
+  '62':'Tarjeta restringida',
+  '65':'Excede límite de frecuencia',
+  '75':'Exceso de intentos de PIN',
+  '76':'PIN inválido',
+  '78':'Tarjeta bloqueada',
+  '91':'Emisor no disponible',
+  '92':'Destino no disponible',
+  '96':'Error del sistema'
+};
 
 let P = {transactions:[], errors:{}, filename:'', totalLines:0};
 
@@ -749,7 +783,7 @@ Solicitud: Por favor informar el motivo del rechazo del IsoCode ${iso} para el n
         <div class="tf-item"><div class="tf-label">Nro. Comercio</div><div class="tf-val">${t.businessNumber||'—'}</div></div>
         <div class="tf-item"><div class="tf-label">Terminal (serialNumber)</div><div class="tf-val">${t.serialNumber||'—'}</div></div>
         <div class="tf-item"><div class="tf-label">Node / Store</div><div class="tf-val">${t.node||'?'} / ${t.store||'?'}</div></div>
-        <div class="tf-item"><div class="tf-label">IsoCode</div><div class="tf-val red">${iso} — ${isoDesc}</div></div>
+        <div class="tf-item" style="border:1px solid rgba(239,68,68,.3);background:rgba(239,68,68,.08)"><div class="tf-label" style="color:#fca5a5">⚠ IsoCode (error Payway)</div><div class="tf-val" style="color:#fca5a5;font-size:13px;font-weight:700">${iso}</div><div style="font-size:11px;color:var(--text-muted);margin-top:2px">${isoDesc}</div></div>
         <div class="tf-item"><div class="tf-label">Tarjeta</div><div class="tf-val">${t.maskedCard||'—'}</div></div>
         <div class="tf-item"><div class="tf-label">Emisor / Host</div><div class="tf-val">${t.issuerName||'—'} / ${t.hostName||'—'}</div></div>
         <div class="tf-item"><div class="tf-label">Monto</div><div class="tf-val">${t.amount||'—'}</div></div>
@@ -762,7 +796,7 @@ Solicitud: Por favor informar el motivo del rechazo del IsoCode ${iso} para el n
           <span>📋 Texto para reportar a Payway / Napse</span>
           <button class="btn-copy" onclick="copyTicket(this, \`${escJs(paywayText)}\`)">📋 Copiar</button>
         </div>
-        <pre>${escHtml(paywayText)}</pre>
+        <pre id="pre-${ticketId}">${escHtml(paywayText).replace(/(IsoCode:.*)/g, '<span style="background:rgba(239,68,68,.2);color:#fca5a5;padding:1px 4px;border-radius:3px;font-weight:700">$1</span>')}</pre>
       </div>
     </div>`;
   }).join('');
