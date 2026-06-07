@@ -195,7 +195,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <div id="login-err" style="display:none" class="alert alert-err"></div>
     <button class="btn" onclick="doLogin()">Ingresar</button>
-    <p style="text-align:center;margin-top:14px;font-size:11px;color:var(--text-muted)">Módulo NAPSE · Alleata Ops v1.6.0</p>
+    <p style="text-align:center;margin-top:14px;font-size:11px;color:var(--text-muted)">Módulo NAPSE · Alleata Ops v1.7.0</p>
   </div>
 </div>
 
@@ -252,7 +252,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       </div>
       <div class="topbar-right">
         <span id="log-meta" style="color:var(--text-mid)"></span>
-        <span>v1.6.0</span>
+        <span>v1.7.0</span>
       </div>
     </div>
 
@@ -604,6 +604,14 @@ function parseLog(text, filename){
     for(let j=searchBefore.length-1;j>=0;j--){
       if(searchBefore[j].includes('1 messageCode')&&searchBefore[j].includes(': 0200')){
         const reqBlock=searchBefore.slice(Math.max(0,j-5),j+30);
+        // Find "Sending message to" line just before 0200
+        let sendingLineIdx = j;
+        for(let k=j; k>=Math.max(0,j-5); k--){
+          if(searchBefore[k]&&searchBefore[k].includes('Sending message to [')){
+            sendingLineIdx=k; break;
+          }
+        }
+        const absLine0200 = Math.max(0,i-500) + sendingLineIdx;
         req0200={
           ts0200:getTs(searchBefore[j]),
           amount:getField(reqBlock,'amount'),
@@ -612,7 +620,8 @@ function parseLog(text, filename){
           businessReq:getField(reqBlock,'businessNumber'),
           trxDate:getField(reqBlock,'trxDate'),
           trxTime:getField(reqBlock,'trxTime'),
-          channel: (searchBefore[j].match(/Sending message to \[(\w+)\]/)||[])[1]||'Visa'
+          channel: (searchBefore[j].match(/Sending message to \[(\w+)\]/)||[])[1]||'Visa',
+          line0200: absLine0200
         };
         break;
       }
@@ -671,22 +680,34 @@ function afterParse(){
 }
 
 // ── BUSCAR ────────────────────────────────────────────────────────────────
-function downloadExtract(lineStart, lineEnd, ts, node, store){
+function downloadExtract(lineStart, lineEnd, ts, node, store, line0200){
   if(!P.allLines||!P.allLines.length){
     alert('Las líneas del log no están disponibles. Recargá el log.');
     return;
   }
-  // Expand context: 10 lines before block start, 20 lines after response
-  const from = Math.max(0, lineStart - 10);
-  const to   = Math.min(P.allLines.length - 1, lineEnd + 20);
-  const extract = P.allLines.slice(from, to + 1).join('\n');
+  // Use pre-computed line0200 from parser (passed as parameter)
+  let req0200Line = (typeof line0200 === 'number' && line0200 > 0)
+    ? line0200
+    : Math.max(0, lineStart - 10);
+  // End: go until "Response Message." or lineEnd + 20
+  let endLine = Math.min(P.allLines.length - 1, lineEnd + 25);
+  for(let i = lineEnd; i <= Math.min(P.allLines.length - 1, lineEnd + 30); i++){
+    if(P.allLines[i] && P.allLines[i].includes('Response Message.')){
+      endLine = Math.min(P.allLines.length - 1, i + 5);
+      break;
+    }
+  }
+  const extract = P.allLines.slice(req0200Line, endLine + 1).join('\n');
   const header = [
     '=== EXTRACTO DE LOG VTOL — ALLEATA OPS ===',
-    'Generado: ' + new Date().toLocaleString('es-AR'),
-    'Archivo:  ' + P.filename,
-    'Node:     ' + node + '  |  Store: ' + store,
+    'Generado:  ' + new Date().toLocaleString('es-AR'),
+    'Archivo:   ' + P.filename,
+    'Node:      ' + node + '  |  Store: ' + store,
     'Timestamp: ' + ts.replace(/-/g,' '),
-    'Líneas:   ' + from + ' a ' + to + ' (de ' + P.allLines.length + ')',
+    'Líneas:    ' + req0200Line + ' a ' + endLine + ' (de ' + P.allLines.length + ')',
+    '',
+    '*** Request VTOL a Payway 0200',
+    '(ver línea con messageCode : 0200 abajo)',
     '==========================================',
     ''
   ].join('\n');
@@ -736,7 +757,7 @@ function renderBuscar(){
     const isoDesc=ISO[iso]||iso;
     const af=t.antifraudTimeout?'<span class="antifraud-tag">⚠ Timeout</span>':'<span style="color:var(--text-muted);font-size:11px">—</span>';
     const ticketBtn=t.isDeny?`<button class="btn-copy" onclick="goTicket('${t.ts}','${t.node}','${t.store}')">Ver ticket</button>`:'—';
-    const extractBtn=`<button class="btn-copy" style="background:rgba(26,159,212,.1);color:#7dd3f0;border-color:rgba(26,159,212,.2)" onclick="downloadExtract(${t.lineStart},${t.lineEnd},'${(t.ts||'').replace(/[: ]/g,'-')}','${t.node||''}','${t.store||''}')">⬇ Log</button>`;
+    const extractBtn=`<button class="btn-copy" style="background:rgba(26,159,212,.1);color:#7dd3f0;border-color:rgba(26,159,212,.2)" onclick="downloadExtract(${t.lineStart},${t.lineEnd},'${(t.ts||'').replace(/[: ,]/g,'-')}','${t.node||''}','${t.store||''}',${t.line0200||0})">⬇ Log</button>`;
     return `<tr class="${t.isDeny?'row-deny':''}">
       <td class="mono" style="color:var(--text-muted);font-size:11px">${(t.ts||'—').split(' ')[0]||'—'}</td>
       <td class="mono">${(t.ts||'—').split(' ')[1]||t.ts||'—'}</td>
