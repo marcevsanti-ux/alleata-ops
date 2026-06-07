@@ -121,6 +121,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
 .badge-teal{background:rgba(29,191,142,.12);color:#6ee7c7;border:1px solid rgba(29,191,142,.2)}
 .badge-gray{background:var(--surface2);color:var(--text-muted);border:1px solid var(--border2)}
 .badge-orange{background:rgba(249,115,22,.12);color:#fdba74;border:1px solid rgba(249,115,22,.2)}
+.badge-purple{background:rgba(139,92,246,.12);color:#c4b5fd;border:1px solid rgba(139,92,246,.2)}
 
 /* TICKET CARD */
 .ticket-card{background:var(--navy-900);border:1px solid rgba(239,68,68,.25);border-radius:12px;padding:18px 20px;margin-bottom:12px}
@@ -197,7 +198,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <div id="login-err" style="display:none" class="alert alert-err"></div>
     <button class="btn" onclick="doLogin()">Ingresar</button>
-    <p style="text-align:center;margin-top:14px;font-size:11px;color:var(--text-muted)">Módulo NAPSE · Alleata Ops v1.13.0</p>
+    <p style="text-align:center;margin-top:14px;font-size:11px;color:var(--text-muted)">Módulo NAPSE · Alleata Ops v1.15.0</p>
   </div>
 </div>
 
@@ -254,7 +255,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       </div>
       <div class="topbar-right">
         <span id="log-meta" style="color:var(--text-mid)"></span>
-        <span>v1.13.0</span>
+        <span>v1.15.0</span>
       </div>
     </div>
 
@@ -337,6 +338,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
                 <option value="DENEGADA">DENEGADA</option>
                 <option value="APROBADA">APROBADA</option>
                 <option value="COMERCIO_INVALIDO">COMERCIO INVÁLIDO (03)</option>
+                <option value="NO_OPERA_OFFLINE">NO OPERA OFF-LINE (99)</option>
               </select>
             </div>
             <div class="field">
@@ -576,7 +578,8 @@ const ISO = {
   '78':'Tarjeta bloqueada',
   '91':'Emisor no disponible',
   '92':'Destino no disponible',
-  '96':'Error del sistema'
+  '96':'Error del sistema',
+  '99':'No opera off-line — tarjeta/comercio no habilitado para operar sin conexión'
 };
 
 let P = {transactions:[], errors:{}, filename:'', totalLines:0};
@@ -716,9 +719,9 @@ function parseLog(text, filename){
     const line=lines[i];
     if(!line.includes('28 responseMessage')) continue;
     const lineUpper=line.toUpperCase();
-    if(!lineUpper.includes('DENEGADA')&&!lineUpper.includes('APROBADA')&&!lineUpper.includes('COMERCIO INVALIDO')) continue;
+    if(!lineUpper.includes('DENEGADA')&&!lineUpper.includes('APROBADA')&&!lineUpper.includes('COMERCIO INVALIDO')&&!lineUpper.includes('NO OPERA OFF-LINE')) continue;
 
-    const isDeny=lineUpper.includes('DENEGADA')||lineUpper.includes('COMERCIO INVALIDO');
+    const isDeny=lineUpper.includes('DENEGADA')||lineUpper.includes('COMERCIO INVALIDO')||lineUpper.includes('NO OPERA OFF-LINE');
     const ts=getTs(line);
 
     // The block of fields for this response starts at "Counting responses from VTOL"
@@ -755,7 +758,15 @@ function parseLog(text, filename){
 
     // ── Find matching 0200 (backwards, up to 500 lines) ──────────────────
     let req0200={};
-    const searchBefore=lines.slice(Math.max(0,i-500),i);
+    const searchBefore=lines.slice(Math.max(0,i-800),i);
+    // First try to find Operation id start (works for ALL transaction types)
+    let opStartLine = Math.max(0,i-800);
+    for(let j=searchBefore.length-1;j>=0;j--){
+      if(searchBefore[j] && (searchBefore[j].match(/Node:[0-9A-Z]+ Operation id: \d+/))){
+        opStartLine = Math.max(0,i-800) + j;
+        break;
+      }
+    }
     for(let j=searchBefore.length-1;j>=0;j--){
       if(searchBefore[j].includes('1 messageCode')&&searchBefore[j].includes(': 0200')){
         const reqBlock=searchBefore.slice(Math.max(0,j-5),j+30);
@@ -780,6 +791,10 @@ function parseLog(text, filename){
         };
         break;
       }
+    }
+    // If no 0200 found (offline/rejected flows), use Operation id start
+    if(!req0200.line0200 && opStartLine > 0){
+      req0200.line0200 = opStartLine;
     }
 
     // ── Antifraud timeout in window ───────────────────────────────────────
@@ -841,10 +856,25 @@ function downloadExtract(lineStart, lineEnd, ts, node, store, line0200){
     alert('Las líneas del log no están disponibles. Recargá el log.');
     return;
   }
-  // Use pre-computed line0200 from parser (passed as parameter)
-  let req0200Line = (typeof line0200 === 'number' && line0200 > 0)
-    ? line0200
-    : Math.max(0, lineStart - 10);
+  // Use pre-computed line0200 from parser if available
+  let req0200Line;
+  if(typeof line0200 === 'number' && line0200 > 0){
+    req0200Line = line0200;
+  } else {
+    // Fallback: search backwards for "Operation id:" (covers NO OPERA OFF-LINE and similar)
+    req0200Line = Math.max(0, lineStart - 10);
+    for(let i = lineStart; i >= Math.max(0, lineStart - 800); i--){
+      const l = P.allLines[i] || '';
+      // For 0200-based flows
+      if(l.includes('Sending message to [') && l.includes('INFO')){
+        req0200Line = i; break;
+      }
+      // For offline/rejected flows — find Operation id start
+      if(l.match(/Node:\d+ Operation id: \d+/) || l.match(/Node:[0-9A-Z]+ Operation id: \d+/)){
+        req0200Line = i; break;
+      }
+    }
+  }
   // End: go until "Response Message." or lineEnd + 20
   let endLine = Math.min(P.allLines.length - 1, lineEnd + 25);
   for(let i = lineEnd; i <= Math.min(P.allLines.length - 1, lineEnd + 30); i++){
@@ -950,6 +980,7 @@ function renderHistorialRows(rows){
     const msgUp=(r.response_message||'').toUpperCase();
     let badge='';
     if(msgUp.includes('COMERCIO INVALIDO')) badge='<span class="badge badge-orange">COMERCIO INVÁLIDO</span>';
+    else if(msgUp.includes('NO OPERA OFF-LINE')) badge='<span class="badge badge-purple">NO OPERA OFF-LINE</span>';
     else if(isDeny) badge='<span class="badge badge-red">DENEGADA</span>';
     else badge='<span class="badge badge-green">APROBADA</span>';
     return `<tr class="${isDeny?'row-deny':''}">
@@ -1022,6 +1053,7 @@ function renderBuscar(){
     if(fe==='DENEGADA'&&!t.isDeny) return false;
     if(fe==='APROBADA'&&t.isDeny) return false;
     if(fe==='COMERCIO_INVALIDO'&&(t.isoCode||'').trim()!=='03') return false;
+    if(fe==='NO_OPERA_OFFLINE'&&(t.isoCode||'').trim()!=='99') return false;
     if(fi&&(t.isoCode||'').trim()!==fi.trim()) return false;
     if(ff&&(t.ts||'').split(' ')[0]!==ff) return false;
     if(fm&&String(t.amount||'').trim()!==fm.trim()) return false;
@@ -1062,7 +1094,7 @@ function renderBuscar(){
   const parts=[];
   if(fn) parts.push(`Node: ${fn}`);
   if(fs) parts.push(`Store: ${fs}`);
-  if(fe) parts.push(fe==='COMERCIO_INVALIDO'?'COMERCIO INVÁLIDO (03)':fe);
+  if(fe) parts.push(fe==='COMERCIO_INVALIDO'?'COMERCIO INVÁLIDO (03)':fe==='NO_OPERA_OFFLINE'?'NO OPERA OFF-LINE (99)':fe);
   if(fi) parts.push(`IsoCode: ${fi}`);
   if(ff) parts.push(`Fecha: ${ff}`);
   if(fm) parts.push(`Monto: ${fm}`);
