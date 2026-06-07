@@ -10,8 +10,9 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v3.5.1</title>
+<title>Alleata · Operaciones v3.5.2</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
@@ -280,6 +281,106 @@ tr:hover td{background:var(--surface2);}
 .empty{text-align:center;padding:36px 20px;color:var(--text-muted);}
 .empty-icon{font-size:30px;opacity:.3;margin-bottom:8px;}
 .empty p{font-size:12px;font-family:'JetBrains Mono',monospace;}
+
+
+/* ══ NAPSE STYLES ══════════════════════════════════════════════════════ */
+/* SEARCH PANEL */
+.search-panel{background:var(--surface);border:1px solid var(--border2);border-radius:14px;padding:20px 24px;margin-bottom:20px}
+.search-panel h3{font-size:14px;font-weight:700;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.search-grid{display:grid;grid-template-columns:1fr 1fr 1fr 1fr auto;gap:10px;align-items:end}
+.search-grid .field{margin:0}
+.select{width:100%;background:var(--navy-700);border:1px solid var(--border2);color:var(--text);font-family:'Inter',sans-serif;font-size:13px;padding:8px 11px;border-radius:8px;outline:none}
+.select:focus{border-color:var(--teal)}
+.filter-input{width:100%;background:var(--navy-700);border:1px solid var(--border2);color:var(--text);font-family:'JetBrains Mono',monospace;font-size:13px;padding:8px 11px;border-radius:8px;outline:none;transition:border-color .2s}
+.filter-input:focus{border-color:var(--teal)}
+.filter-input::placeholder{color:var(--text-muted);font-family:'Inter',sans-serif}
+
+/* TABS */
+.tabs{display:flex;gap:2px;margin-bottom:18px;border-bottom:1px solid var(--border)}
+.tab{padding:9px 16px;font-size:13px;font-weight:500;cursor:pointer;color:var(--text-muted);border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .15s;user-select:none}
+.tab.active{color:var(--teal);border-bottom-color:var(--teal)}
+
+/* TABLE */
+.table-scroll{overflow-x:auto;border-radius:10px;border:1px solid var(--border)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-muted);padding:10px 14px;text-align:left;border-bottom:1px solid var(--border);font-weight:700;background:var(--navy-900)}
+td{padding:10px 14px;border-bottom:1px solid var(--border);color:var(--text);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr.row-deny td{background:rgba(239,68,68,.05)}
+tr.row-deny:hover td{background:rgba(239,68,68,.1)}
+tr:not(.row-deny):hover td{background:var(--surface2)}
+.mono{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-mid)}
+.badge{font-size:10px;font-weight:600;padding:3px 9px;border-radius:20px;display:inline-block;white-space:nowrap}
+.badge-red{background:rgba(239,68,68,.12);color:#fca5a5;border:1px solid rgba(239,68,68,.2)}
+.badge-green{background:rgba(16,185,129,.12);color:#6ee7b7;border:1px solid rgba(16,185,129,.2)}
+.badge-yellow{background:rgba(245,158,11,.12);color:#fcd34d;border:1px solid rgba(245,158,11,.2)}
+.badge-blue{background:rgba(26,159,212,.12);color:#7dd3f0;border:1px solid rgba(26,159,212,.2)}
+.badge-teal{background:rgba(29,191,142,.12);color:#6ee7c7;border:1px solid rgba(29,191,142,.2)}
+.badge-gray{background:var(--surface2);color:var(--text-muted);border:1px solid var(--border2)}
+.badge-orange{background:rgba(249,115,22,.12);color:#fdba74;border:1px solid rgba(249,115,22,.2)}
+.badge-purple{background:rgba(139,92,246,.12);color:#c4b5fd;border:1px solid rgba(139,92,246,.2)}
+
+/* TICKET CARD */
+.ticket-card{background:var(--navy-900);border:1px solid rgba(239,68,68,.25);border-radius:12px;padding:18px 20px;margin-bottom:12px}
+.ticket-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px}
+.ticket-title{font-size:13px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:8px}
+.ticket-meta{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.ticket-fields{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;margin-bottom:14px}
+.tf-item{background:var(--surface);border-radius:8px;padding:8px 12px}
+.tf-label{font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px}
+.tf-val{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:500;color:var(--text)}
+.tf-val.red{color:#fca5a5}
+.ticket-payway{background:rgba(26,159,212,.06);border:1px solid rgba(26,159,212,.15);border-radius:8px;padding:12px 14px}
+.ticket-payway .pw-label{font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center}
+.ticket-payway pre{font-family:'JetBrains Mono',monospace;font-size:12px;color:#7dd3f0;white-space:pre-wrap;word-break:break-word;line-height:1.6}
+.antifraud-tag{display:inline-flex;align-items:center;gap:5px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.2);color:#fcd34d;font-size:10px;font-weight:600;padding:3px 8px;border-radius:6px}
+
+/* UPLOAD */
+.upload-zone{border:2px dashed var(--border2);border-radius:14px;padding:2.5rem 2rem;text-align:center;cursor:pointer;transition:all .2s;background:var(--surface)}
+.upload-zone:hover,.upload-zone.drag{border-color:var(--teal);background:rgba(29,191,142,.03)}
+.upload-icon{font-size:36px;margin-bottom:10px;display:block;opacity:.5}
+.upload-zone h3{font-size:15px;font-weight:600;color:var(--text);margin-bottom:6px}
+.upload-zone p{font-size:13px;color:var(--text-muted)}
+
+/* BANNER */
+.napse-banner{background:var(--surface);border:1px solid var(--border2);border-radius:14px;padding:18px 22px;margin-bottom:20px;display:flex;align-items:center;gap:14px}
+.banner-icon{width:44px;height:44px;border-radius:10px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.2);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+.banner-text h2{font-size:16px;font-weight:700;color:var(--text);margin-bottom:2px}
+.banner-text p{font-size:12px;color:var(--text-muted)}
+
+/* TIMELINE */
+.tl-item{display:flex;gap:14px;padding:11px 0;position:relative}
+.tl-item::before{content:'';position:absolute;left:11px;top:28px;bottom:-11px;width:1px;background:var(--border)}
+.tl-item:last-child::before{display:none}
+.tl-dot{width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;margin-top:1px}
+.tl-dot.deny{background:rgba(239,68,68,.2);color:var(--red);border:1px solid rgba(239,68,68,.3)}
+.tl-dot.err{background:rgba(245,158,11,.2);color:var(--yellow);border:1px solid rgba(245,158,11,.3)}
+.tl-dot.info{background:rgba(26,159,212,.15);color:var(--blue);border:1px solid rgba(26,159,212,.3)}
+.tl-body{flex:1}
+.tl-time{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-muted);margin-bottom:2px}
+.tl-title{font-size:13px;font-weight:600;color:var(--text);margin-bottom:2px}
+.tl-detail{font-size:12px;color:var(--text-muted);line-height:1.5}
+
+/* INSIGHT */
+.insight{border-radius:10px;padding:13px 16px;margin-bottom:10px;border:1px solid}
+.insight.crit{background:rgba(239,68,68,.07);border-color:rgba(239,68,68,.2)}
+.insight.warn{background:rgba(245,158,11,.06);border-color:rgba(245,158,11,.2)}
+.insight.ok{background:rgba(16,185,129,.06);border-color:rgba(16,185,129,.2)}
+.insight.info{background:rgba(26,159,212,.06);border-color:rgba(26,159,212,.2)}
+.insight-title{font-size:13px;font-weight:600;margin-bottom:5px}
+.insight-body{font-size:13px;color:var(--text-muted);line-height:1.6}
+
+.empty{text-align:center;padding:2.5rem 1rem;color:var(--text-muted)}
+.empty-icon{font-size:32px;margin-bottom:8px;opacity:.4;display:block}
+
+/* NAPSE views */
+.napse-view{display:none}
+.napse-view.active{display:block}
+
+/* NAPSE sub-tabs */
+.napse-subtab{padding:9px 14px;font-size:12px;font-weight:600;cursor:pointer;color:var(--text-muted);border:none;background:transparent;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .15s;font-family:'Inter',sans-serif;}
+.napse-subtab:hover{color:var(--text)}
+.napse-subtab.active{color:var(--teal);border-bottom-color:var(--teal)}
 </style>
 </head>
 <body>
@@ -306,7 +407,7 @@ tr:hover td{background:var(--surface2);}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v3.5.1 · 05 jun 2026
+      v3.5.2 · 07 jun 2026
     </div>
   </div>
 </div>
@@ -341,9 +442,8 @@ tr:hover td{background:var(--surface2);}
       <div class="active-bar"></div><span class="nav-icon-wrap">📦</span> Desinstalaciones
       <span class="nav-badge" id="nb-desins">0</span>
     </div>
-    <div class="nav-item" data-mod="merchants" id="nav-merchants" style="opacity:0.4;pointer-events:none;cursor:default;">
-      <div class="active-bar"></div><span class="nav-icon-wrap">🏪</span> Envíos Merchants
-      <span class="nav-badge" id="nb-merchants">0</span>
+    <div class="nav-item" data-mod="napse" id="nav-napse" onclick="goTo('napse')">
+      <div class="active-bar"></div><span class="nav-icon-wrap">🔍</span> NAPSE
     </div>
 
     <div class="nav-item" data-mod="horas" id="nav-horas" style="opacity:0.4;pointer-events:none;cursor:default;">
@@ -381,7 +481,7 @@ tr:hover td{background:var(--surface2);}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v3.5.1 · 05 jun 2026
+      v3.5.2 · 07 jun 2026
     </div>
   </div>
 </nav>
@@ -410,7 +510,7 @@ tr:hover td{background:var(--surface2);}
         SF Sync
       </button>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v3.5.1</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v3.5.2</div>
   </div>
   <div class="content">
 
@@ -970,7 +1070,7 @@ tr:hover td{background:var(--surface2);}
             <div class="mod-pill active" data-mod="sims" onclick="toggleCreateMod(this)"><span class="pill-dot"></span>📡 SIMs</div>
             <div class="mod-pill active" data-mod="envios" onclick="toggleCreateMod(this)"><span class="pill-dot"></span>🚚 Envíos</div>
             <div class="mod-pill" data-mod="desinstalaciones" onclick="toggleCreateMod(this)"><span class="pill-dot"></span>📦 Desinstalaciones</div>
-            <div class="mod-pill" data-mod="merchants" onclick="toggleCreateMod(this)"><span class="pill-dot"></span>🏪 Envíos Merchants</div>
+            <div class="mod-pill" data-mod="napse" onclick="toggleCreateMod(this)"><span class="pill-dot"></span>🔍 NAPSE</div>
             <div class="mod-pill active" data-mod="horas" onclick="toggleCreateMod(this)"><span class="pill-dot"></span>⏱ Horas</div>
             <div class="mod-pill" data-mod="terminales" onclick="toggleCreateMod(this)"><span class="pill-dot"></span>🖥️ Terminales</div>
             <div class="mod-pill" data-mod="sf" onclick="toggleCreateMod(this)"><span class="pill-dot"></span>☁ SF-Integración</div>
@@ -1302,91 +1402,245 @@ tr:hover td{background:var(--surface2);}
   </div>
 </div>
 
-<!-- ══ MÓDULO ENVÍOS MERCHANTS (temporal — volar cuando SF esté integrado) ═══════════ -->
-<div class="module" id="mod-merchants">
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+<!-- ══ MÓDULO NAPSE ════════════════════════════════════════════════════════════════ -->
+<div class="module" id="mod-napse">
+  <!-- Header NAPSE -->
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:12px">
     <div style="display:flex;align-items:center;gap:10px">
-      <span style="font-size:18px">🏪</span>
+      <span style="font-size:20px">🔍</span>
       <div>
-        <div style="font-weight:700;font-size:15px">Envíos Merchants</div>
-        <div style="font-size:11px;color:var(--text-muted)">Seguimiento de guías Correo Argentino — PROMESA DESPACHO</div>
+        <div style="font-weight:700;font-size:15px">NAPSE — Analizador de Logs VTOL</div>
+        <div style="font-size:11px;color:var(--text-muted)">Detecta transacciones denegadas y arma tickets para Payway</div>
       </div>
     </div>
-    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-      <label class="btn-ghost btn-sm" style="cursor:pointer;display:flex;align-items:center;gap:6px;padding:6px 12px;border:1px solid var(--border2);border-radius:7px;font-size:12px;font-weight:600">
-        📂 Importar Excel
-        <input type="file" id="mch-file-input" accept=".xlsx,.xls" style="display:none" onchange="mchImportarExcel(event)">
-      </label>
-      <a href="https://alleata.lightning.force.com/lightning/r/Report/00ORm00000CffUvMAJ/view?queryScope=userFolders" target="_blank" style="display:flex;align-items:center;gap:6px;padding:6px 12px;border:1px solid var(--border2);border-radius:7px;font-size:12px;font-weight:600;color:var(--blue);text-decoration:none;background:var(--surface2)" title="Ver reporte en Salesforce">
-        ☁️ Reporte SF
-      </a>
-      <button class="btn btn-sm" onclick="mchActualizarTodos()" id="mch-btn-update" style="font-size:12px;padding:6px 14px">🔄 Actualizar tracking</button>
-      <button class="btn-ghost btn-sm" onclick="mchLimpiarTodo()" style="font-size:12px;color:#ef4444;border-color:#ef4444">🗑️ Vaciar</button>
-    </div>
+    <div id="napse-log-meta" style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-muted)"></div>
   </div>
-
-  <!-- Stats row -->
-  <div class="stats-row" style="margin-bottom:16px">
-    <div class="stat-box" onclick="mchFiltrarPorEstado('')" style="cursor:pointer"><div class="stat-num" id="mch-stat-total" style="color:var(--teal)">0</div><div class="stat-label">TOTAL</div></div>
-    <div class="stat-box" onclick="mchFiltrarPorEstado('En tránsito')" style="cursor:pointer;border-left:3px solid #1a9fd4"><div class="stat-num" id="mch-stat-transito" style="color:#1a9fd4">0</div><div class="stat-label">EN TRÁNSITO</div></div>
-    <div class="stat-box" onclick="mchFiltrarPorEstado('Entregado')" style="cursor:pointer;border-left:3px solid #10b981"><div class="stat-num" id="mch-stat-entregado" style="color:#10b981">0</div><div class="stat-label">ENTREGADOS</div></div>
-    <div class="stat-box" onclick="mchFiltrarPorEstado('En sucursal')" style="cursor:pointer;border-left:3px solid #f59e0b"><div class="stat-num" id="mch-stat-sucursal" style="color:#f59e0b">0</div><div class="stat-label">EN SUCURSAL</div></div>
-    <div class="stat-box" onclick="mchFiltrarPorEstado('Devuelto')" style="cursor:pointer;border-left:3px solid #ef4444"><div class="stat-num" id="mch-stat-devuelto" style="color:#ef4444">0</div><div class="stat-label">DEVUELTOS</div></div>
-    <div class="stat-box" onclick="mchFiltrarPorEstado('Sin datos')" style="cursor:pointer;border-left:3px solid var(--text-muted)"><div class="stat-num" id="mch-stat-sin" style="color:var(--text-muted)">0</div><div class="stat-label">SIN DATOS</div></div>
+  <!-- Sub-tabs nav NAPSE -->
+  <div style="display:flex;gap:2px;margin-bottom:18px;border-bottom:1px solid var(--border);padding-bottom:0">
+    <button id="napse-tab-upload" class="napse-subtab active" onclick="napseSetView('upload')">📂 Cargar log</button>
+    <button id="napse-tab-buscar" class="napse-subtab" onclick="napseSetView('buscar')">🔍 Buscar error</button>
+    <button id="napse-tab-tickets" class="napse-subtab" onclick="napseSetView('tickets')">🎫 Tickets Payway <span id="ticket-count-badge" style="font-size:9px;padding:1px 6px;background:rgba(239,68,68,.15);color:#fca5a5;border-radius:8px;font-family:'JetBrains Mono',monospace;margin-left:4px"></span></button>
+    <button id="napse-tab-historial" class="napse-subtab" onclick="napseSetView('historial')">🗄️ Historial</button>
+    <button id="napse-tab-errores" class="napse-subtab" onclick="napseSetView('errores')">⚡ Errores sistema</button>
   </div>
-
-  <div class="card">
-    <!-- Filtros -->
-    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px">
-      <div class="field" style="margin:0;min-width:130px">
-        <label class="label">Estado</label>
-        <select class="select" id="mch-f-estado" onchange="mchFiltrar()">
-          <option value="">Todos</option>
-          <option>En tránsito</option>
-          <option>Entregado</option>
-          <option>En sucursal</option>
-          <option>Devuelto</option>
-          <option>Sin datos</option>
-        </select>
+  <div>
+<div id="view-upload" class="napse-view active">
+        <div class="napse-banner">
+          <div class="banner-icon">🔍</div>
+          <div class="banner-text">
+            <h2>Analizador de Logs VTOL — NAPSE</h2>
+            <p>Subí el server.log para detectar transacciones denegadas, armar tickets para Payway y analizar errores del sistema</p>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">📁 Subir archivo de log</div>
+          <div class="upload-zone" id="drop-zone" onclick="document.getElementById('file-in').click()">
+            <span class="upload-icon">📄</span>
+            <h3>Arrastrá el server.log o el .zip acá o hacé clic</h3>
+            <p>Archivos .log · .txt · .zip (incluso server.log.1) — hasta 200MB — procesado 100% local</p>
+          </div>
+          <input type="file" id="file-in" accept=".log,.txt,.zip" style="display:none">
+          <div style="text-align:center;margin-top:16px">
+            <button class="btn-ghost btn-sm" onclick="loadDemo()">▶ Cargar log de demo</button>
+          </div>
+        </div>
+        <div class="card" style="margin-top:14px">
+          <div class="card-title">ℹ️ Flujo de detección</div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px">
+            <div style="background:var(--surface2);border-radius:9px;padding:13px 15px">
+              <div style="font-size:18px;margin-bottom:6px">🚫</div>
+              <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:3px">Detecta DENEGADA</div>
+              <div style="font-size:11px;color:var(--text-muted)">Busca responseMessage: DENEGADA y extrae el bloque completo con Node, Store, IsoCode, tarjeta y comercio</div>
+            </div>
+            <div style="background:var(--surface2);border-radius:9px;padding:13px 15px">
+              <div style="font-size:18px;margin-bottom:6px">🔗</div>
+              <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:3px">Linkea 0200 → 0210</div>
+              <div style="font-size:11px;color:var(--text-muted)">Remonta el log para encontrar el request 0200 enviado a Payway/Visa en el mismo flujo</div>
+            </div>
+            <div style="background:var(--surface2);border-radius:9px;padding:13px 15px">
+              <div style="font-size:18px;margin-bottom:6px">🛡️</div>
+              <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:3px">Detecta antifraud timeout</div>
+              <div style="font-size:11px;color:var(--text-muted)">Correlaciona si hubo timeout del servicio antifraude en el mismo flujo antes de la denegada</div>
+            </div>
+            <div style="background:var(--surface2);border-radius:9px;padding:13px 15px">
+              <div style="font-size:18px;margin-bottom:6px">🎫</div>
+              <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:3px">Arma ticket Payway</div>
+              <div style="font-size:11px;color:var(--text-muted)">Genera el texto exacto para reportar a Payway: nro. comercio, terminal, IsoCode, listo para copiar</div>
+            </div>
+          </div>
+        </div>
       </div>
-      <div style="position:relative;flex:1;min-width:200px">
-        <svg style="position:absolute;left:10px;top:50%;transform:translateY(-50%);opacity:0.4;pointer-events:none" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-        <input id="mch-buscar" class="input" style="padding-left:32px;width:100%" placeholder="Buscar comercio, OT, tracking, ciudad..." oninput="mchFiltrar()">
+
+      <!-- BUSCAR -->
+      <div id="view-buscar" class="napse-view">
+        <div class="napse-banner">
+          <div class="banner-icon">🔍</div>
+          <div class="banner-text">
+            <h2>Buscar error por Node / Store</h2>
+            <p id="banner-file">—</p>
+          </div>
+          <div style="margin-left:auto"><button class="btn-ghost btn-sm" onclick="napseSetView('upload')">↩ Nuevo log</button></div>
+        </div>
+
+        <div class="search-panel">
+          <h3>🎯 Filtros de búsqueda</h3>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr 1fr auto;gap:10px;align-items:end">
+            <div class="field">
+              <label class="label">Node</label>
+              <input class="filter-input" id="f-node" placeholder="ej: 669" onkeydown="if(event.key==='Enter')runBuscar()">
+            </div>
+            <div class="field">
+              <label class="label">Store</label>
+              <input class="filter-input" id="f-store" placeholder="ej: 537" onkeydown="if(event.key==='Enter')runBuscar()">
+            </div>
+            <div class="field">
+              <label class="label">Estado</label>
+              <select class="select" id="f-estado">
+                <option value="">Todos</option>
+                <option value="ERRORS">Solo errores</option>
+                <option value="DENEGADA">DENEGADA</option>
+                <option value="COMERCIO_INVALIDO">COMERCIO INVÁLIDO (03)</option>
+                <option value="NO_OPERA_OFFLINE">NO OPERA OFF-LINE (99)</option>
+                <option value="APROBADA">APROBADA</option>
+              </select>
+            </div>
+            <div class="field">
+              <label class="label">IsoCode</label>
+              <input class="filter-input" id="f-iso" placeholder="ej: 05  ó  03" onkeydown="if(event.key==='Enter')runBuscar()">
+            </div>
+            <div class="field">
+              <label class="label">Fecha</label>
+              <input class="filter-input" id="f-fecha" type="date" style="font-family:'Inter',sans-serif" onkeydown="if(event.key==='Enter')runBuscar()">
+            </div>
+            <div class="field">
+              <label class="label">Monto</label>
+              <input class="filter-input" id="f-monto" placeholder="ej: 39.0" onkeydown="if(event.key==='Enter')runBuscar()">
+            </div>
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-sm" onclick="runBuscar()">🔍 Buscar</button>
+              <button class="btn-ghost btn-sm" onclick="clearFilters()">Limpiar</button>
+            </div>
+          </div>
+          <div id="filter-summary" style="margin-top:10px;font-size:12px;color:var(--text-muted)"></div>
+        </div>
+
+        <!-- SAVE BAR -->
+        <div id="save-bar" style="display:none;background:rgba(29,191,142,.07);border:1px solid rgba(29,191,142,.2);border-radius:10px;padding:12px 16px;margin-bottom:16px;display:none;align-items:center;gap:12px;flex-wrap:wrap">
+          <span style="font-size:13px;color:var(--text-mid);flex:1">
+            <span id="save-bar-msg">📦 Log parseado — guardá las transacciones en el historial para consultas futuras</span>
+          </span>
+          <button class="btn btn-sm" id="btn-guardar" onclick="guardarHistorial()" style="min-width:160px">
+            💾 Guardar en historial
+          </button>
+        </div>
+
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                  <th>Hora</th>
+                <th>Estado</th>
+                <th>Node</th>
+                <th>Store</th>
+                <th>IsoCode</th>
+                <th>Tarjeta</th>
+                <th>Emisor</th>
+                <th>Terminal</th>
+                <th>Comercio</th>
+                <th>Monto</th>
+                <th>Antifraud</th>
+                <th>Ticket</th>
+              </tr>
+            </thead>
+            <tbody id="buscar-body"></tbody>
+          </table>
+        </div>
+        <div id="buscar-count" style="font-size:11px;color:var(--text-muted);margin-top:8px;text-align:right"></div>
       </div>
-      <button class="btn-ghost btn-sm" onclick="mchLimpiarFiltros()">Limpiar</button>
-    </div>
 
-    <!-- Mensaje import -->
-    <div id="mch-import-msg" style="font-size:12px;color:var(--text-muted);margin-bottom:8px"></div>
+      <!-- TICKETS -->
+      <div id="view-tickets" class="napse-view">
+        <div class="napse-banner">
+          <div class="banner-icon">🎫</div>
+          <div class="banner-text">
+            <h2>Tickets para Payway</h2>
+            <p>Textos listos para copiar y reportar a Payway/Napse — un ticket por cada transacción denegada</p>
+          </div>
+        </div>
+        <div id="tickets-list"></div>
+      </div>
 
-    <!-- Tabla -->
-    <div class="table-wrap">
-      <table class="table">
-        <thead>
-          <tr>
-            <th>OT / Comercio</th>
-            <th>Tracking</th>
-            <th>Ciudad / Provincia</th>
-            <th>Estado OT</th>
-            <th>Último evento CA</th>
-            <th>Fecha</th>
-            <th style="text-align:center">SLA</th>
-            <th>Obs. Cliente</th>
-            <th>Contacto</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody id="mch-table-body"></tbody>
-      </table>
+      <!-- HISTORIAL -->
+      <div id="view-historial" class="napse-view">
+        <div class="napse-banner">
+          <div class="banner-icon">🗄️</div>
+          <div class="banner-text">
+            <h2>Historial de transacciones</h2>
+            <p>Todas las transacciones guardadas de logs anteriores — acumuladas en Supabase</p>
+          </div>
+          <div style="margin-left:auto">
+            <button class="btn-ghost btn-sm" onclick="refreshHistorial()">↻ Actualizar</button>
+          </div>
+        </div>
+        <div id="hist-stats" style="margin-bottom:16px"></div>
+        <div class="search-panel" style="margin-bottom:16px">
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr auto;gap:10px;align-items:end">
+            <div class="field">
+              <label class="label">Desde fecha</label>
+              <input class="filter-input" id="hf-fecha-from" type="date" style="font-family:'Inter',sans-serif">
+            </div>
+            <div class="field">
+              <label class="label">Hasta fecha</label>
+              <input class="filter-input" id="hf-fecha-to" type="date" style="font-family:'Inter',sans-serif">
+            </div>
+            <div class="field">
+              <label class="label">Estado</label>
+              <select class="select" id="hf-estado">
+                <option value="">Todos</option>
+                <option value="deny">Solo errores</option>
+                <option value="ok">Solo aprobadas</option>
+              </select>
+            </div>
+            <div class="field">
+              <label class="label">IsoCode</label>
+              <input class="filter-input" id="hf-iso" placeholder="ej: 05">
+            </div>
+            <button class="btn btn-sm" onclick="buscarHistorial()">🔍 Buscar</button>
+          </div>
+        </div>
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Fecha</th><th>Hora</th><th>Estado</th><th>Node</th><th>Store</th>
+                <th>IsoCode</th><th>Tarjeta</th><th>Emisor</th><th>Terminal</th>
+                <th>Comercio</th><th>Monto</th><th>Archivo</th>
+              </tr>
+            </thead>
+            <tbody id="hist-body"></tbody>
+          </table>
+        </div>
+        <div id="hist-count" style="font-size:11px;color:var(--text-muted);margin-top:8px;text-align:right"></div>
+      </div>
+
+      <!-- ERRORES -->
+      <div id="view-errores" class="napse-view">
+        <div class="napse-banner">
+          <div class="banner-icon">⚡</div>
+          <div class="banner-text">
+            <h2>Errores de sistema</h2>
+            <p>Errores de conexión, antifraude y aplicación detectados en el log</p>
+          </div>
+        </div>
+        <div id="errores-content"></div>
+      </div>
+
     </div>
-    <div class="empty" id="mch-empty" style="display:none">
-      <div class="empty-icon">🏪</div>
-      <p>Importá el Excel de Desinstalaciones para empezar</p>
-      <div style="font-size:12px;color:var(--text-muted);margin-top:4px">Reporte "PROMESA DESPACHO CORREO ARGENTINO" exportado desde SF</div>
-    </div>
+  </main>
+</div>
   </div>
 </div>
-
 <!-- ══ MÓDULO ALLY CONFIG ══════════════════════════════════════════════════════════ -->
 <div class="module" id="mod-ally">
   <div style="display:flex;gap:10px;margin-bottom:20px;border-bottom:1px solid var(--border);padding-bottom:12px">
@@ -3395,7 +3649,6 @@ El envío no registra avances recientes. Requiere seguimiento.`,
 // ══════════════════════════════════════════════════════════════════════
 // ETAPA 1 — DESINSTALACIONES + ALLY INTERNO (v2.8.4)
 // Grupo interno: Ángel / Luciana / Marcelo / Ally
-// NO envía a merchants todavía
 // ══════════════════════════════════════════════════════════════════════
 
 const ALLY_DESINST_SECRET = '123456';
@@ -3858,7 +4111,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v3.5.1] OK');
+console.log('[Alleata v3.5.2] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -4039,7 +4292,7 @@ function showApp(){
     document.getElementById('nav-ajustes').style.display='flex';
     document.getElementById('nav-section-config').style.display='block';
   }
-  ['sims','envios','desinstalaciones','merchants','horas'].forEach(mod=>{
+  ['sims','envios','desinstalaciones','napse','horas'].forEach(mod=>{
     const el=document.getElementById('nav-'+mod);
     if(el&&!modulos.includes(mod)&&!isAdmin){el.classList.add('locked');el.onclick=null;}
   });
@@ -4056,7 +4309,7 @@ function buildDashCards(modulos,isAdmin){
     {mod:'envios',icon:'🚚',title:'Envíos',desc:'Logística directa',stat:'cargando...'},
     {mod:'rollout',icon:'🔄',title:'Rollout',desc:'Cambio tecnológico',stat:'cargando...'},
     {mod:'desinstalaciones',icon:'📦',title:'Desinstalaciones',desc:'Logística inversa',stat:'cargando...'},
-    {mod:'merchants',icon:'🏪',title:'Envíos Merchants',desc:'Tracking guías CA',stat:'cargando...'},
+    {mod:'napse',icon:'🔍',title:'NAPSE',desc:'Analizador de Logs VTOL',stat:''},
     {mod:'horas',icon:'⏱',title:'Horas',desc:'Registro diario',stat:'cargando...'},
     {mod:'terminales',icon:'🖥️',title:'Terminales',desc:'Reporte Logicalis → Salesforce',stat:'Logicalis'},
   ];
@@ -4075,7 +4328,7 @@ function buildDashCards(modulos,isAdmin){
   loadOpsPanel(isAdmin);
 }
 
-const MOD_INFO={home:'Dashboard',sims:'Verificador SIMs',envios:'Envíos',rollout:'Rollout',desinstalaciones:'Desinstalaciones',merchants:'Envíos Merchants',instalaciones:'Instalaciones SF',horas:'Control de Horas',retencion:'Retención de Cuentas',ajustes:'Ajustes',ally:'Configuración Ally',distri:'Distribuidores',terminales:'Terminales — Logicalis'};
+const MOD_INFO={home:'Dashboard',sims:'Verificador SIMs',envios:'Envíos',rollout:'Rollout',desinstalaciones:'Desinstalaciones',napse:'NAPSE — Logs VTOL',instalaciones:'Instalaciones SF',horas:'Control de Horas',retencion:'Retención de Cuentas',ajustes:'Ajustes',ally:'Configuración Ally',distri:'Distribuidores',terminales:'Terminales — Logicalis'};
 
 function goTo(mod){
   const el=document.getElementById('nav-'+mod);
@@ -4095,7 +4348,7 @@ function goTo(mod){
   if(mod==='home'){setTimeout(()=>{if(window._drawQR)window._drawQR();},200);loadOpsPanel(currentProfile?.rol==='admin');}
   if(mod==='rollout')initRollout();
   if(mod==='desinstalaciones'&&!DesinModule.cargado)cargarDesinstalaciones();
-  if(mod==='merchants')initMerchants();
+  if(mod==='napse')napseInitApp();
   if(mod==='instalaciones'){window.scrollTo(0,0);initInstalaciones();}
   if(mod==='ally')cargarAlly();
   if(mod==='distri')cargarDistri();
@@ -4141,7 +4394,7 @@ const ALL_MODS = [
   {id:'sims',      label:'📡 SIMs'},
   {id:'envios',    label:'🚚 Envíos'},
   {id:'desinstalaciones', label:'📦 Desinstalaciones'},
-  {id:'merchants', label:'🏪 Envíos Merchants'},
+  {id:'napse', label:'🔍 NAPSE'},
   {id:'horas',     label:'⏱ Horas'},
   {id:'terminales',label:'🖥️ Terminales'},
   {id:'sf',        label:'☁ SF-Integración'},
@@ -7416,7 +7669,7 @@ async function globalSFSync() {
       if (mod === 'instalaciones') initInstalaciones();
       if (mod === 'desinstalaciones') cargarDesinstalaciones();
       if (mod === 'rollout') initRollout?.();
-      if (mod === 'merchants') initMerchants?.();
+      if (mod === 'napse') napseInitApp?.();
       setTimeout(() => { if (status) status.style.display = 'none'; }, 4000);
     } else {
       if (status) status.textContent = '⚠ Error';
@@ -7507,403 +7760,835 @@ async function sfSync() {
   }
 }
 
-// ══════════════════════════════════════════════════════════
-// MÓDULO ENVÍOS MERCHANTS — temporal hasta integración SF
-// Datos en Supabase tabla: merchants_guias (compartida entre usuarios)
-// Para eliminar: borrar nav-item, mod-merchants, este bloque, y hacer DROP TABLE merchants_guias
-// SQL de creación:
-//   create table if not exists merchants_guias (
-//     id uuid primary key default gen_random_uuid(),
-//     sf_id text unique,
-//     ot text, cuenta text, track text, estado_ot text,
-//     ciudad text, obs text,
-//     estado text default 'Sin datos',
-//     ultimo_evento text, ultimo_evento_fecha text,
-//     updated_at timestamptz,
-//     created_at timestamptz default now()
-//   );
-//   alter table merchants_guias enable row level security;
-//   create policy "merchants_all" on merchants_guias for all using (true) with check (true);
-// ══════════════════════════════════════════════════════════
+// ══ MÓDULO NAPSE ═══════════════════════════════════════════════════════════
+const ISO = {
+  '00':'Aprobada',
+  '01':'Referir al emisor',
+  '03':'Comercio inválido — verificar configuración del comercio en Payway',
+  '04':'Retener tarjeta',
+  '05':'No autorizada — tarjeta inválida/no configurada en Payway',
+  '06':'Error general',
+  '07':'Retener tarjeta (condición especial)',
+  '12':'Transacción inválida',
+  '13':'Monto inválido',
+  '14':'Número de tarjeta inválido',
+  '19':'Reintentar transacción',
+  '25':'Registro no encontrado',
+  '30':'Error de formato',
+  '33':'Tarjeta vencida',
+  '34':'Sospecha de fraude',
+  '36':'Tarjeta restringida',
+  '38':'Exceso de intentos de PIN',
+  '41':'Tarjeta perdida — retener',
+  '43':'Tarjeta robada — retener',
+  '51':'Fondos insuficientes',
+  '54':'Tarjeta vencida',
+  '55':'PIN incorrecto',
+  '57':'Transacción no permitida para esta tarjeta',
+  '58':'Transacción no permitida en esta terminal',
+  '61':'Excede límite de monto',
+  '62':'Tarjeta restringida',
+  '65':'Excede límite de frecuencia',
+  '75':'Exceso de intentos de PIN',
+  '76':'PIN inválido',
+  '78':'Tarjeta bloqueada',
+  '91':'Emisor no disponible',
+  '92':'Destino no disponible',
+  '96':'Error del sistema',
+  '99':'No opera off-line — tarjeta/comercio no habilitado para operar sin conexión'
+};
 
-let _mchCache = null; // cache en memoria para la sesión
+let P = {transactions:[], errors:{}, filename:'', totalLines:0};
 
-async function mchGetGuias(){
-  if(_mchCache) return _mchCache;
-  const { data, error } = await sb.from('merchants_guias').select('*').order('created_at', {ascending:false});
-  if(error){ console.error('mchGetGuias:', error); return []; }
-  _mchCache = data || [];
-  return _mchCache;
-}
+// AUTH
 
-function mchInvalidateCache(){ _mchCache = null; }
-
-async function initMerchants(){
-  mchInvalidateCache();
-  const guias = await mchGetGuias();
-  mchRenderTabla(guias);
-  mchUpdateStatsFromData(guias);
-  mchUpdateBadgeFromData(guias);
-  const empty = document.getElementById('mch-empty');
-  if(empty) empty.style.display = guias.length === 0 ? 'flex' : 'none';
-}
-
-function mchUpdateBadgeFromData(guias){
-  const activas = guias.filter(g => g.estado !== 'Entregado' && g.estado !== 'Devuelto').length;
-  const nb = document.getElementById('nb-merchants');
-  if(nb) nb.textContent = activas || '0';
-  const dc = document.querySelector('[data-mod="merchants"] .dash-card-stat');
-  if(dc) dc.textContent = guias.length + ' guías';
-}
-
-function mchUpdateStatsFromData(guias){
-  const set = (id, val) => { const el=document.getElementById(id); if(el) el.textContent=val; };
-  set('mch-stat-total',     guias.length);
-  set('mch-stat-transito',  guias.filter(g=>g.estado==='En tránsito').length);
-  set('mch-stat-entregado', guias.filter(g=>g.estado==='Entregado').length);
-  set('mch-stat-sucursal',  guias.filter(g=>g.estado==='En sucursal').length);
-  set('mch-stat-devuelto',  guias.filter(g=>g.estado==='Devuelto').length);
-  set('mch-stat-sin',       guias.filter(g=>!g.estado||g.estado==='Sin datos').length);
-  mchUpdateBadgeFromData(guias);
-}
-
-function mchMapearEstado(historia, estadoCA){
-  const h = (historia||'').toUpperCase();
-  const e = (estadoCA||'').toUpperCase();
-  if(h.includes('ENTREGADO')||h.includes('ENTREGA OK')||h.includes('ENTREGA EFECTUADA')) return 'Entregado';
-  if(h.includes('DEVUELTO')||h.includes('DEVOLUCION')||e.includes('DEVUELTO')) return 'Devuelto';
-  if(h.includes('EN ESPERA EN SUCURSAL')||e.includes('EN ESPERA EN SUCURSAL')) return 'En sucursal';
-  if(h||e) return 'En tránsito';
-  return 'Sin datos';
-}
-
-async function mchImportarExcel(event){
-  const file = event.target.files[0];
-  if(!file) return;
-  const msg = document.getElementById('mch-import-msg');
-  if(msg) msg.textContent = '⏳ Procesando...';
+async function saveToSupabase(transactions, filename) {
+  if(!transactions || !transactions.length) return {ok:false, msg:'Sin transacciones para guardar'};
+  const rows = transactions.map(t => ({
+    archivo:          filename,
+    fecha:            (t.ts||'').split(' ')[0] || null,
+    hora:             (t.ts||'').split(' ')[1] || null,
+    node:             t.node || null,
+    store:            t.store || null,
+    iso_code:         t.isoCode || null,
+    response_message: t.responseMessage || null,
+    masked_card:      t.maskedCard || null,
+    serial_number:    t.serialNumber || null,
+    business_number:  t.businessNumber || null,
+    host_name:        t.hostName || null,
+    issuer_name:      t.issuerName || null,
+    amount:           t.amount ? parseFloat(t.amount) : null,
+    rrn:              t.rrn || null,
+    trx_ref:          t.trxRef || null,
+    antifraud_timeout: t.antifraudTimeout || false,
+    is_deny:          t.isDeny || false,
+  }));
   try {
-    const data = await file.arrayBuffer();
-    const wb = XLSX.read(data, {type:'array'});
-    const ws = wb.Sheets[wb.SheetNames[0]];
-    const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
-
-    let headerRow = -1;
-    for(let i=0;i<rows.length;i++){
-      if(rows[i].some(c=>(c+'').includes('Id. de orden de trabajo'))){ headerRow=i; break; }
-    }
-    if(headerRow === -1){ if(msg) msg.textContent='❌ No encontré encabezados en el Excel'; return; }
-
-    const headers = rows[headerRow].map(h=>(h+'').trim());
-    const col = name => headers.findIndex(h=>h.toLowerCase().includes(name.toLowerCase()));
-
-    const cSfId    = col('Id. de orden');
-    const cOT      = col('Número de orden');
-    const cCuenta  = col('Nombre de la cuenta');
-    const cTrack   = col('N° de seguimiento');
-    const cEstadoOT= col('Estado');
-    const cCiudad  = col('Ciudad');
-    const cObs     = col('Observaciones generales');
-    const cContacto= col('Contacto');
-    const cObsCliente = col('Observaciones Generales');
-    const cProvincia  = col('Provincia');
-
-    const toInsert = [];
-    for(let i=headerRow+1; i<rows.length; i++){
-      const row = rows[i];
-      if(!row || row.every(c=>!c)) continue;
-      const sfId = (row[cSfId]||'').toString().trim();
-      const track = (row[cTrack]||'').toString().trim();
-      if(!sfId && !track) continue;
-      toInsert.push({
-        sf_id:    sfId || null,
-        ot:       (row[cOT]||'').toString().replace(/\.0$/,'').trim(),
-        cuenta:   (row[cCuenta]||'').toString().trim(),
-        track:    track,
-        estado_ot:(row[cEstadoOT]||'').toString().trim(),
-        ciudad:    (row[cCiudad]||'').toString().trim(),
-        provincia: cProvincia>=0?(row[cProvincia]||'').toString().trim():'',
-        obs:       (row[cObs]||'').toString().trim(),
-        obs_cliente: cObsCliente>=0?(row[cObsCliente]||'').toString().trim():'',
-        contacto:  cContacto>=0?(row[cContacto]||'').toString().trim():'',
-        estado:   'Sin datos',
-        ultimo_evento: '',
-        ultimo_evento_fecha: '',
-        updated_at: new Date().toISOString()
-      });
-    }
-
-    if(toInsert.length === 0){ if(msg) msg.textContent='⚠️ No encontré filas válidas'; return; }
-
-    // upsert por sf_id para no duplicar
-    const { error, count } = await sb.from('merchants_guias')
-      .upsert(toInsert, { onConflict: 'sf_id', ignoreDuplicates: false });
-
-    if(error){ if(msg) msg.textContent='❌ Error guardando: '+error.message; console.error(error); return; }
-
-    mchInvalidateCache();
-    const guias = await mchGetGuias();
-    mchRenderTabla(guias);
-    mchUpdateStatsFromData(guias);
-    if(msg) msg.textContent = `✅ ${toInsert.length} filas procesadas · ${guias.length} guías en total`;
-    const empty = document.getElementById('mch-empty');
-    if(empty) empty.style.display = guias.length===0?'flex':'none';
-  } catch(err){
-    console.error(err);
-    if(msg) msg.textContent = '❌ Error: '+err.message;
+    const {data, error} = await sb.from('napse_transactions').upsert(rows, {
+      onConflict: 'trx_ref',
+      ignoreDuplicates: true
+    });
+    if(error) return {ok:false, msg: error.message};
+    return {ok:true, count: rows.length};
+  } catch(e) {
+    return {ok:false, msg: e.message};
   }
-  event.target.value='';
 }
 
-async function mchFiltrarPorEstado(estado){
-  const sel = document.getElementById('mch-f-estado');
-  if(sel) sel.value = estado;
-  const b = document.getElementById('mch-buscar');
-  if(b) b.value = '';
-  await mchFiltrar();
-}
-
-async function mchFiltrar(){
-  const guias = await mchGetGuias();
-  const q = (document.getElementById('mch-buscar')?.value||'').toLowerCase();
-  const fEst = document.getElementById('mch-f-estado')?.value||'';
-  const filtered = guias.filter(g=>{
-    // Ocultar entregados salvo que se filtre explícitamente por ese estado
-    if(g.estado === 'Entregado' && fEst !== 'Entregado') return false;
-    if(fEst && g.estado !== fEst) return false;
-    if(q && !['cuenta','ot','track','ciudad','estado','ultimo_evento'].some(k=>(g[k]||'').toLowerCase().includes(q))) return false;
-    return true;
-  });
-  // Ordenar por SLA descendente (más días primero)
-  filtered.sort((a,b) => mchCalcSLA(b) - mchCalcSLA(a));
-  mchRenderTabla(filtered);
-}
-
-function mchEstadoBadge(estado, ultimoEvento){
-  const map = {
-    'Entregado':   'background:rgba(16,185,129,.15);color:#10b981;border:1px solid rgba(16,185,129,.3)',
-    'En tránsito': 'background:rgba(26,159,212,.15);color:#1a9fd4;border:1px solid rgba(26,159,212,.3)',
-    'En sucursal': 'background:rgba(245,158,11,.15);color:#f59e0b;border:1px solid rgba(245,158,11,.3)',
-    'Devuelto':    'background:rgba(239,68,68,.15);color:#ef4444;border:1px solid rgba(239,68,68,.3)',
-    'Sin datos':   'background:rgba(128,128,128,.1);color:var(--text-muted);border:1px solid var(--border)',
-  };
-  const style = map[estado]||map['Sin datos'];
-  const chip = `<span style="font-size:11px;padding:2px 8px;border-radius:12px;font-weight:600;${style}">${estado||'Sin datos'}</span>`;
-  // Sub-estado: mostrar ultimo_evento debajo del chip cuando está en tránsito
-  if(estado === 'En tránsito' && ultimoEvento) {
-    const ue = ultimoEvento.toUpperCase();
-    // Detectar sub-estado relevante y color
-    let subColor = '#1a9fd4';
-    if(ue.includes('ENTREGADO') || ue.includes('ENTREGA EN SUCURSAL') || ue.includes('ENTREGA EFECTUADA')) subColor = '#10b981';
-    else if(ue.includes('CADUCA') || ue.includes('PLAZO VENCIDO') || ue.includes('DEVOLUCION') || ue.includes('DEVUELTO')) subColor = '#ef4444';
-    else if(ue.includes('INTENTO DE ENTREGA') || ue.includes('DOMICILIO CERRADO') || ue.includes('ESPERA EN SUCURSAL')) subColor = '#f59e0b';
-    const subLabel = ultimoEvento.length > 22 ? ultimoEvento.slice(0,22)+'…' : ultimoEvento;
-    return chip + `<div style="font-size:9px;font-weight:600;color:${subColor};margin-top:3px;text-transform:uppercase;letter-spacing:.3px">${subLabel}</div>`;
+async function napseLoadHistorial() {
+  try {
+    const {data, error} = await supa
+      .from('napse_transactions')
+      .select('*')
+      .order('fecha', {ascending:false})
+      .order('hora',  {ascending:false})
+      .limit(500);
+    if(error) throw error;
+    return data || [];
+  } catch(e) {
+    console.error('Historial error:', e);
+    return [];
   }
-  return chip;
 }
 
-function mchCalcSLA(g){
-  // Inicio SLA: fecha del PRIMER evento en eventos_ca (preimposicion)
-  // Si no hay eventos_ca, usa ultimo_evento_fecha como fallback
-  // Dias habiles Lun-Vie
-  let inicioStr = null;
 
-  // Prioridad: fecha_primer_evento (campo dedicado) → eventos_ca array → ultimo_evento_fecha
-  if(g.fecha_primer_evento) inicioStr = g.fecha_primer_evento;
-  else if(g.eventos_ca){
-    try {
-      const evts = typeof g.eventos_ca === 'string' ? JSON.parse(g.eventos_ca) : g.eventos_ca;
-      if(Array.isArray(evts) && evts.length > 0){
-        // eventos_ca[0] es el más reciente, el último del array es el más antiguo
-        const primero = evts[evts.length - 1];
-        inicioStr = primero.fecha || null; // formato: "07-05-2026 07:14"
+function napseReadFile(f){
+  if(f.name.toLowerCase().endsWith('.zip')){
+    const r=new FileReader();
+    r.onload=async e=>{
+      try{
+        const zip=await JSZip.loadAsync(e.target.result);
+        // Find first .log or .txt file inside the zip
+        let logFile=null, logName='';
+        zip.forEach((path,file)=>{
+          if(!logFile &&!file.dir){
+            logFile=file; logName=path.split('/').pop();
+          }
+        });
+        if(!logFile){
+          alert('No se encontró ningún archivo de log dentro del ZIP. Archivos encontrados: '+Object.keys(zip.files).join(', '));
+          return;
+        }
+        const text=await logFile.async('string');
+        napseParseLog(text, logName+' ('+f.name+')');
+      } catch(err){
+        alert('Error al leer el ZIP: '+err.message);
       }
-    } catch(e){}
-  }
-
-  // Fallback: ultimo_evento_fecha (aproximado)
-  if(!inicioStr) inicioStr = g.ultimo_evento_fecha || null;
-
-  if(!inicioStr) return -1;
-
-  // Parsear fecha "DD-MM-YYYY HH:MM" o "DD-MM-YYYY"
-  let inicio;
-  const m = inicioStr.match(/(\d{2})-(\d{2})-(\d{4})/);
-  if(m) inicio = new Date(parseInt(m[3]), parseInt(m[2])-1, parseInt(m[1]));
-  else inicio = new Date(inicioStr);
-  if(isNaN(inicio)) return -1;
-
-  const hoy = new Date();
-  let dias = 0;
-  const cur = new Date(inicio);
-  cur.setHours(0,0,0,0);
-  const fin = new Date(hoy);
-  fin.setHours(0,0,0,0);
-  while(cur < fin){
-    const dow = cur.getDay();
-    if(dow !== 0 && dow !== 6) dias++;
-    cur.setDate(cur.getDate()+1);
-  }
-  return dias;
-}
-
-function mchSLABadge(g){
-  const dias = mchCalcSLA(g);
-  if(dias < 0) return '<span style="color:var(--text-muted);font-size:11px">—</span>';
-  let color, bg, border;
-  if(dias <= 3){
-    color='#10b981'; bg='rgba(16,185,129,.15)'; border='rgba(16,185,129,.3)';
-  } else if(dias <= 5){
-    color='#f59e0b'; bg='rgba(245,158,11,.15)'; border='rgba(245,158,11,.3)';
+    };
+    r.readAsArrayBuffer(f);
   } else {
-    color='#ef4444'; bg='rgba(239,68,68,.15)'; border='rgba(239,68,68,.3)';
+    const r=new FileReader();
+    r.onload=e=>napseParseLog(e.target.result,f.name);
+    r.readAsText(f,'utf-8');
   }
-  return `<div style="text-align:center">
-    <span style="font-size:14px;font-weight:700;color:${color}">${dias}</span>
-    <div style="font-size:9px;color:${color};opacity:.8">días</div>
-  </div>`;
 }
 
-function mchRenderTabla(guias){
-  const tbody = document.getElementById('mch-table-body');
-  const empty = document.getElementById('mch-empty');
-  if(!tbody) return;
-  if(!guias || guias.length === 0){
-    tbody.innerHTML='';
-    if(empty) empty.style.display='flex';
+// ── PARSER ────────────────────────────────────────────────────────────────
+function getField(linesArr, name){
+  // Field format:  "  <num> <name>  : <value>"
+  // Also handles ProcessResponseMsg format: "  <num> <name>  : <value>"
+  const re=new RegExp('\\s+\\d+\\s+'+name+'\\s+:\\s+(.+)');
+  for(const l of linesArr){const m=l.match(re);if(m)return m[1].trim();}
+  return null;
+}
+function getTs(line){const m=line.match(/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})/);return m?m[1]:null;}
+
+function napseParseLog(text, filename){
+  const lines=text.split('\n');
+  const transactions=[];
+  const errors={};
+  const totalLines=lines.length;
+
+  // ── Pass 1: collect errors ─────────────────────────────────────────────
+  for(const line of lines){
+    if(!line.includes('ERROR')) continue;
+    const cfm=line.match(/Connect failed: (\w+)/);
+    if(cfm){
+      const k='conn_'+cfm[1];
+      errors[k]=errors[k]||{type:'connection',cat:cfm[1],msg:'Conexión rechazada: '+cfm[1],count:0,ts:getTs(line)};
+      errors[k].count++;
+    } else {
+      const em=line.match(/ERROR \[(\S+?)\s*\]\s+\[\S+\]\s+(.+)/);
+      if(em&&em[2].trim()){
+        const msg=em[2].trim().substring(0,120);
+        const k=em[1]+'|'+msg.substring(0,40);
+        errors[k]=errors[k]||{type:'app',cat:em[1],msg,count:0,ts:getTs(line)};
+        errors[k].count++;
+      }
+    }
+  }
+
+  // ── Pass 2: find DENEGADA blocks ───────────────────────────────────────
+  // Strategy based on log structure:
+  // 1. "Counting responses from VTOL to the POS" line contains Node and Store in header
+  //    OR in the lines immediately after
+  // 2. All fields (isoCode, responseMessage, maskedCardNumber, etc.) follow sequentially
+  // 3. Search backwards up to 500 lines for the matching 0200
+
+  for(let i=0;i<lines.length;i++){
+    const line=lines[i];
+    if(!line.includes('28 responseMessage')) continue;
+    const lineUpper=line.toUpperCase();
+    if(!lineUpper.includes('DENEGADA')&&!lineUpper.includes('APROBADA')&&!lineUpper.includes('COMERCIO INVALIDO')&&!lineUpper.includes('NO OPERA OFF-LINE')) continue;
+
+    const isDeny=lineUpper.includes('DENEGADA')||lineUpper.includes('COMERCIO INVALIDO')||lineUpper.includes('NO OPERA OFF-LINE');
+    const ts=getTs(line);
+
+    // The block of fields for this response starts at "Counting responses from VTOL"
+    // which is at most ~20 lines before responseMessage
+    let blockStart=i;
+    for(let b=i;b>=Math.max(0,i-25);b--){
+      if(lines[b].includes('Counting responses from VTOL to the POS')){
+        blockStart=b;
+        break;
+      }
+    }
+    const respBlock=lines.slice(blockStart,i+10);
+
+    // Node and Store are in the header line AND in the fields
+    // "Ending Request. Node: 669 Store: 537 Datetime:"
+    let node=null,store=null;
+    for(let b=blockStart;b>=Math.max(0,blockStart-3);b--){
+      const hm=lines[b].match(/Node:\s*(\d+)\s+Store:\s*(\d+)/);
+      if(hm){node=hm[1];store=hm[2];break;}
+    }
+    if(!node) node=getField(respBlock,'node');
+    if(!store) store=getField(respBlock,'store');
+
+    const isoCode=getField(respBlock,'isoCode');
+    const maskedCard=getField(respBlock,'maskedCardNumber');
+    const serialNumber=getField(respBlock,'serialNumber');
+    const businessNumber=getField(respBlock,'businessNumber');
+    const hostName=getField(respBlock,'hostName');
+    const issuerName=getField(respBlock,'creditCardIssuerName');
+    const rrn=getField(respBlock,'rrn');
+    const ticket=getField(respBlock,'ticket');
+    const trxRef=getField(respBlock,'trxReferenceNumber');
+    const clientDate=getField(respBlock,'clientDate');
+
+    // ── Find matching 0200 (backwards, up to 500 lines) ──────────────────
+    let req0200={};
+    const searchBefore=lines.slice(Math.max(0,i-800),i);
+    // First try to find Operation id start (works for ALL transaction types)
+    let opStartLine = Math.max(0,i-800);
+    for(let j=searchBefore.length-1;j>=0;j--){
+      if(searchBefore[j] && (searchBefore[j].match(/Node:[0-9A-Z]+ Operation id: \d+/))){
+        opStartLine = Math.max(0,i-800) + j;
+        break;
+      }
+    }
+    for(let j=searchBefore.length-1;j>=0;j--){
+      if(searchBefore[j].includes('1 messageCode')&&searchBefore[j].includes(': 0200')){
+        const reqBlock=searchBefore.slice(Math.max(0,j-5),j+30);
+        // Find "Sending message to" line just before 0200
+        let sendingLineIdx = j;
+        for(let k=j; k>=Math.max(0,j-5); k--){
+          if(searchBefore[k]&&searchBefore[k].includes('Sending message to [')){
+            sendingLineIdx=k; break;
+          }
+        }
+        const absLine0200 = Math.max(0,i-500) + sendingLineIdx;
+        req0200={
+          ts0200:getTs(searchBefore[j]),
+          amount:getField(reqBlock,'amount'),
+          trace:getField(reqBlock,'trace'),
+          serialReq:getField(reqBlock,'serialNumber'),
+          businessReq:getField(reqBlock,'businessNumber'),
+          trxDate:getField(reqBlock,'trxDate'),
+          trxTime:getField(reqBlock,'trxTime'),
+          channel: (searchBefore[j].match(/Sending message to \[(\w+)\]/)||[])[1]||'Visa',
+          line0200: absLine0200
+        };
+        break;
+      }
+    }
+    // If no 0200 found (offline/rejected flows), use Operation id start
+    if(!req0200.line0200 && opStartLine > 0){
+      req0200.line0200 = opStartLine;
+    }
+
+    // ── Antifraud timeout in window ───────────────────────────────────────
+    const window300=lines.slice(Math.max(0,i-350),i+10);
+    const antifraudTimeout=window300.some(l=>l.includes('Antifraud Service did not respond'));
+    let opRejected=null;
+    for(const l of window300){
+      const om=l.match(/Operation id: (\d+) status: Rejected/);
+      if(om){opRejected=om[1];break;}
+    }
+
+    // Skip duplicate APROBADA entries without card data (intermediate response blocks)
+    if(!isDeny && !maskedCard && !isoCode) continue;
+    
+    const responseMessage=getField(respBlock,'responseMessage')||'';
+    // Store line range for log extraction
+    const lineStart=blockStart;
+    const lineEnd=Math.min(lines.length-1, i+15);
+    transactions.push({
+      lineStart, lineEnd,
+      ts,isDeny,node,store,isoCode,maskedCard,serialNumber,businessNumber,responseMessage,
+      hostName,issuerName,rrn,ticket,trxRef,clientDate,
+      antifraudTimeout,opRejected,...req0200
+    });
+  }
+
+  P={transactions,errors,filename,totalLines,allLines:lines};
+  napseAfterParse();
+}
+
+function napseAfterParse(){
+  const {transactions,errors,filename,totalLines}=P;
+  const denies=transactions.filter(t=>t.isDeny);
+
+  // Update UI
+  (document.getElementById('napse-log-meta')||{}).textContent=filename+' · '+totalLines.toLocaleString()+' líneas';
+  document.getElementById('banner-file').textContent=filename+' · '+totalLines.toLocaleString()+' líneas';
+  document.getElementById('ticket-count-badge').textContent=denies.length||'';
+  // nav items always visible
+
+  // Populate node/store selects (used as hints)
+  const nodes=[...new Set(transactions.map(t=>t.node).filter(Boolean))].sort();
+  const stores=[...new Set(transactions.map(t=>t.store).filter(Boolean))].sort();
+
+  napseRenderBuscar();
+  renderTickets();
+  renderErrores();
+  napseSetView('buscar');
+  setTimeout(()=>napseRenderBuscar(),50);
+  // Show save button
+  showSaveBar(transactions);
+}
+
+// ── BUSCAR ────────────────────────────────────────────────────────────────
+function downloadExtract(lineStart, lineEnd, ts, node, store, line0200){
+  if(!P.allLines||!P.allLines.length){
+    alert('Las líneas del log no están disponibles. Recargá el log.');
     return;
   }
-  if(empty) empty.style.display='none';
-  tbody.innerHTML = guias.map((g)=>{
-    const trackLink = g.track
-      ? `<a href="https://www.correoargentino.com.ar/formularios/e-commerce?id=${encodeURIComponent(g.track)}" target="_blank" style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--blue);text-decoration:none" title="Ver en CA">${g.track} 🔗</a>`
-      : '<span style="color:var(--text-muted);font-size:11px">—</span>';
-    return `<tr>
-      <td>
-        <div style="font-weight:600;font-size:13px">${g.cuenta||'—'}</div>
-        ${g.ot?`<div style="font-size:11px;color:var(--text-muted);font-family:'JetBrains Mono',monospace">OT ${g.ot}</div>`:''}
-      </td>
-      <td>${trackLink}</td>
-      <td style="font-size:12px">
-        <div>${g.ciudad||'—'}</div>
-        ${g.provincia?`<div style="font-size:10px;color:var(--text-muted);margin-top:2px">${g.provincia}</div>`:''}
-      </td>
-      <td><span style="font-size:11px;color:var(--text-muted)">${g.estado_ot||'—'}</span></td>
-      <td>
-        ${mchEstadoBadge(g.estado, g.ultimo_evento)}
-      </td>
-      <td style="font-size:11px;color:var(--text-muted);font-family:'JetBrains Mono',monospace">${g.ultimo_evento_fecha||'—'}</td>
-      <td style="text-align:center;min-width:54px">${mchSLABadge(g)}</td>
-      <td style="max-width:200px">
-        ${g.obs_cliente
-          ? `<span style="font-size:11px;color:var(--text-muted);line-height:1.4;display:block" title="${g.obs_cliente.replace(/"/g,'&quot;')}">${g.obs_cliente.length>80?g.obs_cliente.slice(0,80)+'…':g.obs_cliente}</span>`
-          : '<span style="color:var(--text-muted);font-size:11px">—</span>'}
-      </td>
-      <td>
-        ${g.contacto
-          ? `<div style="font-size:12px;font-weight:500;color:var(--text)">${g.contacto}</div>
-             <a href="${'https://web.whatsapp.com/send?phone='+g.contacto.replace(/[^0-9]/g,'')+'&text='+encodeURIComponent('Hola, te contactamos por tu envío OT '+g.ot+'. Por favor coordiná la recepción de tu equipo.')}" target="_blank" style="display:inline-flex;align-items:center;gap:4px;margin-top:3px;font-size:10px;color:#25D366;text-decoration:none;font-weight:600">
-               <svg width="13" height="13" viewBox="0 0 24 24" fill="#25D366"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
-               WhatsApp
-             </a>`
-          : '<span style="color:var(--text-muted);font-size:11px">—</span>'}
-      </td>
-      <td>
-        <button onclick="mchTrackOne('${g.id}','${(g.track||'').replace(/'/g,'')}')" style="background:var(--surface2);border:1px solid var(--border2);color:var(--text-muted);font-size:11px;padding:3px 8px;border-radius:5px;cursor:pointer" id="mch-tb-${g.id}" title="Consultar tracking CA">🔍</button>
-      </td>
+  // Use pre-computed line0200 from parser if available
+  let req0200Line;
+  if(typeof line0200 === 'number' && line0200 > 0){
+    req0200Line = line0200;
+  } else {
+    // Fallback: search backwards for "Operation id:" (covers NO OPERA OFF-LINE and similar)
+    req0200Line = Math.max(0, lineStart - 10);
+    for(let i = lineStart; i >= Math.max(0, lineStart - 800); i--){
+      const l = P.allLines[i] || '';
+      // For 0200-based flows
+      if(l.includes('Sending message to [') && l.includes('INFO')){
+        req0200Line = i; break;
+      }
+      // For offline/rejected flows — find Operation id start
+      if(l.match(/Node:\d+ Operation id: \d+/) || l.match(/Node:[0-9A-Z]+ Operation id: \d+/)){
+        req0200Line = i; break;
+      }
+    }
+  }
+  // End: go until "Response Message." or lineEnd + 20
+  let endLine = Math.min(P.allLines.length - 1, lineEnd + 25);
+  for(let i = lineEnd; i <= Math.min(P.allLines.length - 1, lineEnd + 30); i++){
+    if(P.allLines[i] && P.allLines[i].includes('Response Message.')){
+      endLine = Math.min(P.allLines.length - 1, i + 5);
+      break;
+    }
+  }
+  const extract = P.allLines.slice(req0200Line, endLine + 1).join('\n');
+  const header = [
+    '=== EXTRACTO DE LOG VTOL — ALLEATA OPS ===',
+    'Generado:  ' + new Date().toLocaleString('es-AR'),
+    'Archivo:   ' + P.filename,
+    'Node:      ' + node + '  |  Store: ' + store,
+    'Timestamp: ' + ts.replace(/-/g,' '),
+    'Líneas:    ' + req0200Line + ' a ' + endLine + ' (de ' + P.allLines.length + ')',
+    '',
+    '*** Request VTOL a Payway 0200',
+    '(ver línea con messageCode : 0200 abajo)',
+    '==========================================',
+    ''
+  ].join('\n');
+  const blob = new Blob([header + extract], {type:'text/plain;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'vtol-extract-' + ts + '-node' + node + '.txt';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+async function guardarHistorial(){
+  const btn=document.getElementById('btn-guardar');
+  const msg=document.getElementById('save-bar-msg');
+  btn.disabled=true; btn.textContent='Guardando...';
+  const res = await saveToSupabase(P.transactions, P.filename);
+  if(res.ok){
+    btn.textContent='✓ Guardado';
+    btn.style.background='rgba(16,185,129,.2)';
+    msg.innerHTML='✅ <strong>'+res.count+' transacciones guardadas</strong> en el historial · '+P.filename;
+    setTimeout(()=>{btn.disabled=false;btn.textContent='💾 Guardar en historial';btn.style.background='';},4000);
+  } else {
+    btn.disabled=false; btn.textContent='💾 Guardar en historial';
+    msg.innerHTML='❌ Error al guardar: '+res.msg;
+  }
+}
+
+function showSaveBar(transactions){
+  const bar=document.getElementById('save-bar');
+  if(!bar) return;
+  bar.style.display='flex';
+  const denies=transactions.filter(t=>t.isDeny).length;
+  document.getElementById('save-bar-msg').innerHTML=
+    '📦 <strong>'+transactions.length+' transacciones</strong> parseadas ('+denies+' errores) — guardá en el historial para consultas futuras';
+}
+
+async function napseRefreshHistorial(){
+  document.getElementById('hist-body').innerHTML='<tr><td colspan="12" style="text-align:center;padding:2rem;color:var(--text-muted)">Cargando...</td></tr>';
+  document.getElementById('hist-count').textContent='';
+  document.getElementById('hist-stats').innerHTML='';
+  const rows = await napseLoadHistorial();
+  renderHistorialRows(rows);
+}
+
+async function napseBuscarHistorial(){
+  const fechaFrom=document.getElementById('hf-fecha-from').value;
+  const fechaTo=document.getElementById('hf-fecha-to').value;
+  const estado=document.getElementById('hf-estado').value;
+  const iso=document.getElementById('hf-iso').value.trim();
+  document.getElementById('hist-body').innerHTML='<tr><td colspan="12" style="text-align:center;padding:2rem;color:var(--text-muted)">Buscando...</td></tr>';
+  try {
+    let q = sb.from('napse_transactions').select('*').order('fecha',{ascending:false}).order('hora',{ascending:false}).limit(500);
+    if(fechaFrom) q=q.gte('fecha',fechaFrom);
+    if(fechaTo)   q=q.lte('fecha',fechaTo);
+    if(estado==='deny') q=q.eq('is_deny',true);
+    if(estado==='ok')   q=q.eq('is_deny',false);
+    if(iso) q=q.eq('iso_code',iso);
+    const {data,error}=await q;
+    if(error) throw error;
+    renderHistorialRows(data||[]);
+  } catch(e){
+    document.getElementById('hist-body').innerHTML='<tr><td colspan="12" style="text-align:center;padding:2rem;color:var(--red)">Error: '+e.message+'</td></tr>';
+  }
+}
+
+function renderHistorialRows(rows){
+  if(!rows.length){
+    document.getElementById('hist-body').innerHTML='<tr><td colspan="12" style="text-align:center;padding:2rem;color:var(--text-muted)">Sin resultados</td></tr>';
+    document.getElementById('hist-count').textContent='0 registros';
+    return;
+  }
+  const totalDeny=rows.filter(r=>r.is_deny).length;
+  const archivos=[...new Set(rows.map(r=>r.archivo).filter(Boolean))];
+  document.getElementById('hist-stats').innerHTML=`
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:4px">
+      <div class="kpi-card" style="padding:10px 16px;min-width:120px"><div class="kpi-label">Total registros</div><div class="kpi-val teal" style="font-size:20px">${rows.length}</div></div>
+      <div class="kpi-card" style="padding:10px 16px;min-width:120px"><div class="kpi-label">Errores</div><div class="kpi-val red" style="font-size:20px">${totalDeny}</div></div>
+      <div class="kpi-card" style="padding:10px 16px;min-width:120px"><div class="kpi-label">Archivos</div><div class="kpi-val" style="font-size:20px">${archivos.length}</div></div>
+    </div>`;
+  const body=rows.map(r=>{
+    const iso=r.iso_code||'?';
+    const isoDesc=ISO[iso]||iso;
+    const isDeny=r.is_deny;
+    const msgUp=(r.response_message||'').toUpperCase();
+    let badge='';
+    if(msgUp.includes('COMERCIO INVALIDO')) badge='<span class="badge badge-orange">COMERCIO INVÁLIDO</span>';
+    else if(msgUp.includes('NO OPERA OFF-LINE')) badge='<span class="badge badge-purple">NO OPERA OFF-LINE</span>';
+    else if(isDeny) badge='<span class="badge badge-red">DENEGADA</span>';
+    else badge='<span class="badge badge-green">APROBADA</span>';
+    return `<tr class="${isDeny?'row-deny':''}">
+      <td class="mono" style="font-size:11px;color:var(--text-muted)">${r.fecha||'—'}</td>
+      <td class="mono">${r.hora||'—'}</td>
+      <td>${badge}</td>
+      <td class="mono">${r.node||'—'}</td>
+      <td class="mono">${r.store||'—'}</td>
+      <td title="${isoDesc}"><span class="badge ${isDeny?'badge-red':'badge-gray'}">${iso}</span></td>
+      <td class="mono">${r.masked_card||'—'}</td>
+      <td style="font-size:12px">${r.issuer_name||'—'}</td>
+      <td class="mono">${r.serial_number||'—'}</td>
+      <td class="mono">${r.business_number||'—'}</td>
+      <td class="mono">${r.amount||'—'}</td>
+      <td style="font-size:11px;color:var(--text-muted);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.archivo||''}">${(r.archivo||'—').split('(')[0].trim()}</td>
     </tr>`;
   }).join('');
+  document.getElementById('hist-body').innerHTML=body;
+  document.getElementById('hist-count').textContent=rows.length+' registros';
 }
 
-async function mchTrackOne(id, track){
-  if(!track){ showTrackingToast('⚠️ Sin número de tracking','yellow'); return; }
-  const btn = document.getElementById(`mch-tb-${id}`);
-  if(btn){ btn.textContent='⏳'; btn.disabled=true; }
-  try {
-    const { eventos, pieza } = await fetchTrackingCA(track);
-    if(eventos && eventos.length > 0){
-      const ultimo = eventos[0];
-      const primerEvt = eventos[eventos.length - 1];
-      const updateData = {
-        estado: mchMapearEstado(ultimo.historia, ultimo.estadoCA),
-        ultimo_evento: ultimo.estadoCA ? `${ultimo.historia} — ${ultimo.estadoCA}` : ultimo.historia,
-        ultimo_evento_fecha: ultimo.fecha,
-        eventos_ca: eventos,
-        fecha_primer_evento: primerEvt ? primerEvt.fecha : null,
-        updated_at: new Date().toISOString()
-      };
-      await sb.from('merchants_guias').update(updateData).eq('id', id);
-      mchInvalidateCache();
-      mostrarModalTrackingCA(track, { eventos, pieza }, 'ok');
-      const guias = await mchGetGuias();
-      mchRenderTabla(guias);
-      mchUpdateStatsFromData(guias);
-    } else {
-      showTrackingToast('Sin eventos en CA','yellow');
-    }
-  } catch(err){
-    showTrackingToast('❌ Error consultando CA','red');
-    console.error(err);
+
+function napseRunBuscar(){
+  napseRenderBuscar();
+}
+
+function napseClearFilters(){
+  ['f-node','f-store','f-iso','f-fecha','f-monto'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('f-estado').value='';
+  document.getElementById('f-estado').value='';
+  napseRenderBuscar();
+}
+
+function buildBuscarRow(t){
+  const iso=t.isoCode||'?';
+  const isoDesc=ISO[iso]||iso;
+  const msg=(t.responseMessage||'').toUpperCase();
+  let badge='';
+  if(msg.includes('COMERCIO INVALIDO')) badge='<span class="badge badge-orange">COMERCIO INVÁLIDO</span>';
+  else if(msg.includes('NO OPERA OFF-LINE')) badge='<span class="badge badge-purple">NO OPERA OFF-LINE</span>';
+  else if(t.isDeny) badge='<span class="badge badge-red">DENEGADA</span>';
+  else badge='<span class="badge badge-green">APROBADA</span>';
+  const af=t.antifraudTimeout?'<span class="antifraud-tag">⚠ Timeout</span>':'<span style="color:var(--text-muted);font-size:11px">—</span>';
+  const ticketBtn=t.isDeny&&t.lineStart?`<button class="btn-copy" onclick="goTicket('${t.ts}','${t.node}','${t.store}')">Ver ticket</button>`:'—';
+  const extractBtn=t.lineStart?`<button class="btn-copy" style="background:rgba(26,159,212,.1);color:#7dd3f0;border-color:rgba(26,159,212,.2)" onclick="downloadExtract(${t.lineStart},${t.lineEnd},'${(t.ts||'').replace(/[: ,]/g,'-')}','${t.node||''}','${t.store||''}',${t.line0200||0})">⬇ Log</button>`:'—';
+  const date=(t.ts||'—').split(' ')[0]||'—';
+  const time=(t.ts||'—').split(' ')[1]||t.ts||'—';
+  return `<tr class="${t.isDeny?'row-deny':''}">
+    <td class="mono" style="font-size:11px;color:var(--text-muted)">${date}</td>
+    <td class="mono">${time}</td>
+    <td>${badge}</td>
+    <td class="mono">${t.node||'—'}</td>
+    <td class="mono">${t.store||'—'}</td>
+    <td title="${isoDesc}"><span class="badge ${t.isDeny?'badge-red':'badge-gray'}">${iso}</span></td>
+    <td class="mono">${t.maskedCard||'—'}</td>
+    <td style="font-size:12px">${t.issuerName||t.hostName||'—'}</td>
+    <td class="mono">${t.serialNumber||'—'}</td>
+    <td class="mono">${t.businessNumber||'—'}</td>
+    <td class="mono">${t.amount||'—'}</td>
+    <td>${af}</td>
+    <td style="white-space:nowrap">${ticketBtn} ${extractBtn}</td>
+  </tr>`;
+}
+
+async function napseRenderBuscar(){
+  const {transactions}=P;
+  const fn=document.getElementById('f-node').value.trim();
+  const fs=document.getElementById('f-store').value.trim();
+  const fe=document.getElementById('f-estado').value;
+  const fi=document.getElementById('f-iso').value.trim();
+  const ffRaw=document.getElementById('f-fecha').value.trim();
+  // Normalize date to YYYY-MM-DD regardless of browser locale
+  let ff='';
+  if(ffRaw){
+    const d=new Date(ffRaw);
+    if(!isNaN(d)) ff=d.toISOString().split('T')[0];
+    else ff=ffRaw;
   }
-  if(btn){ btn.textContent='🔍'; btn.disabled=false; }
-}
+  const fm=document.getElementById('f-monto').value.trim();
 
-async function mchActualizarTodos(){
-  const guias = await mchGetGuias();
-  const pendientes = guias.filter(g=>g.track && g.estado !== 'Entregado' && g.estado !== 'Devuelto');
-  if(pendientes.length === 0){ showTrackingToast('No hay guías activas para actualizar','yellow'); return; }
-  const btn = document.getElementById('mch-btn-update');
-  if(btn){ btn.textContent=`⏳ 0/${pendientes.length}`; btn.disabled=true; }
-  let ok=0, err=0;
-  for(let i=0; i<pendientes.length; i++){
-    const g = pendientes[i];
-    if(btn) btn.textContent=`⏳ ${i+1}/${pendientes.length}`;
+  // ── No log loaded → query Supabase ───────────────────────────────────
+  if(!P.filename){
+    document.getElementById('buscar-body').innerHTML='<tr><td colspan="13" style="text-align:center;padding:2rem;color:var(--text-muted)">Buscando en historial...</td></tr>';
+    document.getElementById('buscar-count').textContent='';
     try {
-      const { eventos } = await fetchTrackingCA(g.track);
-      if(eventos && eventos.length > 0){
-        const ultimo = eventos[0];
-        const primerEvtM = eventos[eventos.length - 1];
-        await sb.from('merchants_guias').update({
-          estado: mchMapearEstado(ultimo.historia, ultimo.estadoCA),
-          ultimo_evento: ultimo.estadoCA ? `${ultimo.historia} — ${ultimo.estadoCA}` : ultimo.historia,
-          ultimo_evento_fecha: ultimo.fecha,
-          eventos_ca: eventos,
-          fecha_primer_evento: primerEvtM ? primerEvtM.fecha : null,
-          updated_at: new Date().toISOString()
-        }).eq('id', g.id);
-        ok++;
-      }
-    } catch(e){ err++; }
-    await new Promise(r=>setTimeout(r,400));
+      let q=sb.from('napse_transactions').select('*').order('fecha',{ascending:false}).order('hora',{ascending:false}).limit(500);
+      if(fn) q=q.eq('node',fn);
+      if(fs) q=q.eq('store',fs);
+      if(fe==='ERRORS') q=q.eq('is_deny',true);
+      if(fe==='DENEGADA') q=q.eq('is_deny',true).not('response_message','ilike','%COMERCIO%').not('response_message','ilike','%OFF-LINE%');
+      if(fe==='APROBADA') q=q.eq('is_deny',false);
+      if(fe==='COMERCIO_INVALIDO') q=q.eq('iso_code','03');
+      if(fe==='NO_OPERA_OFFLINE') q=q.eq('iso_code','99');
+      if(fi) q=q.eq('iso_code',fi);
+      if(ff) q=q.eq('fecha',ff);
+      if(fm) q=q.eq('amount',parseFloat(fm));
+      const {data,error}=await q;
+      if(error) throw error;
+      const rows=(data||[]).map(t=>buildBuscarRow({
+        ts: (t.fecha||'')+(t.hora?' '+t.hora:''),
+        isDeny: t.is_deny,
+        responseMessage: t.response_message||'',
+        node: t.node, store: t.store,
+        isoCode: t.iso_code, maskedCard: t.masked_card,
+        issuerName: t.issuer_name, hostName: t.host_name,
+        serialNumber: t.serial_number, businessNumber: t.business_number,
+        amount: t.amount, antifraudTimeout: t.antifraud_timeout,
+        lineStart:0, lineEnd:0, line0200:0
+      }));
+      document.getElementById('buscar-body').innerHTML=rows.length?rows.join(''):'<tr><td colspan="13" style="text-align:center;padding:2rem;color:var(--text-muted)">Sin resultados en el historial</td></tr>';
+      document.getElementById('buscar-count').textContent=`${(data||[]).length} registros del historial`;
+      const parts=[];
+      if(fn) parts.push(`Node: ${fn}`);
+      if(fs) parts.push(`Store: ${fs}`);
+      if(fe) parts.push(fe==='COMERCIO_INVALIDO'?'COMERCIO INVÁLIDO (03)':fe==='NO_OPERA_OFFLINE'?'NO OPERA OFF-LINE (99)':fe==='ERRORS'?'Solo errores':fe);
+      if(fi) parts.push(`IsoCode: ${fi}`);
+      if(ff) parts.push(`Fecha: ${ff}`);
+      if(fm) parts.push(`Monto: ${fm}`);
+      document.getElementById('filter-summary').textContent=parts.length?'Filtros activos (historial): '+parts.join(' · '):'Mostrando historial completo';
+    } catch(e){
+      document.getElementById('buscar-body').innerHTML=`<tr><td colspan="13" style="text-align:center;padding:2rem;color:var(--red)">Error: ${e.message}</td></tr>`;
+    }
+    return;
   }
-  mchInvalidateCache();
-  const guias2 = await mchGetGuias();
-  mchRenderTabla(guias2);
-  mchUpdateStatsFromData(guias2);
-  if(btn){ btn.textContent='🔄 Actualizar tracking'; btn.disabled=false; }
-  showTrackingToast(`✅ ${ok} actualizada${ok!==1?'s':''}${err?' · '+err+' error':''}`, ok>0?'green':'yellow');
+
+  // ── Log loaded → filter in memory ────────────────────────────────────
+  const filtered=transactions.filter(t=>{
+    if(fn&&(t.node||'')!==fn) return false;
+    if(fs&&(t.store||'')!==fs) return false;
+    if(fe==='ERRORS'&&!t.isDeny) return false;
+    if(fe==='DENEGADA'&&!t.isDeny) return false;
+    if(fe==='APROBADA'&&t.isDeny) return false;
+    if(fe==='COMERCIO_INVALIDO'&&(t.isoCode||'').trim()!=='03') return false;
+    if(fe==='NO_OPERA_OFFLINE'&&(t.isoCode||'').trim()!=='99') return false;
+    if(fi&&(t.isoCode||'').trim()!==fi.trim()) return false;
+    if(ff&&(t.ts||'').split(' ')[0]!==ff) return false;
+    if(fm&&String(t.amount||'').trim()!==fm.trim()) return false;
+    return true;
+  });
+
+  const rows=filtered.map(t=>{
+    const iso=t.isoCode||'?';
+    const isoDesc=ISO[iso]||iso;
+    const af=t.antifraudTimeout?'<span class="antifraud-tag">⚠ Timeout</span>':'<span style="color:var(--text-muted);font-size:11px">—</span>';
+    const ticketBtn=t.isDeny?`<button class="btn-copy" onclick="goTicket('${t.ts}','${t.node}','${t.store}')">Ver ticket</button>`:'—';
+    const extractBtn=`<button class="btn-copy" style="background:rgba(26,159,212,.1);color:#7dd3f0;border-color:rgba(26,159,212,.2)" onclick="downloadExtract(${t.lineStart},${t.lineEnd},'${(t.ts||'').replace(/[: ,]/g,'-')}','${t.node||''}','${t.store||''}',${t.line0200||0})">⬇ Log</button>`;
+    return `<tr class="${t.isDeny?'row-deny':''}">
+      <td class="mono" style="color:var(--text-muted);font-size:11px">${(t.ts||'—').split(' ')[0]||'—'}</td>
+      <td class="mono">${(t.ts||'—').split(' ')[1]||t.ts||'—'}</td>
+      <td>${(()=>{
+        const msg=(t.responseMessage||'').toUpperCase();
+        if(msg.includes('COMERCIO INVALIDO')) return '<span class="badge badge-orange">COMERCIO INVÁLIDO</span>';
+        if(msg.includes('NO OPERA OFF-LINE')) return '<span class="badge badge-purple">NO OPERA OFF-LINE</span>';
+        if(t.isDeny) return '<span class="badge badge-red">DENEGADA</span>';
+        return '<span class="badge badge-green">APROBADA</span>';
+      })()}</td>
+      <td class="mono">${t.node||'—'}</td>
+      <td class="mono">${t.store||'—'}</td>
+      <td title="${isoDesc}"><span class="badge ${t.isDeny?'badge-red':'badge-gray'}">${iso}</span></td>
+      <td class="mono">${t.maskedCard||'—'}</td>
+      <td style="font-size:12px">${t.issuerName||t.hostName||'—'}</td>
+      <td class="mono">${t.serialNumber||'—'}</td>
+      <td class="mono">${t.businessNumber||'—'}</td>
+      <td class="mono">${t.amount||'—'}</td>
+      <td>${af}</td>
+      <td style="white-space:nowrap">${ticketBtn} ${extractBtn}</td>
+    </tr>`;
+  });
+
+  document.getElementById('buscar-body').innerHTML=rows.length?rows.join(''):'<tr><td colspan="12" style="text-align:center;padding:2rem;color:var(--text-muted)">Sin resultados</td></tr>';
+  document.getElementById('buscar-count').textContent=`${filtered.length} de ${transactions.length} transacciones`;
+
+  const parts=[];
+  if(fn) parts.push(`Node: ${fn}`);
+  if(fs) parts.push(`Store: ${fs}`);
+  if(fe) parts.push(fe==='COMERCIO_INVALIDO'?'COMERCIO INVÁLIDO (03)':fe==='NO_OPERA_OFFLINE'?'NO OPERA OFF-LINE (99)':fe==='ERRORS'?'Solo errores':fe);
+  if(fi) parts.push(`IsoCode: ${fi}`);
+  if(ff) parts.push(`Fecha: ${ff}`);
+  if(fm) parts.push(`Monto: ${fm}`);
+  document.getElementById('filter-summary').textContent=parts.length?'Filtros activos: '+parts.join(' · '):'';
 }
 
-async function mchLimpiarFiltros(){
-  const b=document.getElementById('mch-buscar'); if(b) b.value='';
-  const e=document.getElementById('mch-f-estado'); if(e) e.value='';
-  await mchFiltrar();
+function goTicket(ts,node,store){
+  napseSetView('tickets');
+  setTimeout(()=>{
+    const el=document.getElementById('ticket-'+ts.replace(/[: ,]/g,'-'));
+    if(el) el.scrollIntoView({behavior:'smooth',block:'center'});
+  },100);
 }
 
-async function mchLimpiarTodo(){
-  if(!confirm('¿Vaciar todas las guías Merchants? Esta acción no se puede deshacer.')) return;
-  const { error } = await sb.from('merchants_guias').delete().neq('id','00000000-0000-0000-0000-000000000000');
-  if(error){ showTrackingToast('❌ Error al vaciar','red'); return; }
-  mchInvalidateCache();
-  mchRenderTabla([]);
-  mchUpdateStatsFromData([]);
-  const empty=document.getElementById('mch-empty');
-  if(empty) empty.style.display='flex';
-  const msg=document.getElementById('mch-import-msg');
-  if(msg) msg.textContent='';
+// ── TICKETS ───────────────────────────────────────────────────────────────
+function renderTickets(){
+  const denies=P.transactions.filter(t=>t.isDeny);
+  if(!denies.length){
+    document.getElementById('tickets-list').innerHTML='<div class="empty"><span class="empty-icon">✅</span>Sin transacciones denegadas en este log</div>';
+    return;
+  }
+
+  const html=denies.map((t,idx)=>{
+    const iso=t.isoCode||'?';
+    const isoDesc=ISO[iso]||'Código desconocido';
+    const ticketId='ticket-'+( t.ts||idx).replace(/[: ,]/g,'-');
+    const time=(t.ts||'').split(' ')[1]||t.ts||'—';
+    const date=(t.ts||'').split(' ')[0]||'—';
+
+    const paywayText=`=== DENEGADA PAYWAY — ${t.businessNumber||'?'} / Terminal ${t.serialNumber||'?'} ===
+Fecha y hora:    ${t.ts||'—'}
+Nro. Comercio:   ${t.businessNumber||'—'}
+Terminal (serie):${t.serialNumber||'—'}
+Node / Store:    ${t.node||'—'} / ${t.store||'—'}
+IsoCode:         ${iso} — ${isoDesc}
+Host:            ${t.hostName||'—'}
+Tarjeta:         ${t.maskedCard||'—'} (${t.issuerName||'—'})
+Monto:           ${t.amount||'—'}
+RRN:             ${t.rrn||'—'}
+Ticket:          ${t.ticket||'—'}
+TrxRef:          ${t.trxRef||'—'}
+Trace 0200:      ${t.trace||'—'}
+Fecha Trx (CA):  ${t.trxDate||'—'} ${t.trxTime||'—'}
+${t.antifraudTimeout?'⚠ Antifraud timeout en el mismo flujo (Op. '+( t.opRejected||'?')+')':''}
+
+Solicitud: Por favor informar el motivo del rechazo del IsoCode ${iso} para el número de comercio ${t.businessNumber||'?'} y terminal ${t.serialNumber||'?'}.`;
+
+    const af=t.antifraudTimeout?'<span class="antifraud-tag">⚠ Antifraud timeout</span>':'';
+
+    return `<div class="ticket-card" id="${ticketId}">
+      <div class="ticket-header">
+        <div class="ticket-title">
+          🎫 Ticket #${idx+1}
+          <span class="badge badge-red">DENEGADA</span>
+          <span class="badge badge-gray">${time}</span>
+          ${af}
+        </div>
+        <div class="ticket-meta">
+          <span class="badge badge-blue">Node ${t.node||'?'}</span>
+          <span class="badge badge-blue">Store ${t.store||'?'}</span>
+          <span class="badge badge-red">IsoCode ${iso}</span>
+        </div>
+      </div>
+      <div class="ticket-fields">
+        <div class="tf-item"><div class="tf-label">Nro. Comercio</div><div class="tf-val">${t.businessNumber||'—'}</div></div>
+        <div class="tf-item"><div class="tf-label">Terminal (serialNumber)</div><div class="tf-val">${t.serialNumber||'—'}</div></div>
+        <div class="tf-item"><div class="tf-label">Node / Store</div><div class="tf-val">${t.node||'?'} / ${t.store||'?'}</div></div>
+        <div class="tf-item" style="border:1px solid rgba(239,68,68,.3);background:rgba(239,68,68,.08)"><div class="tf-label" style="color:#fca5a5">⚠ IsoCode (error Payway)</div><div class="tf-val" style="color:#fca5a5;font-size:13px;font-weight:700">${iso}</div><div style="font-size:11px;color:var(--text-muted);margin-top:2px">${isoDesc}</div></div>
+        <div class="tf-item"><div class="tf-label">Tarjeta</div><div class="tf-val">${t.maskedCard||'—'}</div></div>
+        <div class="tf-item"><div class="tf-label">Emisor / Host</div><div class="tf-val">${t.issuerName||'—'} / ${t.hostName||'—'}</div></div>
+        <div class="tf-item"><div class="tf-label">Monto</div><div class="tf-val">${t.amount||'—'}</div></div>
+        <div class="tf-item"><div class="tf-label">RRN</div><div class="tf-val">${t.rrn||'—'}</div></div>
+        <div class="tf-item"><div class="tf-label">0200 enviado a</div><div class="tf-val">${t.channel||'Visa'} @ ${t.ts0200||'—'}</div></div>
+        <div class="tf-item"><div class="tf-label">TrxReferenceNumber</div><div class="tf-val">${t.trxRef||'—'}</div></div>
+      </div>
+      <div class="ticket-payway">
+        <div class="pw-label">
+          <span>📋 Texto para reportar a Payway / Napse</span>
+          <button class="btn-copy" onclick="copyTicket(this, \`${escJs(paywayText)}\`)">📋 Copiar</button>
+        </div>
+        <pre id="pre-${ticketId}">${escHtml(paywayText).replace(/(IsoCode:.*)/g, '<span style="background:rgba(239,68,68,.2);color:#fca5a5;padding:1px 4px;border-radius:3px;font-weight:700">$1</span>')}</pre>
+      </div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('tickets-list').innerHTML=html;
 }
-// ══ FIN MÓDULO ENVÍOS MERCHANTS ══════════════════════════════════════════════
+
+function escHtml(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function escJs(s){return s.replace(/\\/g,'\\\\').replace(/`/g,'\\`').replace(/\$/g,'\\$');}
+
+function copyTicket(btn,text){
+  navigator.clipboard.writeText(text).then(()=>{
+    const orig=btn.textContent;btn.textContent='✓ Copiado!';btn.style.background='rgba(16,185,129,.2)';btn.style.color='#6ee7b7';
+    setTimeout(()=>{btn.textContent=orig;btn.style.background='';btn.style.color='';},2000);
+  }).catch(()=>{
+    const ta=document.createElement('textarea');ta.value=text;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);
+    btn.textContent='✓ Copiado!';setTimeout(()=>btn.textContent='📋 Copiar',2000);
+  });
+}
+
+// ── ERRORES ───────────────────────────────────────────────────────────────
+function renderErrores(){
+  const errList=Object.values(P.errors).sort((a,b)=>b.count-a.count);
+  if(!errList.length){
+    document.getElementById('errores-content').innerHTML='<div class="empty"><span class="empty-icon">✅</span>Sin errores de sistema detectados</div>';
+    return;
+  }
+  const conn=errList.filter(e=>e.type==='connection');
+  const app=errList.filter(e=>e.type==='app');
+  let html='';
+  if(conn.length){
+    html+='<div class="sec-title">Errores de conexión</div>';
+    html+=conn.map(e=>`<div style="background:var(--surface2);border-left:3px solid var(--yellow);border-radius:0 8px 8px 0;padding:10px 14px;margin-bottom:8px;display:flex;gap:14px;align-items:flex-start">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;color:var(--yellow);min-width:32px;text-align:right">${e.count}×</div>
+      <div><div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:2px">${e.cat}</div><div style="font-size:12px;color:var(--text-muted)">${e.msg}</div></div>
+    </div>`).join('');
+  }
+  if(app.length){
+    html+='<div class="sec-title" style="margin-top:18px">Errores de aplicación</div>';
+    html+=app.map(e=>`<div style="background:var(--surface2);border-left:3px solid var(--red);border-radius:0 8px 8px 0;padding:10px 14px;margin-bottom:8px;display:flex;gap:14px;align-items:flex-start">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;color:var(--red);min-width:32px;text-align:right">${e.count}×</div>
+      <div><div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:2px">${e.cat}</div><div style="font-size:12px;color:var(--text-muted)">${e.msg}</div></div>
+    </div>`).join('');
+  }
+  document.getElementById('errores-content').innerHTML=html;
+}
+
+// ── DEMO ──────────────────────────────────────────────────────────────────
+function loadDemo(){
+  const demo=`2026-06-05 12:20:48,071 INFO  [vtol] [CdDbMessageThreadPool-Thread-151] Sending message to [Visa] using ClientCommunication [VisaClientCommunication-0]
+2026-06-05 12:20:48,071 INFO  [communication] [CdDbMessageThreadPool-Thread-151]   1 messageCode                    : 0200
+2026-06-05 12:20:48,071 INFO  [communication] [CdDbMessageThreadPool-Thread-151]   4 amount                         : 30.0
+2026-06-05 12:20:48,071 INFO  [communication] [CdDbMessageThreadPool-Thread-151]  11 trace                          : 7
+2026-06-05 12:20:48,071 INFO  [communication] [CdDbMessageThreadPool-Thread-151]  13 trxDate                        : 0605
+2026-06-05 12:20:48,071 INFO  [communication] [CdDbMessageThreadPool-Thread-151]  12 trxTime                        : 122048
+2026-06-05 12:20:48,071 INFO  [communication] [CdDbMessageThreadPool-Thread-151]  41 serialNumber                   : 38021305
+2026-06-05 12:20:48,071 INFO  [communication] [CdDbMessageThreadPool-Thread-151]  42 businessNumber                 : 00994483
+2026-06-05 12:20:48,264 ERROR [AntifraudRestClient] [CdDbMessageThreadPool-Thread-154] Antifraud Service did not respond on time.
+2026-06-05 12:20:48,263 DEBUG [vtol] [CdDbMessageThreadPool-Thread-154] Operation id: 581 status: Rejected
+2026-06-05 12:20:48,305 DEBUG [common] [ProcessResponseMsg-Thread-174] Ending Request. Node: 669 Store: 537 Datetime: Fri Jun 05 15:20:45 ART 2026 ClientSocketId: x
+2026-06-05 12:20:48,305 INFO  [common] [ProcessResponseMsg-Thread-174] Counting responses from VTOL to the POS (ErrorResponseMessage, PendingTransactionMessage and ResponseAuthorizeMessage)..................
+2026-06-05 12:20:48,305 INFO  [communication] [ProcessResponseMsg-Thread-174]  25 clientDate                     : 20260605152045
+2026-06-05 12:20:48,305 INFO  [communication] [ProcessResponseMsg-Thread-174]   2 node                           : 669
+2026-06-05 12:20:48,305 INFO  [communication] [ProcessResponseMsg-Thread-174]   1 store                          : 537
+2026-06-05 12:20:48,305 INFO  [communication] [ProcessResponseMsg-Thread-174]  30 businessNumber                 : 00994483
+2026-06-05 12:20:48,305 INFO  [communication] [ProcessResponseMsg-Thread-174]  33 creditCardIssuerName           : Visa Debito
+2026-06-05 12:20:48,305 INFO  [communication] [ProcessResponseMsg-Thread-174]  34 hostName                       : Visa
+2026-06-05 12:20:48,305 INFO  [communication] [ProcessResponseMsg-Thread-174]  27 isoCode                        : 05
+2026-06-05 12:20:48,305 INFO  [communication] [ProcessResponseMsg-Thread-174]   6 maskedCardNumber               : 427836******4051
+2026-06-05 12:20:48,305 INFO  [communication] [ProcessResponseMsg-Thread-174]  26 responseCode                   : ISO8583
+2026-06-05 12:20:48,305 INFO  [communication] [ProcessResponseMsg-Thread-174]  28 responseMessage                : DENEGADA
+2026-06-05 12:20:48,305 INFO  [communication] [ProcessResponseMsg-Thread-174]  68 rrn                            : 000000000007
+2026-06-05 12:20:48,305 INFO  [communication] [ProcessResponseMsg-Thread-174]  29 serialNumber                   : 38021305
+2026-06-05 12:20:48,305 INFO  [communication] [ProcessResponseMsg-Thread-174]  32 ticket                         : 1
+2026-06-05 12:20:48,305 INFO  [communication] [ProcessResponseMsg-Thread-174] 166 trxReferenceNumber             : 5062612204800000581
+2026-06-05 12:20:48,300 ERROR [communication] [RSFMK.AsyncCommWorker-1] Connect failed: AmexGEDCClientCommunication-0(127.0.0.1:7994[0]). Retry is set forever. Error Message: Connection refused
+2026-06-05 12:20:48,300 ERROR [communication] [RSFMK.AsyncCommWorker-4] Connect failed: AmexClientCommunication-0(127.0.0.1:7894[0]). Retry is set forever. Error Message: Connection refused
+2026-06-05 12:26:07,816 INFO  [vtol] [CdDbMessageThreadPool-Thread-151] Sending message to [Visa] using ClientCommunication [VisaClientCommunication-0]
+2026-06-05 12:26:07,816 INFO  [communication] [CdDbMessageThreadPool-Thread-151]   1 messageCode                    : 0200
+2026-06-05 12:26:07,816 INFO  [communication] [CdDbMessageThreadPool-Thread-151]   4 amount                         : 60.0
+2026-06-05 12:26:07,816 INFO  [communication] [CdDbMessageThreadPool-Thread-151]  11 trace                          : 8
+2026-06-05 12:26:07,816 INFO  [communication] [CdDbMessageThreadPool-Thread-151]  13 trxDate                        : 0605
+2026-06-05 12:26:07,816 INFO  [communication] [CdDbMessageThreadPool-Thread-151]  12 trxTime                        : 122607
+2026-06-05 12:26:07,816 INFO  [communication] [CdDbMessageThreadPool-Thread-151]  41 serialNumber                   : 38021305
+2026-06-05 12:26:07,816 INFO  [communication] [CdDbMessageThreadPool-Thread-151]  42 businessNumber                 : 00994483
+2026-06-05 12:26:08,035 DEBUG [common] [ProcessResponseMsg-Thread-174] Ending Request. Node: 669 Store: 537 Datetime: Fri Jun 05 15:26:05 ART 2026 ClientSocketId: y
+2026-06-05 12:26:08,035 INFO  [common] [ProcessResponseMsg-Thread-174] Counting responses from VTOL to the POS (ErrorResponseMessage, PendingTransactionMessage and ResponseAuthorizeMessage)..................
+2026-06-05 12:26:08,035 INFO  [communication] [ProcessResponseMsg-Thread-174]   2 node                           : 669
+2026-06-05 12:26:08,035 INFO  [communication] [ProcessResponseMsg-Thread-174]   1 store                          : 537
+2026-06-05 12:26:08,035 INFO  [communication] [ProcessResponseMsg-Thread-174]  30 businessNumber                 : 00994483
+2026-06-05 12:26:08,035 INFO  [communication] [ProcessResponseMsg-Thread-174]  33 creditCardIssuerName           : Visa Debito
+2026-06-05 12:26:08,035 INFO  [communication] [ProcessResponseMsg-Thread-174]  34 hostName                       : Visa
+2026-06-05 12:26:08,035 INFO  [communication] [ProcessResponseMsg-Thread-174]  27 isoCode                        : 05
+2026-06-05 12:26:08,035 INFO  [communication] [ProcessResponseMsg-Thread-174]   6 maskedCardNumber               : 427836******4051
+2026-06-05 12:26:08,035 INFO  [communication] [ProcessResponseMsg-Thread-174]  28 responseMessage                : DENEGADA
+2026-06-05 12:26:08,035 INFO  [communication] [ProcessResponseMsg-Thread-174]  68 rrn                            : 000000000008
+2026-06-05 12:26:08,035 INFO  [communication] [ProcessResponseMsg-Thread-174]  29 serialNumber                   : 38021305
+2026-06-05 12:26:08,035 INFO  [communication] [ProcessResponseMsg-Thread-174]  32 ticket                         : 1
+2026-06-05 12:26:08,035 INFO  [communication] [ProcessResponseMsg-Thread-174] 166 trxReferenceNumber             : 5062612260700000582`;
+  napseParseLog(demo,'demo-server.log');
+}
+</script>
+</body>
+
+// ── NAPSE initApp (se llama cuando se entra al módulo desde goTo) ──────────
+async function napseInitApp(){
+  napseSetupDropZone();
+  await napseRenderBuscar();
+  try {
+    const {count} = await sb.from('napse_transactions').select('*', {count:'exact', head:true});
+    if(count > 0){ napseSetView('historial'); await napseRefreshHistorial(); }
+    else { napseSetView('upload'); }
+  } catch(e){ napseSetView('upload'); }
+}
+
+// ── NAPSE setView ─────────────────────────────────────────────────────────
+function napseSetView(v){
+  const views=['upload','buscar','tickets','historial','errores'];
+  views.forEach(id=>{
+    const el=document.getElementById('view-'+id);
+    const btn=document.getElementById('napse-tab-'+id);
+    if(el) el.classList.toggle('active', id===v);
+    if(btn) btn.classList.toggle('active', id===v);
+  });
+  if(v==='buscar') napseRenderBuscar();
+  if(v==='tickets') renderTickets();
+  if(v==='historial') napseRefreshHistorial();
+  if(v==='errores') renderErrores();
+}
+
+// ── NAPSE drop zone setup ─────────────────────────────────────────────────
+function napseSetupDropZone(){
+  const dz=document.getElementById('drop-zone');
+  const fi=document.getElementById('file-in');
+  if(!dz||fi.dataset.napseReady) return;
+  fi.dataset.napseReady='1';
+  fi.addEventListener('change',e=>{ if(e.target.files[0]) napseReadFile(e.target.files[0]); });
+  dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('drag');});
+  dz.addEventListener('dragleave',()=>dz.classList.remove('drag'));
+  dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('drag');if(e.dataTransfer.files[0]) napseReadFile(e.dataTransfer.files[0]);});
+}
+
+// ══ FIN MÓDULO NAPSE ═════════════════════════════════════════════════════
 
 </script>
 <!-- MODAL COTIZADOR CA -->
