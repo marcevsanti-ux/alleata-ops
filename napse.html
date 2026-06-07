@@ -198,7 +198,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <div id="login-err" style="display:none" class="alert alert-err"></div>
     <button class="btn" onclick="doLogin()">Ingresar</button>
-    <p style="text-align:center;margin-top:14px;font-size:11px;color:var(--text-muted)">Módulo NAPSE · Alleata Ops v1.19.0</p>
+    <p style="text-align:center;margin-top:14px;font-size:11px;color:var(--text-muted)">Módulo NAPSE · Alleata Ops v1.20.0</p>
   </div>
 </div>
 
@@ -255,7 +255,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       </div>
       <div class="topbar-right">
         <span id="log-meta" style="color:var(--text-mid)"></span>
-        <span>v1.19.0</span>
+        <span>v1.20.0</span>
       </div>
     </div>
 
@@ -1048,7 +1048,34 @@ function clearFilters(){
 }
 
 function buildBuscarRow(t){
-
+  const iso=t.isoCode||'?';
+  const isoDesc=ISO[iso]||iso;
+  const msg=(t.responseMessage||'').toUpperCase();
+  let badge='';
+  if(msg.includes('COMERCIO INVALIDO')) badge='<span class="badge badge-orange">COMERCIO INVÁLIDO</span>';
+  else if(msg.includes('NO OPERA OFF-LINE')) badge='<span class="badge badge-purple">NO OPERA OFF-LINE</span>';
+  else if(t.isDeny) badge='<span class="badge badge-red">DENEGADA</span>';
+  else badge='<span class="badge badge-green">APROBADA</span>';
+  const af=t.antifraudTimeout?'<span class="antifraud-tag">⚠ Timeout</span>':'<span style="color:var(--text-muted);font-size:11px">—</span>';
+  const ticketBtn=t.isDeny&&t.lineStart?`<button class="btn-copy" onclick="goTicket('${t.ts}','${t.node}','${t.store}')">Ver ticket</button>`:'—';
+  const extractBtn=t.lineStart?`<button class="btn-copy" style="background:rgba(26,159,212,.1);color:#7dd3f0;border-color:rgba(26,159,212,.2)" onclick="downloadExtract(${t.lineStart},${t.lineEnd},'${(t.ts||'').replace(/[: ,]/g,'-')}','${t.node||''}','${t.store||''}',${t.line0200||0})">⬇ Log</button>`:'—';
+  const date=(t.ts||'—').split(' ')[0]||'—';
+  const time=(t.ts||'—').split(' ')[1]||t.ts||'—';
+  return `<tr class="${t.isDeny?'row-deny':''}">
+    <td class="mono" style="font-size:11px;color:var(--text-muted)">${date}</td>
+    <td class="mono">${time}</td>
+    <td>${badge}</td>
+    <td class="mono">${t.node||'—'}</td>
+    <td class="mono">${t.store||'—'}</td>
+    <td title="${isoDesc}"><span class="badge ${t.isDeny?'badge-red':'badge-gray'}">${iso}</span></td>
+    <td class="mono">${t.maskedCard||'—'}</td>
+    <td style="font-size:12px">${t.issuerName||t.hostName||'—'}</td>
+    <td class="mono">${t.serialNumber||'—'}</td>
+    <td class="mono">${t.businessNumber||'—'}</td>
+    <td class="mono">${t.amount||'—'}</td>
+    <td>${af}</td>
+    <td style="white-space:nowrap">${ticketBtn} ${extractBtn}</td>
+  </tr>`;
 }
 
 async function renderBuscar(){
