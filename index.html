@@ -4129,6 +4129,131 @@ setInterval(updateDate,60000);updateDate();
 
 
 // ══════════════════════════════════════════════════════════════
+// MÓDULO AJUSTES — Gestión de usuarios
+// ══════════════════════════════════════════════════════════════
+
+const ADMIN_HEADERS = {
+  'Content-Type': 'application/json',
+  'x-automation-secret': '123456'
+};
+
+const ALL_MODS = [
+  {id:'sims',      label:'📡 SIMs'},
+  {id:'envios',    label:'🚚 Envíos'},
+  {id:'desinstalaciones', label:'📦 Desinstalaciones'},
+  {id:'merchants', label:'🏪 Envíos Merchants'},
+  {id:'horas',     label:'⏱ Horas'},
+  {id:'terminales',label:'🖥️ Terminales'},
+  {id:'sf',        label:'☁ SF-Integración'},
+];
+
+async function loadUsers() {
+  const grid = document.getElementById('usersGrid');
+  if (!grid) return;
+  grid.innerHTML = '<div class="empty" style="grid-column:1/-1"><div class="empty-icon">⏳</div><p>Cargando usuarios...</p></div>';
+  try {
+    const res = await fetch(`${ALLY_RAILWAY_BASE}/admin/users`, { headers: ADMIN_HEADERS });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error);
+    renderUsersGrid(data.users);
+  } catch (err) {
+    grid.innerHTML = `<div class="empty" style="grid-column:1/-1;color:#ff6b6b"><div class="empty-icon">❌</div><p>Error al cargar usuarios: ${err.message}</p></div>`;
+  }
+}
+
+function renderUsersGrid(users) {
+  const grid = document.getElementById('usersGrid');
+  if (!users || !users.length) {
+    grid.innerHTML = '<div class="empty" style="grid-column:1/-1"><div class="empty-icon">👥</div><p>No hay usuarios registrados.</p></div>';
+    return;
+  }
+  grid.innerHTML = users.map(u => {
+    const mods = (u.modulos || []).map(m => {
+      const info = ALL_MODS.find(x => x.id === m);
+      return `<span style="background:var(--navy-700);border:1px solid var(--border2);border-radius:20px;padding:2px 10px;font-size:11px;color:var(--text-muted)">${info ? info.label : m}</span>`;
+    }).join('');
+    const rolColor = u.rol === 'admin' ? 'var(--teal)' : u.rol === 'logistica' ? '#f59e0b' : 'var(--blue)';
+    return `
+      <div class="card" style="padding:16px;display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start">
+          <div>
+            <div style="font-weight:700;font-size:14px;color:var(--text)">${u.nombre || '—'}</div>
+            <div style="font-size:12px;color:var(--text-muted);margin-top:2px">${u.email || ''}</div>
+            ${u.celular ? `<div style="font-size:11px;color:var(--text-muted)">${u.celular}</div>` : ''}
+          </div>
+          <div style="display:flex;gap:6px;align-items:center">
+            <span style="background:${rolColor}22;color:${rolColor};border:1px solid ${rolColor}55;border-radius:20px;padding:2px 10px;font-size:11px;font-weight:700;text-transform:uppercase">${u.rol}</span>
+            <button onclick="deleteUser('${u.id}','${u.nombre}')" style="background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3);color:#ef4444;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px;font-family:'Inter',sans-serif" title="Eliminar usuario">🗑</button>
+          </div>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:4px">${mods || '<span style="font-size:11px;color:var(--text-muted)">Sin módulos</span>'}</div>
+      </div>`;
+  }).join('');
+}
+
+async function createUser() {
+  const nombre = document.getElementById('ajNombre').value.trim();
+  const email  = document.getElementById('ajEmail').value.trim();
+  const pass   = document.getElementById('ajPass').value;
+  const celular= document.getElementById('ajCelular').value.trim();
+  const rol    = document.getElementById('ajRol').value;
+  const msg    = document.getElementById('ajMsg');
+
+  if (!nombre || !email || !pass) {
+    msg.innerHTML = '<span style="color:#ff6b6b;font-size:12px">⚠️ Nombre, email y contraseña son obligatorios.</span>';
+    return;
+  }
+  if (pass.length < 6) {
+    msg.innerHTML = '<span style="color:#ff6b6b;font-size:12px">⚠️ La contraseña debe tener al menos 6 caracteres.</span>';
+    return;
+  }
+
+  // Recopilar módulos activos
+  const pills = document.querySelectorAll('#createModPills .mod-pill.active');
+  const modulos = Array.from(pills).map(p => p.dataset.mod);
+
+  msg.innerHTML = '<span style="color:var(--teal);font-size:12px">⏳ Creando usuario...</span>';
+
+  try {
+    const res = await fetch(`${ALLY_RAILWAY_BASE}/admin/users`, {
+      method: 'POST',
+      headers: ADMIN_HEADERS,
+      body: JSON.stringify({ nombre, email, password: pass, rol, modulos, celular })
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error);
+
+    msg.innerHTML = `<span style="color:var(--teal);font-size:12px">✅ Usuario <strong>${nombre}</strong> creado correctamente.</span>`;
+    // Limpiar formulario
+    document.getElementById('ajNombre').value = '';
+    document.getElementById('ajEmail').value  = '';
+    document.getElementById('ajPass').value   = '';
+    document.getElementById('ajCelular').value= '';
+    document.getElementById('ajRol').value    = 'operador';
+    document.querySelectorAll('#createModPills .mod-pill').forEach(p => p.classList.remove('active'));
+    // Recargar lista
+    loadUsers();
+  } catch (err) {
+    msg.innerHTML = `<span style="color:#ff6b6b;font-size:12px">❌ Error: ${err.message}</span>`;
+  }
+}
+
+async function deleteUser(id, nombre) {
+  if (!confirm(`¿Eliminar al usuario "${nombre}"? Esta acción no se puede deshacer.`)) return;
+  try {
+    const res = await fetch(`${ALLY_RAILWAY_BASE}/admin/users/${id}`, {
+      method: 'DELETE',
+      headers: ADMIN_HEADERS
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error);
+    loadUsers();
+  } catch (err) {
+    alert('Error al eliminar: ' + err.message);
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
 // MÓDULO ROLLOUT
 // ══════════════════════════════════════════════════════════════
 let _rlData=[];
