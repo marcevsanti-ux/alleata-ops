@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>NAPSE · Analizador de Logs VTOL</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -270,10 +271,10 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
           <div class="card-title">📁 Subir archivo de log</div>
           <div class="upload-zone" id="drop-zone" onclick="document.getElementById('file-in').click()">
             <span class="upload-icon">📄</span>
-            <h3>Arrastrá el server.log acá o hacé clic</h3>
-            <p>Archivos .log o .txt — hasta 100MB — procesado 100% local, sin uploads</p>
+            <h3>Arrastrá el server.log o el .zip acá o hacé clic</h3>
+            <p>Archivos .log · .txt · .zip — hasta 100MB — procesado 100% local, sin uploads</p>
           </div>
-          <input type="file" id="file-in" accept=".log,.txt" style="display:none">
+          <input type="file" id="file-in" accept=".log,.txt,.zip" style="display:none">
           <div style="text-align:center;margin-top:16px">
             <button class="btn-ghost btn-sm" onclick="loadDemo()">▶ Cargar log de demo</button>
           </div>
@@ -336,8 +337,8 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
               </select>
             </div>
             <div class="field">
-              <label class="label">Horario (contiene)</label>
-              <input class="filter-input" id="f-hora" placeholder="ej: 12:26" onkeydown="if(event.key==='Enter')runBuscar()">
+              <label class="label">Desde horario</label>
+              <input class="filter-input" id="f-hora" placeholder="ej: 12:10" onkeydown="if(event.key==='Enter')runBuscar()">
             </div>
             <div style="display:flex;gap:8px">
               <button class="btn btn-sm" onclick="runBuscar()">🔍 Buscar</button>
@@ -443,7 +444,36 @@ const dz=document.getElementById('drop-zone');
 dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('drag');});
 dz.addEventListener('dragleave',()=>dz.classList.remove('drag'));
 dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('drag');if(e.dataTransfer.files[0])readFile(e.dataTransfer.files[0]);});
-function readFile(f){const r=new FileReader();r.onload=e=>parseLog(e.target.result,f.name);r.readAsText(f,'utf-8');}
+function readFile(f){
+  if(f.name.toLowerCase().endsWith('.zip')){
+    const r=new FileReader();
+    r.onload=async e=>{
+      try{
+        const zip=await JSZip.loadAsync(e.target.result);
+        // Find first .log or .txt file inside the zip
+        let logFile=null, logName='';
+        zip.forEach((path,file)=>{
+          if(!logFile && !file.dir && (path.match(/\.(log|txt)$/i))){
+            logFile=file; logName=path.split('/').pop();
+          }
+        });
+        if(!logFile){
+          alert('No se encontró ningún archivo .log o .txt dentro del ZIP.');
+          return;
+        }
+        const text=await logFile.async('string');
+        parseLog(text, logName+' ('+f.name+')');
+      } catch(err){
+        alert('Error al leer el ZIP: '+err.message);
+      }
+    };
+    r.readAsArrayBuffer(f);
+  } else {
+    const r=new FileReader();
+    r.onload=e=>parseLog(e.target.result,f.name);
+    r.readAsText(f,'utf-8');
+  }
+}
 
 // ── PARSER ────────────────────────────────────────────────────────────────
 function getField(linesArr, name){
@@ -618,7 +648,11 @@ function renderBuscar(){
     if(fs&&(t.store||'')!==fs) return false;
     if(fe==='DENEGADA'&&!t.isDeny) return false;
     if(fe==='APROBADA'&&t.isDeny) return false;
-    if(fh&&!(t.ts||'').includes(fh)) return false;
+    // Hora: filter transactions >= the given time (HH:MM or HH:MM:SS)
+    if(fh){
+      const tTime=(t.ts||'').split(' ')[1]||'';
+      if(tTime<fh) return false;
+    }
     return true;
   });
 
@@ -650,7 +684,7 @@ function renderBuscar(){
   if(fn) parts.push(`Node: ${fn}`);
   if(fs) parts.push(`Store: ${fs}`);
   if(fe) parts.push(fe);
-  if(fh) parts.push(`Hora: ${fh}`);
+  if(fh) parts.push(`Desde: ${fh}`);
   document.getElementById('filter-summary').textContent=parts.length?'Filtros activos: '+parts.join(' · '):'';
 }
 
