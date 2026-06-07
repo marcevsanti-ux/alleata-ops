@@ -1487,15 +1487,15 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
           <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr 1fr auto;gap:10px;align-items:end">
             <div class="field">
               <label class="label">Node</label>
-              <input class="filter-input" id="f-node" placeholder="ej: 669" onkeydown="if(event.key==='Enter')runBuscar()">
+              <input class="filter-input" id="f-node" placeholder="ej: 669" onkeydown="if(event.key==='Enter')napseRunBuscar()">
             </div>
             <div class="field">
               <label class="label">Store</label>
-              <input class="filter-input" id="f-store" placeholder="ej: 537" onkeydown="if(event.key==='Enter')runBuscar()">
+              <input class="filter-input" id="f-store" placeholder="ej: 537" onkeydown="if(event.key==='Enter')napseRunBuscar()">
             </div>
             <div class="field">
               <label class="label">Estado</label>
-              <select class="select" id="f-estado">
+              <select class="select" id="f-estado" autocomplete="off">
                 <option value="">Todos</option>
                 <option value="ERRORS">Solo errores</option>
                 <option value="DENEGADA">DENEGADA</option>
@@ -1506,19 +1506,19 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
             </div>
             <div class="field">
               <label class="label">IsoCode</label>
-              <input class="filter-input" id="f-iso" placeholder="ej: 05  ó  03" onkeydown="if(event.key==='Enter')runBuscar()">
+              <input class="filter-input" id="f-iso" placeholder="ej: 05  ó  03" onkeydown="if(event.key==='Enter')napseRunBuscar()">
             </div>
             <div class="field">
               <label class="label">Fecha</label>
-              <input class="filter-input" id="f-fecha" type="date" style="font-family:'Inter',sans-serif" onkeydown="if(event.key==='Enter')runBuscar()">
+              <input class="filter-input" id="f-fecha" type="date" style="font-family:'Inter',sans-serif" onkeydown="if(event.key==='Enter')napseRunBuscar()">
             </div>
             <div class="field">
               <label class="label">Monto</label>
-              <input class="filter-input" id="f-monto" placeholder="ej: 39.0" onkeydown="if(event.key==='Enter')runBuscar()">
+              <input class="filter-input" id="f-monto" placeholder="ej: 39.0" onkeydown="if(event.key==='Enter')napseRunBuscar()">
             </div>
             <div style="display:flex;gap:8px">
-              <button class="btn btn-sm" onclick="runBuscar()">🔍 Buscar</button>
-              <button class="btn-ghost btn-sm" onclick="clearFilters()">Limpiar</button>
+              <button class="btn btn-sm" onclick="napseRunBuscar()">🔍 Buscar</button>
+              <button class="btn-ghost btn-sm" onclick="napseClearFilters()">Limpiar</button>
             </div>
           </div>
           <div id="filter-summary" style="margin-top:10px;font-size:12px;color:var(--text-muted)"></div>
@@ -8218,7 +8218,6 @@ function napseRunBuscar(){
 function napseClearFilters(){
   ['f-node','f-store','f-iso','f-fecha','f-monto'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('f-estado').value='';
-  document.getElementById('f-estado').value='';
   napseRenderBuscar();
 }
 
@@ -8551,6 +8550,9 @@ function loadDemo(){
 // ── NAPSE initApp (se llama cuando se entra al módulo desde goTo) ──────────
 async function napseInitApp(){
   napseSetupDropZone();
+  // Reset filtros al entrar al módulo
+  ['f-node','f-store','f-iso','f-fecha','f-monto'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+  const fEst=document.getElementById('f-estado'); if(fEst) fEst.value='';
   await napseRenderBuscar();
   try {
     const {count} = await sb.from('napse_transactions').select('*', {count:'exact', head:true});
