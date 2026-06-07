@@ -197,7 +197,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <div id="login-err" style="display:none" class="alert alert-err"></div>
     <button class="btn" onclick="doLogin()">Ingresar</button>
-    <p style="text-align:center;margin-top:14px;font-size:11px;color:var(--text-muted)">Módulo NAPSE · Alleata Ops v1.11.0</p>
+    <p style="text-align:center;margin-top:14px;font-size:11px;color:var(--text-muted)">Módulo NAPSE · Alleata Ops v1.13.0</p>
   </div>
 </div>
 
@@ -254,7 +254,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       </div>
       <div class="topbar-right">
         <span id="log-meta" style="color:var(--text-mid)"></span>
-        <span>v1.11.0</span>
+        <span>v1.13.0</span>
       </div>
     </div>
 
@@ -477,8 +477,21 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
 
 <script>
 // ── SUPABASE ──────────────────────────────────────────────────────────────
+// Check existing session on page load
+window.addEventListener('DOMContentLoaded', async () => {
+  const {data:{session}} = await supa.auth.getSession();
+  if(session && session.user){
+    const name=(session.user.email||'').split('@')[0].replace(/[._]/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
+    document.getElementById('user-name').textContent=name;
+    document.getElementById('user-avatar').textContent=name.charAt(0).toUpperCase();
+    document.getElementById('login-screen').style.display='none';
+    document.getElementById('app-screen').style.display='flex';
+    initApp();
+  }
+});
+
 const SUPA_URL = 'https://njkstpfmcfhqxdadqbdy.supabase.co';
-const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MDk5MzU3NzcsImV4cCI6MjAyNTUxMTc3N30.KPDwFNIGJVJBH7A7pYIFoaIMy-a2j1aKfLYG8dUCq0w';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const supa = supabase.createClient(SUPA_URL, SUPA_KEY);
 
 async function saveToSupabase(transactions, filename) {
@@ -569,25 +582,41 @@ const ISO = {
 let P = {transactions:[], errors:{}, filename:'', totalLines:0};
 
 // AUTH
-function doLogin(){
+async function doLogin(){
   const e=document.getElementById('login-email').value.trim();
   const p=document.getElementById('login-pass').value;
   const err=document.getElementById('login-err');
+  const btn=document.querySelector('#login-screen .btn');
   if(!e||!p){err.textContent='Completá email y contraseña';err.style.display='block';return;}
   err.style.display='none';
-  const name=e.split('@')[0].replace(/[._]/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
-  document.getElementById('user-name').textContent=name;
-  document.getElementById('user-avatar').textContent=name.charAt(0).toUpperCase();
-  document.getElementById('login-screen').style.display='none';
-  document.getElementById('app-screen').style.display='flex';
-  // Auto-load historial on login
-  initApp();
+  btn.disabled=true; btn.textContent='Ingresando...';
+  try {
+    const {data, error} = await supa.auth.signInWithPassword({email:e, password:p});
+    if(error) throw error;
+    const user = data.user;
+    const name = (user.email||'').split('@')[0].replace(/[._]/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
+    document.getElementById('user-name').textContent=name;
+    document.getElementById('user-avatar').textContent=name.charAt(0).toUpperCase();
+    document.getElementById('login-screen').style.display='none';
+    document.getElementById('app-screen').style.display='flex';
+    initApp();
+  } catch(err2) {
+    document.getElementById('login-err').textContent = err2.message==='Invalid login credentials'
+      ? 'Email o contraseña incorrectos'
+      : err2.message;
+    document.getElementById('login-err').style.display='block';
+  } finally {
+    btn.disabled=false; btn.textContent='Ingresar';
+  }
 }
 document.getElementById('login-pass').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
 document.getElementById('login-email').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('login-pass').focus();});
-function doLogout(){
+async function doLogout(){
+  await supa.auth.signOut();
   document.getElementById('app-screen').style.display='none';
   document.getElementById('login-screen').style.display='flex';
+  document.getElementById('login-email').value='';
+  document.getElementById('login-pass').value='';
 }
 
 // NAV
