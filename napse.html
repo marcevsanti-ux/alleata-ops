@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>NAPSE · Analizador de Logs VTOL</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -195,7 +196,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <div id="login-err" style="display:none" class="alert alert-err"></div>
     <button class="btn" onclick="doLogin()">Ingresar</button>
-    <p style="text-align:center;margin-top:14px;font-size:11px;color:var(--text-muted)">Módulo NAPSE · Alleata Ops v1.8.0</p>
+    <p style="text-align:center;margin-top:14px;font-size:11px;color:var(--text-muted)">Módulo NAPSE · Alleata Ops v1.9.0</p>
   </div>
 </div>
 
@@ -220,6 +221,9 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <div class="nav-item" id="nav-tickets" onclick="setView('tickets')" style="display:none">
         <span class="active-bar"></span><span class="nav-icon">🎫</span><span>Tickets Payway</span>
         <span id="ticket-count-badge" style="margin-left:auto;font-size:9px;padding:1px 6px;background:rgba(239,68,68,.15);color:#fca5a5;border-radius:8px;font-family:'JetBrains Mono',monospace"></span>
+      </div>
+      <div class="nav-item" id="nav-historial" onclick="setView('historial')">
+        <span class="active-bar"></span><span class="nav-icon">🗄️</span><span>Historial</span>
       </div>
       <div class="nav-item" id="nav-errores-nav" onclick="setView('errores')" style="display:none">
         <span class="active-bar"></span><span class="nav-icon">⚡</span><span>Errores sistema</span>
@@ -249,7 +253,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       </div>
       <div class="topbar-right">
         <span id="log-meta" style="color:var(--text-mid)"></span>
-        <span>v1.8.0</span>
+        <span>v1.9.0</span>
       </div>
     </div>
 
@@ -350,6 +354,16 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
           <div id="filter-summary" style="margin-top:10px;font-size:12px;color:var(--text-muted)"></div>
         </div>
 
+        <!-- SAVE BAR -->
+        <div id="save-bar" style="display:none;background:rgba(29,191,142,.07);border:1px solid rgba(29,191,142,.2);border-radius:10px;padding:12px 16px;margin-bottom:16px;display:none;align-items:center;gap:12px;flex-wrap:wrap">
+          <span style="font-size:13px;color:var(--text-mid);flex:1">
+            <span id="save-bar-msg">📦 Log parseado — guardá las transacciones en el historial para consultas futuras</span>
+          </span>
+          <button class="btn btn-sm" id="btn-guardar" onclick="guardarHistorial()" style="min-width:160px">
+            💾 Guardar en historial
+          </button>
+        </div>
+
         <div class="table-scroll">
           <table>
             <thead>
@@ -387,6 +401,59 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="tickets-list"></div>
       </div>
 
+      <!-- HISTORIAL -->
+      <div id="view-historial" class="module">
+        <div class="napse-banner">
+          <div class="banner-icon">🗄️</div>
+          <div class="banner-text">
+            <h2>Historial de transacciones</h2>
+            <p>Todas las transacciones guardadas de logs anteriores — acumuladas en Supabase</p>
+          </div>
+          <div style="margin-left:auto">
+            <button class="btn-ghost btn-sm" onclick="refreshHistorial()">↻ Actualizar</button>
+          </div>
+        </div>
+        <div id="hist-stats" style="margin-bottom:16px"></div>
+        <div class="search-panel" style="margin-bottom:16px">
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr auto;gap:10px;align-items:end">
+            <div class="field">
+              <label class="label">Desde fecha</label>
+              <input class="filter-input" id="hf-fecha-from" type="date" style="font-family:'Inter',sans-serif">
+            </div>
+            <div class="field">
+              <label class="label">Hasta fecha</label>
+              <input class="filter-input" id="hf-fecha-to" type="date" style="font-family:'Inter',sans-serif">
+            </div>
+            <div class="field">
+              <label class="label">Estado</label>
+              <select class="select" id="hf-estado">
+                <option value="">Todos</option>
+                <option value="deny">Solo errores</option>
+                <option value="ok">Solo aprobadas</option>
+              </select>
+            </div>
+            <div class="field">
+              <label class="label">IsoCode</label>
+              <input class="filter-input" id="hf-iso" placeholder="ej: 05">
+            </div>
+            <button class="btn btn-sm" onclick="buscarHistorial()">🔍 Buscar</button>
+          </div>
+        </div>
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Fecha</th><th>Hora</th><th>Estado</th><th>Node</th><th>Store</th>
+                <th>IsoCode</th><th>Tarjeta</th><th>Emisor</th><th>Terminal</th>
+                <th>Comercio</th><th>Monto</th><th>Archivo</th>
+              </tr>
+            </thead>
+            <tbody id="hist-body"></tbody>
+          </table>
+        </div>
+        <div id="hist-count" style="font-size:11px;color:var(--text-muted);margin-top:8px;text-align:right"></div>
+      </div>
+
       <!-- ERRORES -->
       <div id="view-errores" class="module">
         <div class="napse-banner">
@@ -404,6 +471,60 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
 </div>
 
 <script>
+// ── SUPABASE ──────────────────────────────────────────────────────────────
+const SUPA_URL = 'https://njkstpfmcfhqxdadqbdy.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MDk5MzU3NzcsImV4cCI6MjAyNTUxMTc3N30.KPDwFNIGJVJBH7A7pYIFoaIMy-a2j1aKfLYG8dUCq0w';
+const supa = supabase.createClient(SUPA_URL, SUPA_KEY);
+
+async function saveToSupabase(transactions, filename) {
+  if(!transactions || !transactions.length) return {ok:false, msg:'Sin transacciones para guardar'};
+  const rows = transactions.map(t => ({
+    archivo:          filename,
+    fecha:            (t.ts||'').split(' ')[0] || null,
+    hora:             (t.ts||'').split(' ')[1] || null,
+    node:             t.node || null,
+    store:            t.store || null,
+    iso_code:         t.isoCode || null,
+    response_message: t.responseMessage || null,
+    masked_card:      t.maskedCard || null,
+    serial_number:    t.serialNumber || null,
+    business_number:  t.businessNumber || null,
+    host_name:        t.hostName || null,
+    issuer_name:      t.issuerName || null,
+    amount:           t.amount ? parseFloat(t.amount) : null,
+    rrn:              t.rrn || null,
+    trx_ref:          t.trxRef || null,
+    antifraud_timeout: t.antifraudTimeout || false,
+    is_deny:          t.isDeny || false,
+  }));
+  try {
+    const {data, error} = await supa.from('napse_transactions').upsert(rows, {
+      onConflict: 'trx_ref',
+      ignoreDuplicates: true
+    });
+    if(error) return {ok:false, msg: error.message};
+    return {ok:true, count: rows.length};
+  } catch(e) {
+    return {ok:false, msg: e.message};
+  }
+}
+
+async function loadHistorial() {
+  try {
+    const {data, error} = await supa
+      .from('napse_transactions')
+      .select('*')
+      .order('fecha', {ascending:false})
+      .order('hora',  {ascending:false})
+      .limit(500);
+    if(error) throw error;
+    return data || [];
+  } catch(e) {
+    console.error('Historial error:', e);
+    return [];
+  }
+}
+
 const ISO = {
   '00':'Aprobada',
   '01':'Referir al emisor',
@@ -467,12 +588,13 @@ function setView(v){
   document.querySelectorAll('.module').forEach(m=>m.classList.remove('active'));
   document.getElementById('view-'+v).classList.add('active');
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
-  const map={'upload':'nav-upload','buscar':'nav-buscar','tickets':'nav-tickets','errores':'nav-errores-nav'};
+  const map={'upload':'nav-upload','buscar':'nav-buscar','tickets':'nav-tickets','errores':'nav-errores-nav','historial':'nav-historial'};
   if(map[v]) document.getElementById(map[v])?.classList.add('active');
-  const sub={upload:'Cargar log',buscar:'Buscar error',tickets:'Tickets Payway',errores:'Errores sistema'};
+  const sub={upload:'Cargar log',buscar:'Buscar error',tickets:'Tickets Payway',errores:'Errores sistema',historial:'Historial'};
   document.getElementById('crumb-sub').textContent=sub[v]||'';
   document.getElementById('crumb-sep').style.display=sub[v]?'inline':'none';
   document.getElementById('crumb-sub').style.display=sub[v]?'inline':'none';
+  if(v==='historial') refreshHistorial();
 }
 
 // FILE
@@ -672,8 +794,9 @@ function afterParse(){
   renderTickets();
   renderErrores();
   setView('buscar');
-  // Auto-show all transactions on load
   setTimeout(()=>renderBuscar(),50);
+  // Show save button
+  showSaveBar(transactions);
 }
 
 // ── BUSCAR ────────────────────────────────────────────────────────────────
@@ -714,6 +837,102 @@ function downloadExtract(lineStart, lineEnd, ts, node, store, line0200){
   a.download = 'vtol-extract-' + ts + '-node' + node + '.txt';
   a.click();
   URL.revokeObjectURL(a.href);
+}
+
+async function guardarHistorial(){
+  const btn=document.getElementById('btn-guardar');
+  const msg=document.getElementById('save-bar-msg');
+  btn.disabled=true; btn.textContent='Guardando...';
+  const res = await saveToSupabase(P.transactions, P.filename);
+  if(res.ok){
+    btn.textContent='✓ Guardado';
+    btn.style.background='rgba(16,185,129,.2)';
+    msg.innerHTML='✅ <strong>'+res.count+' transacciones guardadas</strong> en el historial · '+P.filename;
+    setTimeout(()=>{btn.disabled=false;btn.textContent='💾 Guardar en historial';btn.style.background='';},4000);
+  } else {
+    btn.disabled=false; btn.textContent='💾 Guardar en historial';
+    msg.innerHTML='❌ Error al guardar: '+res.msg;
+  }
+}
+
+function showSaveBar(transactions){
+  const bar=document.getElementById('save-bar');
+  if(!bar) return;
+  bar.style.display='flex';
+  const denies=transactions.filter(t=>t.isDeny).length;
+  document.getElementById('save-bar-msg').innerHTML=
+    '📦 <strong>'+transactions.length+' transacciones</strong> parseadas ('+denies+' errores) — guardá en el historial para consultas futuras';
+}
+
+async function refreshHistorial(){
+  document.getElementById('hist-body').innerHTML='<tr><td colspan="12" style="text-align:center;padding:2rem;color:var(--text-muted)">Cargando...</td></tr>';
+  document.getElementById('hist-count').textContent='';
+  document.getElementById('hist-stats').innerHTML='';
+  const rows = await loadHistorial();
+  renderHistorialRows(rows);
+}
+
+async function buscarHistorial(){
+  const fechaFrom=document.getElementById('hf-fecha-from').value;
+  const fechaTo=document.getElementById('hf-fecha-to').value;
+  const estado=document.getElementById('hf-estado').value;
+  const iso=document.getElementById('hf-iso').value.trim();
+  document.getElementById('hist-body').innerHTML='<tr><td colspan="12" style="text-align:center;padding:2rem;color:var(--text-muted)">Buscando...</td></tr>';
+  try {
+    let q = supa.from('napse_transactions').select('*').order('fecha',{ascending:false}).order('hora',{ascending:false}).limit(500);
+    if(fechaFrom) q=q.gte('fecha',fechaFrom);
+    if(fechaTo)   q=q.lte('fecha',fechaTo);
+    if(estado==='deny') q=q.eq('is_deny',true);
+    if(estado==='ok')   q=q.eq('is_deny',false);
+    if(iso) q=q.eq('iso_code',iso);
+    const {data,error}=await q;
+    if(error) throw error;
+    renderHistorialRows(data||[]);
+  } catch(e){
+    document.getElementById('hist-body').innerHTML='<tr><td colspan="12" style="text-align:center;padding:2rem;color:var(--red)">Error: '+e.message+'</td></tr>';
+  }
+}
+
+function renderHistorialRows(rows){
+  if(!rows.length){
+    document.getElementById('hist-body').innerHTML='<tr><td colspan="12" style="text-align:center;padding:2rem;color:var(--text-muted)">Sin resultados</td></tr>';
+    document.getElementById('hist-count').textContent='0 registros';
+    return;
+  }
+  const totalDeny=rows.filter(r=>r.is_deny).length;
+  const archivos=[...new Set(rows.map(r=>r.archivo).filter(Boolean))];
+  document.getElementById('hist-stats').innerHTML=`
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:4px">
+      <div class="kpi-card" style="padding:10px 16px;min-width:120px"><div class="kpi-label">Total registros</div><div class="kpi-val teal" style="font-size:20px">${rows.length}</div></div>
+      <div class="kpi-card" style="padding:10px 16px;min-width:120px"><div class="kpi-label">Errores</div><div class="kpi-val red" style="font-size:20px">${totalDeny}</div></div>
+      <div class="kpi-card" style="padding:10px 16px;min-width:120px"><div class="kpi-label">Archivos</div><div class="kpi-val" style="font-size:20px">${archivos.length}</div></div>
+    </div>`;
+  const body=rows.map(r=>{
+    const iso=r.iso_code||'?';
+    const isoDesc=ISO[iso]||iso;
+    const isDeny=r.is_deny;
+    const msgUp=(r.response_message||'').toUpperCase();
+    let badge='';
+    if(msgUp.includes('COMERCIO INVALIDO')) badge='<span class="badge badge-orange">COMERCIO INVÁLIDO</span>';
+    else if(isDeny) badge='<span class="badge badge-red">DENEGADA</span>';
+    else badge='<span class="badge badge-green">APROBADA</span>';
+    return `<tr class="${isDeny?'row-deny':''}">
+      <td class="mono" style="font-size:11px;color:var(--text-muted)">${r.fecha||'—'}</td>
+      <td class="mono">${r.hora||'—'}</td>
+      <td>${badge}</td>
+      <td class="mono">${r.node||'—'}</td>
+      <td class="mono">${r.store||'—'}</td>
+      <td title="${isoDesc}"><span class="badge ${isDeny?'badge-red':'badge-gray'}">${iso}</span></td>
+      <td class="mono">${r.masked_card||'—'}</td>
+      <td style="font-size:12px">${r.issuer_name||'—'}</td>
+      <td class="mono">${r.serial_number||'—'}</td>
+      <td class="mono">${r.business_number||'—'}</td>
+      <td class="mono">${r.amount||'—'}</td>
+      <td style="font-size:11px;color:var(--text-muted);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.archivo||''}">${(r.archivo||'—').split('(')[0].trim()}</td>
+    </tr>`;
+  }).join('');
+  document.getElementById('hist-body').innerHTML=body;
+  document.getElementById('hist-count').textContent=rows.length+' registros';
 }
 
 function runBuscar(){
