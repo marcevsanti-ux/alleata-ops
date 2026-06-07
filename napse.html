@@ -321,15 +321,15 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
           <div class="search-grid">
             <div class="field">
               <label class="label">Node</label>
-              <input class="filter-input" id="f-node" placeholder="ej: 669" oninput="renderBuscar()">
+              <input class="filter-input" id="f-node" placeholder="ej: 669" onkeydown="if(event.key==='Enter')runBuscar()">
             </div>
             <div class="field">
               <label class="label">Store</label>
-              <input class="filter-input" id="f-store" placeholder="ej: 537" oninput="renderBuscar()">
+              <input class="filter-input" id="f-store" placeholder="ej: 537" onkeydown="if(event.key==='Enter')runBuscar()">
             </div>
             <div class="field">
               <label class="label">Estado</label>
-              <select class="select" id="f-estado" onchange="renderBuscar()">
+              <select class="select" id="f-estado">
                 <option value="">Todos</option>
                 <option value="DENEGADA">DENEGADA</option>
                 <option value="APROBADA">APROBADA</option>
@@ -337,9 +337,12 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
             </div>
             <div class="field">
               <label class="label">Horario (contiene)</label>
-              <input class="filter-input" id="f-hora" placeholder="ej: 12:26" oninput="renderBuscar()">
+              <input class="filter-input" id="f-hora" placeholder="ej: 12:26" onkeydown="if(event.key==='Enter')runBuscar()">
             </div>
-            <button class="btn btn-sm" onclick="clearFilters()">Limpiar</button>
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-sm" onclick="runBuscar()">🔍 Buscar</button>
+              <button class="btn-ghost btn-sm" onclick="clearFilters()">Limpiar</button>
+            </div>
           </div>
           <div id="filter-summary" style="margin-top:10px;font-size:12px;color:var(--text-muted)"></div>
         </div>
@@ -486,9 +489,11 @@ function parseLog(text, filename){
 
   for(let i=0;i<lines.length;i++){
     const line=lines[i];
-    if(!line.includes('28 responseMessage')||(!(line.includes('DENEGADA')||line.includes('Aprobada')||line.includes('APROBADA')))) continue;
+    if(!line.includes('28 responseMessage')) continue;
+    const lineUpper=line.toUpperCase();
+    if(!lineUpper.includes('DENEGADA')&&!lineUpper.includes('APROBADA')) continue;
 
-    const isDeny=line.toUpperCase().includes('DENEGADA');
+    const isDeny=lineUpper.includes('DENEGADA');
     const ts=getTs(line);
 
     // The block of fields for this response starts at "Counting responses from VTOL"
@@ -552,6 +557,9 @@ function parseLog(text, filename){
       if(om){opRejected=om[1];break;}
     }
 
+    // Skip duplicate APROBADA entries without card data (intermediate response blocks)
+    if(!isDeny && !maskedCard && !isoCode) continue;
+    
     transactions.push({
       ts,isDeny,node,store,isoCode,maskedCard,serialNumber,businessNumber,
       hostName,issuerName,rrn,ticket,trxRef,clientDate,
@@ -583,9 +591,15 @@ function afterParse(){
   renderTickets();
   renderErrores();
   setView('buscar');
+  // Auto-show all transactions on load
+  setTimeout(()=>renderBuscar(),50);
 }
 
 // ── BUSCAR ────────────────────────────────────────────────────────────────
+function runBuscar(){
+  renderBuscar();
+}
+
 function clearFilters(){
   ['f-node','f-store','f-hora'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('f-estado').value='';
