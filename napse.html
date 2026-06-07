@@ -196,7 +196,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <div id="login-err" style="display:none" class="alert alert-err"></div>
     <button class="btn" onclick="doLogin()">Ingresar</button>
-    <p style="text-align:center;margin-top:14px;font-size:11px;color:var(--text-muted)">Módulo NAPSE · Alleata Ops v1.9.0</p>
+    <p style="text-align:center;margin-top:14px;font-size:11px;color:var(--text-muted)">Módulo NAPSE · Alleata Ops v1.10.0</p>
   </div>
 </div>
 
@@ -253,7 +253,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       </div>
       <div class="topbar-right">
         <span id="log-meta" style="color:var(--text-mid)"></span>
-        <span>v1.9.0</span>
+        <span>v1.10.0</span>
       </div>
     </div>
 
@@ -320,7 +320,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
 
         <div class="search-panel">
           <h3>🎯 Filtros de búsqueda</h3>
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr auto;gap:10px;align-items:end">
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr 1fr auto;gap:10px;align-items:end">
             <div class="field">
               <label class="label">Node</label>
               <input class="filter-input" id="f-node" placeholder="ej: 669" onkeydown="if(event.key==='Enter')runBuscar()">
@@ -343,8 +343,12 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
               <input class="filter-input" id="f-iso" placeholder="ej: 05  ó  03" onkeydown="if(event.key==='Enter')runBuscar()">
             </div>
             <div class="field">
-              <label class="label">Desde horario</label>
-              <input class="filter-input" id="f-hora" placeholder="ej: 12:10" onkeydown="if(event.key==='Enter')runBuscar()">
+              <label class="label">Fecha</label>
+              <input class="filter-input" id="f-fecha" type="date" style="font-family:'Inter',sans-serif" onkeydown="if(event.key==='Enter')runBuscar()">
+            </div>
+            <div class="field">
+              <label class="label">Monto</label>
+              <input class="filter-input" id="f-monto" placeholder="ej: 39.0" onkeydown="if(event.key==='Enter')runBuscar()">
             </div>
             <div style="display:flex;gap:8px">
               <button class="btn btn-sm" onclick="runBuscar()">🔍 Buscar</button>
@@ -940,7 +944,8 @@ function runBuscar(){
 }
 
 function clearFilters(){
-  ['f-node','f-store','f-iso','f-hora'].forEach(id=>document.getElementById(id).value='');
+  ['f-node','f-store','f-iso','f-fecha','f-monto'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('f-estado').value='';
   document.getElementById('f-estado').value='';
   renderBuscar();
 }
@@ -951,7 +956,8 @@ function renderBuscar(){
   const fs=document.getElementById('f-store').value.trim();
   const fe=document.getElementById('f-estado').value;
   const fi=document.getElementById('f-iso').value.trim();
-  const fh=document.getElementById('f-hora').value.trim();
+  const ff=document.getElementById('f-fecha').value.trim();
+  const fm=document.getElementById('f-monto').value.trim();
 
   const filtered=transactions.filter(t=>{
     if(fn&&(t.node||'')!==fn) return false;
@@ -960,11 +966,8 @@ function renderBuscar(){
     if(fe==='APROBADA'&&t.isDeny) return false;
     if(fe==='COMERCIO_INVALIDO'&&(t.isoCode||'').trim()!=='03') return false;
     if(fi&&(t.isoCode||'').trim()!==fi.trim()) return false;
-    // Hora: filter transactions >= the given time (HH:MM or HH:MM:SS)
-    if(fh){
-      const tTime=(t.ts||'').split(' ')[1]||'';
-      if(tTime<fh) return false;
-    }
+    if(ff&&(t.ts||'').split(' ')[0]!==ff) return false;
+    if(fm&&String(t.amount||'').trim()!==fm.trim()) return false;
     return true;
   });
 
@@ -1004,7 +1007,8 @@ function renderBuscar(){
   if(fs) parts.push(`Store: ${fs}`);
   if(fe) parts.push(fe==='COMERCIO_INVALIDO'?'COMERCIO INVÁLIDO (03)':fe);
   if(fi) parts.push(`IsoCode: ${fi}`);
-  if(fh) parts.push(`Desde: ${fh}`);
+  if(ff) parts.push(`Fecha: ${ff}`);
+  if(fm) parts.push(`Monto: ${fm}`);
   document.getElementById('filter-summary').textContent=parts.length?'Filtros activos: '+parts.join(' · '):'';
 }
 
