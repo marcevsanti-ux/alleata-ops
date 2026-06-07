@@ -198,7 +198,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <div id="login-err" style="display:none" class="alert alert-err"></div>
     <button class="btn" onclick="doLogin()">Ingresar</button>
-    <p style="text-align:center;margin-top:14px;font-size:11px;color:var(--text-muted)">Módulo NAPSE · Alleata Ops v1.15.0</p>
+    <p style="text-align:center;margin-top:14px;font-size:11px;color:var(--text-muted)">Módulo NAPSE · Alleata Ops v1.16.0</p>
   </div>
 </div>
 
@@ -217,17 +217,17 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <div class="nav-item active" id="nav-upload" onclick="setView('upload')">
         <span class="active-bar"></span><span class="nav-icon">📂</span><span>Cargar log</span>
       </div>
-      <div class="nav-item" id="nav-buscar" onclick="setView('buscar')" style="display:none">
+      <div class="nav-item" id="nav-buscar" onclick="setView('buscar')">
         <span class="active-bar"></span><span class="nav-icon">🔍</span><span>Buscar error</span>
       </div>
-      <div class="nav-item" id="nav-tickets" onclick="setView('tickets')" style="display:none">
+      <div class="nav-item" id="nav-tickets" onclick="setView('tickets')">
         <span class="active-bar"></span><span class="nav-icon">🎫</span><span>Tickets Payway</span>
         <span id="ticket-count-badge" style="margin-left:auto;font-size:9px;padding:1px 6px;background:rgba(239,68,68,.15);color:#fca5a5;border-radius:8px;font-family:'JetBrains Mono',monospace"></span>
       </div>
       <div class="nav-item" id="nav-historial" onclick="setView('historial')">
         <span class="active-bar"></span><span class="nav-icon">🗄️</span><span>Historial</span>
       </div>
-      <div class="nav-item" id="nav-errores-nav" onclick="setView('errores')" style="display:none">
+      <div class="nav-item" id="nav-errores-nav" onclick="setView('errores')">
         <span class="active-bar"></span><span class="nav-icon">⚡</span><span>Errores sistema</span>
       </div>
 
@@ -255,7 +255,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       </div>
       <div class="topbar-right">
         <span id="log-meta" style="color:var(--text-mid)"></span>
-        <span>v1.15.0</span>
+        <span>v1.16.0</span>
       </div>
     </div>
 
@@ -634,6 +634,17 @@ function setView(v){
   document.getElementById('crumb-sep').style.display=sub[v]?'inline':'none';
   document.getElementById('crumb-sub').style.display=sub[v]?'inline':'none';
   if(v==='historial') refreshHistorial();
+  // If no log loaded and trying to access log-dependent views, show hint
+  if((v==='buscar'||v==='tickets'||v==='errores')&&!P.filename){
+    // Show empty state with hint
+    if(v==='buscar'){
+      document.getElementById('buscar-body').innerHTML='<tr><td colspan="13" style="text-align:center;padding:3rem;color:var(--text-muted)">📂 Cargá un log primero para buscar transacciones</td></tr>';
+      document.getElementById('buscar-count').textContent='';
+      document.getElementById('filter-summary').textContent='';
+    }
+    if(v==='tickets') document.getElementById('tickets-list').innerHTML='<div class="empty"><span class="empty-icon">📂</span>Cargá un log primero para ver los tickets</div>';
+    if(v==='errores') document.getElementById('errores-content').innerHTML='<div class="empty"><span class="empty-icon">📂</span>Cargá un log primero para ver los errores del sistema</div>';
+  }
 }
 
 // FILE
@@ -833,9 +844,7 @@ function afterParse(){
   document.getElementById('log-meta').textContent=filename+' · '+totalLines.toLocaleString()+' líneas';
   document.getElementById('banner-file').textContent=filename+' · '+totalLines.toLocaleString()+' líneas';
   document.getElementById('ticket-count-badge').textContent=denies.length||'';
-  ['nav-buscar','nav-tickets','nav-errores-nav'].forEach(id=>{
-    document.getElementById(id).style.display='flex';
-  });
+  // nav items always visible
 
   // Populate node/store selects (used as hints)
   const nodes=[...new Set(transactions.map(t=>t.node).filter(Boolean))].sort();
