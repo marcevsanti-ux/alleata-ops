@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v3.6.6</title>
+<title>Alleata · Operaciones v3.6.9</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -407,7 +407,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v3.6.6 · 08 jun 2026
+      v3.6.9 · 08 jun 2026
     </div>
   </div>
 </div>
@@ -481,7 +481,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v3.6.6 · 08 jun 2026
+      v3.6.9 · 08 jun 2026
     </div>
   </div>
 </nav>
@@ -510,7 +510,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         SF Sync
       </button>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v3.6.6</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v3.6.9</div>
   </div>
   <div class="content">
 
@@ -4107,7 +4107,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v3.6.6] OK');
+console.log('[Alleata v3.6.9] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -8196,32 +8196,16 @@ function downloadExtract(lineStart, lineEnd, ts, node, store, line0200){
     alert('Las líneas del log no están disponibles. Recargá el log.');
     return;
   }
-  // Use pre-computed line0200 from parser if available
-  let req0200Line;
-  if(typeof line0200 === 'number' && line0200 > 0){
-    req0200Line = line0200;
-  } else {
-    // Fallback: search backwards for "Operation id:" (covers NO OPERA OFF-LINE and similar)
-    req0200Line = Math.max(0, lineStart - 10);
-    for(let i = lineStart; i >= Math.max(0, lineStart - 800); i--){
-      const l = P.allLines[i] || '';
-      // For 0200-based flows
-      if(l.includes('Sending message to [') && l.includes('INFO')){
-        req0200Line = i; break;
-      }
-      // For offline/rejected flows — find Operation id start
-      if(l.match(/Node:\d+ Operation id: \d+/) || l.match(/Node:[0-9A-Z]+ Operation id: \d+/)){
-        req0200Line = i; break;
-      }
-    }
+  // INICIO: "Init Accepted Socket" más cercano hacia atrás desde lineStart
+  let req0200Line = lineStart;
+  for(let i = lineStart; i >= Math.max(0, lineStart - 1200); i--){
+    if((P.allLines[i]||'').includes('Init Accepted Socket')){ req0200Line = i; break; }
   }
-  // End: go until "Response Message." or lineEnd + 20
-  let endLine = Math.min(P.allLines.length - 1, lineEnd + 25);
-  for(let i = lineEnd; i <= Math.min(P.allLines.length - 1, lineEnd + 30); i++){
-    if(P.allLines[i] && P.allLines[i].includes('Response Message.')){
-      endLine = Math.min(P.allLines.length - 1, i + 5);
-      break;
-    }
+  // FIN: "PeiReverseSenderProcess" más cercano hacia adelante desde lineEnd
+  let endLine = Math.min(P.allLines.length - 1, lineEnd + 50);
+  for(let i = lineEnd; i <= Math.min(P.allLines.length - 1, lineEnd + 300); i++){
+    const l = P.allLines[i] || '';
+    if(l.includes('PeiReverseSenderProcess')){ endLine = i; break; }
   }
   const extract = P.allLines.slice(req0200Line, endLine + 1).join('\n');
   const header = [
