@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v3.6.4</title>
+<title>Alleata · Operaciones v3.6.5</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -407,7 +407,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v3.6.4 · 08 jun 2026
+      v3.6.5 · 08 jun 2026
     </div>
   </div>
 </div>
@@ -481,7 +481,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v3.6.4 · 08 jun 2026
+      v3.6.5 · 08 jun 2026
     </div>
   </div>
 </nav>
@@ -510,7 +510,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         SF Sync
       </button>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v3.6.4</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v3.6.5</div>
   </div>
   <div class="content">
 
@@ -1605,6 +1605,10 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
             <div class="field">
               <label class="label">IsoCode</label>
               <input class="filter-input" id="hf-iso" placeholder="ej: 05">
+            </div>
+            <div class="field" style="margin:0">
+              <label class="label">Monto</label>
+              <input class="filter-input" id="hf-monto" placeholder="ej: 28700" style="max-width:120px">
             </div>
             <button class="btn btn-sm" onclick="napseBuscarHistorial()">🔍 Buscar</button>
           </div>
@@ -4103,7 +4107,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v3.6.4] OK');
+console.log('[Alleata v3.6.5] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -8287,6 +8291,8 @@ async function napseBuscarHistorial(){
     if(estado==='deny') q=q.eq('is_deny',true);
     if(estado==='ok')   q=q.eq('is_deny',false);
     if(iso) q=q.eq('iso_code',iso);
+    const hfMonto=document.getElementById('hf-monto')?.value.trim();
+    if(hfMonto){ const _hm=parseFloat(hfMonto); q=q.gte('amount',_hm-0.01).lte('amount',_hm+0.01); }
     const {data,error}=await q;
     if(error) throw error;
     renderHistorialRows(data||[]);
@@ -8417,7 +8423,7 @@ async function napseRenderBuscar(){
       if(fe==='NO_OPERA_OFFLINE') q=q.eq('iso_code','99');
       if(fi) q=q.eq('iso_code',fi);
       if(ff) q=q.eq('fecha',ff);
-      if(fm) q=q.eq('amount',parseFloat(fm));
+      if(fm){ const fmV=parseFloat(fm); q=q.gte('amount',fmV-0.01).lte('amount',fmV+0.01); }
       const {data,error}=await q;
       if(error) throw error;
       const rows=(data||[]).map(t=>buildBuscarRow({
