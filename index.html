@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v3.5.4</title>
+<title>Alleata · Operaciones v3.5.5</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -407,7 +407,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v3.5.4 · 07 jun 2026
+      v3.5.5 · 07 jun 2026
     </div>
   </div>
 </div>
@@ -481,7 +481,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v3.5.4 · 07 jun 2026
+      v3.5.5 · 07 jun 2026
     </div>
   </div>
 </nav>
@@ -510,7 +510,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         SF Sync
       </button>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v3.5.4</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v3.5.5</div>
   </div>
   <div class="content">
 
@@ -4113,7 +4113,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v3.5.4] OK');
+console.log('[Alleata v3.5.5] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -8270,7 +8270,9 @@ function buildBuscarRow(t){
   }
   const date=(t.ts||'—').split(' ')[0]||'—';
   const time=(t.ts||'—').split(' ')[1]||t.ts||'—';
-  return `<tr class="${t.isDeny?'row-deny':''}">
+  // Botón match SF
+  const sfBtn = (t.node||t.store) ? `<button class="btn-copy" style="background:rgba(29,191,142,.1);color:var(--teal);border-color:rgba(29,191,142,.2);margin-top:3px" onclick="napseMatchSF('${t.serialNumber||''}','${t.node||''}','${t.store||''}',this)">☁ SF</button>` : '';
+  return `<tr class="${t.isDeny?'row-deny':''}" id="napse-row-${t.trxRef||t.ts||Math.random()}">
     <td class="mono" style="font-size:11px;color:var(--text-muted)">${date}</td>
     <td class="mono">${time}</td>
     <td>${badge}</td>
@@ -8283,7 +8285,7 @@ function buildBuscarRow(t){
     <td class="mono">${t.businessNumber||'—'}</td>
     <td class="mono">${t.amount||'—'}</td>
     <td>${af}</td>
-    <td style="white-space:nowrap">${ticketBtn} ${extractBtn}</td>
+    <td style="white-space:nowrap;display:flex;flex-direction:column;gap:3px;align-items:flex-start">${ticketBtn} ${extractBtn}${sfBtn}</td>
   </tr>`;
 }
 
@@ -8640,6 +8642,84 @@ function napseDownloadStoredExtract(extract, ts, node, store){
   const a = document.createElement('a');
   a.href = url; a.download = 'log_' + node + '_' + store + '_' + ts + '.txt';
   a.click(); URL.revokeObjectURL(url);
+}
+
+// ── NAPSE: match con SF por node + store (+ terminal_id si existe) ─────────
+async function napseMatchSF(serialNumber, node, store, btn){
+  if(!node && !store){ alert('Sin Node/Store para buscar en SF.'); return; }
+  const origTxt = btn.textContent;
+  btn.textContent = '...';
+  btn.disabled = true;
+  try {
+    // Buscar en sf_workorders por wo_node_code + wo_store_code
+    // Si hay terminal_id también lo usamos como criterio adicional
+    let q = sb.from('sf_workorders')
+      .select('id,workorder_number,cuenta,responsable,propietario_cuenta,status,record_type,perfil,terminal_id,wo_node_code,wo_store_code,usuario_cajero,contrasena_cajero,contacto_celular,email_destino,direccion_formula,ciudad,provincia')
+      .eq('wo_node_code', node)
+      .eq('wo_store_code', store)
+      .not('status', 'in', '("Exitoso","Fallido","Cancelado")')
+      .order('created_at', { ascending: false })
+      .limit(5);
+    const { data, error } = await q;
+    if(error) throw error;
+
+    // Si no encontró activas, buscar sin filtro de estado
+    let rows = data || [];
+    if(!rows.length){
+      const { data: d2 } = await sb.from('sf_workorders')
+        .select('id,workorder_number,cuenta,responsable,propietario_cuenta,status,record_type,perfil,terminal_id,wo_node_code,wo_store_code,usuario_cajero,contrasena_cajero,contacto_celular,email_destino,direccion_formula,ciudad,provincia')
+        .eq('wo_node_code', node)
+        .eq('wo_store_code', store)
+        .order('created_at', { ascending: false })
+        .limit(5);
+      rows = d2 || [];
+    }
+
+    if(!rows.length){
+      btn.textContent = '✗ Sin OT';
+      btn.style.background = 'rgba(239,68,68,.1)';
+      btn.style.color = '#fca5a5';
+      btn.style.borderColor = 'rgba(239,68,68,.2)';
+      btn.disabled = false;
+      return;
+    }
+
+    // Mostrar panel con resultados debajo del botón
+    btn.textContent = '☁ SF ✓';
+    btn.style.background = 'rgba(29,191,142,.2)';
+    btn.disabled = false;
+
+    // Buscar o crear el panel de resultados SF en la fila
+    const td = btn.closest('td');
+    let panel = td.querySelector('.napse-sf-panel');
+    if(panel){ panel.remove(); return; } // toggle
+    panel = document.createElement('div');
+    panel.className = 'napse-sf-panel';
+    panel.style.cssText = 'margin-top:6px;background:var(--navy-900);border:1px solid rgba(29,191,142,.25);border-radius:8px;padding:10px 12px;min-width:260px;font-size:11px;line-height:1.6;text-align:left';
+
+    const html = rows.map(r => `
+      <div style="border-bottom:1px solid var(--border);padding-bottom:7px;margin-bottom:7px">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+          <span style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:var(--teal)">OT ${r.workorder_number||'—'}</span>
+          <span style="font-size:10px;padding:1px 6px;background:var(--surface2);border-radius:10px;color:var(--text-muted)">${r.status||'—'}</span>
+        </div>
+        <div style="color:var(--text)">${r.cuenta||'—'}</div>
+        <div style="color:var(--text-muted)">Resp: ${r.responsable||'—'}</div>
+        ${r.terminal_id?`<div style="color:var(--text-muted);font-family:'JetBrains Mono',monospace">Terminal: ${r.terminal_id}</div>`:''}
+        ${r.usuario_cajero?`<div style="color:var(--text-muted);font-family:'JetBrains Mono',monospace">User cajero: ${r.usuario_cajero}</div>`:''}
+        ${r.contrasena_cajero?`<div style="color:var(--text-muted);font-family:'JetBrains Mono',monospace">Pass cajero: ${r.contrasena_cajero}</div>`:''}
+        ${r.contacto_celular?`<div style="color:var(--text-muted)">📱 ${r.contacto_celular}</div>`:''}
+        ${r.direccion_formula?`<div style="color:var(--text-muted)">📍 ${r.direccion_formula}${r.ciudad?', '+r.ciudad:''}</div>`:''}
+      </div>
+    `).join('');
+    panel.innerHTML = html + `<div style="color:var(--text-muted);font-size:10px;margin-top:2px">Node ${node} · Store ${store}${serialNumber?' · Terminal '+serialNumber:''}</div>`;
+    td.appendChild(panel);
+
+  } catch(e){
+    btn.textContent = '✗ Error';
+    btn.disabled = false;
+    console.error('napseMatchSF error:', e);
+  }
 }
 
 // ══ FIN MÓDULO NAPSE ═════════════════════════════════════════════════════
