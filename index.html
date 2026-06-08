@@ -6427,6 +6427,16 @@ async function updateEstadoDevolucion(id,estado){
 
 // ── CANAL SELECTOR ──
 let _canalActivo = 'TODOS'; // 'TODOS' | 'ALLEATA' | 'CORREO' | 'CABIFY'
+let selectedEnvios = new Set();
+function updateSelectedCount(){
+  const checks = document.querySelectorAll('.envio-chk');
+  selectedEnvios.clear();
+  checks.forEach(c => { if(c.checked) selectedEnvios.add(c.dataset.id); });
+  const btn = document.getElementById('btnPrintSelected');
+  const cnt = document.getElementById('selectedCount');
+  if(btn){ btn.style.display = selectedEnvios.size > 0 ? 'inline-flex' : 'none'; }
+  if(cnt){ cnt.textContent = selectedEnvios.size; }
+}
 
 function setCanalEnvios(canal){
   _canalActivo = canal;
@@ -7107,6 +7117,111 @@ async function updateEnvioEstado(id, estado){
     valor_antes: prev?.status||null, valor_despues: estado});
   loadBadges(); renderEnvios();
 }
+// ── Imprimir rótulo envío (logística Alleata) ─────────────────
+async function printRotulo(id) {
+  const { data: rawR } = await sb.from('sf_workorders').select('*').eq('id', id).single();
+  if (!rawR) { alert('No se encontró la OT.'); return; }
+  const e = normalizarSFWorkorder(rawR);
+  _imprimirRotuloHTML([e]);
+}
+
+// ── Imprimir rótulos seleccionados ────────────────────────────
+async function printSelectedRotulos() {
+  const ids = [...selectedEnvios];
+  if (!ids.length) return;
+  const { data: raws } = await sb.from('sf_workorders').select('*').in('id', ids);
+  if (!raws || !raws.length) { alert('No se pudieron cargar las OTs.'); return; }
+  const envios = raws.map(normalizarSFWorkorder);
+  _imprimirRotuloHTML(envios);
+}
+
+function _imprimirRotuloHTML(envios) {
+  function makeQRDataUrl(text, size) {
+    const tmp = document.createElement('div');
+    tmp.style.cssText = 'position:absolute;left:-9999px;top:-9999px;';
+    document.body.appendChild(tmp);
+    new QRCode(tmp, { text, width: size, height: size, colorDark: '#000', colorLight: '#fff', correctLevel: QRCode.CorrectLevel.M });
+    const canvas = tmp.querySelector('canvas');
+    let dataUrl = '';
+    if (canvas) dataUrl = canvas.toDataURL('image/png');
+    document.body.removeChild(tmp);
+    return dataUrl;
+  }
+
+  const rotulosHTML = envios.map(e => {
+    const trackUrl = e.track
+      ? `https://www.correoargentino.com.ar/formularios/e-commerce?id=${e.track}`
+      : null;
+    const qrSrc = trackUrl ? makeQRDataUrl(trackUrl, 80) : '';
+
+    return `
+    <div class="rotulo">
+      <div class="hdr">
+        <div class="hdr-logo">alleata</div>
+        <div class="hdr-info">Andrés Moretti e Hijos S.A.<br>Logística Alleata &nbsp;·&nbsp; (+54 11) 4103-4600</div>
+      </div>
+      <div class="tipo">${e.tipo || '—'}</div>
+      <div class="ot-block">
+        <div>
+          <div class="ot-label">ORDEN DE TRABAJO</div>
+          <div class="ot-num">${e.ot_numero || '—'}</div>
+          ${e.track ? `<div class="track-num">Track: ${e.track}</div>` : '<div class="track-num" style="color:#aaa">Sin tracking</div>'}
+        </div>
+        ${qrSrc ? `<div style="text-align:center"><img src="${qrSrc}" width="72" height="72" style="display:block;"><div style="font-size:6px;font-weight:700;margin-top:2px;text-transform:uppercase;">Tracking CA</div></div>` : ''}
+      </div>
+      <div class="dest-label">DESTINATARIO</div>
+      <div class="dest">${e.cuenta || '—'}</div>
+      <div class="row"><span class="lbl">Dirección</span><span class="val">${e.direccion_completa || '—'}</span></div>
+      <div class="row"><span class="lbl">C.P.</span><span class="val">${e.cp_dest || '—'}</span></div>
+      <div class="row"><span class="lbl">Localidad</span><span class="val">${e.ciudad || '—'}</span></div>
+      <div class="row"><span class="lbl">Provincia</span><span class="val">${e.provincia || '—'}</span></div>
+      <div class="divider"></div>
+      <div class="row"><span class="lbl">Responsable</span><span class="val">${e.responsable || '—'}</span></div>
+      ${e.notas ? `<div class="row"><span class="lbl">Obs.</span><span class="val" style="font-size:9px">${e.notas}</span></div>` : ''}
+      <div class="footer">
+        <div class="footer-lbl">Remitente</div>
+        <div class="footer-val">Andrés Moretti e Hijos S.A. &nbsp;·&nbsp; Av. Rivadavia 1234, CABA</div>
+      </div>
+    </div>`;
+  }).join('<div class="page-break"></div>');
+
+  const w = window.open('', '_blank', 'width=460,height=700');
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
+  <title>Rótulos Alleata — ${envios.length} OT${envios.length > 1 ? 's' : ''}</title>
+  <style>
+    @page { size: 100mm 150mm; margin: 0; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100mm; font-family: 'Arial', sans-serif; background: #fff; font-size: 10px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .rotulo { width: 100mm; min-height: 150mm; padding: 3mm; display: flex; flex-direction: column; }
+    .page-break { page-break-after: always; break-after: page; height: 0; }
+    .hdr { display: flex; align-items: center; justify-content: space-between; border-bottom: 1.5px solid #000; padding-bottom: 1.5mm; margin-bottom: 2mm; }
+    .hdr-logo { font-size: 16px; font-weight: 900; letter-spacing: -1px; color: #1dbf8e !important; }
+    .hdr-info { font-size: 6.5px; line-height: 1.5; color: #444; text-align: right; }
+    .tipo { font-size: 8px; font-weight: 700; text-align: center; border: 1px solid #ccc; padding: 1.5mm; margin-bottom: 2mm; text-transform: uppercase; color: #555; }
+    .ot-block { display: flex; align-items: center; justify-content: space-between; border: 2.5px solid #000; padding: 2mm 3mm; margin-bottom: 2mm; }
+    .ot-label { font-size: 7px; font-weight: 700; text-transform: uppercase; color: #555; }
+    .ot-num { font-size: 24px; font-weight: 900; letter-spacing: -1px; line-height: 1.1; }
+    .track-num { font-size: 9px; font-weight: 700; font-family: 'Courier New', monospace; color: #333; margin-top: 1mm; }
+    .dest-label { font-size: 7px; font-weight: 700; text-transform: uppercase; color: #555; margin-bottom: 1mm; }
+    .dest { font-size: 12px; font-weight: 900; text-align: center; text-transform: uppercase; background: #f0f0f0 !important; padding: 2mm; margin-bottom: 2mm; line-height: 1.3; border: 1px solid #ccc; }
+    .row { display: flex; align-items: baseline; gap: 2mm; margin-bottom: 1.2mm; }
+    .lbl { font-weight: 700; font-size: 8px; min-width: 22mm; color: #555; text-transform: uppercase; flex-shrink: 0; }
+    .val { font-size: 10px; font-weight: 700; color: #000; }
+    .divider { border-top: 1px solid #ccc; margin: 2mm 0; }
+    .footer { margin-top: auto; border-top: 1.5px solid #000; padding-top: 1.5mm; }
+    .footer-lbl { font-size: 7px; font-weight: 700; color: #555; text-transform: uppercase; }
+    .footer-val { font-size: 7.5px; color: #333; margin-top: 0.5mm; }
+    .btn-print { display: block; width: 95mm; margin: 6px auto 0; padding: 9px; background: #1dbf8e; color: #fff; border: none; font-size: 13px; font-weight: 700; cursor: pointer; border-radius: 5px; font-family: Arial, sans-serif; }
+    @media print { .btn-print { display: none !important; } }
+  </style>
+  </head><body>
+  ${rotulosHTML}
+  <button class="btn-print" onclick="window.print()">🖨️ Imprimir ${envios.length > 1 ? envios.length + ' rótulos' : 'rótulo'}</button>
+  <script>window.onafterprint = () => window.close();<\/script>
+  </body></html>`);
+  w.document.close();
+}
+
 async function printRotuloDevolucion(id){
   const{data:rawRD}=await sb.from('sf_workorders').select('*').eq('id',id).single();
   if(!rawRD||!rawRD.tracking_devolucion){ alert('Esta OT no tiene tracking de retorno cargado. Primero cargá el tracking.'); return; }
