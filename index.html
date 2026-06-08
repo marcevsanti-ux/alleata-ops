@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v3.5.7</title>
+<title>Alleata · Operaciones v3.5.8</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -407,7 +407,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v3.5.7 · 07 jun 2026
+      v3.5.8 · 07 jun 2026
     </div>
   </div>
 </div>
@@ -481,7 +481,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v3.5.7 · 07 jun 2026
+      v3.5.8 · 07 jun 2026
     </div>
   </div>
 </nav>
@@ -510,7 +510,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         SF Sync
       </button>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v3.5.7</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v3.5.8</div>
   </div>
   <div class="content">
 
@@ -1550,7 +1550,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
                 <th>Terminal</th>
                 <th>Comercio</th>
                 <th>Monto</th>
-                <th>Acciones</th>
+                <th style="min-width:120px">SF / Log</th>
               </tr>
             </thead>
             <tbody id="buscar-body"></tbody>
@@ -4111,7 +4111,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v3.5.7] OK');
+console.log('[Alleata v3.5.8] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -8256,7 +8256,7 @@ function buildBuscarRow(t){
   else if(t.isDeny) badge='<span class="badge badge-red">DENEGADA</span>';
   else badge='<span class="badge badge-green">APROBADA</span>';
   const af=t.antifraudTimeout?'<span class="antifraud-tag" title="Antifraud Timeout">⚠</span>':'';
-  const ticketBtn=t.isDeny&&t.lineStart?`<button class="btn-copy" onclick="goTicket('${t.ts}','${t.node}','${t.store}')">Ver ticket</button>`:'—';
+  const ticketBtn=t.isDeny?`<button class="btn-copy" onclick="goTicket('${t.ts}','${t.node}','${t.store}')">🎫</button>`:'<span style="color:var(--text-muted)">—</span>';
   let extractBtn='<span style="color:var(--text-muted);font-size:10px" title="Subí el log de nuevo para guardar el extracto">sin log</span>';
   if(t.lineStart){
     // Log cargado en memoria
@@ -8268,7 +8268,7 @@ function buildBuscarRow(t){
   const date=(t.ts||'—').split(' ')[0]||'—';
   const time=(t.ts||'—').split(' ')[1]||t.ts||'—';
   // Botón match SF
-  const sfBtn = (t.node||t.store) ? `<button class="btn-copy" style="background:rgba(29,191,142,.1);color:var(--teal);border-color:rgba(29,191,142,.2);margin-top:3px" onclick="napseMatchSF('${t.serialNumber||''}','${t.node||''}','${t.store||''}',this)">☁ SF</button>` : '';
+  const sfBtn = (t.node||t.store) ? `<button class="btn-copy" style="background:rgba(29,191,142,.1);color:var(--teal);border-color:rgba(29,191,142,.2)" onclick="napseMatchSF('${t.serialNumber||''}','${t.node||''}','${t.store||''}',this)">☁ SF</button>` : '';
   return `<tr class="${t.isDeny?'row-deny':''}" id="napse-row-${t.trxRef||t.ts||Math.random()}">
     <td class="mono" style="font-size:11px"><div style="color:var(--text-muted)">${date}</div><div style="color:var(--text-muted);opacity:.7;font-size:10px">${time}</div></td>
     <td>${badge}${af}</td>
@@ -8280,13 +8280,7 @@ function buildBuscarRow(t){
     <td class="mono">${t.serialNumber||'—'}</td>
     <td class="mono">${t.businessNumber||'—'}</td>
     <td class="mono">${t.amount||'—'}</td>
-    <td style="white-space:nowrap">
-      <div style="display:flex;flex-direction:column;gap:3px;align-items:flex-start">
-        ${ticketBtn}
-        ${extractBtn}
-        ${sfBtn}
-      </div>
-    </td>
+    <td style="white-space:nowrap;vertical-align:middle">${ticketBtn}${extractBtn ? ' '+extractBtn : ''} ${sfBtn}</td>
   </tr>`;
 }
 
