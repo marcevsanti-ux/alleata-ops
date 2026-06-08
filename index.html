@@ -65,7 +65,7 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;min-h
              var(--navy-900);}
 .login-box{background:var(--navy-800);border:1px solid var(--border2);border-radius:16px;padding:40px;width:100%;max-width:400px;box-shadow:var(--shadow-lg);}
 .login-logo{display:flex;flex-direction:column;align-items:center;margin-bottom:28px;gap:10px;}
-.login-logo img{height:52px;}
+.login-logo img{height:52px;filter:brightness(0) invert(1);}
 .login-divider{width:40px;height:2px;background:var(--grad);border-radius:2px;}
 .login-sub{font-size:11px;color:var(--text-muted);letter-spacing:2px;text-transform:uppercase;font-weight:600;}
 .field{margin-bottom:14px;}
@@ -101,7 +101,7 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;min-h
 #sb-toggle-icon{transition:transform .22s;}
 .sidebar.collapsed #sb-toggle-icon{transform:rotate(180deg);}
 .sidebar-logo{padding:20px 18px 16px;border-bottom:1px solid var(--border);}
-.logo-img{height:32px;}
+.logo-img{height:32px;mix-blend-mode:multiply;filter:brightness(0) invert(1);}
 .logo-tagline{font-size:9px;color:var(--text-muted);letter-spacing:2px;text-transform:uppercase;margin-top:8px;font-weight:500;}
 .nav{flex:1;padding:8px 0;overflow-y:auto;}
 .nav-section{font-size:9px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:var(--navy-500);padding:14px 18px 4px;}
@@ -7149,10 +7149,18 @@ function _imprimirRotuloHTML(envios) {
   }
 
   const rotulosHTML = envios.map(e => {
-    const trackUrl = e.track
-      ? `https://www.correoargentino.com.ar/formularios/e-commerce?id=${e.track}`
-      : null;
-    const qrSrc = trackUrl ? makeQRDataUrl(trackUrl, 80) : '';
+    // QR: si tiene tracking CA → URL tracking, sino → Google Maps con la dirección
+    let qrTarget = null;
+    let qrLabel = '';
+    if (e.track) {
+      qrTarget = `https://www.correoargentino.com.ar/formularios/e-commerce?id=${e.track}`;
+      qrLabel = 'Tracking CA';
+    } else if (e.direccion_completa || e.ciudad) {
+      const addr = encodeURIComponent([e.direccion_completa, e.ciudad, e.provincia, 'Argentina'].filter(Boolean).join(', '));
+      qrTarget = `https://maps.google.com/?q=${addr}`;
+      qrLabel = 'Ver en Maps';
+    }
+    const qrSrc = qrTarget ? makeQRDataUrl(qrTarget, 80) : '';
 
     return `
     <div class="rotulo">
@@ -7167,7 +7175,7 @@ function _imprimirRotuloHTML(envios) {
           <div class="ot-num">${e.ot_numero || '—'}</div>
           ${e.track ? `<div class="track-num">Track: ${e.track}</div>` : '<div class="track-num" style="color:#aaa">Sin tracking</div>'}
         </div>
-        ${qrSrc ? `<div style="text-align:center"><img src="${qrSrc}" width="72" height="72" style="display:block;"><div style="font-size:6px;font-weight:700;margin-top:2px;text-transform:uppercase;">Tracking CA</div></div>` : ''}
+        ${qrSrc ? `<div style="text-align:center"><img src="${qrSrc}" width="72" height="72" style="display:block;"><div style="font-size:6px;font-weight:700;margin-top:2px;text-transform:uppercase;">${qrLabel}</div></div>` : ''}
       </div>
       <div class="dest-label">DESTINATARIO</div>
       <div class="dest">${e.cuenta || '—'}</div>
