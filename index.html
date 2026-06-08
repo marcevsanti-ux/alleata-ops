@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v3.5.2</title>
+<title>Alleata · Operaciones v3.5.3</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -407,7 +407,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v3.5.2 · 07 jun 2026
+      v3.5.3 · 07 jun 2026
     </div>
   </div>
 </div>
@@ -481,7 +481,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v3.5.2 · 07 jun 2026
+      v3.5.3 · 07 jun 2026
     </div>
   </div>
 </nav>
@@ -510,7 +510,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         SF Sync
       </button>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v3.5.2</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v3.5.3</div>
   </div>
   <div class="content">
 
@@ -4113,7 +4113,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v3.5.2] OK');
+console.log('[Alleata v3.5.3] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -7824,6 +7824,7 @@ async function saveToSupabase(transactions, filename) {
     trx_ref:          t.trxRef || null,
     antifraud_timeout: t.antifraudTimeout || false,
     is_deny:          t.isDeny || false,
+    log_extract:      t.logExtract || null,
   }));
   try {
     const {data, error} = await sb.from('napse_transactions').upsert(rows, {
@@ -8025,11 +8026,20 @@ function napseParseLog(text, filename){
     // Store line range for log extraction
     const lineStart=blockStart;
     const lineEnd=Math.min(lines.length-1, i+15);
+    // Calcular extracto del log para guardar en Supabase
+    let logExtract=null;
+    try{
+      let r0=req0200?.line0200>0?req0200.line0200:Math.max(0,blockStart-10);
+      if(!req0200?.line0200){for(let _x=blockStart;_x>=Math.max(0,blockStart-800);_x--){const _l=lines[_x]||'';if(_l.includes('Sending message to [')&&_l.includes('INFO')){r0=_x;break;}if(_l.match(/Node:\d+ Operation id: \d+/)){r0=_x;break;}}}
+      let _end=Math.min(lines.length-1,i+40);
+      for(let _x=i;_x<=Math.min(lines.length-1,i+50);_x++){if((lines[_x]||'').includes('Response Message.')){_end=Math.min(lines.length-1,_x+5);break;}}
+      logExtract=lines.slice(r0,_end+1).join('\n');
+    }catch(_e){}
     transactions.push({
       lineStart, lineEnd,
       ts,isDeny,node,store,isoCode,maskedCard,serialNumber,businessNumber,responseMessage,
       hostName,issuerName,rrn,ticket,trxRef,clientDate,
-      antifraudTimeout,opRejected,...req0200
+      antifraudTimeout,opRejected,logExtract,...req0200
     });
   }
 
@@ -8234,7 +8244,14 @@ function buildBuscarRow(t){
   else badge='<span class="badge badge-green">APROBADA</span>';
   const af=t.antifraudTimeout?'<span class="antifraud-tag">⚠ Timeout</span>':'<span style="color:var(--text-muted);font-size:11px">—</span>';
   const ticketBtn=t.isDeny&&t.lineStart?`<button class="btn-copy" onclick="goTicket('${t.ts}','${t.node}','${t.store}')">Ver ticket</button>`:'—';
-  const extractBtn=t.lineStart?`<button class="btn-copy" style="background:rgba(26,159,212,.1);color:#7dd3f0;border-color:rgba(26,159,212,.2)" onclick="downloadExtract(${t.lineStart},${t.lineEnd},'${(t.ts||'').replace(/[: ,]/g,'-')}','${t.node||''}','${t.store||''}',${t.line0200||0})">⬇ Log</button>`:'—';
+  let extractBtn='—';
+  if(t.lineStart){
+    // Log cargado en memoria
+    extractBtn=`<button class="btn-copy" style="background:rgba(26,159,212,.1);color:#7dd3f0;border-color:rgba(26,159,212,.2)" onclick="downloadExtract(${t.lineStart},${t.lineEnd},'${(t.ts||'').replace(/[: ,]/g,'-')}','${t.node||''}','${t.store||''}',${t.line0200||0})">⬇ Log</button>`;
+  } else if(t.logExtract){
+    // Extracto guardado en Supabase
+    extractBtn=`<button class="btn-copy" style="background:rgba(26,159,212,.1);color:#7dd3f0;border-color:rgba(26,159,212,.2)" onclick="napseDownloadStoredExtract(${JSON.stringify(t.logExtract).replace(/"/g,'&quot;')},'${(t.ts||'').replace(/[: ,]/g,'-')}','${t.node||''}','${t.store||''}')">⬇ Log</button>`;
+  }
   const date=(t.ts||'—').split(' ')[0]||'—';
   const time=(t.ts||'—').split(' ')[1]||t.ts||'—';
   return `<tr class="${t.isDeny?'row-deny':''}">
@@ -8297,7 +8314,8 @@ async function napseRenderBuscar(){
         issuerName: t.issuer_name, hostName: t.host_name,
         serialNumber: t.serial_number, businessNumber: t.business_number,
         amount: t.amount, antifraudTimeout: t.antifraud_timeout,
-        lineStart:0, lineEnd:0, line0200:0
+        lineStart:0, lineEnd:0, line0200:0,
+        logExtract: t.log_extract || null
       }));
       document.getElementById('buscar-body').innerHTML=rows.length?rows.join(''):'<tr><td colspan="13" style="text-align:center;padding:2rem;color:var(--text-muted)">Sin resultados en el historial</td></tr>';
       document.getElementById('buscar-count').textContent=`${(data||[]).length} registros del historial`;
@@ -8588,6 +8606,24 @@ function napseSetupDropZone(){
   dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('drag');});
   dz.addEventListener('dragleave',()=>dz.classList.remove('drag'));
   dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('drag');if(e.dataTransfer.files[0]) napseReadFile(e.dataTransfer.files[0]);});
+}
+
+// ── NAPSE: descargar extracto guardado desde Supabase ──────────────────────
+function napseDownloadStoredExtract(extract, ts, node, store){
+  const header = [
+    '=== EXTRACTO DE LOG VTOL — ALLEATA OPS ===',
+    'Generado:  ' + new Date().toLocaleString('es-AR'),
+    'Node:      ' + node + '  |  Store: ' + store,
+    'Timestamp: ' + ts.replace(/-/g,' '),
+    '(extracto guardado en historial)',
+    '==========================================',
+    ''
+  ].join('\n');
+  const blob = new Blob([header + extract], {type:'text/plain;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'log_' + node + '_' + store + '_' + ts + '.txt';
+  a.click(); URL.revokeObjectURL(url);
 }
 
 // ══ FIN MÓDULO NAPSE ═════════════════════════════════════════════════════
