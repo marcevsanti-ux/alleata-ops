@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v3.5.3</title>
+<title>Alleata · Operaciones v3.5.4</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -407,7 +407,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v3.5.3 · 07 jun 2026
+      v3.5.4 · 07 jun 2026
     </div>
   </div>
 </div>
@@ -481,7 +481,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v3.5.3 · 07 jun 2026
+      v3.5.4 · 07 jun 2026
     </div>
   </div>
 </nav>
@@ -510,7 +510,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         SF Sync
       </button>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v3.5.3</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v3.5.4</div>
   </div>
   <div class="content">
 
@@ -4113,7 +4113,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v3.5.3] OK');
+console.log('[Alleata v3.5.4] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -8027,13 +8027,29 @@ function napseParseLog(text, filename){
     const lineStart=blockStart;
     const lineEnd=Math.min(lines.length-1, i+15);
     // Calcular extracto del log para guardar en Supabase
+    // Misma lógica que downloadExtract: desde line0200 hasta "Response Message." + 5
     let logExtract=null;
     try{
-      let r0=req0200?.line0200>0?req0200.line0200:Math.max(0,blockStart-10);
-      if(!req0200?.line0200){for(let _x=blockStart;_x>=Math.max(0,blockStart-800);_x--){const _l=lines[_x]||'';if(_l.includes('Sending message to [')&&_l.includes('INFO')){r0=_x;break;}if(_l.match(/Node:\d+ Operation id: \d+/)){r0=_x;break;}}}
-      let _end=Math.min(lines.length-1,i+40);
-      for(let _x=i;_x<=Math.min(lines.length-1,i+50);_x++){if((lines[_x]||'').includes('Response Message.')){_end=Math.min(lines.length-1,_x+5);break;}}
-      logExtract=lines.slice(r0,_end+1).join('\n');
+      // Inicio: la línea del 0200 (Sending message to [...]) ya calculada por el parser
+      let r0 = (req0200 && req0200.line0200 > 0) ? req0200.line0200 : null;
+      if(r0 === null){
+        // Fallback: buscar hacia atrás desde blockStart
+        r0 = Math.max(0, blockStart - 10);
+        for(let _x=blockStart; _x>=Math.max(0,blockStart-800); _x--){
+          const _l=lines[_x]||'';
+          if(_l.includes('Sending message to [') && _l.includes('INFO')){ r0=_x; break; }
+          if(_l.match(/Node:\d+ Operation id: \d+/)){ r0=_x; break; }
+        }
+      }
+      // Fin: buscar "Response Message." desde i hacia adelante
+      let _end = Math.min(lines.length-1, i+25);
+      for(let _x=i; _x<=Math.min(lines.length-1,i+35); _x++){
+        if((lines[_x]||'').includes('Response Message.')){
+          _end = Math.min(lines.length-1, _x+5);
+          break;
+        }
+      }
+      if(r0 <= _end) logExtract = lines.slice(r0, _end+1).join('\n');
     }catch(_e){}
     transactions.push({
       lineStart, lineEnd,
