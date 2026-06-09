@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Seguimiento OTs — Angel Flores</title>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
 <style>
 :root {
   --navy-900:#0d1b2a;--navy-800:#112236;--navy-700:#162d45;--navy-600:#1a3550;
@@ -122,7 +123,7 @@ tr.hidden-row{display:none}
   <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
     <div class="drop-icon">📊</div>
     <div class="drop-title">Cargá el reporte de Salesforce</div>
-    <div class="drop-sub">Arrastrá el archivo acá o hacé clic para seleccionar<br>Formato .xls exportado desde SF</div>
+    <div class="drop-sub">Arrastrá el archivo acá o hacé clic para seleccionar<br>Formato .xlsx o .xls exportado desde SF</div>
     <input type="file" id="file-input" accept=".xls,.xlsx,.html,.htm" onchange="handleFile(event)">
   </div>
   <div class="import-hint">
@@ -182,9 +183,9 @@ tr.hidden-row{display:none}
 </div>
 
 <script>
-const AGENT_URL    = 'https://alleata-agent-production.up.railway.app';
-const AGENT_SECRET = '123456';
-const CA_TRACK_URL = 'https://www.correoargentino.com.ar/formularios/olvw?id=';
+const CA_TRACK_URL  = 'https://www.correoargentino.com.ar/formularios/olvw?id=';
+const SUPABASE_URL  = 'https://njkstpfmcfhqxdadqbdy.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 
 let ots = [];
 let filtroEstado = 'all';
@@ -194,94 +195,117 @@ function handleFile(evt) { processFile(evt.target.files[0]); }
 
 function processFile(file) {
   if (!file) return;
-  const reader = new FileReader();
-  reader.onload = function(e) {
-    try {
-      const content = e.target.result;
-
-      // Regex-based parser — works with SF's malformed HTML-as-XLS
-      function extractCells(rowHtml, tag) {
-        const re = new RegExp('<' + tag + '[^>]*>([\\s\\S]*?)<\/' + tag + '>', 'gi');
-        const cells = [];
-        let m;
-        while ((m = re.exec(rowHtml)) !== null) {
-          cells.push(m[1].replace(/<[^>]+>/g,'').trim().replace(/\s+/g,' '));
+  const name = file.name.toLowerCase();
+  // Real xlsx/xls → SheetJS; HTML-as-xls de SF → parser HTML
+  if (name.endsWith('.xlsx')) {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      try {
+        const wb = XLSX.read(e.target.result, { type: 'array' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(ws, { header: 1 });
+        if (!rows.length) { alert('Planilla vacía.'); return; }
+        const headers = rows[0].map(h => String(h || '').trim());
+        const idx = buildIdx(headers);
+        const data = [];
+        for (let i = 1; i < rows.length; i++) {
+          const r = rows[i];
+          const get = j => (j >= 0 && j < r.length) ? String(r[j] || '').trim() : '';
+          const otNum = get(idx.ot);
+          if (!otNum || otNum.length < 3) continue;
+          data.push({
+            ot: otNum, tracking: get(idx.tracking), cuenta: get(idx.cuenta),
+            ciudad: get(idx.ciudad), estado_sf: get(idx.estado),
+            observaciones: get(idx.observaciones), zona: get(idx.zona),
+            fecha: get(idx.fecha), estado_ca: null, ultimo_evento: null, ultimo_fecha: null,
+          });
         }
-        return cells;
-      }
+        if (!data.length) { alert('No se encontraron OTs.'); return; }
+        loadOTs(data, file.name);
+      } catch(err) { alert('Error leyendo xlsx: ' + err.message); }
+    };
+    reader.readAsArrayBuffer(file);
+  } else {
+    // HTML-as-XLS de SF (latin-1)
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      try { parseHtmlXls(e.target.result, file.name); }
+      catch(err) { alert('Error leyendo el archivo: ' + err.message); }
+    };
+    reader.readAsText(file, 'latin-1');
+  }
+}
 
-      const trRe = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
-      const trBlocks = [];
-      let tm;
-      while ((tm = trRe.exec(content)) !== null) trBlocks.push(tm[0]);
-
-      if (!trBlocks.length) { alert('No se encontraron filas en el archivo. Verificá el formato.'); return; }
-
-      // Headers from first row (th or td)
-      const rawHeaders = extractCells(trBlocks[0], 'th');
-      const headers = rawHeaders.length ? rawHeaders : extractCells(trBlocks[0], 'td');
-      if (!headers.length) { alert('No se encontraron encabezados.'); return; }
-
-      // Map column indices
-      const idx = {
-        fecha:         findCol(headers, ['Fecha de creaci']),
-        estado:        findCol(headers, ['Estado']),
-        cuenta:        findCol(headers, ['Nombre de la cuenta','cuenta']),
-        ot:            findCol(headers, ['mero de orden de trabajo','Numero de orden','Número de orden']),
-        zona:          findCol(headers, ['zona','Zona']),
-        gestion:       findCol(headers, ['Gesti']),
-        tracking:      findCol(headers, ['seguimiento']),
-        observaciones: findCol(headers, ['Observaciones','observaciones']),
-        direccion:     findCol(headers, ['Calle','calle']),
-        ciudad:        findCol(headers, ['Ciudad','ciudad']),
-        responsable:   findCol(headers, ['Responsable','responsable']),
-      };
-
-      // If OT column not found by partial, try exact positions (SF report col 4)
-      if (idx.ot < 0) idx.ot = 4;
-      if (idx.tracking < 0) idx.tracking = 8;
-      if (idx.estado < 0) idx.estado = 2;
-      if (idx.cuenta < 0) idx.cuenta = 3;
-      if (idx.ciudad < 0) idx.ciudad = 12;
-      if (idx.zona < 0) idx.zona = 6;
-      if (idx.fecha < 0) idx.fecha = 0;
-      if (idx.observaciones < 0) idx.observaciones = 10;
-
-      const data = [];
-      for (let i = 1; i < trBlocks.length; i++) {
-        const cells = extractCells(trBlocks[i], 'td');
-        if (!cells.length) continue;
-        const get = (j) => (j >= 0 && j < cells.length) ? cells[j] : '';
-        const otNum = get(idx.ot);
-        if (!otNum || otNum.length < 3) continue;
-        data.push({
-          ot:            otNum,
-          tracking:      get(idx.tracking),
-          cuenta:        get(idx.cuenta),
-          ciudad:        get(idx.ciudad),
-          estado_sf:     get(idx.estado),
-          observaciones: get(idx.observaciones),
-          zona:          get(idx.zona),
-          fecha:         get(idx.fecha),
-          estado_ca:     null,
-          ultimo_evento: null,
-          ultimo_fecha:  null,
-        });
-      }
-
-      if (!data.length) { alert('No se encontraron OTs en el archivo. Verificá el formato.'); return; }
-
-      ots = data;
-      document.getElementById('file-name-chip').textContent = file.name;
-      document.getElementById('import-screen').style.display = 'none';
-      document.getElementById('app-screen').style.display = 'block';
-      renderAll();
-
-    } catch(err) {
-      alert('Error leyendo el archivo: ' + err.message);
+function buildIdx(headers) {
+  const find = names => {
+    for (const n of names) {
+      const i = headers.findIndex(h => h.toLowerCase().includes(n.toLowerCase()));
+      if (i >= 0) return i;
     }
+    return -1;
   };
-  reader.readAsText(file, 'latin-1');
+  return {
+    fecha:         find(['Fecha de creaci']),
+    estado:        find(['Estado']),
+    cuenta:        find(['Nombre de la cuenta', 'cuenta']),
+    ot:            find(['mero de orden de trabajo', 'Numero de orden', 'Número de orden']),
+    zona:          find(['zona', 'Zona']),
+    tracking:      find(['seguimiento']),
+    observaciones: find(['Observaciones', 'observaciones']),
+    ciudad:        find(['Ciudad', 'ciudad']),
+  };
+}
+
+function parseHtmlXls(content, fileName) {
+  function extractCells(rowHtml, tag) {
+    const re = new RegExp('<' + tag + '[^>]*>([\s\S]*?)<\/' + tag + '>', 'gi');
+    const cells = [];
+    let m;
+    while ((m = re.exec(rowHtml)) !== null)
+      cells.push(m[1].replace(/<[^>]+>/g, '').trim().replace(/\s+/g, ' '));
+    return cells;
+  }
+  const trRe = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
+  const trBlocks = [];
+  let tm;
+  while ((tm = trRe.exec(content)) !== null) trBlocks.push(tm[0]);
+  if (!trBlocks.length) { alert('No se encontraron filas en el archivo. Verificá el formato.'); return; }
+  const rawHeaders = extractCells(trBlocks[0], 'th');
+  const headers    = rawHeaders.length ? rawHeaders : extractCells(trBlocks[0], 'td');
+  if (!headers.length) { alert('No se encontraron encabezados.'); return; }
+  const idx = buildIdx(headers);
+  if (idx.ot < 0) idx.ot = 4;
+  if (idx.tracking < 0) idx.tracking = 8;
+  if (idx.estado < 0) idx.estado = 2;
+  if (idx.cuenta < 0) idx.cuenta = 3;
+  if (idx.ciudad < 0) idx.ciudad = 12;
+  if (idx.zona < 0) idx.zona = 6;
+  if (idx.fecha < 0) idx.fecha = 0;
+  if (idx.observaciones < 0) idx.observaciones = 10;
+  const data = [];
+  for (let i = 1; i < trBlocks.length; i++) {
+    const cells = extractCells(trBlocks[i], 'td');
+    if (!cells.length) continue;
+    const get = j => (j >= 0 && j < cells.length) ? cells[j] : '';
+    const otNum = get(idx.ot);
+    if (!otNum || otNum.length < 3) continue;
+    data.push({
+      ot: otNum, tracking: get(idx.tracking), cuenta: get(idx.cuenta),
+      ciudad: get(idx.ciudad), estado_sf: get(idx.estado),
+      observaciones: get(idx.observaciones), zona: get(idx.zona),
+      fecha: get(idx.fecha), estado_ca: null, ultimo_evento: null, ultimo_fecha: null,
+    });
+  }
+  if (!data.length) { alert('No se encontraron OTs en el archivo. Verificá el formato.'); return; }
+  loadOTs(data, fileName);
+}
+
+function loadOTs(data, fileName) {
+  ots = data;
+  document.getElementById('file-name-chip').textContent = fileName;
+  document.getElementById('import-screen').style.display = 'none';
+  document.getElementById('app-screen').style.display    = 'block';
+  renderAll();
 }
 
 function findCol(headers, names) {
@@ -399,17 +423,59 @@ function applyFilters() {
   document.getElementById('empty-state').style.display = visible === 0 ? 'block' : 'none';
 }
 
-// ── AUTOTRACKING ──────────────────────────────────────────────────────────────
-function mapearEstadoCA(historia) {
-  if (!historia) return null;
-  const h = historia.toUpperCase();
-  if (h.includes('ENTREGADO') || h.includes('ENTREGA OK')) return 'Entregado';
+// ── AUTOTRACKING — via Supabase ca-proxy ─────────────────────────────────────
+function mapearEstadoCA(historia, estadoCA) {
+  const h = (historia || '').toUpperCase();
+  const e = (estadoCA || '').toUpperCase();
+  if (e === 'ENTREGADO' || e.includes('ENTREGA EN SUCURSAL') || e.includes('ENTREGA EFECTUADA')) return 'Entregado';
+  if (h.includes('ENTREGADO') || h.includes('ENTREGA OK') || h.includes('ENTREGA EFECTUADA')) return 'Entregado';
   if (h.includes('DEVUELTO') || h.includes('DEVOLUCION')) return 'Devuelto';
-  if (h.includes('EN ESPERA EN SUCURSAL') || h.includes('SUCURSAL')) return 'En sucursal';
-  if (h.includes('EN PODER DEL DISTRIBUIDOR') || h.includes('DISTRIBUIDOR')) return 'En camino';
-  if (h.includes('CENTRO DE PROCESAMIENTO') || h.includes('CLASIFICAC')) return 'En camino';
-  if (h.includes('INGRESO AL CORREO') || h.includes('INGRESO')) return 'En tránsito';
-  return 'En tránsito';
+  if (h.includes('EN ESPERA EN SUCURSAL')) return 'En sucursal';
+  if (h.includes('EN PODER DEL DISTRIBUIDOR') || h.includes('INTENTO DE ENTREGA')) return 'En camino';
+  if (h.includes('CENTRO DE PROCESAMIENTO') || h.includes('CLASIFIC') || h.includes('LLEGADA AL CENTRO')) return 'En tránsito';
+  if (h.includes('INGRESO AL CORREO') || h.includes('REPESAJE') || h.includes('PREIMPOSICION')) return 'En tránsito';
+  if (h.includes('PERDIDO')) return 'Perdido';
+  if (e.includes('RETORNANDO') || h.includes('DEMORADO')) return 'Fallido';
+  if (h) return 'En tránsito';
+  return null;
+}
+
+async function fetchTrackingCA(trackNum) {
+  const resp = await fetch(`${SUPABASE_URL}/functions/v1/ca-proxy`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON}` },
+    body: JSON.stringify({ shippingId: trackNum.trim() })
+  });
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  const json = await resp.json();
+  if (json.error) throw new Error(json.error);
+  const html = json.html || '';
+  const eventos = [];
+  try {
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    doc.querySelectorAll('tbody tr').forEach(row => {
+      const tds = row.querySelectorAll('td');
+      if (tds.length >= 3) eventos.push({
+        fecha:    (tds[0]?.textContent || '').replace(/\s+/g, ' ').trim(),
+        planta:   (tds[1]?.textContent || '').replace(/\s+/g, ' ').trim(),
+        historia: (tds[2]?.textContent || '').replace(/\s+/g, ' ').trim(),
+        estadoCA: (tds[3]?.textContent || '').replace(/\s+/g, ' ').trim(),
+      });
+    });
+  } catch(_) {}
+  // Fallback regex si el HTML de CA está malformado
+  if (!eventos.length) {
+    const re = /<td[^>]*>([\s\S]*?)<\/td>/gi;
+    const cells = [];
+    let m;
+    while ((m = re.exec(html)) !== null)
+      cells.push(m[1].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim());
+    for (let i = 0; i + 2 < cells.length; i += 4) {
+      if (cells[i].match(/\d{2}\/\d{2}\/\d{4}/))
+        eventos.push({ fecha: cells[i], planta: cells[i+1], historia: cells[i+2], estadoCA: cells[i+3] || '' });
+    }
+  }
+  return eventos;
 }
 
 async function runAutotracking() {
@@ -429,41 +495,41 @@ async function runAutotracking() {
   for (const o of conTracking) {
     const idx = ots.indexOf(o);
     try {
-      const res = await fetch(`${AGENT_URL}/ca/tracking`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-automation-secret': AGENT_SECRET },
-        body: JSON.stringify({ tracking: o.tracking, ot: o.ot })
-      });
-      const data = await res.json();
-      if (data && (data.ok !== false) && (data.estado || data.historia_ca)) {
-        ots[idx].estado_ca     = data.estado || mapearEstadoCA(data.historia_ca);
-        ots[idx].ultimo_evento = data.historia_ca || data.estado;
-        ots[idx].ultimo_fecha  = data.ultimo_evento_fecha || '';
-        const badge    = document.getElementById(`ca-badge-${idx}`);
-        const eventoEl = document.getElementById(`ca-evento-${idx}`);
-        if (badge) {
-          badge.className   = `estado ${estadoClass(ots[idx].estado_ca)}`;
-          badge.textContent = ots[idx].estado_ca;
-        }
-        if (eventoEl && ots[idx].ultimo_evento) {
-          eventoEl.innerHTML = `<div class="ca-evento"><strong>${ots[idx].ultimo_evento}</strong></div><div class="ca-fecha">${ots[idx].ultimo_fecha}</div>`;
-        }
+      const eventos = await fetchTrackingCA(o.tracking);
+      if (eventos.length) {
+        const ultimo = eventos[0];
+        ots[idx].estado_ca     = mapearEstadoCA(ultimo.historia, ultimo.estadoCA) || ultimo.estadoCA || ultimo.historia || 'En tránsito';
+        ots[idx].ultimo_evento = ultimo.estadoCA ? `${ultimo.historia} — ${ultimo.estadoCA}` : ultimo.historia;
+        ots[idx].ultimo_fecha  = ultimo.fecha;
+      } else {
+        ots[idx].estado_ca     = null;
+        ots[idx].ultimo_evento = 'Sin eventos registrados';
+        ots[idx].ultimo_fecha  = '';
+      }
+      const badge    = document.getElementById(`ca-badge-${idx}`);
+      const eventoEl = document.getElementById(`ca-evento-${idx}`);
+      if (badge) {
+        badge.className   = `estado ${estadoClass(ots[idx].estado_ca || '')}`;
+        badge.textContent = ots[idx].estado_ca || '—';
+      }
+      if (eventoEl && ots[idx].ultimo_evento) {
+        eventoEl.innerHTML = `<div class="ca-evento"><strong>${ots[idx].ultimo_evento}</strong></div><div class="ca-fecha">${ots[idx].ultimo_fecha}</div>`;
       }
     } catch(e) {
       console.warn(`Error tracking ${o.ot}:`, e.message);
       const badge = document.getElementById(`ca-badge-${idx}`);
-      if(badge){ badge.className='estado sin-tracking'; badge.textContent='Error CA'; }
+      if (badge) { badge.className = 'estado sin-tracking'; badge.textContent = 'Error CA'; }
     }
 
     procesadas++;
     progFill.style.width  = Math.round((procesadas / conTracking.length) * 100) + '%';
     progLabel.textContent = `${procesadas} / ${conTracking.length} OTs consultadas...`;
-    await new Promise(r => setTimeout(r, 120));
+    await new Promise(r => setTimeout(r, 150));
   }
 
   progFill.style.width  = '100%';
   progLabel.textContent = `✓ Completado — ${conTracking.length} OTs actualizadas`;
-  const now = new Date().toLocaleTimeString('es-AR', {hour:'2-digit',minute:'2-digit'});
+  const now = new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
   document.getElementById('last-update').textContent     = `Actualizado ${now}`;
   document.getElementById('last-update-top').textContent = `últ. ${now}`;
   btn.classList.remove('running');
