@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v3.8.1</title>
+<title>Alleata · Operaciones v3.8.2</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -509,6 +509,17 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <svg id="global-sf-sync-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
         Full Sync
       </button>
+      <div id="sf-sync-progress-panel" style="display:none;position:fixed;top:48px;right:12px;z-index:9999;background:var(--navy-800);border:1px solid rgba(29,191,142,.3);border-radius:10px;padding:14px 16px;min-width:260px;box-shadow:0 8px 32px rgba(0,0,0,.5);">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+          <span style="font-size:12px;font-weight:700;color:var(--teal);">Full Sync en curso</span>
+          <span id="sf-sync-elapsed" style="font-size:10px;color:var(--text-muted);font-family:'JetBrains Mono',monospace">0s</span>
+        </div>
+        <div id="sf-sync-steps" style="display:flex;flex-direction:column;gap:5px;margin-bottom:10px;"></div>
+        <div style="background:var(--navy-700);border-radius:4px;height:4px;overflow:hidden;">
+          <div id="sf-sync-bar" style="height:4px;background:linear-gradient(90deg,#1dbf8e,#1a9fd4);width:0%;transition:width .4s ease;border-radius:4px;"></div>
+        </div>
+        <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
+      </div>
     </div>
     <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v3.8.1</div>
   </div>
@@ -5648,9 +5659,9 @@ async function renderEnvios(){
   const isLogistica=currentProfile?.rol==='logistica';
   const filtroEstOrden=document.getElementById('envFiltroEstado')?.value||'';
 
-  // OTs de Envíos: Instalación Equipo+Simcard / Instalación Simcard / Asistencia Tecnica
-  // Activos: Pre-Colecta o Despachado, logística ALLEATA o CORREO ARGENTINO
-  const TIPOS_ENVIO = ['Instalación Equipo + Simcard','Instalación Simcard','Asistencia Tecnica'];
+  // OTs de Envíos: Instalación Equipo+Simcard / Instalación Simcard / Asistencia Tecnica / Cambio de Terminal (no-NAPSE)
+  // Activos: Pre-Colecta, Despachado, En Proceso
+  const TIPOS_ENVIO = ['Instalación Equipo + Simcard','Instalación Simcard','Asistencia Tecnica','Cambio de Terminal'];
 
   let query=sb.from('sf_workorders')
     .select('*')
@@ -5658,7 +5669,7 @@ async function renderEnvios(){
     .order('fecha_despacho',{ascending:false});
 
   // Estados activos: Pre-Colecta o Despachado — logística ALLEATA / CORREO ARGENTINO / CABIFY
-  const STATUSES_ACTIVOS = ['Pre-Colecta','Despachado'];
+  const STATUSES_ACTIVOS = ['Pre-Colecta','Despachado','En Proceso'];
   const LOG_MAP = {ALLEATA:'ALLEATA', CORREO:'CORREO ARGENTINO', CABIFY:'CABIFY'};
   const LOGS_CONOCIDAS = ['ALLEATA','CORREO ARGENTINO','CABIFY'];
   query=query.in('status', STATUSES_ACTIVOS);
@@ -5688,6 +5699,12 @@ async function renderEnvios(){
   if(_canalActivo==='OTROS'){
     list=list.filter(e=>!['ALLEATA','CORREO ARGENTINO','CABIFY'].includes((e.logistica||'').toUpperCase().trim()));
   }
+
+  // Excluir Cambio de Terminal NAPSE (pertenecen a Rollout, no a Envíos)
+  list = list.filter(e => !(
+    (e.record_type||e.tipo||'').trim() === 'Cambio de Terminal' &&
+    (e.perfil||'').trim().toUpperCase() === 'NAPSE'
+  ));
 
   // Filtro búsqueda local (OT, tracking, cuenta, responsable)
   const buscar=(document.getElementById('envBuscar')?.value||'').trim().toLowerCase();
@@ -7751,36 +7768,125 @@ async function sfCargarLogs() {
 async function globalSFSync() {
   const btn    = document.getElementById('global-sf-sync-btn');
   const icon   = document.getElementById('global-sf-sync-icon');
-  const status = document.getElementById('global-sf-sync-status');
+  const panel  = document.getElementById('sf-sync-progress-panel');
+  const steps  = document.getElementById('sf-sync-steps');
+  const bar    = document.getElementById('sf-sync-bar');
+  const elapsed= document.getElementById('sf-sync-elapsed');
+  const summary= document.getElementById('sf-sync-summary');
   if (!btn) return;
+
+  // Pasos simulados con tiempos aproximados
+  const STEPS = [
+    { label: '🔐 Autenticando con Salesforce',     pct: 10, delay: 0    },
+    { label: '📡 Consultando OTs activas (SOQL)',    pct: 30, delay: 2500 },
+    { label: '📦 Procesando ~2500 registros',        pct: 55, delay: 8000 },
+    { label: '💾 Guardando en base de datos',        pct: 80, delay: 18000},
+    { label: '🚀 CA Tracker sincronizando estados',  pct: 92, delay: 28000},
+  ];
+
   btn.disabled = true;
   if (icon) icon.style.animation = 'spin 0.7s linear infinite';
-  if (status) { status.style.display = 'block'; status.textContent = 'Sincronizando…'; }
+
+  // Mostrar panel
+  if (panel) { panel.style.display = 'block'; }
+  if (steps) steps.innerHTML = '';
+  if (bar)   bar.style.width = '0%';
+  if (summary) { summary.style.display = 'none'; summary.textContent = ''; }
+
+  // Timer de tiempo transcurrido
+  const t0 = Date.now();
+  const timerInterval = setInterval(() => {
+    if (elapsed) elapsed.textContent = Math.round((Date.now()-t0)/1000) + 's';
+  }, 1000);
+
+  // Ir mostrando pasos progresivamente
+  const stepTimeouts = [];
+  STEPS.forEach((step, i) => {
+    const t = setTimeout(() => {
+      // Marcar pasos anteriores como completados
+      if (steps) {
+        const prev = steps.querySelectorAll('.sync-step-pending');
+        prev.forEach(el => {
+          el.innerHTML = el.innerHTML.replace(/^[^\s]+/, '✅');
+          el.classList.remove('sync-step-pending');
+          el.style.color = 'var(--text-muted)';
+        });
+        const div = document.createElement('div');
+        div.className = 'sync-step-pending';
+        div.style.cssText = 'font-size:11px;color:var(--text);display:flex;align-items:center;gap:6px;';
+        div.innerHTML = `<span style="animation:spin .6s linear infinite;display:inline-block">⟳</span> ${step.label}`;
+        steps.appendChild(div);
+      }
+      if (bar) bar.style.width = step.pct + '%';
+    }, step.delay);
+    stepTimeouts.push(t);
+  });
+
   try {
     const res  = await fetch(`${SF_AGENT_URL}/automations/run/sf_sync`, {
       method: 'POST', headers: { 'x-automation-secret': SF_SYNC_SECRET }
     });
     const data = await res.json();
+
+    // Cancelar pasos pendientes y completar
+    stepTimeouts.forEach(clearTimeout);
+    clearInterval(timerInterval);
+    const totalSec = Math.round((Date.now()-t0)/1000);
+    if (elapsed) elapsed.textContent = totalSec + 's';
+
     if (data.ok || data.upserted !== undefined) {
-      // Actualizar el último sync en el topbar
+      // Marcar todos los pasos como completados
+      if (steps) {
+        steps.querySelectorAll('.sync-step-pending').forEach(el => {
+          el.innerHTML = el.innerHTML.replace(/^⟳/, '✅');
+          el.classList.remove('sync-step-pending');
+          el.style.color = 'var(--text-muted)';
+        });
+        // Paso final real
+        const done = document.createElement('div');
+        done.style.cssText = 'font-size:11px;color:var(--teal);font-weight:700;';
+        done.textContent = '✅ Sincronización completada';
+        steps.appendChild(done);
+      }
+      if (bar) bar.style.width = '100%';
+
+      // Resumen con datos reales
+      if (summary) {
+        summary.style.display = 'block';
+        const ots    = data.total    ?? data.upserted ?? '?';
+        const nuevas = data.upserted ?? '?';
+        summary.innerHTML = `
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;">
+            <span style="color:var(--text-muted)">OTs procesadas</span><span style="color:var(--text);font-weight:700">${ots}</span>
+            <span style="color:var(--text-muted)">Actualizadas</span><span style="color:var(--teal);font-weight:700">${nuevas}</span>
+            <span style="color:var(--text-muted)">Duración</span><span style="color:var(--text);font-weight:700">${totalSec}s</span>
+          </div>`;
+      }
+
+      // Actualizar topbar
       const lastSyncEl = document.getElementById('sf-last-sync');
       if (lastSyncEl) lastSyncEl.textContent = 'Último sync: ' + new Date().toLocaleString('es-AR',{day:'2-digit',month:'numeric',hour:'2-digit',minute:'2-digit'});
       sfActualizarProximoCron();
-      // Refrescar el módulo activo si es instalaciones o desinstalaciones
       const mod = document.querySelector('.nav-item.active')?.dataset?.mod;
       if (mod === 'instalaciones') initInstalaciones();
       if (mod === 'desinstalaciones') cargarDesinstalaciones();
       if (mod === 'rollout') initRollout?.();
-      if (mod === 'napse') napseInitApp?.();
-      setTimeout(() => { if (status) status.style.display = 'none'; }, 4000);
+      if (mod === 'envios') renderEnvios?.();
+
+      // Cerrar panel a los 6s
+      setTimeout(() => { if (panel) panel.style.display = 'none'; }, 6000);
     } else {
-      if (status) status.textContent = '⚠ Error';
-      setTimeout(() => { if (status) status.style.display = 'none'; }, 3000);
+      if (steps) steps.innerHTML += '<div style="font-size:11px;color:#f87171;">⚠ Error en el sync</div>';
+      if (bar) { bar.style.background = '#f87171'; bar.style.width = '100%'; }
+      setTimeout(() => { if (panel) panel.style.display = 'none'; }, 4000);
     }
   } catch (err) {
+    stepTimeouts.forEach(clearTimeout);
+    clearInterval(timerInterval);
     console.error('[SF Sync global]', err);
-    if (status) status.textContent = '⚠ ' + (err.message || 'Error');
-    setTimeout(() => { if (status) status.style.display = 'none'; }, 3000);
+    if (steps) steps.innerHTML += `<div style="font-size:11px;color:#f87171;">⚠ ${err.message || 'Error de conexión'}</div>`;
+    if (bar) { bar.style.background = '#f87171'; bar.style.width = '100%'; }
+    setTimeout(() => { if (panel) panel.style.display = 'none'; }, 5000);
   } finally {
     btn.disabled = false;
     if (icon) icon.style.animation = '';
