@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v3.7.5</title>
+<title>Alleata · Operaciones v3.7.6</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -407,7 +407,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v3.7.5 · 08 jun 2026
+      v3.7.6 · 08 jun 2026
     </div>
   </div>
 </div>
@@ -481,7 +481,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v3.7.5 · 08 jun 2026
+      v3.7.6 · 08 jun 2026
     </div>
   </div>
 </nav>
@@ -510,7 +510,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         SF Sync
       </button>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v3.7.5</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v3.7.6</div>
   </div>
   <div class="content">
 
@@ -4108,7 +4108,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v3.7.5] OK');
+console.log('[Alleata v3.7.6] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -8137,10 +8137,12 @@ function napseParseLog(text, filename){
     for(let _ls=blockStart; _ls>=Math.max(0,blockStart-1200); _ls--){
       if((lines[_ls]||'').includes('Init Accepted Socket')){ lineStart=_ls; break; }
     }
-    // lineEnd: buscar hacia adelante "PeiReverseSenderProcess"
+    // lineEnd: APROBADAS → PeiReverseSenderProcess | DENEGADAS → ClosingEntry
+    const _leMarker = isDeny ? 'ClosingEntry count:' : 'PeiReverseSenderProcess';
+    const _leLimit  = isDeny ? 2000 : 300;
     let lineEnd=Math.min(lines.length-1, i+50);
-    for(let _le=i; _le<=Math.min(lines.length-1,i+300); _le++){
-      if((lines[_le]||'').includes('PeiReverseSenderProcess')){ lineEnd=_le; break; }
+    for(let _le=i; _le<=Math.min(lines.length-1, i+_leLimit); _le++){
+      if((lines[_le]||'').includes(_leMarker)){ lineEnd=_le; break; }
     }
     // Calcular extracto del log para guardar en Supabase
     // Misma lógica que downloadExtract: desde line0200 hasta "Response Message." + 5
@@ -8152,13 +8154,12 @@ function napseParseLog(text, filename){
         const _l=lines[_x]||'';
         if(_l.includes('Init Accepted Socket')){ r0=_x; break; }
       }
-      // ── FIN: buscar hacia adelante "PeiReverseSenderProcess" ──
+      // ── FIN: APROBADAS → PeiReverseSenderProcess | DENEGADAS → ClosingEntry ──
+      const _endMarker = isDeny ? 'ClosingEntry count:' : 'PeiReverseSenderProcess';
+      const _searchLim = isDeny ? 2000 : 300;
       let _end = Math.min(lines.length-1, i+50);
-      for(let _x=i; _x<=Math.min(lines.length-1, i+300); _x++){
-        const _l=lines[_x]||'';
-        if(_l.includes('PeiReverseSenderProcess')){ _end=_x; break; }
-        // Fallback: Response Message. si no hay PeiReverse
-        if(_l.includes('Response Message.') && _x>i+10){ _end=Math.min(lines.length-1,_x+3); }
+      for(let _x=i; _x<=Math.min(lines.length-1, i+_searchLim); _x++){
+        if((lines[_x]||'').includes(_endMarker)){ _end=_x; break; }
       }
       if(r0 <= _end) logExtract = lines.slice(r0, _end+1).join('\n');
     }catch(_e){}
@@ -8208,11 +8209,15 @@ function downloadExtract(lineStart, lineEnd, ts, node, store, line0200){
   for(let i = lineStart; i >= Math.max(0, lineStart - 1200); i--){
     if((P.allLines[i]||'').includes('Init Accepted Socket')){ req0200Line = i; break; }
   }
-  // FIN: "PeiReverseSenderProcess" más cercano hacia adelante desde lineEnd
+  // FIN: APROBADAS → "PeiReverseSenderProcess" | DENEGADAS → "ClosingEntry count:"
   let endLine = Math.min(P.allLines.length - 1, lineEnd + 50);
-  for(let i = lineEnd; i <= Math.min(P.allLines.length - 1, lineEnd + 300); i++){
-    const l = P.allLines[i] || '';
-    if(l.includes('PeiReverseSenderProcess')){ endLine = i; break; }
+  const isDenyExtract = (P.allLines[lineEnd]||'').includes('DENEGADA') ||
+    (P.allLines[lineEnd]||'').includes('COMERCIO INVALIDO') ||
+    (P.allLines[lineEnd]||'').includes('NO OPERA');
+  const endMarker = isDenyExtract ? 'ClosingEntry count:' : 'PeiReverseSenderProcess';
+  const searchLimit = isDenyExtract ? 2000 : 300;
+  for(let i = lineEnd; i <= Math.min(P.allLines.length - 1, lineEnd + searchLimit); i++){
+    if((P.allLines[i]||'').includes(endMarker)){ endLine = i; break; }
   }
   const extract = P.allLines.slice(req0200Line, endLine + 1).join('\n');
   const header = [
