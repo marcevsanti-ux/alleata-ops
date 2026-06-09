@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v3.8.0</title>
+<title>Alleata · Operaciones v3.8.1</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -407,7 +407,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v3.8.0 · 08 jun 2026
+      v3.8.1 · 08 jun 2026
     </div>
   </div>
 </div>
@@ -481,7 +481,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v3.8.0 · 08 jun 2026
+      v3.8.1 · 08 jun 2026
     </div>
   </div>
 </nav>
@@ -510,7 +510,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         SF Sync
       </button>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v3.8.0</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v3.8.1</div>
   </div>
   <div class="content">
 
@@ -4108,7 +4108,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v3.8.0] OK');
+console.log('[Alleata v3.8.1] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -8364,10 +8364,14 @@ function buildBuscarRow(t){
   const ticketBtn=t.isDeny?`<button class="btn-copy" onclick="goTicket('${t.ts}','${t.node}','${t.store}')">🎫</button>`:'<span style="color:var(--text-muted)">—</span>';
   // Si viene del historial (lineStart=0) pero hay log en memoria, buscar en P.transactions
   let _memTrx = null;
-  if(!t.lineStart && typeof P!=='undefined' && P.transactions){
-    _memTrx = P.transactions.find(x => (t.trxRef && x.trxRef===t.trxRef) ||
-      (x.ts===t.ts && x.node===t.node && x.store===t.store));
-    if(_memTrx) { t.lineStart=_memTrx.lineStart; t.lineEnd=_memTrx.lineEnd; t.line0200=_memTrx.line0200||0; }
+  if(!t.lineStart && typeof P!=='undefined' && P.transactions && P.transactions.length){
+    const _tDate = (t.ts||'').split(' ')[0];
+    _memTrx = P.transactions.find(x =>
+      (t.trxRef && x.trxRef && x.trxRef===t.trxRef) ||
+      (t.serialNumber && x.serialNumber===t.serialNumber && x.node===t.node && x.store===t.store && (x.ts||'').split(' ')[0]===_tDate) ||
+      (x.ts===t.ts && x.node===t.node && x.store===t.store)
+    );
+    if(_memTrx && _memTrx.lineStart){ t.lineStart=_memTrx.lineStart; t.lineEnd=_memTrx.lineEnd; t.line0200=_memTrx.line0200||0; }
   }
   let extractBtn='<span style="color:var(--text-muted);font-size:10px" title="Subí el log de nuevo para guardar el extracto">sin log</span>';
   if(t.lineStart){
