@@ -95,6 +95,7 @@
   .btn:active { transform:scale(.97); }
   .btn-teal  { background:linear-gradient(135deg,#1dbf8e,#1a9fd4); color:var(--navy); }
   .btn-ghost { background:rgba(255,255,255,.07); color:var(--text); border:1px solid var(--border); }
+  .btn-green { background:linear-gradient(135deg,#27ae60,#1dbf8e); color:var(--navy); }
   .btn-logout { background:transparent; border:none; color:var(--muted); font-size:11px; cursor:pointer; padding:4px 8px; border-radius:6px; transition:color .2s; }
   .btn-logout:hover { color:var(--red); }
 
@@ -235,6 +236,7 @@
         <span id="user-name">—</span>
       </div>
       <button class="btn btn-ghost" onclick="syncFromRailway()">↻ Sync SF</button>
+      <button class="btn btn-green" id="btn-fullsync" onclick="fullSync()">⚡ Full Sync</button>
       <button class="btn btn-teal"  onclick="generateInsight()">✦ Análisis IA</button>
       <button class="btn-logout" onclick="doLogout()">Salir</button>
     </div>
@@ -466,8 +468,42 @@ document.getElementById('login-email').addEventListener('keydown', e => {
 });
 
 // ════════════════════════════════════════════════════════════════
-// SYNC desde Railway
+// FULL SYNC — dispara snapshot en Railway (consulta SF ahora)
 // ════════════════════════════════════════════════════════════════
+async function fullSync() {
+  const btn = document.getElementById('btn-fullsync');
+  btn.disabled = true;
+  btn.textContent = '⏳ Consultando SF…';
+  setSyncStatus('loading', 'Consultando SF…');
+
+  try {
+    // 1. Disparar snapshot en Railway (consulta SF y guarda en Supabase)
+    const snap = await fetch(`${RAILWAY_BASE}/automations/napse/snapshot`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-automation-secret': AUTOMATION_SECRET
+      }
+    });
+    if (!snap.ok) throw new Error(`HTTP ${snap.status}`);
+    const snapJson = await snap.json();
+    if (!snapJson.ok) throw new Error(snapJson.error || 'Error en snapshot');
+
+    // 2. Traer los snapshots actualizados
+    await syncFromRailway();
+    toast('✓ Full Sync OK — datos traídos desde SF', 'ok');
+
+  } catch(err) {
+    console.error('[Full Sync]', err);
+    setSyncStatus('error', 'Error en Full Sync');
+    toast(`Error: ${err.message}`, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '⚡ Full Sync';
+  }
+}
+
+
 function setSyncStatus(state, text) {
   document.getElementById('sync-dot').className = 'sync-dot ' + state;
   document.getElementById('sync-label').textContent = text;
