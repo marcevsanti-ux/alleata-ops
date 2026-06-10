@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GESTIÓN NAPSE — Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap');
+
+  :root {
+    --navy:   #0d1b2a; --navy-2: #112236; --navy-3: #162d45;
+    --teal:   #1dbf8e; --blue:   #1a9fd4;
+    --white:  #ffffff; --text:   #e2e8f0; --muted:  #7a91a8;
+    --gold:   #f5a623; --green:  #27ae60; --orange: #e67e22; --red: #e74c3c;
+    --card-bg: #112236; --border: rgba(29,191,142,0.15);
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:var(--navy); font-family:'Inter',sans-serif; color:var(--text); min-height:100vh; }
+
+  /* ── LOGIN SCREEN ── */
+  #login-screen {
+    min-height:100vh; display:flex; align-items:center; justify-content:center;
+    background: radial-gradient(ellipse at 50% 0%, rgba(29,191,142,0.08) 0%, transparent 60%), var(--navy);
+  }
+  .login-card {
+    background:var(--navy-2); border:1px solid var(--border); border-radius:16px;
+    padding:40px 36px; width:100%; max-width:400px;
+    box-shadow: 0 24px 64px rgba(0,0,0,0.4);
+  }
+  .login-logo {
+    background:linear-gradient(135deg,#1dbf8e,#1a9fd4); color:var(--navy);
+    font-weight:800; font-size:13px; letter-spacing:1.5px; padding:5px 14px;
+    border-radius:20px; text-transform:uppercase; display:inline-block; margin-bottom:24px;
+  }
+  .login-title { font-size:22px; font-weight:800; color:var(--white); margin-bottom:4px; }
+  .login-sub   { font-size:13px; color:var(--muted); margin-bottom:32px; }
+  .field { margin-bottom:16px; }
+  .field label { display:block; font-size:10px; font-weight:700; color:var(--muted); letter-spacing:1.5px; text-transform:uppercase; margin-bottom:6px; }
+  .field input {
+    width:100%; background:var(--navy-3); border:1px solid var(--border);
+    color:var(--white); font-family:'Inter',sans-serif; font-size:14px;
+    padding:11px 14px; border-radius:8px; outline:none; transition:border-color .2s;
+  }
+  .field input:focus { border-color:var(--teal); }
+  .btn-login {
+    width:100%; background:linear-gradient(135deg,#1dbf8e,#1a9fd4); color:var(--navy);
+    border:none; padding:12px; border-radius:8px; font-family:'Inter',sans-serif;
+    font-weight:800; font-size:14px; cursor:pointer; transition:opacity .2s, transform .1s;
+    margin-top:4px;
+  }
+  .btn-login:hover { opacity:.9; transform:translateY(-1px); }
+  .btn-login:disabled { opacity:.5; cursor:not-allowed; transform:none; }
+  .login-error {
+    background:rgba(231,76,60,.12); border:1px solid rgba(231,76,60,.3);
+    color:#ff6b6b; font-size:12px; padding:10px 14px; border-radius:8px;
+    margin-top:14px; display:none;
+  }
+  .login-error.show { display:block; }
+
+  /* ── APP (oculto hasta login) ── */
+  #app { display:none; }
+
+  /* TOPBAR */
+  .topbar {
+    background:var(--navy-2); border-bottom:1px solid var(--border);
+    padding:0 32px; height:60px; display:flex; align-items:center;
+    justify-content:space-between; position:sticky; top:0; z-index:100;
+  }
+  .topbar-left { display:flex; align-items:center; gap:16px; }
+  .logo-pill { background:linear-gradient(135deg,#1dbf8e,#1a9fd4); color:var(--navy); font-weight:800; font-size:13px; letter-spacing:1.5px; padding:5px 14px; border-radius:20px; text-transform:uppercase; }
+  .topbar-title { font-size:15px; font-weight:600; color:var(--white); }
+  .topbar-right { display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+  #live-clock { font-family:'JetBrains Mono',monospace; font-size:13px; color:var(--teal); font-weight:600; }
+  .user-chip {
+    display:flex; align-items:center; gap:8px;
+    background:var(--navy-3); border:1px solid var(--border);
+    border-radius:20px; padding:4px 12px 4px 8px; font-size:12px; color:var(--muted);
+  }
+  .user-avatar {
+    width:22px; height:22px; border-radius:50%;
+    background:linear-gradient(135deg,#1dbf8e,#1a9fd4);
+    display:flex; align-items:center; justify-content:center;
+    font-size:10px; font-weight:800; color:var(--navy);
+  }
+  .sync-status { font-size:11px; color:var(--muted); display:flex; align-items:center; gap:6px; }
+  .sync-dot { width:7px; height:7px; border-radius:50%; background:var(--muted); flex-shrink:0; transition:background .3s; }
+  .sync-dot.ok { background:var(--green); }
+  .sync-dot.loading { background:var(--gold); animation:pulse 1s infinite; }
+  .sync-dot.error { background:var(--red); }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+  .btn { border:none; padding:8px 16px; border-radius:8px; font-family:'Inter',sans-serif; font-weight:700; font-size:12px; cursor:pointer; transition:opacity .2s, transform .1s; display:flex; align-items:center; gap:6px; }
+  .btn:hover { opacity:.88; transform:translateY(-1px); }
+  .btn:active { transform:scale(.97); }
+  .btn-teal  { background:linear-gradient(135deg,#1dbf8e,#1a9fd4); color:var(--navy); }
+  .btn-ghost { background:rgba(255,255,255,.07); color:var(--text); border:1px solid var(--border); }
+  .btn-logout { background:transparent; border:none; color:var(--muted); font-size:11px; cursor:pointer; padding:4px 8px; border-radius:6px; transition:color .2s; }
+  .btn-logout:hover { color:var(--red); }
+
+  /* MAIN */
+  .main { padding:24px 32px; max-width:1400px; margin:0 auto; }
+
+  /* FILTER BANNER */
+  .filter-banner {
+    background:var(--navy-3); border:1px solid var(--border); border-left:3px solid var(--teal);
+    border-radius:8px; padding:9px 16px; margin-bottom:20px;
+    display:flex; align-items:center; gap:8px; font-size:11px; color:var(--muted); flex-wrap:wrap;
+  }
+  .filter-tag { background:rgba(29,191,142,.1); border:1px solid rgba(29,191,142,.25); color:var(--teal); padding:2px 9px; border-radius:20px; font-size:10px; font-weight:700; font-family:'JetBrains Mono',monospace; }
+
+  /* SNAPSHOT HEADER */
+  .snapshot-header { display:flex; align-items:baseline; justify-content:space-between; margin-bottom:18px; flex-wrap:wrap; gap:10px; }
+  .snapshot-label { font-size:10px; font-weight:700; color:var(--muted); letter-spacing:2px; text-transform:uppercase; }
+  .snapshot-date  { font-size:20px; font-weight:800; color:var(--white); font-family:'JetBrains Mono',monospace; }
+  .turno-badge    { background:rgba(29,191,142,.12); border:1px solid var(--teal); color:var(--teal); padding:4px 14px; border-radius:20px; font-size:12px; font-weight:700; }
+
+  /* CARDS */
+  .cards-grid { display:grid; grid-template-columns:repeat(5,1fr); gap:12px; margin-bottom:20px; }
+  @media(max-width:1100px){ .cards-grid { grid-template-columns:repeat(3,1fr); } }
+  @media(max-width:700px) { .cards-grid { grid-template-columns:repeat(2,1fr); } }
+
+  .stat-card { background:var(--card-bg); border:1px solid var(--border); border-radius:12px; padding:18px 16px 14px; position:relative; overflow:hidden; transition:transform .2s; }
+  .stat-card:hover { transform:translateY(-3px); }
+  .stat-card::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; background:var(--accent); }
+  .card-label  { font-size:9px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; color:var(--accent); margin-bottom:8px; }
+  .card-number { font-family:'JetBrains Mono',monospace; font-size:44px; font-weight:700; color:var(--white); line-height:1; margin-bottom:4px; transition:all .3s; }
+  .card-pct    { font-size:11px; color:var(--muted); }
+  .card-pct span { color:var(--accent); font-weight:600; }
+  .card-bar      { margin-top:10px; height:3px; background:rgba(255,255,255,.07); border-radius:2px; overflow:hidden; }
+  .card-bar-fill { height:100%; background:var(--accent); border-radius:2px; transition:width 1s cubic-bezier(.4,0,.2,1); width:0; }
+
+  /* TOTAL STRIP */
+  .total-strip { background:linear-gradient(135deg,#1dbf8e,#1a9fd4); border-radius:10px; padding:12px 24px; display:flex; align-items:center; justify-content:space-between; margin-bottom:22px; flex-wrap:wrap; gap:10px; }
+  .total-strip .label  { font-size:11px; font-weight:700; color:var(--navy); opacity:.7; }
+  .total-strip .number { font-family:'JetBrains Mono',monospace; font-size:32px; font-weight:800; color:var(--navy); }
+  .total-strip .sublabel { font-size:11px; color:var(--navy); opacity:.7; }
+
+  /* AI INSIGHT */
+  .insight-panel { background:linear-gradient(135deg,rgba(29,191,142,.07),rgba(26,159,212,.07)); border:1px solid rgba(29,191,142,.25); border-radius:12px; padding:18px 20px; margin-bottom:22px; }
+  .insight-label { font-size:9px; font-weight:700; letter-spacing:2px; text-transform:uppercase; color:var(--teal); margin-bottom:8px; }
+  .insight-text  { font-size:13px; color:var(--text); line-height:1.65; min-height:38px; }
+  .dot-anim span { display:inline-block; width:5px; height:5px; border-radius:50%; background:var(--teal); margin:0 2px; animation:bounce 1.2s infinite; }
+  .dot-anim span:nth-child(2) { animation-delay:.2s; }
+  .dot-anim span:nth-child(3) { animation-delay:.4s; }
+  @keyframes bounce { 0%,80%,100%{transform:translateY(0)} 40%{transform:translateY(-5px)} }
+
+  /* BOTTOM GRID */
+  .bottom-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:22px; }
+  @media(max-width:900px){ .bottom-grid { grid-template-columns:1fr; } }
+
+  .panel { background:var(--card-bg); border:1px solid var(--border); border-radius:12px; padding:18px 20px; }
+  .panel-title { font-size:10px; font-weight:700; letter-spacing:2px; text-transform:uppercase; color:var(--muted); margin-bottom:16px; display:flex; align-items:center; gap:8px; }
+  .panel-title::after { content:''; flex:1; height:1px; background:var(--border); }
+
+  /* BAR CHART */
+  .bar-row   { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
+  .bar-label { font-size:11px; color:var(--text); width:140px; flex-shrink:0; font-weight:500; }
+  .bar-track { flex:1; height:26px; background:rgba(255,255,255,.05); border-radius:4px; overflow:hidden; }
+  .bar-fill  { height:100%; border-radius:4px; transition:width 1.2s cubic-bezier(.4,0,.2,1); width:0; display:flex; align-items:center; justify-content:center; font-family:'JetBrains Mono',monospace; font-size:12px; font-weight:600; color:var(--navy); white-space:nowrap; min-width:28px; }
+
+  /* HISTORY TABLE */
+  .history-table { width:100%; border-collapse:collapse; font-size:11px; }
+  .history-table th { text-align:left; padding:5px 8px; color:var(--muted); font-weight:600; font-size:9px; letter-spacing:1px; text-transform:uppercase; border-bottom:1px solid var(--border); }
+  .history-table td { padding:8px; border-bottom:1px solid rgba(255,255,255,.04); color:var(--text); font-family:'JetBrains Mono',monospace; font-size:11px; }
+  .history-table tr:hover td { background:rgba(255,255,255,.03); }
+  .turno-m { color:var(--teal); } .turno-t { color:var(--blue); }
+  .delta-pos { color:var(--green); } .delta-neg { color:var(--red); } .delta-neu { color:var(--muted); }
+  .badge-sf     { background:rgba(29,191,142,.15); color:var(--teal); border-radius:4px; padding:1px 5px; font-size:9px; }
+  .badge-manual { background:rgba(245,166,35,.15); color:var(--gold); border-radius:4px; padding:1px 5px; font-size:9px; }
+
+  /* MANUAL FORM */
+  .update-form { background:var(--navy-3); border:1px solid var(--border); border-radius:12px; padding:18px 20px; margin-bottom:22px; }
+  .form-title  { font-size:13px; font-weight:700; color:var(--white); margin-bottom:14px; display:flex; align-items:center; gap:8px; }
+  .form-grid   { display:grid; grid-template-columns:auto auto repeat(5,1fr) auto; gap:8px; align-items:end; }
+  @media(max-width:900px){ .form-grid { grid-template-columns:1fr 1fr; } }
+  .form-field label { display:block; font-size:9px; font-weight:600; color:var(--muted); letter-spacing:1px; text-transform:uppercase; margin-bottom:5px; }
+  .form-field input, .form-field select { background:var(--navy-2); border:1px solid var(--border); color:var(--white); font-family:'JetBrains Mono',monospace; font-size:13px; padding:7px 10px; border-radius:7px; width:100%; outline:none; transition:border-color .2s; }
+  .form-field input:focus, .form-field select:focus { border-color:var(--teal); }
+
+  /* TOAST */
+  #toast { position:fixed; bottom:24px; right:24px; padding:10px 18px; border-radius:8px; font-weight:700; font-size:13px; opacity:0; transform:translateY(8px); transition:all .3s; pointer-events:none; z-index:999; }
+  #toast.ok    { background:var(--teal); color:var(--navy); }
+  #toast.error { background:var(--red);  color:var(--white); }
+  #toast.show  { opacity:1; transform:translateY(0); }
+
+  .footer { text-align:center; padding:20px; font-size:10px; color:var(--muted); border-top:1px solid var(--border); }
+  .footer span { color:var(--teal); font-weight:600; }
+  .empty-state { text-align:center; padding:32px; color:var(--muted); font-size:13px; }
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════════════
+     LOGIN SCREEN
+══════════════════════════════════════════════════════════ -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">Alleata</div>
+    <div class="login-title">Gestión NAPSE</div>
+    <div class="login-sub">Ingresá con tu cuenta Alleata Ops</div>
+
+    <div class="field">
+      <label>Email</label>
+      <input type="email" id="login-email" placeholder="usuario@alleata.com.ar" autocomplete="email">
+    </div>
+    <div class="field">
+      <label>Contraseña</label>
+      <input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password">
+    </div>
+    <button class="btn-login" id="btn-login" onclick="doLogin()">Ingresar</button>
+    <div class="login-error" id="login-error"></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     APP
+══════════════════════════════════════════════════════════ -->
+<div id="app">
+
+  <!-- TOPBAR -->
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="logo-pill">Alleata</div>
+      <div class="topbar-title">Gestión NAPSE</div>
+    </div>
+    <div class="topbar-right">
+      <div class="sync-status">
+        <div class="sync-dot" id="sync-dot"></div>
+        <span id="sync-label">Cargando…</span>
+      </div>
+      <div id="live-clock">--:--:--</div>
+      <div class="user-chip">
+        <div class="user-avatar" id="user-avatar">G</div>
+        <span id="user-name">—</span>
+      </div>
+      <button class="btn btn-ghost" onclick="syncFromRailway()">↻ Sync SF</button>
+      <button class="btn btn-teal"  onclick="generateInsight()">✦ Análisis IA</button>
+      <button class="btn-logout" onclick="doLogout()">Salir</button>
+    </div>
+  </div>
+
+  <div class="main">
+
+    <!-- FILTER BANNER -->
+    <div class="filter-banner">
+      <span>Filtros SF activos:</span>
+      <span class="filter-tag">Perfil = NAPSE</span>
+      <span class="filter-tag">Tipo = Instalación Equipo + Simcard | Cambio de Terminal</span>
+      <span class="filter-tag">Estado = todos activos</span>
+      <span class="filter-tag">Fecha ≥ 01/06/2026</span>
+    </div>
+
+    <!-- SNAPSHOT HEADER -->
+    <div class="snapshot-header">
+      <div>
+        <div class="snapshot-label">Último snapshot</div>
+        <div class="snapshot-date" id="current-snapshot-date">—</div>
+      </div>
+      <div class="turno-badge" id="current-turno">—</div>
+    </div>
+
+    <!-- CARDS -->
+    <div class="cards-grid" id="cards-grid">
+      <div class="empty-state" style="grid-column:1/-1">Cargando datos…</div>
+    </div>
+
+    <!-- TOTAL STRIP -->
+    <div class="total-strip">
+      <div><div class="label">TOTAL OTs ACTIVAS</div></div>
+      <div class="number" id="total-number">—</div>
+      <div><div class="sublabel" id="total-sublabel">—</div></div>
+    </div>
+
+    <!-- AI INSIGHT -->
+    <div class="insight-panel">
+      <div class="insight-label">✦ Análisis Ally</div>
+      <div class="insight-text" id="insight-text">
+        <span style="color:var(--muted)">Hacé clic en "Análisis IA" para obtener un diagnóstico del estado operativo actual.</span>
+      </div>
+    </div>
+
+    <!-- BOTTOM GRID -->
+    <div class="bottom-grid">
+      <div class="panel">
+        <div class="panel-title">Distribución por estado</div>
+        <div id="bar-chart"><div class="empty-state">Sin datos</div></div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">Historial de snapshots</div>
+        <div id="history-container"><div class="empty-state">Sin datos</div></div>
+      </div>
+    </div>
+
+    <!-- CARGA MANUAL -->
+    <div class="update-form">
+      <div class="form-title">
+        📥 Carga manual
+        <span style="font-size:10px;font-weight:400;color:var(--muted)">— fallback si Railway no está disponible</span>
+      </div>
+      <div class="form-grid">
+        <div class="form-field"><label>Fecha</label><input type="date" id="f-fecha"></div>
+        <div class="form-field">
+          <label>Turno</label>
+          <select id="f-turno">
+            <option value="🌅 Mañana (9:00)">🌅 Mañana (9:00)</option>
+            <option value="🌆 Tarde (17:00)">🌆 Tarde (17:00)</option>
+          </select>
+        </div>
+        <div class="form-field"><label>Config. Terminal</label><input type="number" id="f-conf" min="0" placeholder="0"></div>
+        <div class="form-field"><label>En Proceso</label>     <input type="number" id="f-proc" min="0" placeholder="0"></div>
+        <div class="form-field"><label>Pre-Colecta</label>    <input type="number" id="f-pre"  min="0" placeholder="0"></div>
+        <div class="form-field"><label>Despachado</label>     <input type="number" id="f-desp" min="0" placeholder="0"></div>
+        <div class="form-field"><label>Exitoso</label>        <input type="number" id="f-exit" min="0" placeholder="0"></div>
+        <button class="btn btn-teal" onclick="saveManual()" style="height:36px;align-self:end;">Guardar →</button>
+      </div>
+    </div>
+
+  </div><!-- /main -->
+
+  <div class="footer">
+    <span>Alleata Ops</span> · NAPSE Dashboard · Moretti e Hijos S.A. · v2.0.0
+  </div>
+
+</div><!-- /app -->
+
+<div id="toast"></div>
+
+<script>
+// ════════════════════════════════════════════════════════════════
+// SUPABASE — mismas credenciales que el portal principal
+// ════════════════════════════════════════════════════════════════
+const SUPA_URL = 'https://njkstpfmcfhqxdadqbdy.supabase.co';
+const SUPA_KEY = 'sb_publishable_W3fP-CCb0m-B0v5tdaHQCg_2L43Rx5J';
+const { createClient } = supabase;
+const sb = createClient(SUPA_URL, SUPA_KEY);
+
+const RAILWAY_BASE      = 'https://alleata-agent-production.up.railway.app';
+const AUTOMATION_SECRET = '123456';
+
+const ESTADOS = [
+  { key:'configurar_terminal', label:'Configurar Terminal', accent:'#e67e22' },
+  { key:'en_proceso',          label:'En Proceso',          accent:'#1a9fd4' },
+  { key:'pre_colecta',         label:'Pre-Colecta',         accent:'#f5a623' },
+  { key:'despachado',          label:'Despachado',          accent:'#3a7bd5' },
+  { key:'exitoso',             label:'Exitoso',             accent:'#27ae60' },
+];
+
+let snapshots   = [];
+let currentUser = null;
+
+// ── Helpers ──────────────────────────────────────────────────────
+function getTotal(r) { return ESTADOS.reduce((s,e) => s + (r[e.key]||0), 0); }
+function fmtDate(iso) {
+  if (!iso) return '—';
+  const d = (iso.includes('T') ? iso.split('T')[0] : iso);
+  const [y,m,dd] = d.split('-');
+  return `${dd}/${m}/${y}`;
+}
+function fmtDatetime(d) {
+  const p = n => String(n).padStart(2,'0');
+  return `${p(d.getDate())}/${p(d.getMonth()+1)} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+function loadLocal()      { try { return JSON.parse(localStorage.getItem('napse_snaps_v2')||'[]'); } catch { return []; } }
+function saveLocal(snaps) { try { localStorage.setItem('napse_snaps_v2', JSON.stringify(snaps.slice(0,200))); } catch {} }
+
+// ── Clock ─────────────────────────────────────────────────────────
+function updateClock() {
+  const p=n=>String(n).padStart(2,'0'), n=new Date();
+  document.getElementById('live-clock').textContent=`${p(n.getHours())}:${p(n.getMinutes())}:${p(n.getSeconds())}`;
+}
+setInterval(updateClock,1000); updateClock();
+
+// ════════════════════════════════════════════════════════════════
+// AUTH
+// ════════════════════════════════════════════════════════════════
+async function doLogin() {
+  const email    = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+  const btn      = document.getElementById('btn-login');
+  const errEl    = document.getElementById('login-error');
+
+  if (!email || !password) { showLoginError('Completá email y contraseña.'); return; }
+
+  btn.disabled    = true;
+  btn.textContent = 'Ingresando…';
+  errEl.classList.remove('show');
+
+  const { data, error } = await sb.auth.signInWithPassword({ email, password });
+
+  if (error) {
+    btn.disabled    = false;
+    btn.textContent = 'Ingresar';
+    showLoginError(error.message === 'Invalid login credentials'
+      ? 'Email o contraseña incorrectos.'
+      : error.message);
+    return;
+  }
+
+  await onLogin(data.user);
+}
+
+function showLoginError(msg) {
+  const el = document.getElementById('login-error');
+  el.textContent = msg;
+  el.classList.add('show');
+}
+
+async function onLogin(user) {
+  // Verificar perfil en profiles
+  const { data: profile } = await sb
+    .from('profiles')
+    .select('nombre, rol, modulos')
+    .eq('id', user.id)
+    .single();
+
+  if (!profile) {
+    await sb.auth.signOut();
+    showLoginError('Tu usuario no tiene perfil configurado. Contactá al administrador.');
+    document.getElementById('btn-login').disabled    = false;
+    document.getElementById('btn-login').textContent = 'Ingresar';
+    return;
+  }
+
+  currentUser = { ...user, ...profile };
+
+  // Mostrar nombre en topbar
+  const nombre = profile.nombre || user.email.split('@')[0];
+  document.getElementById('user-name').textContent = nombre;
+  document.getElementById('user-avatar').textContent = nombre.charAt(0).toUpperCase();
+
+  // Transición login → app
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+
+  // Init form
+  document.getElementById('f-fecha').value = new Date().toISOString().split('T')[0];
+  const h = new Date().getHours();
+  document.getElementById('f-turno').value = h < 13 ? '🌅 Mañana (9:00)' : '🌆 Tarde (17:00)';
+
+  // Cargar datos
+  snapshots = loadLocal();
+  if (snapshots.length) { render(); setSyncStatus('ok','Caché local'); }
+  syncFromRailway();
+}
+
+async function doLogout() {
+  await sb.auth.signOut();
+  currentUser = null;
+  snapshots   = [];
+  document.getElementById('app').style.display          = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('login-email').value    = '';
+  document.getElementById('login-password').value = '';
+  document.getElementById('login-error').classList.remove('show');
+  document.getElementById('btn-login').disabled    = false;
+  document.getElementById('btn-login').textContent = 'Ingresar';
+}
+
+// Enter key en login
+document.getElementById('login-password').addEventListener('keydown', e => {
+  if (e.key === 'Enter') doLogin();
+});
+document.getElementById('login-email').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('login-password').focus();
+});
+
+// ════════════════════════════════════════════════════════════════
+// SYNC desde Railway
+// ════════════════════════════════════════════════════════════════
+function setSyncStatus(state, text) {
+  document.getElementById('sync-dot').className = 'sync-dot ' + state;
+  document.getElementById('sync-label').textContent = text;
+}
+
+async function syncFromRailway() {
+  setSyncStatus('loading', 'Consultando SF…');
+  try {
+    const resp = await fetch(`${RAILWAY_BASE}/automations/napse/snapshots?limit=60`, {
+      headers: { 'x-automation-secret': AUTOMATION_SECRET }
+    });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const json = await resp.json();
+    if (!json.ok) throw new Error(json.error || 'Error desconocido');
+
+    const remote   = (json.snapshots || []).map(s => ({ ...s, _source:'sf' }));
+    const localMan = loadLocal().filter(s => s._source === 'manual');
+    snapshots = [...remote, ...localMan].sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+    saveLocal(snapshots);
+    setSyncStatus('ok', `SF · ${fmtDatetime(new Date())}`);
+    render();
+    toast('✓ Datos sincronizados desde SF', 'ok');
+  } catch(err) {
+    console.error('[Sync]', err);
+    snapshots = loadLocal();
+    setSyncStatus('error', `Sin conexión Railway`);
+    if (snapshots.length) { render(); toast('⚠ Mostrando caché local', 'error'); }
+    else toast('Error al conectar con Railway', 'error');
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
+// RENDER
+// ════════════════════════════════════════════════════════════════
+function render() {
+  if (!snapshots.length) return;
+  const latest = snapshots[0];
+  const total  = getTotal(latest);
+
+  document.getElementById('current-snapshot-date').textContent = fmtDate(latest.fecha || latest.created_at);
+  document.getElementById('current-turno').textContent         = latest.turno || '—';
+
+  // Cards
+  document.getElementById('cards-grid').innerHTML = ESTADOS.map(e => {
+    const val = latest[e.key]||0;
+    const pct = total ? Math.round(val/total*100) : 0;
+    return `<div class="stat-card" style="--accent:${e.accent};border-color:${e.accent}22">
+      <div class="card-label">${e.label}</div>
+      <div class="card-number">${val}</div>
+      <div class="card-pct"><span>${pct}%</span> del total</div>
+      <div class="card-bar"><div class="card-bar-fill" data-pct="${pct}" style="background:${e.accent}"></div></div>
+    </div>`;
+  }).join('');
+  requestAnimationFrame(() => {
+    document.querySelectorAll('.card-bar-fill').forEach(el => el.style.width = el.dataset.pct+'%');
+  });
+
+  // Total strip
+  document.getElementById('total-number').textContent  = total;
+  document.getElementById('total-sublabel').textContent =
+    `${snapshots.length} registros · ${snapshots.filter(s=>s._source==='sf').length} desde SF`;
+
+  // Bar chart
+  const maxVal = Math.max(...ESTADOS.map(e => latest[e.key]||0), 1);
+  document.getElementById('bar-chart').innerHTML = ESTADOS.map(e => {
+    const val = latest[e.key]||0;
+    const w   = Math.round(val/maxVal*100);
+    return `<div class="bar-row">
+      <div class="bar-label">${e.label}</div>
+      <div class="bar-track">
+        <div class="bar-fill" data-w="${w}" style="background:${e.accent}">${val}</div>
+      </div>
+    </div>`;
+  }).join('');
+  requestAnimationFrame(() => {
+    document.querySelectorAll('.bar-fill').forEach(el => el.style.width = el.dataset.w+'%');
+  });
+
+  // History table
+  const rows = snapshots.slice(0,40);
+  document.getElementById('history-container').innerHTML = `
+    <table class="history-table">
+      <thead><tr>
+        <th>Fecha</th><th>Turno</th><th>Conf.</th><th>Proc.</th>
+        <th>Pre-Col.</th><th>Desp.</th><th>Éxit.</th><th>Total</th><th>Δ</th><th>Src</th>
+      </tr></thead>
+      <tbody>${rows.map((r,i) => {
+        const tot     = getTotal(r);
+        const prev    = i < rows.length-1 ? getTotal(rows[i+1]) : null;
+        const delta   = prev !== null ? tot - prev : null;
+        const deltaStr = delta === null ? '—'
+          : delta > 0 ? `<span class="delta-pos">+${delta}</span>`
+          : delta < 0 ? `<span class="delta-neg">${delta}</span>`
+          : `<span class="delta-neu">—</span>`;
+        const tc = (r.turno||'').includes('Mañana') ? 'turno-m' : 'turno-t';
+        const ts = (r.turno||'').includes('Mañana') ? '🌅 M' : '🌆 T';
+        const src = r._source==='sf'
+          ? '<span class="badge-sf">SF</span>'
+          : '<span class="badge-manual">manual</span>';
+        return `<tr>
+          <td>${fmtDate(r.fecha||r.created_at)}</td>
+          <td class="${tc}">${ts}</td>
+          <td>${r.configurar_terminal||0}</td><td>${r.en_proceso||0}</td>
+          <td>${r.pre_colecta||0}</td><td>${r.despachado||0}</td>
+          <td>${r.exitoso||0}</td>
+          <td style="color:var(--teal);font-weight:700">${tot}</td>
+          <td>${deltaStr}</td><td>${src}</td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table>`;
+}
+
+// ════════════════════════════════════════════════════════════════
+// CARGA MANUAL
+// ════════════════════════════════════════════════════════════════
+function saveManual() {
+  const fecha = document.getElementById('f-fecha').value;
+  const turno = document.getElementById('f-turno').value;
+  if (!fecha) { toast('Ingresá una fecha', 'error'); return; }
+  const snap = {
+    fecha, turno, _source:'manual',
+    created_at: new Date().toISOString(),
+    configurar_terminal: parseInt(document.getElementById('f-conf').value)||0,
+    en_proceso:          parseInt(document.getElementById('f-proc').value)||0,
+    pre_colecta:         parseInt(document.getElementById('f-pre').value) ||0,
+    despachado:          parseInt(document.getElementById('f-desp').value)||0,
+    exitoso:             parseInt(document.getElementById('f-exit').value)||0,
+  };
+  snap.total = getTotal(snap);
+  snapshots  = [snap, ...snapshots];
+  saveLocal(snapshots);
+  render();
+  ['f-conf','f-proc','f-pre','f-desp','f-exit'].forEach(id => document.getElementById(id).value='');
+  toast('✓ Guardado localmente', 'ok');
+}
+
+// ════════════════════════════════════════════════════════════════
+// AI INSIGHT
+// ════════════════════════════════════════════════════════════════
+async function generateInsight() {
+  if (!snapshots.length) { toast('Primero sincronizá los datos', 'error'); return; }
+  const insightEl = document.getElementById('insight-text');
+  insightEl.innerHTML = `<span style="color:var(--muted);display:flex;align-items:center;gap:8px">
+    <span class="dot-anim"><span></span><span></span><span></span></span> Ally analizando…
+  </span>`;
+
+  const latest = snapshots[0];
+  const total  = getTotal(latest);
+  const hist   = snapshots.slice(0,6).map(r =>
+    `${fmtDate(r.fecha||r.created_at)} ${r.turno||''}: CT=${r.configurar_terminal||0}, EP=${r.en_proceso||0}, PC=${r.pre_colecta||0}, D=${r.despachado||0}, EX=${r.exitoso||0}, T=${getTotal(r)}`
+  ).join('\n');
+
+  const prompt = `Sos Ally, agente operativo de Alleata. Analizá el pipeline NAPSE (instalaciones terminales POS) en 2-3 oraciones concretas. Español argentino, directo, con números.
+
+SNAPSHOT ACTUAL (${fmtDate(latest.fecha||latest.created_at)} · ${latest.turno||''}):
+Config.Terminal=${latest.configurar_terminal||0} | En Proceso=${latest.en_proceso||0} | Pre-Colecta=${latest.pre_colecta||0} | Despachado=${latest.despachado||0} | Exitoso=${latest.exitoso||0} | TOTAL=${total}
+
+HISTORIAL:
+${hist}
+
+Flujo: Configurar Terminal → En Proceso → Pre-Colecta → Despachado → Exitoso. ¿Dónde acumula? ¿% Exitoso? ¿Cuello de botella? Recomendá una acción concreta.`;
+
+  try {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ model:'claude-sonnet-4-20250514', max_tokens:1000, messages:[{role:'user',content:prompt}] })
+    });
+    const data = await resp.json();
+    insightEl.textContent = data.content?.find(b=>b.type==='text')?.text || 'Sin respuesta.';
+  } catch(e) {
+    insightEl.innerHTML = `<span style="color:var(--red)">Error al conectar con Ally.</span>`;
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
+// TOAST
+// ════════════════════════════════════════════════════════════════
+function toast(msg, type='ok') {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = `${type} show`;
+  clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+// ════════════════════════════════════════════════════════════════
+// BOOT — restaurar sesión si ya estaba logueado
+// ════════════════════════════════════════════════════════════════
+(async () => {
+  const { data: { session } } = await sb.auth.getSession();
+  if (session?.user) {
+    await onLogin(session.user);
+  }
+})();
+</script>
+</body>
+</html>
