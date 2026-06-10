@@ -137,15 +137,6 @@
   .total-strip .number { font-family:'JetBrains Mono',monospace; font-size:32px; font-weight:800; color:var(--navy); }
   .total-strip .sublabel { font-size:11px; color:var(--navy); opacity:.7; }
 
-  /* AI INSIGHT */
-  .insight-panel { background:linear-gradient(135deg,rgba(29,191,142,.07),rgba(26,159,212,.07)); border:1px solid rgba(29,191,142,.25); border-radius:12px; padding:18px 20px; margin-bottom:22px; }
-  .insight-label { font-size:9px; font-weight:700; letter-spacing:2px; text-transform:uppercase; color:var(--teal); margin-bottom:8px; }
-  .insight-text  { font-size:13px; color:var(--text); line-height:1.65; min-height:38px; }
-  .dot-anim span { display:inline-block; width:5px; height:5px; border-radius:50%; background:var(--teal); margin:0 2px; animation:bounce 1.2s infinite; }
-  .dot-anim span:nth-child(2) { animation-delay:.2s; }
-  .dot-anim span:nth-child(3) { animation-delay:.4s; }
-  @keyframes bounce { 0%,80%,100%{transform:translateY(0)} 40%{transform:translateY(-5px)} }
-
   /* BOTTOM GRID */
   .bottom-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:22px; }
   @media(max-width:900px){ .bottom-grid { grid-template-columns:1fr; } }
@@ -237,7 +228,6 @@
       </div>
       <button class="btn btn-ghost" onclick="syncFromRailway()">↻ Sync SF</button>
       <button class="btn btn-green" id="btn-fullsync" onclick="fullSync()">⚡ Full Sync</button>
-      <button class="btn btn-teal"  onclick="generateInsight()">✦ Análisis IA</button>
       <button class="btn-logout" onclick="doLogout()">Salir</button>
     </div>
   </div>
@@ -262,11 +252,6 @@
       <div class="turno-badge" id="current-turno">—</div>
     </div>
 
-    <!-- CARDS -->
-    <div class="cards-grid" id="cards-grid">
-      <div class="empty-state" style="grid-column:1/-1">Cargando datos…</div>
-    </div>
-
     <!-- TOTAL STRIP -->
     <div class="total-strip">
       <div><div class="label">TOTAL OTs ACTIVAS</div></div>
@@ -274,12 +259,15 @@
       <div><div class="sublabel" id="total-sublabel">—</div></div>
     </div>
 
-    <!-- AI INSIGHT -->
-    <div class="insight-panel">
-      <div class="insight-label">✦ Análisis Ally</div>
-      <div class="insight-text" id="insight-text">
-        <span style="color:var(--muted)">Hacé clic en "Análisis IA" para obtener un diagnóstico del estado operativo actual.</span>
-      </div>
+    <!-- CARDS -->
+    <div class="cards-grid" id="cards-grid">
+      <div class="empty-state" style="grid-column:1/-1">Cargando datos…</div>
+    </div>
+
+    <!-- HISTORIAL -->
+    <div class="panel" style="margin-bottom:22px;">
+      <div class="panel-title">Historial de snapshots</div>
+      <div id="history-container"><div class="empty-state">Sin datos</div></div>
     </div>
 
     <!-- BOTTOM GRID -->
@@ -287,10 +275,6 @@
       <div class="panel">
         <div class="panel-title">Distribución por estado</div>
         <div id="bar-chart"><div class="empty-state">Sin datos</div></div>
-      </div>
-      <div class="panel">
-        <div class="panel-title">Historial de snapshots</div>
-        <div id="history-container"><div class="empty-state">Sin datos</div></div>
       </div>
     </div>
 
@@ -321,7 +305,7 @@
   </div><!-- /main -->
 
   <div class="footer">
-    <span>Alleata Ops</span> · NAPSE Dashboard · Moretti e Hijos S.A. · v2.0.0
+    <span>Alleata Ops</span> · NAPSE Dashboard · Moretti e Hijos S.A. · v2.1.0
   </div>
 
 </div><!-- /app -->
@@ -359,6 +343,18 @@ function fmtDate(iso) {
   const [y,m,dd] = d.split('-');
   return `${dd}/${m}/${y}`;
 }
+function fmtTime(iso) {
+  if (!iso) return '—';
+  // iso puede ser "2026-06-10T23:49:00Z" o similar
+  try {
+    const d = new Date(iso);
+    const p = n => String(n).padStart(2,'0');
+    // Convertir a ART (UTC-3)
+    const ar = new Date(d.getTime() - 3*60*60*1000);
+    return `${p(ar.getUTCHours())}:${p(ar.getUTCMinutes())}`;
+  } catch { return '—'; }
+}
+
 function fmtDatetime(d) {
   const p = n => String(n).padStart(2,'0');
   return `${p(d.getDate())}/${p(d.getMonth()+1)} ${p(d.getHours())}:${p(d.getMinutes())}`;
@@ -587,7 +583,7 @@ function render() {
   document.getElementById('history-container').innerHTML = `
     <table class="history-table">
       <thead><tr>
-        <th>Fecha</th><th>Turno</th><th>Conf.</th><th>Proc.</th>
+        <th>Fecha</th><th>Hora</th><th>Turno</th><th>Conf.</th><th>Proc.</th>
         <th>Pre-Col.</th><th>Desp.</th><th>Éxit.</th><th>Total</th><th>Δ</th><th>Src</th>
       </tr></thead>
       <tbody>${rows.map((r,i) => {
@@ -605,6 +601,7 @@ function render() {
           : '<span class="badge-manual">manual</span>';
         return `<tr>
           <td>${fmtDate(r.fecha||r.created_at)}</td>
+          <td style="color:var(--muted)">${fmtTime(r.created_at)}</td>
           <td class="${tc}">${ts}</td>
           <td>${r.configurar_terminal||0}</td><td>${r.en_proceso||0}</td>
           <td>${r.pre_colecta||0}</td><td>${r.despachado||0}</td>
@@ -638,44 +635,6 @@ function saveManual() {
   render();
   ['f-conf','f-proc','f-pre','f-desp','f-exit'].forEach(id => document.getElementById(id).value='');
   toast('✓ Guardado localmente', 'ok');
-}
-
-// ════════════════════════════════════════════════════════════════
-// AI INSIGHT
-// ════════════════════════════════════════════════════════════════
-async function generateInsight() {
-  if (!snapshots.length) { toast('Primero sincronizá los datos', 'error'); return; }
-  const insightEl = document.getElementById('insight-text');
-  insightEl.innerHTML = `<span style="color:var(--muted);display:flex;align-items:center;gap:8px">
-    <span class="dot-anim"><span></span><span></span><span></span></span> Ally analizando…
-  </span>`;
-
-  const latest = snapshots[0];
-  const total  = getTotal(latest);
-  const hist   = snapshots.slice(0,6).map(r =>
-    `${fmtDate(r.fecha||r.created_at)} ${r.turno||''}: CT=${r.configurar_terminal||0}, EP=${r.en_proceso||0}, PC=${r.pre_colecta||0}, D=${r.despachado||0}, EX=${r.exitoso||0}, T=${getTotal(r)}`
-  ).join('\n');
-
-  const prompt = `Sos Ally, agente operativo de Alleata. Analizá el pipeline NAPSE (instalaciones terminales POS) en 2-3 oraciones concretas. Español argentino, directo, con números.
-
-SNAPSHOT ACTUAL (${fmtDate(latest.fecha||latest.created_at)} · ${latest.turno||''}):
-Config.Terminal=${latest.configurar_terminal||0} | En Proceso=${latest.en_proceso||0} | Pre-Colecta=${latest.pre_colecta||0} | Despachado=${latest.despachado||0} | Exitoso=${latest.exitoso||0} | TOTAL=${total}
-
-HISTORIAL:
-${hist}
-
-Flujo: Configurar Terminal → En Proceso → Pre-Colecta → Despachado → Exitoso. ¿Dónde acumula? ¿% Exitoso? ¿Cuello de botella? Recomendá una acción concreta.`;
-
-  try {
-    const resp = await fetch('https://api.anthropic.com/v1/messages', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ model:'claude-sonnet-4-20250514', max_tokens:1000, messages:[{role:'user',content:prompt}] })
-    });
-    const data = await resp.json();
-    insightEl.textContent = data.content?.find(b=>b.type==='text')?.text || 'Sin respuesta.';
-  } catch(e) {
-    insightEl.innerHTML = `<span style="color:var(--red)">Error al conectar con Ally.</span>`;
-  }
 }
 
 // ════════════════════════════════════════════════════════════════
