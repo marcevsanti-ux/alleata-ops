@@ -246,7 +246,7 @@
         <div class="sync-dot" id="sync-dot"></div>
         <span id="sync-label">Cargando…</span>
       </div>
-      <div class="version-chip">v2.4.3</div>
+      <div class="version-chip">v2.4.4</div>
       <div id="live-clock">--:--:--</div>
       <div class="user-chip">
         <div class="user-avatar" id="user-avatar">G</div>
@@ -352,7 +352,7 @@
   </div><!-- /main -->
 
   <div class="footer">
-    <span>Alleata Ops</span> · NAPSE Dashboard · Moretti e Hijos S.A. · v2.4.3
+    <span>Alleata Ops</span> · NAPSE Dashboard · Moretti e Hijos S.A. · v2.4.4
   </div>
 
 </div><!-- /app -->
@@ -646,13 +646,8 @@ function render() {
   renderCharts(snapshots);
 
 
-  // Historial: una sola lectura por día (la última — más reciente)
-  const byDay = {};
-  snapshots.forEach(s => {
-    const d = s.fecha || s.created_at?.split('T')[0] || '';
-    if (!byDay[d]) byDay[d] = s; // snapshots ya vienen desc, el primero es el más reciente
-  });
-  const rows = Object.values(byDay).sort((a,b) => new Date(b.created_at) - new Date(a.created_at)).slice(0,60);
+  // Historial: todos los registros de cada ejecución del cron
+  const rows = snapshots.slice(0, 60);
   document.getElementById('history-container').innerHTML = `
     <table class="history-table">
       <thead><tr>
