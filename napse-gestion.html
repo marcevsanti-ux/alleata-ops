@@ -187,6 +187,8 @@
   .costo-ots span { color:var(--text); font-weight:600; font-family:'JetBrains Mono',monospace; }
   .costo-amount { font-family:'JetBrains Mono',monospace; font-size:22px; font-weight:700; color:var(--white); }
   .costo-card.total .costo-amount { font-size:28px; color:var(--teal); }
+  .costo-prom { margin-top:10px; padding-top:10px; border-top:1px solid rgba(255,255,255,.08); font-size:10px; color:var(--muted); line-height:1.5; }
+  .costo-prom span { color:var(--teal); font-family:'JetBrains Mono',monospace; font-size:13px; font-weight:700; }
 </style>
 </head>
 <body>
@@ -230,7 +232,7 @@
         <span id="sync-label">Cargando…</span>
       </div>
       <div class="next-cron-chip" id="next-cron-chip">⏱ próx.: <span id="next-cron">—</span></div>
-      <div class="version-chip">v2.3.0</div>
+      <div class="version-chip">v2.3.1</div>
       <div id="live-clock">--:--:--</div>
       <div class="user-chip">
         <div class="user-avatar" id="user-avatar">G</div>
@@ -321,7 +323,7 @@
   </div><!-- /main -->
 
   <div class="footer">
-    <span>Alleata Ops</span> · NAPSE Dashboard · Moretti e Hijos S.A. · v2.3.0
+    <span>Alleata Ops</span> · NAPSE Dashboard · Moretti e Hijos S.A. · v2.3.1
   </div>
 
 </div><!-- /app -->
@@ -389,7 +391,7 @@ function proximoCronNAPSE() {
   const m    = ar.getUTCMinutes();
   const hm   = h * 60 + m;
 
-  const slots = [9 * 60, 17 * 60]; // 9:00 y 17:00 en minutos
+  const slots = [10 * 60, 14 * 60, 17 * 60]; // 10:00, 14:00 y 17:00 en minutos
 
   // Buscar próximo slot en días hábiles
   for (let dayOffset = 0; dayOffset <= 7; dayOffset++) {
@@ -821,17 +823,27 @@ function renderCharts(snaps) {
   ];
   const costoTotal = latest.costo_total || logisticas.reduce((s,l)=>s+l.costo,0);
 
+  const totalOts = logisticas.reduce((s,l)=>s+l.ots,0);
+  const promTotal = totalOts > 0 ? costoTotal / totalOts : 0;
+
   document.getElementById('costo-grid').innerHTML =
-    logisticas.map(l => `
-      <div class="costo-card">
+    logisticas.map(l => {
+      const prom = l.ots > 0 ? l.costo / l.ots : 0;
+      const promLine = (l.label !== 'ALLEATA' && l.ots > 0)
+        ? `<div class="costo-prom">Costo por envío ${l.label}<br><span>${fmt(prom)}</span></div>`
+        : '';
+      return `<div class="costo-card">
         <div class="costo-label" style="color:${l.color}">${l.label}</div>
         <div class="costo-ots"><span>${l.ots}</span> OTs</div>
         <div class="costo-amount">${fmt(l.costo)}</div>
-      </div>`).join('') +
+        ${promLine}
+      </div>`;
+    }).join('') +
     `<div class="costo-card total">
       <div class="costo-label">TOTAL</div>
-      <div class="costo-ots"><span>${logisticas.reduce((s,l)=>s+l.ots,0)}</span> OTs</div>
+      <div class="costo-ots"><span>${totalOts}</span> OTs</div>
       <div class="costo-amount">${fmt(costoTotal)}</div>
+      ${totalOts > 0 ? `<div class="costo-prom">Costo promedio por envío<br><span>${fmt(promTotal)}</span></div>` : ''}
     </div>`;
 }
 
