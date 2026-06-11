@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>GESTIÓN NAPSE — Dashboard</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap');
 
@@ -181,6 +182,26 @@
   .footer { text-align:center; padding:20px; font-size:10px; color:var(--muted); border-top:1px solid var(--border); }
   .footer span { color:var(--teal); font-weight:600; }
   .empty-state { text-align:center; padding:32px; color:var(--muted); font-size:13px; }
+
+  /* GRAFICOS */
+  .charts-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:22px; }
+  @media(max-width:900px){ .charts-grid { grid-template-columns:1fr; } }
+  .chart-panel { background:var(--card-bg); border:1px solid var(--border); border-radius:12px; padding:18px 20px; }
+  .chart-title { font-size:10px; font-weight:700; letter-spacing:2px; text-transform:uppercase; color:var(--muted); margin-bottom:16px; display:flex; align-items:center; gap:8px; }
+  .chart-title::after { content:''; flex:1; height:1px; background:var(--border); }
+  .chart-wrap { position:relative; height:220px; }
+  .chart-wrap-tall { position:relative; height:260px; }
+
+  /* COSTO INDICATOR */
+  .costo-grid { display:grid; grid-template-columns:repeat(4,1fr) 1.3fr; gap:12px; margin-bottom:22px; }
+  @media(max-width:1100px){ .costo-grid { grid-template-columns:repeat(2,1fr); } }
+  .costo-card { background:var(--card-bg); border:1px solid var(--border); border-radius:12px; padding:16px; }
+  .costo-card.total { background:linear-gradient(135deg,rgba(29,191,142,.12),rgba(26,159,212,.08)); border-color:rgba(29,191,142,.3); }
+  .costo-label { font-size:9px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; color:var(--muted); margin-bottom:6px; }
+  .costo-ots   { font-size:11px; color:var(--muted); margin-bottom:4px; }
+  .costo-ots span { color:var(--text); font-weight:600; font-family:'JetBrains Mono',monospace; }
+  .costo-amount { font-family:'JetBrains Mono',monospace; font-size:22px; font-weight:700; color:var(--white); }
+  .costo-card.total .costo-amount { font-size:28px; color:var(--teal); }
 </style>
 </head>
 <body>
@@ -224,7 +245,7 @@
         <span id="sync-label">Cargando…</span>
       </div>
       <div class="next-cron-chip" id="next-cron-chip">⏱ próx.: <span id="next-cron">—</span></div>
-      <div class="version-chip">v2.1.0</div>
+      <div class="version-chip">v2.2.0</div>
       <div id="live-clock">--:--:--</div>
       <div class="user-chip">
         <div class="user-avatar" id="user-avatar">G</div>
@@ -274,6 +295,39 @@
       <div id="history-container"><div class="empty-state">Sin datos</div></div>
     </div>
 
+
+    <!-- GRAFICOS -->
+    <div class="charts-grid">
+
+      <!-- Gráfico 1: Evolución día a día -->
+      <div class="chart-panel" style="grid-column:1/-1">
+        <div class="chart-title">Evolución diaria de estados</div>
+        <div class="chart-wrap-tall"><canvas id="chart-evolucion"></canvas></div>
+      </div>
+
+      <!-- Gráfico 2: Tipo de OT -->
+      <div class="chart-panel">
+        <div class="chart-title">OTs por tipo</div>
+        <div class="chart-wrap"><canvas id="chart-tipo"></canvas></div>
+      </div>
+
+      <!-- Gráfico 3: Logística -->
+      <div class="chart-panel">
+        <div class="chart-title">OTs por logística (Despachado + Exitoso)</div>
+        <div class="chart-wrap"><canvas id="chart-logistica"></canvas></div>
+      </div>
+
+    </div>
+
+    <!-- COSTOS POR LOGISTICA -->
+    <div class="panel-title" style="margin-bottom:12px;font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:8px;">
+      Costo por logística (Despachado + Exitoso)
+      <span style="flex:1;height:1px;background:var(--border);display:block"></span>
+    </div>
+    <div class="costo-grid" id="costo-grid">
+      <!-- Llenado por JS -->
+    </div>
+
     <!-- BOTTOM GRID -->
     <div class="bottom-grid">
       <div class="panel">
@@ -309,7 +363,7 @@
   </div><!-- /main -->
 
   <div class="footer">
-    <span>Alleata Ops</span> · NAPSE Dashboard · Moretti e Hijos S.A. · v2.1.0
+    <span>Alleata Ops</span> · NAPSE Dashboard · Moretti e Hijos S.A. · v2.2.0
   </div>
 
 </div><!-- /app -->
@@ -604,6 +658,9 @@ function render() {
   document.getElementById('total-sublabel').textContent =
     `${snapshots.length} registros · ${snapshots.filter(s=>s._source==='sf').length} desde SF`;
 
+  // Gráficos
+  renderCharts(snapshots);
+
   // Bar chart
   const maxVal = Math.max(...ESTADOS.map(e => latest[e.key]||0), 1);
   document.getElementById('bar-chart').innerHTML = ESTADOS.map(e => {
@@ -677,6 +734,150 @@ function saveManual() {
   render();
   ['f-conf','f-proc','f-pre','f-desp','f-exit'].forEach(id => document.getElementById(id).value='');
   toast('✓ Guardado localmente', 'ok');
+}
+
+
+// ════════════════════════════════════════════════════════════════
+// GRÁFICOS
+// ════════════════════════════════════════════════════════════════
+let chartEvolucion = null;
+let chartTipo      = null;
+let chartLogistica = null;
+
+const CHART_DEFAULTS = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: { legend: { labels: { color: '#7a91a8', font: { family: 'Inter', size: 11 } } } },
+};
+
+function destroyCharts() {
+  [chartEvolucion, chartTipo, chartLogistica].forEach(c => { if (c) c.destroy(); });
+}
+
+function renderCharts(snaps) {
+  if (!snaps.length) return;
+  destroyCharts();
+
+  const latest = snaps[0];
+
+  // ── Gráfico 1: Evolución día a día ─────────────────────────────
+  // Tomamos los últimos 14 snapshots únicos por fecha (último del día)
+  const byDate = {};
+  [...snaps].reverse().forEach(s => {
+    const d = (s.fecha || s.created_at?.split('T')[0]);
+    byDate[d] = s; // sobreescribe, queda el más reciente del día
+  });
+  const dias = Object.keys(byDate).sort().slice(-14);
+  const labels = dias.map(d => { const [y,m,dd]=d.split('-'); return `${dd}/${m}`; });
+
+  chartEvolucion = new Chart(document.getElementById('chart-evolucion'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label: 'Configurar Terminal', data: dias.map(d => byDate[d].configurar_terminal||0), borderColor:'#e67e22', backgroundColor:'rgba(230,126,34,.1)', tension:.3, fill:true, pointRadius:3 },
+        { label: 'En Proceso',          data: dias.map(d => byDate[d].en_proceso||0),          borderColor:'#1a9fd4', backgroundColor:'rgba(26,159,212,.1)',  tension:.3, fill:true, pointRadius:3 },
+        { label: 'Pre-Colecta',         data: dias.map(d => byDate[d].pre_colecta||0),         borderColor:'#f5a623', backgroundColor:'rgba(245,166,35,.1)',  tension:.3, fill:true, pointRadius:3 },
+        { label: 'Despachado',          data: dias.map(d => byDate[d].despachado||0),          borderColor:'#3a7bd5', backgroundColor:'rgba(58,123,213,.1)',  tension:.3, fill:true, pointRadius:3 },
+        { label: 'Exitoso',             data: dias.map(d => byDate[d].exitoso||0),             borderColor:'#27ae60', backgroundColor:'rgba(39,174,96,.1)',   tension:.3, fill:true, pointRadius:3 },
+      ],
+    },
+    options: {
+      ...CHART_DEFAULTS,
+      scales: {
+        x: { ticks: { color:'#7a91a8', font:{size:10} }, grid: { color:'rgba(255,255,255,.04)' } },
+        y: { ticks: { color:'#7a91a8', font:{size:10} }, grid: { color:'rgba(255,255,255,.04)' }, beginAtZero:true },
+      },
+    },
+  });
+
+  // ── Gráfico 2: Tipo de OT ───────────────────────────────────────
+  const inst   = latest.instalacion_equipo  || 0;
+  const cambio = latest.cambio_terminal     || 0;
+  chartTipo = new Chart(document.getElementById('chart-tipo'), {
+    type: 'bar',
+    data: {
+      labels: ['Instalación Equipo + Simcard', 'Cambio de Terminal'],
+      datasets: [{
+        label: 'OTs',
+        data: [inst, cambio],
+        backgroundColor: ['rgba(29,191,142,.7)', 'rgba(26,159,212,.7)'],
+        borderColor:     ['#1dbf8e', '#1a9fd4'],
+        borderWidth: 1,
+        borderRadius: 6,
+      }],
+    },
+    options: {
+      ...CHART_DEFAULTS,
+      indexAxis: 'y',
+      plugins: { ...CHART_DEFAULTS.plugins, legend: { display: false } },
+      scales: {
+        x: { ticks: { color:'#7a91a8', font:{size:10} }, grid: { color:'rgba(255,255,255,.04)' }, beginAtZero:true },
+        y: { ticks: { color:'#e2e8f0', font:{size:11} }, grid: { display:false } },
+      },
+    },
+  });
+
+  // ── Gráfico 3: Logística ────────────────────────────────────────
+  const logLabels = ['ALLEATA', 'Correo Arg.', 'EPSA', 'Cabify', 'Otros'];
+  const logData   = [
+    latest.alleata_ots          || 0,
+    latest.correo_argentino_ots || 0,
+    latest.epsa_ots             || 0,
+    latest.cabify_ots           || 0,
+    latest.otros_ots            || 0,
+  ].filter((v,i,a) => v > 0 || i < 4); // mostrar aunque sea 0 las principales
+
+  const logColors = ['rgba(29,191,142,.75)','rgba(26,159,212,.75)','rgba(245,166,35,.75)','rgba(231,76,60,.75)','rgba(122,145,168,.5)'];
+
+  chartLogistica = new Chart(document.getElementById('chart-logistica'), {
+    type: 'bar',
+    data: {
+      labels: logLabels,
+      datasets: [{
+        label: 'OTs',
+        data: [
+          latest.alleata_ots||0, latest.correo_argentino_ots||0,
+          latest.epsa_ots||0,    latest.cabify_ots||0, latest.otros_ots||0,
+        ],
+        backgroundColor: logColors,
+        borderColor: logColors.map(c => c.replace('.75','.9').replace('.5','.8')),
+        borderWidth: 1,
+        borderRadius: 6,
+      }],
+    },
+    options: {
+      ...CHART_DEFAULTS,
+      plugins: { ...CHART_DEFAULTS.plugins, legend: { display: false } },
+      scales: {
+        x: { ticks: { color:'#e2e8f0', font:{size:11} }, grid: { display:false } },
+        y: { ticks: { color:'#7a91a8', font:{size:10} }, grid: { color:'rgba(255,255,255,.04)' }, beginAtZero:true },
+      },
+    },
+  });
+
+  // ── Costos por logística ────────────────────────────────────────
+  const fmt = n => '$' + (n||0).toLocaleString('es-AR', {minimumFractionDigits:0, maximumFractionDigits:0});
+  const logisticas = [
+    { label:'ALLEATA',        ots: latest.alleata_ots||0,          costo: latest.alleata_costo||0,          color:'#1dbf8e' },
+    { label:'Correo Arg.',    ots: latest.correo_argentino_ots||0,  costo: latest.correo_argentino_costo||0, color:'#1a9fd4' },
+    { label:'EPSA',           ots: latest.epsa_ots||0,             costo: latest.epsa_costo||0,             color:'#f5a623' },
+    { label:'Cabify',         ots: latest.cabify_ots||0,           costo: latest.cabify_costo||0,           color:'#e74c3c' },
+  ];
+  const costoTotal = latest.costo_total || logisticas.reduce((s,l)=>s+l.costo,0);
+
+  document.getElementById('costo-grid').innerHTML =
+    logisticas.map(l => `
+      <div class="costo-card">
+        <div class="costo-label" style="color:${l.color}">${l.label}</div>
+        <div class="costo-ots"><span>${l.ots}</span> OTs</div>
+        <div class="costo-amount">${fmt(l.costo)}</div>
+      </div>`).join('') +
+    `<div class="costo-card total">
+      <div class="costo-label">TOTAL</div>
+      <div class="costo-ots"><span>${logisticas.reduce((s,l)=>s+l.ots,0)}</span> OTs</div>
+      <div class="costo-amount">${fmt(costoTotal)}</div>
+    </div>`;
 }
 
 // ════════════════════════════════════════════════════════════════
