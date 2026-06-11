@@ -87,7 +87,6 @@
   .sync-status { font-size:11px; color:var(--muted); display:flex; align-items:center; gap:6px; }
   .sync-dot { width:7px; height:7px; border-radius:50%; background:var(--muted); flex-shrink:0; transition:background .3s; }
   .sync-dot.ok { background:var(--green); }
-  .next-cron-chip { font-size:11px; color:var(--teal); font-family:'JetBrains Mono',monospace; background:rgba(29,191,142,.08); border:1px solid rgba(29,191,142,.2); border-radius:20px; padding:3px 10px; white-space:nowrap; }
   .version-chip   { font-size:10px; color:var(--muted); font-family:'JetBrains Mono',monospace; background:rgba(255,255,255,.05); border:1px solid var(--border); border-radius:20px; padding:3px 10px; }
   .sync-dot.loading { background:var(--gold); animation:pulse 1s infinite; }
   .sync-dot.error { background:var(--red); }
@@ -168,6 +167,18 @@
   .footer span { color:var(--teal); font-weight:600; }
   .empty-state { text-align:center; padding:32px; color:var(--muted); font-size:13px; }
 
+  /* CRON INFO PANEL */
+  .cron-info-panel { background:var(--navy-3); border:1px solid var(--border); border-left:3px solid var(--teal); border-radius:8px; padding:10px 18px; margin-bottom:18px; display:flex; align-items:center; justify-content:space-between; }
+  .cron-info-left  { display:flex; align-items:center; gap:12px; }
+  .cron-info-icon  { font-size:16px; }
+  .cron-info-title { font-size:10px; font-weight:700; color:var(--muted); letter-spacing:1.5px; text-transform:uppercase; margin-bottom:5px; }
+  .cron-info-slots { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .cron-slot  { font-size:11px; font-weight:700; color:var(--text); }
+  .cron-time  { font-family:'JetBrains Mono',monospace; font-size:12px; font-weight:700; color:var(--teal); background:rgba(29,191,142,.1); border:1px solid rgba(29,191,142,.2); padding:2px 8px; border-radius:6px; }
+  .cron-sep   { color:var(--muted); font-size:12px; }
+  .cron-info-next { font-size:11px; color:var(--muted); margin-left:4px; }
+  .cron-info-next strong { color:var(--gold); font-family:'JetBrains Mono',monospace; }
+
   /* GRAFICOS */
   .charts-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:22px; }
   @media(max-width:900px){ .charts-grid { grid-template-columns:1fr; } }
@@ -175,7 +186,6 @@
   .chart-title { font-size:10px; font-weight:700; letter-spacing:2px; text-transform:uppercase; color:var(--muted); margin-bottom:16px; display:flex; align-items:center; gap:8px; }
   .chart-title::after { content:''; flex:1; height:1px; background:var(--border); }
   .chart-wrap { position:relative; height:220px; }
-  .chart-wrap-tall { position:relative; height:260px; }
 
   /* COSTO INDICATOR */
   .costo-grid { display:grid; grid-template-columns:repeat(4,1fr) 1.3fr; gap:12px; margin-bottom:22px; }
@@ -231,8 +241,7 @@
         <div class="sync-dot" id="sync-dot"></div>
         <span id="sync-label">Cargando…</span>
       </div>
-      <div class="next-cron-chip" id="next-cron-chip">⏱ próx.: <span id="next-cron">—</span></div>
-      <div class="version-chip">v2.3.1</div>
+      <div class="version-chip">v2.4.0</div>
       <div id="live-clock">--:--:--</div>
       <div class="user-chip">
         <div class="user-avatar" id="user-avatar">G</div>
@@ -264,6 +273,27 @@
       <div class="turno-badge" id="current-turno">—</div>
     </div>
 
+
+    <!-- CRON INFO -->
+    <div class="cron-info-panel">
+      <div class="cron-info-left">
+        <span class="cron-info-icon">⏱</span>
+        <div>
+          <div class="cron-info-title">Actualización automática desde SF</div>
+          <div class="cron-info-slots">
+            <span class="cron-slot">Lun–Vie</span>
+            <span class="cron-time">10:00</span>
+            <span class="cron-sep">·</span>
+            <span class="cron-time">14:00</span>
+            <span class="cron-sep">·</span>
+            <span class="cron-time">17:00</span>
+            <span class="cron-sep">·</span>
+            <span class="cron-info-next">Próximo: <strong id="next-cron">—</strong></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- TOTAL STRIP -->
     <div class="total-strip">
       <div><div class="label">TOTAL OTs ACTIVAS</div></div>
@@ -285,12 +315,6 @@
 
     <!-- GRAFICOS -->
     <div class="charts-grid">
-
-      <!-- Gráfico 1: Evolución día a día -->
-      <div class="chart-panel" style="grid-column:1/-1">
-        <div class="chart-title">Evolución diaria de estados</div>
-        <div class="chart-wrap-tall"><canvas id="chart-evolucion"></canvas></div>
-      </div>
 
       <!-- Gráfico 2: Tipo de OT -->
       <div class="chart-panel">
@@ -323,7 +347,7 @@
   </div><!-- /main -->
 
   <div class="footer">
-    <span>Alleata Ops</span> · NAPSE Dashboard · Moretti e Hijos S.A. · v2.3.1
+    <span>Alleata Ops</span> · NAPSE Dashboard · Moretti e Hijos S.A. · v2.4.0
   </div>
 
 </div><!-- /app -->
@@ -663,7 +687,6 @@ function render() {
 // ════════════════════════════════════════════════════════════════
 // GRÁFICOS
 // ════════════════════════════════════════════════════════════════
-let chartEvolucion = null;
 let chartTipo      = null;
 let chartLogistica = null;
 
@@ -674,7 +697,7 @@ const CHART_DEFAULTS = {
 };
 
 function destroyCharts() {
-  [chartEvolucion, chartTipo, chartLogistica].forEach(c => { if (c) c.destroy(); });
+  [chartTipo, chartLogistica].forEach(c => { if (c) c.destroy(); });
 }
 
 function renderCharts(snaps) {
@@ -682,37 +705,6 @@ function renderCharts(snaps) {
   destroyCharts();
 
   const latest = snaps[0];
-
-  // ── Gráfico 1: Evolución día a día ─────────────────────────────
-  // Tomamos los últimos 14 snapshots únicos por fecha (último del día)
-  const byDate = {};
-  [...snaps].reverse().forEach(s => {
-    const d = (s.fecha || s.created_at?.split('T')[0]);
-    byDate[d] = s; // sobreescribe, queda el más reciente del día
-  });
-  const dias = Object.keys(byDate).sort().slice(-14);
-  const labels = dias.map(d => { const [y,m,dd]=d.split('-'); return `${dd}/${m}`; });
-
-  chartEvolucion = new Chart(document.getElementById('chart-evolucion'), {
-    type: 'line',
-    data: {
-      labels,
-      datasets: [
-        { label: 'Configurar Terminal', data: dias.map(d => byDate[d].configurar_terminal||0), borderColor:'#e67e22', backgroundColor:'rgba(230,126,34,.1)', tension:.3, fill:true, pointRadius:3 },
-        { label: 'En Proceso',          data: dias.map(d => byDate[d].en_proceso||0),          borderColor:'#1a9fd4', backgroundColor:'rgba(26,159,212,.1)',  tension:.3, fill:true, pointRadius:3 },
-        { label: 'Pre-Colecta',         data: dias.map(d => byDate[d].pre_colecta||0),         borderColor:'#f5a623', backgroundColor:'rgba(245,166,35,.1)',  tension:.3, fill:true, pointRadius:3 },
-        { label: 'Despachado',          data: dias.map(d => byDate[d].despachado||0),          borderColor:'#3a7bd5', backgroundColor:'rgba(58,123,213,.1)',  tension:.3, fill:true, pointRadius:3 },
-        { label: 'Exitoso',             data: dias.map(d => byDate[d].exitoso||0),             borderColor:'#27ae60', backgroundColor:'rgba(39,174,96,.1)',   tension:.3, fill:true, pointRadius:3 },
-      ],
-    },
-    options: {
-      ...CHART_DEFAULTS,
-      scales: {
-        x: { ticks: { color:'#7a91a8', font:{size:10} }, grid: { color:'rgba(255,255,255,.04)' } },
-        y: { ticks: { color:'#7a91a8', font:{size:10} }, grid: { color:'rgba(255,255,255,.04)' }, beginAtZero:true },
-      },
-    },
-  });
 
   // ── Gráfico 2: Tipo de OT ───────────────────────────────────────
   const inst   = latest.instalacion_equipo  || 0;
