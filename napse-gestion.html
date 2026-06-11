@@ -245,7 +245,7 @@
         <span id="sync-label">Cargando…</span>
       </div>
       <div class="next-cron-chip" id="next-cron-chip">⏱ próx.: <span id="next-cron">—</span></div>
-      <div class="version-chip">v2.2.0</div>
+      <div class="version-chip">v2.2.1</div>
       <div id="live-clock">--:--:--</div>
       <div class="user-chip">
         <div class="user-avatar" id="user-avatar">G</div>
@@ -363,7 +363,7 @@
   </div><!-- /main -->
 
   <div class="footer">
-    <span>Alleata Ops</span> · NAPSE Dashboard · Moretti e Hijos S.A. · v2.2.0
+    <span>Alleata Ops</span> · NAPSE Dashboard · Moretti e Hijos S.A. · v2.2.1
   </div>
 
 </div><!-- /app -->
@@ -810,11 +810,30 @@ function renderCharts(snaps) {
     options: {
       ...CHART_DEFAULTS,
       indexAxis: 'y',
-      plugins: { ...CHART_DEFAULTS.plugins, legend: { display: false } },
+      plugins: {
+        ...CHART_DEFAULTS.plugins,
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => ` ${ctx.parsed.x} OTs` } },
+      },
       scales: {
-        x: { ticks: { color:'#7a91a8', font:{size:10} }, grid: { color:'rgba(255,255,255,.04)' }, beginAtZero:true },
+        x: { ticks: { color:'#7a91a8', font:{size:10} }, grid: { color:'rgba(255,255,255,.04)' }, beginAtZero:true, max: Math.max(inst,cambio) * 1.18 },
         y: { ticks: { color:'#e2e8f0', font:{size:11} }, grid: { display:false } },
       },
+      animation: { onComplete(ctx) {
+        const chart = ctx.chart;
+        const { ctx: c, data } = chart;
+        c.save();
+        c.font = 'bold 13px JetBrains Mono, monospace';
+        c.fillStyle = '#e2e8f0';
+        c.textAlign = 'left';
+        c.textBaseline = 'middle';
+        data.datasets[0].data.forEach((val, i) => {
+          const meta = chart.getDatasetMeta(0);
+          const bar  = meta.data[i];
+          c.fillText(val + ' OTs', bar.x + 8, bar.y);
+        });
+        c.restore();
+      }},
     },
   });
 
@@ -830,16 +849,17 @@ function renderCharts(snaps) {
 
   const logColors = ['rgba(29,191,142,.75)','rgba(26,159,212,.75)','rgba(245,166,35,.75)','rgba(231,76,60,.75)','rgba(122,145,168,.5)'];
 
+  const logDataVals = [
+    latest.alleata_ots||0, latest.correo_argentino_ots||0,
+    latest.epsa_ots||0,    latest.cabify_ots||0, latest.otros_ots||0,
+  ];
   chartLogistica = new Chart(document.getElementById('chart-logistica'), {
     type: 'bar',
     data: {
       labels: logLabels,
       datasets: [{
         label: 'OTs',
-        data: [
-          latest.alleata_ots||0, latest.correo_argentino_ots||0,
-          latest.epsa_ots||0,    latest.cabify_ots||0, latest.otros_ots||0,
-        ],
+        data: logDataVals,
         backgroundColor: logColors,
         borderColor: logColors.map(c => c.replace('.75','.9').replace('.5','.8')),
         borderWidth: 1,
@@ -851,8 +871,22 @@ function renderCharts(snaps) {
       plugins: { ...CHART_DEFAULTS.plugins, legend: { display: false } },
       scales: {
         x: { ticks: { color:'#e2e8f0', font:{size:11} }, grid: { display:false } },
-        y: { ticks: { color:'#7a91a8', font:{size:10} }, grid: { color:'rgba(255,255,255,.04)' }, beginAtZero:true },
+        y: { ticks: { color:'#7a91a8', font:{size:10} }, grid: { color:'rgba(255,255,255,.04)' }, beginAtZero:true, max: Math.max(...logDataVals) * 1.2 },
       },
+      animation: { onComplete(ctx) {
+        const chart = ctx.chart;
+        const { ctx: c } = chart;
+        c.save();
+        c.font = 'bold 12px JetBrains Mono, monospace';
+        c.fillStyle = '#e2e8f0';
+        c.textAlign = 'center';
+        c.textBaseline = 'bottom';
+        chart.getDatasetMeta(0).data.forEach((bar, i) => {
+          const val = logDataVals[i];
+          if (val > 0) c.fillText(val, bar.x, bar.y - 4);
+        });
+        c.restore();
+      }},
     },
   });
 
