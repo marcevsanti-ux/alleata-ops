@@ -86,6 +86,8 @@
   .sync-status { font-size:11px; color:var(--muted); display:flex; align-items:center; gap:6px; }
   .sync-dot { width:7px; height:7px; border-radius:50%; background:var(--muted); flex-shrink:0; transition:background .3s; }
   .sync-dot.ok { background:var(--green); }
+  .next-cron-chip { font-size:11px; color:var(--teal); font-family:'JetBrains Mono',monospace; background:rgba(29,191,142,.08); border:1px solid rgba(29,191,142,.2); border-radius:20px; padding:3px 10px; white-space:nowrap; }
+  .version-chip   { font-size:10px; color:var(--muted); font-family:'JetBrains Mono',monospace; background:rgba(255,255,255,.05); border:1px solid var(--border); border-radius:20px; padding:3px 10px; }
   .sync-dot.loading { background:var(--gold); animation:pulse 1s infinite; }
   .sync-dot.error { background:var(--red); }
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
@@ -221,6 +223,8 @@
         <div class="sync-dot" id="sync-dot"></div>
         <span id="sync-label">Cargando…</span>
       </div>
+      <div class="next-cron-chip" id="next-cron-chip">⏱ próx.: <span id="next-cron">—</span></div>
+      <div class="version-chip">v2.1.0</div>
       <div id="live-clock">--:--:--</div>
       <div class="user-chip">
         <div class="user-avatar" id="user-avatar">G</div>
@@ -362,10 +366,48 @@ function fmtDatetime(d) {
 function loadLocal()      { try { return JSON.parse(localStorage.getItem('napse_snaps_v2')||'[]'); } catch { return []; } }
 function saveLocal(snaps) { try { localStorage.setItem('napse_snaps_v2', JSON.stringify(snaps.slice(0,200))); } catch {} }
 
+
+// ── Próximo cron NAPSE (9:00 y 17:00 ART, L-V) ───────────────────────────────
+function proximoCronNAPSE() {
+  // Hora actual en ART (UTC-3)
+  const now = new Date();
+  const ar  = new Date(now.getTime() - 3 * 60 * 60 * 1000);
+  const dow  = ar.getUTCDay();   // 0=Dom, 1=Lun ... 5=Vie, 6=Sab
+  const h    = ar.getUTCHours();
+  const m    = ar.getUTCMinutes();
+  const hm   = h * 60 + m;
+
+  const slots = [9 * 60, 17 * 60]; // 9:00 y 17:00 en minutos
+
+  // Buscar próximo slot en días hábiles
+  for (let dayOffset = 0; dayOffset <= 7; dayOffset++) {
+    const targetDow = (dow + dayOffset) % 7;
+    const esHabil = targetDow >= 1 && targetDow <= 5;
+    if (!esHabil) continue;
+
+    for (const slot of slots) {
+      if (dayOffset === 0 && slot <= hm) continue; // ya pasó hoy
+      const slotH = Math.floor(slot / 60);
+      const slotM = slot % 60;
+      const p = n => String(n).padStart(2, '0');
+
+      if (dayOffset === 0) return `hoy ${p(slotH)}:${p(slotM)}`;
+      if (dayOffset === 1) return `mañana ${p(slotH)}:${p(slotM)}`;
+      const dias = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+      return `${dias[targetDow]} ${p(slotH)}:${p(slotM)}`;
+    }
+  }
+  return '—';
+}
+
 // ── Clock ─────────────────────────────────────────────────────────
 function updateClock() {
   const p=n=>String(n).padStart(2,'0'), n=new Date();
   document.getElementById('live-clock').textContent=`${p(n.getHours())}:${p(n.getMinutes())}:${p(n.getSeconds())}`;
+  // Actualizar próximo cron cada minuto
+  if (n.getSeconds() === 0 || document.getElementById('next-cron').textContent === '—') {
+    document.getElementById('next-cron').textContent = proximoCronNAPSE();
+  }
 }
 setInterval(updateClock,1000); updateClock();
 
