@@ -148,6 +148,11 @@
   .panel-title::after { content:''; flex:1; height:1px; background:var(--border); }
 
   /* HISTORY TABLE */
+  /* HISTORIAL SCROLL */
+  .history-scroll { max-height:320px; overflow-y:auto; scrollbar-width:thin; scrollbar-color:var(--teal) var(--navy-3); }
+  .history-scroll::-webkit-scrollbar { width:5px; }
+  .history-scroll::-webkit-scrollbar-track { background:var(--navy-3); border-radius:3px; }
+  .history-scroll::-webkit-scrollbar-thumb { background:var(--teal); border-radius:3px; }
   .history-table { width:100%; border-collapse:collapse; font-size:11px; }
   .history-table th { text-align:left; padding:5px 8px; color:var(--muted); font-weight:600; font-size:9px; letter-spacing:1px; text-transform:uppercase; border-bottom:1px solid var(--border); }
   .history-table td { padding:8px; border-bottom:1px solid rgba(255,255,255,.04); color:var(--text); font-family:'JetBrains Mono',monospace; font-size:11px; }
@@ -241,7 +246,7 @@
         <div class="sync-dot" id="sync-dot"></div>
         <span id="sync-label">Cargando…</span>
       </div>
-      <div class="version-chip">v2.4.1</div>
+      <div class="version-chip">v2.4.3</div>
       <div id="live-clock">--:--:--</div>
       <div class="user-chip">
         <div class="user-avatar" id="user-avatar">G</div>
@@ -309,7 +314,7 @@
     <!-- HISTORIAL -->
     <div class="panel" style="margin-bottom:22px;">
       <div class="panel-title">Historial de snapshots</div>
-      <div id="history-container" style="max-height:320px;overflow-y:auto;"><div class="empty-state">Sin datos</div></div>
+      <div id="history-container" class="history-scroll"><div class="empty-state">Sin datos</div></div>
     </div>
 
 
@@ -347,7 +352,7 @@
   </div><!-- /main -->
 
   <div class="footer">
-    <span>Alleata Ops</span> · NAPSE Dashboard · Moretti e Hijos S.A. · v2.4.1
+    <span>Alleata Ops</span> · NAPSE Dashboard · Moretti e Hijos S.A. · v2.4.3
   </div>
 
 </div><!-- /app -->
@@ -641,11 +646,11 @@ function render() {
   renderCharts(snapshots);
 
 
-  // Historial: una sola lectura por día (la primera — más temprana)
+  // Historial: una sola lectura por día (la última — más reciente)
   const byDay = {};
-  [...snapshots].reverse().forEach(s => {
+  snapshots.forEach(s => {
     const d = s.fecha || s.created_at?.split('T')[0] || '';
-    if (!byDay[d]) byDay[d] = s;
+    if (!byDay[d]) byDay[d] = s; // snapshots ya vienen desc, el primero es el más reciente
   });
   const rows = Object.values(byDay).sort((a,b) => new Date(b.created_at) - new Date(a.created_at)).slice(0,60);
   document.getElementById('history-container').innerHTML = `
