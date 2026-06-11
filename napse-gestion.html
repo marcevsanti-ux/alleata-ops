@@ -241,7 +241,7 @@
         <div class="sync-dot" id="sync-dot"></div>
         <span id="sync-label">Cargando…</span>
       </div>
-      <div class="version-chip">v2.4.0</div>
+      <div class="version-chip">v2.4.1</div>
       <div id="live-clock">--:--:--</div>
       <div class="user-chip">
         <div class="user-avatar" id="user-avatar">G</div>
@@ -347,7 +347,7 @@
   </div><!-- /main -->
 
   <div class="footer">
-    <span>Alleata Ops</span> · NAPSE Dashboard · Moretti e Hijos S.A. · v2.4.0
+    <span>Alleata Ops</span> · NAPSE Dashboard · Moretti e Hijos S.A. · v2.4.1
   </div>
 
 </div><!-- /app -->
@@ -815,8 +815,9 @@ function renderCharts(snaps) {
   ];
   const costoTotal = latest.costo_total || logisticas.reduce((s,l)=>s+l.costo,0);
 
-  const totalOts = logisticas.reduce((s,l)=>s+l.ots,0);
-  const promTotal = totalOts > 0 ? costoTotal / totalOts : 0;
+  const totalOts    = logisticas.reduce((s,l)=>s+l.ots,0);
+  const otsConCosto = logisticas.filter(l=>l.label!=='ALLEATA').reduce((s,l)=>s+l.ots,0);
+  const promTotal   = otsConCosto > 0 ? costoTotal / otsConCosto : 0;
 
   document.getElementById('costo-grid').innerHTML =
     logisticas.map(l => {
@@ -835,7 +836,7 @@ function renderCharts(snaps) {
       <div class="costo-label">TOTAL</div>
       <div class="costo-ots"><span>${totalOts}</span> OTs</div>
       <div class="costo-amount">${fmt(costoTotal)}</div>
-      ${totalOts > 0 ? `<div class="costo-prom">Costo promedio por envío<br><span>${fmt(promTotal)}</span></div>` : ''}
+      ${otsConCosto > 0 ? `<div class="costo-prom">Costo promedio por envío<br><span>${fmt(promTotal)}</span><br><em style="font-size:9px;color:var(--muted);font-style:normal">* No contempla envíos Alleata</em></div>` : ''}
     </div>`;
 }
 
