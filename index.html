@@ -9517,7 +9517,10 @@ async function storeLoad(){
   try{
     const res=await fetch(`${ALLY_RAILWAY_BASE}/store/terminales-barracas`,{headers:{'x-automation-secret':'123456'}});
     const data=await res.json();
-    if(!data.ok) throw new Error(data.error||'Error desconocido');
+    if(!data.ok){
+      const msg=typeof data.error==='string'?data.error:JSON.stringify(data.error);
+      throw new Error(msg||'Error desconocido');
+    }
     _storeData=data.terminales||[];
     document.getElementById('sk-total').textContent=data.total;
     document.getElementById('sk-andres').textContent=data.resumen.andres;
@@ -9528,7 +9531,7 @@ async function storeLoad(){
     storeRender();
   }catch(err){
     errEl.style.display='block';
-    const errMsg=typeof err.message==='string'?err.message:JSON.stringify(err.message);
+    const errMsg=typeof err==='string'?err:err.message||JSON.stringify(err);
     errEl.textContent='❌ '+errMsg;
     wrap.innerHTML=`<div style="padding:40px;text-align:center;color:var(--text-muted)">Sin datos</div>`;
   }finally{
