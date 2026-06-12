@@ -133,7 +133,7 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;min-h
 .topbar-right{margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-muted);}
 .content{flex:1;padding:22px 28px 60px;}
 
-.module{display:none!important;}.module.active{display:block!important;}
+.module{display:none!important;}.module.active{display:block!important;}.module.active:not(#mod-sf):not(#mod-home):not(#mod-sims):not(#mod-envios):not(#mod-devoluciones):not(#mod-horas):not(#mod-ajustes):not(#mod-rollout):not(#mod-desinstalaciones):not(#mod-napse){padding:22px 28px 60px;}
 
 /* WELCOME */
 .welcome-banner{background:var(--surface);border:1px solid var(--border2);border-radius:14px;padding:24px 28px;margin-bottom:20px;display:flex;align-items:center;gap:20px;position:relative;overflow:hidden;}
@@ -4422,6 +4422,10 @@ function goTo(mod){
   const target=document.getElementById('mod-'+mod);
   if(!target)return;
   target.classList.add('active');
+  // Ocultar .content cuando el módulo vive fuera de él (evita el bloque negro vacío)
+  const outsideMods=new Set(['ally','retencion','distri','store','terminales','instalaciones']);
+  const contentEl=document.querySelector('.content');
+  if(contentEl) contentEl.style.display=outsideMods.has(mod)?'none':'';
   const navEl=document.querySelector(`.nav-item[data-mod="${mod}"]`);
   if(navEl)navEl.classList.add('active');
   document.getElementById('topbar-title').textContent=MOD_INFO[mod]||mod;
