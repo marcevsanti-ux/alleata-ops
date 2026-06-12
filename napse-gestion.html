@@ -246,7 +246,7 @@
         <div class="sync-dot" id="sync-dot"></div>
         <span id="sync-label">Cargando…</span>
       </div>
-      <div class="version-chip">v2.5.1</div>
+      <div class="version-chip">v2.5.2</div>
       <div id="live-clock">--:--:--</div>
       <div class="user-chip">
         <div class="user-avatar" id="user-avatar">G</div>
@@ -313,7 +313,13 @@
 
     <!-- HISTORIAL -->
     <div class="panel" style="margin-bottom:22px;">
-      <div class="panel-title">Historial de snapshots</div>
+      <div class="panel-title" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+        <span>Historial de snapshots</span>
+        <label style="display:flex;align-items:center;gap:6px;font-size:10px;color:var(--muted);font-weight:400;letter-spacing:0;text-transform:none;cursor:pointer;">
+          <input type="checkbox" id="show-manual" style="accent-color:var(--teal);cursor:pointer;">
+          Mostrar Full Sync manuales
+        </label>
+      </div>
       <div id="history-container" class="history-scroll"><div class="empty-state">Sin datos</div></div>
     </div>
 
@@ -352,7 +358,7 @@
   </div><!-- /main -->
 
   <div class="footer">
-    <span>Alleata Ops</span> · NAPSE Dashboard · Moretti e Hijos S.A. · v2.5.1
+    <span>Alleata Ops</span> · NAPSE Dashboard · Moretti e Hijos S.A. · v2.5.2
   </div>
 
 </div><!-- /app -->
@@ -376,8 +382,8 @@ const ESTADOS = [
   { key:'en_proceso',          label:'En Proceso',          accent:'#1a9fd4' },
   { key:'pre_colecta',         label:'Pre-Colecta',         accent:'#f5a623' },
   { key:'despachado',          label:'Despachado',          accent:'#3a7bd5' },
-  { key:'exitoso',             label:'Exitoso',             accent:'#27ae60' },
   { key:'retirar_terminal',    label:'Retirar Terminal',    accent:'#9b59b6' },
+  { key:'exitoso',             label:'Exitoso',             accent:'#27ae60' },
 ];
 
 let snapshots   = [];
@@ -647,8 +653,10 @@ function render() {
   renderCharts(snapshots);
 
 
-  // Historial: todos los registros de cada ejecución del cron
-  const rows = snapshots.slice(0, 60);
+  // Historial: filtrar manuales según toggle
+  const showManual = document.getElementById('show-manual')?.checked;
+  const allRows = snapshots.slice(0, 60);
+  const rows = showManual ? allRows : allRows.filter(r => r.origen !== 'manual' && r._source !== 'manual');
   document.getElementById('history-container').innerHTML = `
     <table class="history-table">
       <thead><tr>
