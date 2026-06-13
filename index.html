@@ -4442,7 +4442,7 @@ function goTo(mod){
   if(mod==='sf') cargarSFIntegracion();
   if(mod==='retencion') cargarRetencion();
   if(mod==='terminales') termInit();
-  if(mod==='store') storeInit();
+  if(mod==='store') storeInit(); // store
 }
 
 function refreshCurrentModule(){
@@ -9488,10 +9488,6 @@ async function napseMatchSF(serialNumber, node, store, btn){
   };
 })();
 
-// ── loadSimsDbStats stub (función llamada en ajustes/refresh, implementación real en SIMs) ──
-if(typeof loadSimsDbStats === 'undefined'){
-  window.loadSimsDbStats = function(){ /* no-op si el módulo SIMs no está activo */ };
-}
 
 // ── STORE MODULE ──────────────────────────────────────────────────────────────
 let _storeData   = [];
@@ -9591,13 +9587,12 @@ function storeRender(){
   </div>`;
 }
 
-function storeInit(){
-  if(_storeData.length===0) storeLoad();
-}
+
 // ── /STORE MODULE ─────────────────────────────────────────────────────────────
 
 
-// ══ CONFIG ALLY — JS ════════════════════════════════════════════════════════
+
+// ══ CONFIG ALLY ══════════════════════════════════════════════════════════════
 
 function allyInit() {
   var firstTab = document.querySelector('.ally-tab');
@@ -9607,7 +9602,7 @@ function allyInit() {
 function allyTab(tab, btn) {
   ['contactos','grupos','reglas'].forEach(function(t) {
     var el = document.getElementById('ally-tab-' + t);
-    if (el) el.style.display = t === tab ? '' : 'none';
+    if (el) el.style.display = (t === tab) ? '' : 'none';
   });
   document.querySelectorAll('.ally-tab').forEach(function(b) { b.classList.remove('active'); });
   if (btn) btn.classList.add('active');
@@ -9623,21 +9618,26 @@ async function allyCargarContactos() {
   try {
     var res = await _supabase.from('contactos').select('*').order('nombre');
     if (res.error) throw res.error;
-    var data = res.data;
-    if (!data.length) {
+    var rows = res.data || [];
+    if (!rows.length) {
       tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:20px">Sin contactos</td></tr>';
       return;
     }
-    tbody.innerHTML = data.map(function(c) {
+    tbody.innerHTML = rows.map(function(c) {
+      var nombre = (c.nombre || '').replace(/"/g, '&quot;');
+      var wa = c.whatsapp || '—';
+      var team = c.team || '—';
+      var unidad = c.unidad || '—';
+      var activo = c.activo !== false;
       return '<tr>' +
-        '<td style="font-weight:600;color:var(--text)">' + (c.nombre||'—') + '</td>' +
-        '<td style="font-family:JetBrains Mono,monospace;font-size:12px">' + (c.whatsapp||'—') + '</td>' +
-        '<td><span style="background:rgba(29,191,142,.1);color:var(--teal);border-radius:20px;padding:2px 10px;font-size:11px;font-weight:700">' + (c.team||'—') + '</span></td>' +
-        '<td style="font-size:12px;color:var(--text-muted)">' + (c.unidad||'—') + '</td>' +
-        '<td><span style="color:' + (c.activo ? 'var(--teal)' : 'var(--text-muted)') + ';font-size:13px">' + (c.activo ? '✅' : '⬜') + '</span></td>' +
+        '<td style="font-weight:600;color:var(--text)">' + nombre + '</td>' +
+        '<td style="font-family:monospace;font-size:12px">' + wa + '</td>' +
+        '<td><span style="background:rgba(29,191,142,.1);color:var(--teal);border-radius:20px;padding:2px 10px;font-size:11px;font-weight:700">' + team + '</span></td>' +
+        '<td style="font-size:12px;color:var(--text-muted)">' + unidad + '</td>' +
+        '<td>' + (activo ? '✅' : '⬜') + '</td>' +
         '<td style="text-align:right">' +
-          '<button onclick="allyEditContacto(\'' + c.id + '\')" style="background:var(--navy-700);border:1px solid var(--border);color:var(--text-muted);border-radius:6px;padding:3px 9px;cursor:pointer;font-size:11px;font-family:Inter,sans-serif">✏️</button> ' +
-          '<button onclick="allyDeleteContacto(\'' + c.id + '\',\'' + (c.nombre||'').replace(/'/g,'') + '\')" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#ef4444;border-radius:6px;padding:3px 9px;cursor:pointer;font-size:11px;margin-left:4px;font-family:Inter,sans-serif">🗑</button>' +
+          '<button onclick="allyEditContacto(\'' + c.id + '\')" style="background:var(--navy-700);border:1px solid var(--border);color:var(--text-muted);border-radius:6px;padding:3px 9px;cursor:pointer;font-size:11px">✏️</button> ' +
+          '<button onclick="allyDeleteContacto(\'' + c.id + '\',\'' + nombre + '\')" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#ef4444;border-radius:6px;padding:3px 9px;cursor:pointer;font-size:11px;margin-left:4px">🗑</button>' +
         '</td></tr>';
     }).join('');
   } catch(e) {
@@ -9645,63 +9645,69 @@ async function allyCargarContactos() {
   }
 }
 
-function allyNuevoContacto() { allyModalContacto(null); }
+function allyNuevoContacto() { allyAbrirModalContacto(null); }
 
 function allyEditContacto(id) {
-  _supabase.from('contactos').select('*').eq('id', id).single().then(function(r) { allyModalContacto(r.data); });
+  _supabase.from('contactos').select('*').eq('id', id).single().then(function(r) {
+    allyAbrirModalContacto(r.data);
+  });
 }
 
 async function allyDeleteContacto(id, nombre) {
   if (!confirm('Eliminar contacto ' + nombre + '?')) return;
   var r = await _supabase.from('contactos').delete().eq('id', id);
-  if (r.error) return alert('Error: ' + r.error.message);
+  if (r.error) { alert('Error: ' + r.error.message); return; }
   allyCargarContactos();
 }
 
-function allyModalContacto(c) {
-  var m = document.getElementById('allyModalContacto');
-  if (!m) {
-    m = document.createElement('div');
-    m.id = 'allyModalContacto';
-    m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px';
-    document.body.appendChild(m);
-    m.addEventListener('click', function(e) { if(e.target===m) m.style.display='none'; });
+function allyAbrirModalContacto(c) {
+  var overlay = document.getElementById('allyModalContactoOverlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'allyModalContactoOverlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px';
+    overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.style.display = 'none'; });
+    document.body.appendChild(overlay);
   }
-  var isEdit = !!c;
-  m.innerHTML =
-    '<div style="background:var(--navy-800);border:1px solid var(--border);border-radius:14px;padding:24px;width:100%;max-width:420px">' +
-    '<div style="font-size:15px;font-weight:800;color:var(--text);margin-bottom:18px">' + (isEdit ? '✏️ Editar' : '+ Nuevo') + ' Contacto</div>' +
+  var edit = !!(c && c.id);
+  var box = document.createElement('div');
+  box.style.cssText = 'background:var(--navy-800);border:1px solid var(--border);border-radius:14px;padding:24px;width:100%;max-width:420px';
+  box.innerHTML =
+    '<div style="font-size:15px;font-weight:800;color:var(--text);margin-bottom:18px">' + (edit ? '✏️ Editar' : '+ Nuevo') + ' Contacto</div>' +
     '<div style="display:flex;flex-direction:column;gap:10px">' +
-    '<input id="ac-nombre" placeholder="Nombre completo" value="' + (c&&c.nombre||'') + '" style="background:var(--navy-700);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-family:Inter,sans-serif;font-size:13px;outline:none">' +
-    '<input id="ac-whatsapp" placeholder="WhatsApp (ej: 5491165117989)" value="' + (c&&c.whatsapp||'') + '" style="background:var(--navy-700);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-family:JetBrains Mono,monospace;font-size:13px;outline:none">' +
-    '<input id="ac-team" placeholder="Team (ej: ops, sales, logistica)" value="' + (c&&c.team||'') + '" style="background:var(--navy-700);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-family:Inter,sans-serif;font-size:13px;outline:none">' +
-    '<input id="ac-unidad" placeholder="Unidad" value="' + (c&&c.unidad||'') + '" style="background:var(--navy-700);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-family:Inter,sans-serif;font-size:13px;outline:none">' +
-    '<label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text);cursor:pointer">' +
-    '<input type="checkbox" id="ac-activo" ' + ((!c||c.activo!==false)?'checked':'') + ' style="width:16px;height:16px"> Activo</label>' +
+      '<input id="acNombre" placeholder="Nombre" value="' + ((c && c.nombre) || '') + '" style="background:var(--navy-700);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-size:13px;outline:none;width:100%;box-sizing:border-box">' +
+      '<input id="acWa" placeholder="WhatsApp (ej: 5491165117989)" value="' + ((c && c.whatsapp) || '') + '" style="background:var(--navy-700);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-size:13px;outline:none;width:100%;box-sizing:border-box">' +
+      '<input id="acTeam" placeholder="Team (ops / sales / logistica)" value="' + ((c && c.team) || '') + '" style="background:var(--navy-700);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-size:13px;outline:none;width:100%;box-sizing:border-box">' +
+      '<input id="acUnidad" placeholder="Unidad" value="' + ((c && c.unidad) || '') + '" style="background:var(--navy-700);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-size:13px;outline:none;width:100%;box-sizing:border-box">' +
+      '<label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text);cursor:pointer"><input type="checkbox" id="acActivo" style="width:15px;height:15px" ' + ((!c || c.activo !== false) ? 'checked' : '') + '> Activo</label>' +
     '</div>' +
-    '<div id="ac-msg" style="min-height:18px;margin-top:10px;font-size:12px"></div>' +
+    '<div id="acMsg" style="min-height:18px;margin-top:10px;font-size:12px"></div>' +
     '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">' +
-    '<button onclick="document.getElementById('allyModalContacto').style.display='none'" style="background:var(--navy-700);border:1px solid var(--border);color:var(--text-muted);border-radius:8px;padding:7px 16px;cursor:pointer;font-size:13px;font-family:Inter,sans-serif">Cancelar</button>' +
-    '<button onclick="allySaveContacto(\'' + (c&&c.id||'') + '\')" style="background:var(--grad);border:none;color:#fff;border-radius:8px;padding:7px 18px;cursor:pointer;font-size:13px;font-family:Inter,sans-serif;font-weight:700">Guardar</button>' +
-    '</div></div>';
-  m.style.display = 'flex';
+      '<button id="acCancelBtn" style="background:var(--navy-700);border:1px solid var(--border);color:var(--text-muted);border-radius:8px;padding:7px 16px;cursor:pointer;font-size:13px">Cancelar</button>' +
+      '<button id="acSaveBtn" style="background:var(--grad);border:none;color:#fff;border-radius:8px;padding:7px 18px;cursor:pointer;font-size:13px;font-weight:700">Guardar</button>' +
+    '</div>';
+  overlay.innerHTML = '';
+  overlay.appendChild(box);
+  overlay.style.display = 'flex';
+  document.getElementById('acCancelBtn').onclick = function() { overlay.style.display = 'none'; };
+  document.getElementById('acSaveBtn').onclick = function() { allySaveContacto(c ? c.id : null); };
 }
 
 async function allySaveContacto(id) {
-  var msg = document.getElementById('ac-msg');
+  var msg = document.getElementById('acMsg');
   var payload = {
-    nombre:   document.getElementById('ac-nombre').value.trim(),
-    whatsapp: document.getElementById('ac-whatsapp').value.trim(),
-    team:     document.getElementById('ac-team').value.trim(),
-    unidad:   document.getElementById('ac-unidad').value.trim(),
-    activo:   document.getElementById('ac-activo').checked,
+    nombre:   document.getElementById('acNombre').value.trim(),
+    whatsapp: document.getElementById('acWa').value.trim(),
+    team:     document.getElementById('acTeam').value.trim(),
+    unidad:   document.getElementById('acUnidad').value.trim(),
+    activo:   document.getElementById('acActivo').checked,
   };
-  if (!payload.nombre) { msg.innerHTML = '<span style="color:#ef4444">El nombre es obligatorio</span>'; return; }
+  if (!payload.nombre) { msg.innerHTML = '<span style="color:#ef4444">Nombre obligatorio</span>'; return; }
   var op = id ? _supabase.from('contactos').update(payload).eq('id', id)
               : _supabase.from('contactos').insert(payload);
   var r = await op;
   if (r.error) { msg.innerHTML = '<span style="color:#ef4444">' + r.error.message + '</span>'; return; }
-  document.getElementById('allyModalContacto').style.display = 'none';
+  document.getElementById('allyModalContactoOverlay').style.display = 'none';
   allyCargarContactos();
 }
 
@@ -9712,21 +9718,22 @@ async function allyCargarGrupos() {
   try {
     var res = await _supabase.from('ally_grupos').select('*').order('nombre');
     if (res.error) throw res.error;
-    var data = res.data;
-    if (!data.length) {
+    var rows = res.data || [];
+    if (!rows.length) {
       tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:20px">Sin grupos vinculados</td></tr>';
       return;
     }
-    tbody.innerHTML = data.map(function(g) {
+    tbody.innerHTML = rows.map(function(g) {
+      var nombre = (g.nombre || '').replace(/"/g, '&quot;');
       return '<tr>' +
-        '<td style="font-weight:600;color:var(--text)">' + (g.nombre||'—') + '</td>' +
-        '<td style="font-family:JetBrains Mono,monospace;font-size:11px;color:var(--text-muted)">' + (g.group_id||'—') + '</td>' +
-        '<td><span style="background:rgba(26,159,212,.1);color:var(--blue);border-radius:20px;padding:2px 10px;font-size:11px;font-weight:700">' + (g.tipo||'—') + '</span></td>' +
-        '<td style="font-size:12px;color:var(--text-muted)">' + (g.unidad||'—') + '</td>' +
-        '<td><span style="color:' + (g.activo?'var(--teal)':'var(--text-muted)') + ';font-size:13px">' + (g.activo?'✅':'⬜') + '</span></td>' +
+        '<td style="font-weight:600;color:var(--text)">' + nombre + '</td>' +
+        '<td style="font-family:monospace;font-size:11px;color:var(--text-muted)">' + (g.group_id || '—') + '</td>' +
+        '<td><span style="background:rgba(26,159,212,.1);color:var(--blue);border-radius:20px;padding:2px 10px;font-size:11px;font-weight:700">' + (g.tipo || '—') + '</span></td>' +
+        '<td style="font-size:12px;color:var(--text-muted)">' + (g.unidad || '—') + '</td>' +
+        '<td>' + (g.activo ? '✅' : '⬜') + '</td>' +
         '<td style="text-align:right">' +
-          '<button onclick="allyEditGrupo(\'' + g.id + '\')" style="background:var(--navy-700);border:1px solid var(--border);color:var(--text-muted);border-radius:6px;padding:3px 9px;cursor:pointer;font-size:11px;font-family:Inter,sans-serif">✏️</button> ' +
-          '<button onclick="allyDeleteGrupo(\'' + g.id + '\',\'' + (g.nombre||'').replace(/'/g,'') + '\')" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#ef4444;border-radius:6px;padding:3px 9px;cursor:pointer;font-size:11px;margin-left:4px;font-family:Inter,sans-serif">🗑</button>' +
+          '<button onclick="allyEditGrupo(\'' + g.id + '\')" style="background:var(--navy-700);border:1px solid var(--border);color:var(--text-muted);border-radius:6px;padding:3px 9px;cursor:pointer;font-size:11px">✏️</button> ' +
+          '<button onclick="allyDeleteGrupo(\'' + g.id + '\',\'' + nombre + '\')" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#ef4444;border-radius:6px;padding:3px 9px;cursor:pointer;font-size:11px;margin-left:4px">🗑</button>' +
         '</td></tr>';
     }).join('');
   } catch(e) {
@@ -9734,62 +9741,70 @@ async function allyCargarGrupos() {
   }
 }
 
-function allyNuevoGrupo() { allyModalGrupo(null); }
+function allyNuevoGrupo() { allyAbrirModalGrupo(null); }
+
 function allyEditGrupo(id) {
-  _supabase.from('ally_grupos').select('*').eq('id',id).single().then(function(r){ allyModalGrupo(r.data); });
+  _supabase.from('ally_grupos').select('*').eq('id', id).single().then(function(r) {
+    allyAbrirModalGrupo(r.data);
+  });
 }
+
 async function allyDeleteGrupo(id, nombre) {
-  if (!confirm('Desvincular grupo ' + nombre + '?')) return;
+  if (!confirm('Desvincular ' + nombre + '?')) return;
   var r = await _supabase.from('ally_grupos').delete().eq('id', id);
-  if (r.error) return alert('Error: ' + r.error.message);
+  if (r.error) { alert('Error: ' + r.error.message); return; }
   allyCargarGrupos();
 }
 
-function allyModalGrupo(g) {
-  var m = document.getElementById('allyModalGrupo');
-  if (!m) {
-    m = document.createElement('div');
-    m.id = 'allyModalGrupo';
-    m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px';
-    document.body.appendChild(m);
-    m.addEventListener('click', function(e){ if(e.target===m) m.style.display='none'; });
+function allyAbrirModalGrupo(g) {
+  var overlay = document.getElementById('allyModalGrupoOverlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'allyModalGrupoOverlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px';
+    overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.style.display = 'none'; });
+    document.body.appendChild(overlay);
   }
-  var isEdit = !!g;
-  m.innerHTML =
-    '<div style="background:var(--navy-800);border:1px solid var(--border);border-radius:14px;padding:24px;width:100%;max-width:420px">' +
-    '<div style="font-size:15px;font-weight:800;color:var(--text);margin-bottom:6px">' + (isEdit?'✏️ Editar':'📢 Vincular') + ' Grupo WhatsApp</div>' +
-    '<div style="font-size:12px;color:var(--text-muted);margin-bottom:16px">Agregá a Ally al grupo antes de vincularlo</div>' +
+  var edit = !!(g && g.id);
+  var box = document.createElement('div');
+  box.style.cssText = 'background:var(--navy-800);border:1px solid var(--border);border-radius:14px;padding:24px;width:100%;max-width:420px';
+  box.innerHTML =
+    '<div style="font-size:15px;font-weight:800;color:var(--text);margin-bottom:6px">' + (edit ? '✏️ Editar' : '📢 Vincular') + ' Grupo</div>' +
+    '<div style="font-size:12px;color:var(--text-muted);margin-bottom:14px">Asegurate de que Ally esté en el grupo antes de vincularlo</div>' +
     '<div style="display:flex;flex-direction:column;gap:10px">' +
-    '<input id="ag-nombre" placeholder="Nombre del grupo" value="' + (g&&g.nombre||'') + '" style="background:var(--navy-700);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-family:Inter,sans-serif;font-size:13px;outline:none">' +
-    '<input id="ag-group-id" placeholder="Group ID (de WaSender)" value="' + (g&&g.group_id||'') + '" style="background:var(--navy-700);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-family:JetBrains Mono,monospace;font-size:12px;outline:none">' +
-    '<input id="ag-tipo" placeholder="Tipo (ej: ops, sales)" value="' + (g&&g.tipo||'') + '" style="background:var(--navy-700);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-family:Inter,sans-serif;font-size:13px;outline:none">' +
-    '<input id="ag-unidad" placeholder="Unidad" value="' + (g&&g.unidad||'') + '" style="background:var(--navy-700);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-family:Inter,sans-serif;font-size:13px;outline:none">' +
-    '<label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text);cursor:pointer">' +
-    '<input type="checkbox" id="ag-activo" ' + ((!g||g.activo!==false)?'checked':'') + ' style="width:16px;height:16px"> Activo</label>' +
+      '<input id="agNombre" placeholder="Nombre del grupo" value="' + ((g && g.nombre) || '') + '" style="background:var(--navy-700);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-size:13px;outline:none;width:100%;box-sizing:border-box">' +
+      '<input id="agGroupId" placeholder="Group ID (de WaSender)" value="' + ((g && g.group_id) || '') + '" style="background:var(--navy-700);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-size:12px;font-family:monospace;outline:none;width:100%;box-sizing:border-box">' +
+      '<input id="agTipo" placeholder="Tipo (ops / sales)" value="' + ((g && g.tipo) || '') + '" style="background:var(--navy-700);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-size:13px;outline:none;width:100%;box-sizing:border-box">' +
+      '<input id="agUnidad" placeholder="Unidad" value="' + ((g && g.unidad) || '') + '" style="background:var(--navy-700);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-size:13px;outline:none;width:100%;box-sizing:border-box">' +
+      '<label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text);cursor:pointer"><input type="checkbox" id="agActivo" style="width:15px;height:15px" ' + ((!g || g.activo !== false) ? 'checked' : '') + '> Activo</label>' +
     '</div>' +
-    '<div id="ag-msg" style="min-height:18px;margin-top:10px;font-size:12px"></div>' +
+    '<div id="agMsg" style="min-height:18px;margin-top:10px;font-size:12px"></div>' +
     '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">' +
-    '<button onclick="document.getElementById('allyModalGrupo').style.display='none'" style="background:var(--navy-700);border:1px solid var(--border);color:var(--text-muted);border-radius:8px;padding:7px 16px;cursor:pointer;font-size:13px;font-family:Inter,sans-serif">Cancelar</button>' +
-    '<button onclick="allySaveGrupo(\'' + (g&&g.id||'') + '\')" style="background:var(--grad);border:none;color:#fff;border-radius:8px;padding:7px 18px;cursor:pointer;font-size:13px;font-family:Inter,sans-serif;font-weight:700">Guardar</button>' +
-    '</div></div>';
-  m.style.display = 'flex';
+      '<button id="agCancelBtn" style="background:var(--navy-700);border:1px solid var(--border);color:var(--text-muted);border-radius:8px;padding:7px 16px;cursor:pointer;font-size:13px">Cancelar</button>' +
+      '<button id="agSaveBtn" style="background:var(--grad);border:none;color:#fff;border-radius:8px;padding:7px 18px;cursor:pointer;font-size:13px;font-weight:700">Guardar</button>' +
+    '</div>';
+  overlay.innerHTML = '';
+  overlay.appendChild(box);
+  overlay.style.display = 'flex';
+  document.getElementById('agCancelBtn').onclick = function() { overlay.style.display = 'none'; };
+  document.getElementById('agSaveBtn').onclick = function() { allySaveGrupo(g ? g.id : null); };
 }
 
 async function allySaveGrupo(id) {
-  var msg = document.getElementById('ag-msg');
+  var msg = document.getElementById('agMsg');
   var payload = {
-    nombre:   document.getElementById('ag-nombre').value.trim(),
-    group_id: document.getElementById('ag-group-id').value.trim(),
-    tipo:     document.getElementById('ag-tipo').value.trim(),
-    unidad:   document.getElementById('ag-unidad').value.trim(),
-    activo:   document.getElementById('ag-activo').checked,
+    nombre:   document.getElementById('agNombre').value.trim(),
+    group_id: document.getElementById('agGroupId').value.trim(),
+    tipo:     document.getElementById('agTipo').value.trim(),
+    unidad:   document.getElementById('agUnidad').value.trim(),
+    activo:   document.getElementById('agActivo').checked,
   };
   if (!payload.nombre || !payload.group_id) { msg.innerHTML = '<span style="color:#ef4444">Nombre y Group ID son obligatorios</span>'; return; }
-  var op = id ? _supabase.from('ally_grupos').update(payload).eq('id',id)
+  var op = id ? _supabase.from('ally_grupos').update(payload).eq('id', id)
               : _supabase.from('ally_grupos').insert(payload);
   var r = await op;
   if (r.error) { msg.innerHTML = '<span style="color:#ef4444">' + r.error.message + '</span>'; return; }
-  document.getElementById('allyModalGrupo').style.display = 'none';
+  document.getElementById('allyModalGrupoOverlay').style.display = 'none';
   allyCargarGrupos();
 }
 
@@ -9800,27 +9815,132 @@ async function allyCargarReglas() {
   try {
     var res = await _supabase.from('ally_notification_rules').select('*').order('nombre');
     if (res.error) throw res.error;
-    var data = res.data;
-    if (!data.length) {
+    var rows = res.data || [];
+    if (!rows.length) {
       wrap.innerHTML = '<div style="color:var(--text-muted);padding:20px;text-align:center">Sin reglas configuradas</div>';
       return;
     }
-    wrap.innerHTML = data.map(function(r) {
+    wrap.innerHTML = rows.map(function(r) {
+      var activa = !!r.activa;
       return '<div style="background:var(--navy-800);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;gap:12px">' +
         '<div>' +
-        '<div style="font-weight:700;color:var(--text);font-size:13px">' + (r.nombre||'—') + '</div>' +
-        '<div style="font-size:11px;color:var(--text-muted);margin-top:3px">' + JSON.stringify(r.condition||{}) + '</div>' +
+          '<div style="font-weight:700;color:var(--text);font-size:13px">' + (r.nombre || '—') + '</div>' +
+          '<div style="font-size:11px;color:var(--text-muted);margin-top:3px">' + JSON.stringify(r.condition || {}) + '</div>' +
         '</div>' +
         '<span style="font-size:11px;font-weight:700;padding:2px 10px;border-radius:20px;flex-shrink:0;' +
-        (r.activa ? 'background:rgba(29,191,142,.12);color:var(--teal);border:1px solid rgba(29,191,142,.3)' : 'background:rgba(255,255,255,.05);color:var(--text-muted);border:1px solid var(--border)') + '">' +
-        (r.activa ? 'ACTIVA' : 'INACTIVA') + '</span>' +
+          (activa ? 'background:rgba(29,191,142,.12);color:var(--teal);border:1px solid rgba(29,191,142,.3)' : 'background:rgba(255,255,255,.05);color:var(--text-muted);border:1px solid var(--border)') +
+        '">' + (activa ? 'ACTIVA' : 'INACTIVA') + '</span>' +
         '</div>';
     }).join('');
   } catch(e) {
     wrap.innerHTML = '<div style="color:#ef4444;padding:16px">Error: ' + e.message + '</div>';
   }
 }
+
 // ══ /CONFIG ALLY ═════════════════════════════════════════════════════════════
+
+// ══ STORE MODULE ═════════════════════════════════════════════════════════════
+var _storeData   = [];
+var _storeFilter = 'todos';
+var STORE_OP_COLORS = { andres: 'var(--blue)', gonzalo: 'var(--teal)', angel: '#f59e0b' };
+
+function storeDetectOp(banco) {
+  var b = (banco || '').toLowerCase();
+  if (b.indexOf('andres') >= 0 || b.indexOf('andrés') >= 0) return 'andres';
+  if (b.indexOf('gonzalo') >= 0) return 'gonzalo';
+  if (b.indexOf('angel') >= 0 || b.indexOf('ángel') >= 0) return 'angel';
+  return 'otro';
+}
+
+async function storeLoad() {
+  var wrap  = document.getElementById('store-table-wrap');
+  var errEl = document.getElementById('store-error');
+  var spin  = document.getElementById('store-spin');
+  errEl.style.display = 'none';
+  spin.style.display = 'inline-block';
+  wrap.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text-muted);font-size:13px"><div style="font-size:24px;margin-bottom:10px">⟳</div>Consultando Salesforce...</div>';
+  try {
+    var res  = await fetch(ALLY_RAILWAY_BASE + '/store/terminales-barracas', { headers: { 'x-automation-secret': '123456' } });
+    var data = await res.json();
+    if (!data.ok) {
+      var msg = typeof data.error === 'string' ? data.error : JSON.stringify(data.error);
+      throw new Error(msg || 'Error desconocido');
+    }
+    _storeData = data.terminales || [];
+    document.getElementById('sk-total').textContent   = data.total;
+    document.getElementById('sk-andres').textContent  = data.resumen.andres;
+    document.getElementById('sk-gonzalo').textContent = data.resumen.gonzalo;
+    document.getElementById('sk-angel').textContent   = data.resumen.angel;
+    var ts = new Date(data.actualizado);
+    document.getElementById('store-ts').textContent = 'Actualizado: ' + ts.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+    storeRender();
+  } catch(err) {
+    errEl.style.display = 'block';
+    var errMsg = typeof err === 'string' ? err : (err.message || JSON.stringify(err));
+    errEl.textContent = '❌ ' + errMsg;
+    wrap.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text-muted)">Sin datos</div>';
+  } finally {
+    spin.style.display = 'none';
+  }
+}
+
+function storeSetFilter(btn, filter) {
+  _storeFilter = filter;
+  document.querySelectorAll('.store-filter').forEach(function(b) {
+    var on = b.dataset.filter === filter;
+    b.style.borderColor = on ? 'var(--teal)' : 'var(--border2)';
+    b.style.background  = on ? 'rgba(29,191,142,.12)' : 'transparent';
+    b.style.color       = on ? 'var(--teal)' : 'var(--text-muted)';
+  });
+  storeRender();
+}
+
+function storeRender() {
+  var wrap   = document.getElementById('store-table-wrap');
+  var search = (document.getElementById('store-search') ? document.getElementById('store-search').value : '').toLowerCase().trim();
+  var filtered = _storeData.filter(function(t) {
+    var op = storeDetectOp(t.banco_trabajo);
+    if (_storeFilter !== 'todos' && op !== _storeFilter) return false;
+    if (search && (t.serial||'').toLowerCase().indexOf(search) < 0 && (t.banco_trabajo||'').toLowerCase().indexOf(search) < 0) return false;
+    return true;
+  });
+  if (!filtered.length) {
+    wrap.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text-muted);font-size:13px"><div style="font-size:28px;margin-bottom:10px">🔍</div>No hay terminales que coincidan.</div>';
+    return;
+  }
+  var rows = filtered.map(function(t) {
+    var op    = storeDetectOp(t.banco_trabajo);
+    var color = STORE_OP_COLORS[op] || 'var(--text-muted)';
+    var ec    = t.estado === 'DISPONIBLE' ? 'var(--teal)' : t.estado === 'OUTLET' ? '#f59e0b' : 'var(--text-muted)';
+    return '<tr style="border-bottom:1px solid var(--border)">' +
+      '<td style="padding:8px 12px;font-family:monospace;font-size:12px;font-weight:700;color:var(--text)">' + (t.serial||'—') + '</td>' +
+      '<td style="padding:8px 12px"><span style="background:' + ec + '18;color:' + ec + ';border:1px solid ' + ec + '40;border-radius:20px;padding:2px 10px;font-size:11px;font-weight:700">' + (t.estado||'—') + '</span></td>' +
+      '<td style="padding:8px 12px;font-size:12px;color:' + color + ';font-weight:700">' + (t.banco_trabajo||'—') + '</td>' +
+      '<td style="padding:8px 12px;font-size:12px;color:var(--text-muted)">' + (t.perfil||'—') + '</td>' +
+      '<td style="padding:8px 12px;font-size:12px;color:var(--text-muted)">' + (t.ubicacion||'—') + '</td>' +
+      '</tr>';
+  }).join('');
+  wrap.innerHTML =
+    '<table style="width:100%;border-collapse:collapse;min-width:500px">' +
+    '<thead><tr style="background:var(--navy-800)">' +
+    '<th style="padding:9px 12px;text-align:left;font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">Serial</th>' +
+    '<th style="padding:9px 12px;text-align:left;font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">Estado</th>' +
+    '<th style="padding:9px 12px;text-align:left;font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">Banco de trabajo</th>' +
+    '<th style="padding:9px 12px;text-align:left;font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">Perfil</th>' +
+    '<th style="padding:9px 12px;text-align:left;font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">Ubicación</th>' +
+    '</tr></thead>' +
+    '<tbody>' + rows + '</tbody>' +
+    '</table>' +
+    '<div style="padding:8px 12px;font-size:11px;color:var(--text-muted);border-top:1px solid var(--border)">' +
+      filtered.length + ' terminal' + (filtered.length !== 1 ? 'es' : '') + ' mostrada' + (filtered.length !== 1 ? 's' : '') +
+      (filtered.length !== _storeData.length ? ' de ' + _storeData.length + ' totales' : '') +
+    '</div>';
+}
+
+function storeInit() {
+  if (_storeData.length === 0) storeLoad();
+}
+// ══ /STORE MODULE ════════════════════════════════════════════════════════════
 
 </script>
 
