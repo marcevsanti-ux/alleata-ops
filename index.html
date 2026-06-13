@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v3.8.5</title>
+<title>Alleata · Operaciones v3.8.6</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -407,7 +407,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v3.8.5 · 12 jun 2026
+      v3.8.6 · 12 jun 2026
     </div>
   </div>
 </div>
@@ -485,7 +485,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v3.8.5 · 12 jun 2026
+      v3.8.6 · 12 jun 2026
     </div>
   </div>
 </nav>
@@ -525,7 +525,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v3.8.5</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v3.8.6</div>
   </div>
   <div class="content">
 
@@ -4187,7 +4187,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v3.8.5] OK');
+console.log('[Alleata v3.8.6] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -4435,7 +4435,7 @@ function goTo(mod){
   if(mod==='desinstalaciones'&&!DesinModule.cargado)cargarDesinstalaciones();
   if(mod==='napse')napseInitApp();
   if(mod==='instalaciones'){window.scrollTo(0,0);initInstalaciones();}
-  if(mod==='ally')cargarAlly();
+  if(mod==='ally')allyInit();
   if(mod==='distri')cargarDistri();
   if(mod==='horas')renderHoras();
   if(mod==='ajustes'){loadUsers();loadSimsDbStats();loadConfigSLA();_auditPage=0;loadAuditLog();cargarCronHorarios();}
@@ -9595,6 +9595,232 @@ function storeInit(){
   if(_storeData.length===0) storeLoad();
 }
 // ── /STORE MODULE ─────────────────────────────────────────────────────────────
+
+
+// ══ CONFIG ALLY — JS ════════════════════════════════════════════════════════
+
+function allyInit() {
+  var firstTab = document.querySelector('.ally-tab');
+  allyTab('contactos', firstTab);
+}
+
+function allyTab(tab, btn) {
+  ['contactos','grupos','reglas'].forEach(function(t) {
+    var el = document.getElementById('ally-tab-' + t);
+    if (el) el.style.display = t === tab ? '' : 'none';
+  });
+  document.querySelectorAll('.ally-tab').forEach(function(b) { b.classList.remove('active'); });
+  if (btn) btn.classList.add('active');
+  if (tab === 'contactos') allyCargarContactos();
+  if (tab === 'grupos')    allyCargarGrupos();
+  if (tab === 'reglas')    allyCargarReglas();
+}
+
+async function allyCargarContactos() {
+  var tbody = document.getElementById('ally-contactos-tbody');
+  if (!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:20px">Cargando...</td></tr>';
+  try {
+    var res = await _supabase.from('contactos').select('*').order('nombre');
+    if (res.error) throw res.error;
+    var data = res.data;
+    if (!data.length) {
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:20px">Sin contactos</td></tr>';
+      return;
+    }
+    tbody.innerHTML = data.map(function(c) {
+      return '<tr>' +
+        '<td style="font-weight:600;color:var(--text)">' + (c.nombre||'—') + '</td>' +
+        '<td style="font-family:JetBrains Mono,monospace;font-size:12px">' + (c.whatsapp||'—') + '</td>' +
+        '<td><span style="background:rgba(29,191,142,.1);color:var(--teal);border-radius:20px;padding:2px 10px;font-size:11px;font-weight:700">' + (c.team||'—') + '</span></td>' +
+        '<td style="font-size:12px;color:var(--text-muted)">' + (c.unidad||'—') + '</td>' +
+        '<td><span style="color:' + (c.activo ? 'var(--teal)' : 'var(--text-muted)') + ';font-size:13px">' + (c.activo ? '✅' : '⬜') + '</span></td>' +
+        '<td style="text-align:right">' +
+          '<button onclick="allyEditContacto(\'' + c.id + '\')" style="background:var(--navy-700);border:1px solid var(--border);color:var(--text-muted);border-radius:6px;padding:3px 9px;cursor:pointer;font-size:11px;font-family:Inter,sans-serif">✏️</button> ' +
+          '<button onclick="allyDeleteContacto(\'' + c.id + '\',\'' + (c.nombre||'').replace(/'/g,'') + '\')" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#ef4444;border-radius:6px;padding:3px 9px;cursor:pointer;font-size:11px;margin-left:4px;font-family:Inter,sans-serif">🗑</button>' +
+        '</td></tr>';
+    }).join('');
+  } catch(e) {
+    tbody.innerHTML = '<tr><td colspan="6" style="color:#ef4444;padding:16px">Error: ' + e.message + '</td></tr>';
+  }
+}
+
+function allyNuevoContacto() { allyModalContacto(null); }
+
+function allyEditContacto(id) {
+  _supabase.from('contactos').select('*').eq('id', id).single().then(function(r) { allyModalContacto(r.data); });
+}
+
+async function allyDeleteContacto(id, nombre) {
+  if (!confirm('Eliminar contacto ' + nombre + '?')) return;
+  var r = await _supabase.from('contactos').delete().eq('id', id);
+  if (r.error) return alert('Error: ' + r.error.message);
+  allyCargarContactos();
+}
+
+function allyModalContacto(c) {
+  var m = document.getElementById('allyModalContacto');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'allyModalContacto';
+    m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px';
+    document.body.appendChild(m);
+    m.addEventListener('click', function(e) { if(e.target===m) m.style.display='none'; });
+  }
+  var isEdit = !!c;
+  m.innerHTML =
+    '<div style="background:var(--navy-800);border:1px solid var(--border);border-radius:14px;padding:24px;width:100%;max-width:420px">' +
+    '<div style="font-size:15px;font-weight:800;color:var(--text);margin-bottom:18px">' + (isEdit ? '✏️ Editar' : '+ Nuevo') + ' Contacto</div>' +
+    '<div style="display:flex;flex-direction:column;gap:10px">' +
+    '<input id="ac-nombre" placeholder="Nombre completo" value="' + (c&&c.nombre||'') + '" style="background:var(--navy-700);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-family:Inter,sans-serif;font-size:13px;outline:none">' +
+    '<input id="ac-whatsapp" placeholder="WhatsApp (ej: 5491165117989)" value="' + (c&&c.whatsapp||'') + '" style="background:var(--navy-700);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-family:JetBrains Mono,monospace;font-size:13px;outline:none">' +
+    '<input id="ac-team" placeholder="Team (ej: ops, sales, logistica)" value="' + (c&&c.team||'') + '" style="background:var(--navy-700);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-family:Inter,sans-serif;font-size:13px;outline:none">' +
+    '<input id="ac-unidad" placeholder="Unidad" value="' + (c&&c.unidad||'') + '" style="background:var(--navy-700);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-family:Inter,sans-serif;font-size:13px;outline:none">' +
+    '<label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text);cursor:pointer">' +
+    '<input type="checkbox" id="ac-activo" ' + ((!c||c.activo!==false)?'checked':'') + ' style="width:16px;height:16px"> Activo</label>' +
+    '</div>' +
+    '<div id="ac-msg" style="min-height:18px;margin-top:10px;font-size:12px"></div>' +
+    '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">' +
+    '<button onclick="document.getElementById('allyModalContacto').style.display='none'" style="background:var(--navy-700);border:1px solid var(--border);color:var(--text-muted);border-radius:8px;padding:7px 16px;cursor:pointer;font-size:13px;font-family:Inter,sans-serif">Cancelar</button>' +
+    '<button onclick="allySaveContacto(\'' + (c&&c.id||'') + '\')" style="background:var(--grad);border:none;color:#fff;border-radius:8px;padding:7px 18px;cursor:pointer;font-size:13px;font-family:Inter,sans-serif;font-weight:700">Guardar</button>' +
+    '</div></div>';
+  m.style.display = 'flex';
+}
+
+async function allySaveContacto(id) {
+  var msg = document.getElementById('ac-msg');
+  var payload = {
+    nombre:   document.getElementById('ac-nombre').value.trim(),
+    whatsapp: document.getElementById('ac-whatsapp').value.trim(),
+    team:     document.getElementById('ac-team').value.trim(),
+    unidad:   document.getElementById('ac-unidad').value.trim(),
+    activo:   document.getElementById('ac-activo').checked,
+  };
+  if (!payload.nombre) { msg.innerHTML = '<span style="color:#ef4444">El nombre es obligatorio</span>'; return; }
+  var op = id ? _supabase.from('contactos').update(payload).eq('id', id)
+              : _supabase.from('contactos').insert(payload);
+  var r = await op;
+  if (r.error) { msg.innerHTML = '<span style="color:#ef4444">' + r.error.message + '</span>'; return; }
+  document.getElementById('allyModalContacto').style.display = 'none';
+  allyCargarContactos();
+}
+
+async function allyCargarGrupos() {
+  var tbody = document.getElementById('ally-grupos-tbody');
+  if (!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:20px">Cargando...</td></tr>';
+  try {
+    var res = await _supabase.from('ally_grupos').select('*').order('nombre');
+    if (res.error) throw res.error;
+    var data = res.data;
+    if (!data.length) {
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:20px">Sin grupos vinculados</td></tr>';
+      return;
+    }
+    tbody.innerHTML = data.map(function(g) {
+      return '<tr>' +
+        '<td style="font-weight:600;color:var(--text)">' + (g.nombre||'—') + '</td>' +
+        '<td style="font-family:JetBrains Mono,monospace;font-size:11px;color:var(--text-muted)">' + (g.group_id||'—') + '</td>' +
+        '<td><span style="background:rgba(26,159,212,.1);color:var(--blue);border-radius:20px;padding:2px 10px;font-size:11px;font-weight:700">' + (g.tipo||'—') + '</span></td>' +
+        '<td style="font-size:12px;color:var(--text-muted)">' + (g.unidad||'—') + '</td>' +
+        '<td><span style="color:' + (g.activo?'var(--teal)':'var(--text-muted)') + ';font-size:13px">' + (g.activo?'✅':'⬜') + '</span></td>' +
+        '<td style="text-align:right">' +
+          '<button onclick="allyEditGrupo(\'' + g.id + '\')" style="background:var(--navy-700);border:1px solid var(--border);color:var(--text-muted);border-radius:6px;padding:3px 9px;cursor:pointer;font-size:11px;font-family:Inter,sans-serif">✏️</button> ' +
+          '<button onclick="allyDeleteGrupo(\'' + g.id + '\',\'' + (g.nombre||'').replace(/'/g,'') + '\')" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#ef4444;border-radius:6px;padding:3px 9px;cursor:pointer;font-size:11px;margin-left:4px;font-family:Inter,sans-serif">🗑</button>' +
+        '</td></tr>';
+    }).join('');
+  } catch(e) {
+    tbody.innerHTML = '<tr><td colspan="6" style="color:#ef4444;padding:16px">Error: ' + e.message + '</td></tr>';
+  }
+}
+
+function allyNuevoGrupo() { allyModalGrupo(null); }
+function allyEditGrupo(id) {
+  _supabase.from('ally_grupos').select('*').eq('id',id).single().then(function(r){ allyModalGrupo(r.data); });
+}
+async function allyDeleteGrupo(id, nombre) {
+  if (!confirm('Desvincular grupo ' + nombre + '?')) return;
+  var r = await _supabase.from('ally_grupos').delete().eq('id', id);
+  if (r.error) return alert('Error: ' + r.error.message);
+  allyCargarGrupos();
+}
+
+function allyModalGrupo(g) {
+  var m = document.getElementById('allyModalGrupo');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'allyModalGrupo';
+    m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px';
+    document.body.appendChild(m);
+    m.addEventListener('click', function(e){ if(e.target===m) m.style.display='none'; });
+  }
+  var isEdit = !!g;
+  m.innerHTML =
+    '<div style="background:var(--navy-800);border:1px solid var(--border);border-radius:14px;padding:24px;width:100%;max-width:420px">' +
+    '<div style="font-size:15px;font-weight:800;color:var(--text);margin-bottom:6px">' + (isEdit?'✏️ Editar':'📢 Vincular') + ' Grupo WhatsApp</div>' +
+    '<div style="font-size:12px;color:var(--text-muted);margin-bottom:16px">Agregá a Ally al grupo antes de vincularlo</div>' +
+    '<div style="display:flex;flex-direction:column;gap:10px">' +
+    '<input id="ag-nombre" placeholder="Nombre del grupo" value="' + (g&&g.nombre||'') + '" style="background:var(--navy-700);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-family:Inter,sans-serif;font-size:13px;outline:none">' +
+    '<input id="ag-group-id" placeholder="Group ID (de WaSender)" value="' + (g&&g.group_id||'') + '" style="background:var(--navy-700);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-family:JetBrains Mono,monospace;font-size:12px;outline:none">' +
+    '<input id="ag-tipo" placeholder="Tipo (ej: ops, sales)" value="' + (g&&g.tipo||'') + '" style="background:var(--navy-700);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-family:Inter,sans-serif;font-size:13px;outline:none">' +
+    '<input id="ag-unidad" placeholder="Unidad" value="' + (g&&g.unidad||'') + '" style="background:var(--navy-700);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-family:Inter,sans-serif;font-size:13px;outline:none">' +
+    '<label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text);cursor:pointer">' +
+    '<input type="checkbox" id="ag-activo" ' + ((!g||g.activo!==false)?'checked':'') + ' style="width:16px;height:16px"> Activo</label>' +
+    '</div>' +
+    '<div id="ag-msg" style="min-height:18px;margin-top:10px;font-size:12px"></div>' +
+    '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">' +
+    '<button onclick="document.getElementById('allyModalGrupo').style.display='none'" style="background:var(--navy-700);border:1px solid var(--border);color:var(--text-muted);border-radius:8px;padding:7px 16px;cursor:pointer;font-size:13px;font-family:Inter,sans-serif">Cancelar</button>' +
+    '<button onclick="allySaveGrupo(\'' + (g&&g.id||'') + '\')" style="background:var(--grad);border:none;color:#fff;border-radius:8px;padding:7px 18px;cursor:pointer;font-size:13px;font-family:Inter,sans-serif;font-weight:700">Guardar</button>' +
+    '</div></div>';
+  m.style.display = 'flex';
+}
+
+async function allySaveGrupo(id) {
+  var msg = document.getElementById('ag-msg');
+  var payload = {
+    nombre:   document.getElementById('ag-nombre').value.trim(),
+    group_id: document.getElementById('ag-group-id').value.trim(),
+    tipo:     document.getElementById('ag-tipo').value.trim(),
+    unidad:   document.getElementById('ag-unidad').value.trim(),
+    activo:   document.getElementById('ag-activo').checked,
+  };
+  if (!payload.nombre || !payload.group_id) { msg.innerHTML = '<span style="color:#ef4444">Nombre y Group ID son obligatorios</span>'; return; }
+  var op = id ? _supabase.from('ally_grupos').update(payload).eq('id',id)
+              : _supabase.from('ally_grupos').insert(payload);
+  var r = await op;
+  if (r.error) { msg.innerHTML = '<span style="color:#ef4444">' + r.error.message + '</span>'; return; }
+  document.getElementById('allyModalGrupo').style.display = 'none';
+  allyCargarGrupos();
+}
+
+async function allyCargarReglas() {
+  var wrap = document.getElementById('ally-reglas-wrap');
+  if (!wrap) return;
+  wrap.innerHTML = '<div style="color:var(--text-muted);padding:20px;text-align:center">Cargando...</div>';
+  try {
+    var res = await _supabase.from('ally_notification_rules').select('*').order('nombre');
+    if (res.error) throw res.error;
+    var data = res.data;
+    if (!data.length) {
+      wrap.innerHTML = '<div style="color:var(--text-muted);padding:20px;text-align:center">Sin reglas configuradas</div>';
+      return;
+    }
+    wrap.innerHTML = data.map(function(r) {
+      return '<div style="background:var(--navy-800);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;gap:12px">' +
+        '<div>' +
+        '<div style="font-weight:700;color:var(--text);font-size:13px">' + (r.nombre||'—') + '</div>' +
+        '<div style="font-size:11px;color:var(--text-muted);margin-top:3px">' + JSON.stringify(r.condition||{}) + '</div>' +
+        '</div>' +
+        '<span style="font-size:11px;font-weight:700;padding:2px 10px;border-radius:20px;flex-shrink:0;' +
+        (r.activa ? 'background:rgba(29,191,142,.12);color:var(--teal);border:1px solid rgba(29,191,142,.3)' : 'background:rgba(255,255,255,.05);color:var(--text-muted);border:1px solid var(--border)') + '">' +
+        (r.activa ? 'ACTIVA' : 'INACTIVA') + '</span>' +
+        '</div>';
+    }).join('');
+  } catch(e) {
+    wrap.innerHTML = '<div style="color:#ef4444;padding:16px">Error: ' + e.message + '</div>';
+  }
+}
+// ══ /CONFIG ALLY ═════════════════════════════════════════════════════════════
 
 </script>
 
