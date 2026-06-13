@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v3.8.6</title>
+<title>Alleata · Operaciones v3.8.8</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -407,7 +407,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v3.8.6 · 12 jun 2026
+      v3.8.8 · 12 jun 2026
     </div>
   </div>
 </div>
@@ -485,7 +485,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v3.8.6 · 12 jun 2026
+      v3.8.8 · 12 jun 2026
     </div>
   </div>
 </nav>
@@ -525,7 +525,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v3.8.6</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v3.8.8</div>
   </div>
   <div class="content">
 
@@ -4187,7 +4187,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v3.8.6] OK');
+console.log('[Alleata v3.8.8] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -9516,7 +9516,7 @@ async function allyCargarContactos() {
   if (!tbody) return;
   tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:20px">Cargando...</td></tr>';
   try {
-    var res = await _supabase.from('contactos').select('*').order('nombre');
+    var res = await sb.from('contactos').select('*').order('nombre');
     if (res.error) throw res.error;
     var rows = res.data || [];
     if (!rows.length) {
@@ -9548,14 +9548,14 @@ async function allyCargarContactos() {
 function allyNuevoContacto() { allyAbrirModalContacto(null); }
 
 function allyEditContacto(id) {
-  _supabase.from('contactos').select('*').eq('id', id).single().then(function(r) {
+  sb.from('contactos').select('*').eq('id', id).single().then(function(r) {
     allyAbrirModalContacto(r.data);
   });
 }
 
 async function allyDeleteContacto(id, nombre) {
   if (!confirm('Eliminar contacto ' + nombre + '?')) return;
-  var r = await _supabase.from('contactos').delete().eq('id', id);
+  var r = await sb.from('contactos').delete().eq('id', id);
   if (r.error) { alert('Error: ' + r.error.message); return; }
   allyCargarContactos();
 }
@@ -9603,8 +9603,8 @@ async function allySaveContacto(id) {
     activo:   document.getElementById('acActivo').checked,
   };
   if (!payload.nombre) { msg.innerHTML = '<span style="color:#ef4444">Nombre obligatorio</span>'; return; }
-  var op = id ? _supabase.from('contactos').update(payload).eq('id', id)
-              : _supabase.from('contactos').insert(payload);
+  var op = id ? sb.from('contactos').update(payload).eq('id', id)
+              : sb.from('contactos').insert(payload);
   var r = await op;
   if (r.error) { msg.innerHTML = '<span style="color:#ef4444">' + r.error.message + '</span>'; return; }
   document.getElementById('allyModalContactoOverlay').style.display = 'none';
@@ -9616,7 +9616,7 @@ async function allyCargarGrupos() {
   if (!tbody) return;
   tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:20px">Cargando...</td></tr>';
   try {
-    var res = await _supabase.from('ally_grupos').select('*').order('nombre');
+    var res = await sb.from('ally_grupos').select('*').order('nombre');
     if (res.error) throw res.error;
     var rows = res.data || [];
     if (!rows.length) {
@@ -9644,14 +9644,14 @@ async function allyCargarGrupos() {
 function allyNuevoGrupo() { allyAbrirModalGrupo(null); }
 
 function allyEditGrupo(id) {
-  _supabase.from('ally_grupos').select('*').eq('id', id).single().then(function(r) {
+  sb.from('ally_grupos').select('*').eq('id', id).single().then(function(r) {
     allyAbrirModalGrupo(r.data);
   });
 }
 
 async function allyDeleteGrupo(id, nombre) {
   if (!confirm('Desvincular ' + nombre + '?')) return;
-  var r = await _supabase.from('ally_grupos').delete().eq('id', id);
+  var r = await sb.from('ally_grupos').delete().eq('id', id);
   if (r.error) { alert('Error: ' + r.error.message); return; }
   allyCargarGrupos();
 }
@@ -9700,8 +9700,8 @@ async function allySaveGrupo(id) {
     activo:   document.getElementById('agActivo').checked,
   };
   if (!payload.nombre || !payload.group_id) { msg.innerHTML = '<span style="color:#ef4444">Nombre y Group ID son obligatorios</span>'; return; }
-  var op = id ? _supabase.from('ally_grupos').update(payload).eq('id', id)
-              : _supabase.from('ally_grupos').insert(payload);
+  var op = id ? sb.from('ally_grupos').update(payload).eq('id', id)
+              : sb.from('ally_grupos').insert(payload);
   var r = await op;
   if (r.error) { msg.innerHTML = '<span style="color:#ef4444">' + r.error.message + '</span>'; return; }
   document.getElementById('allyModalGrupoOverlay').style.display = 'none';
@@ -9713,7 +9713,7 @@ async function allyCargarReglas() {
   if (!wrap) return;
   wrap.innerHTML = '<div style="color:var(--text-muted);padding:20px;text-align:center">Cargando...</div>';
   try {
-    var res = await _supabase.from('ally_notification_rules').select('*').order('nombre');
+    var res = await sb.from('ally_notification_rules').select('*').order('nombre');
     if (res.error) throw res.error;
     var rows = res.data || [];
     if (!rows.length) {
