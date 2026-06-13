@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v3.8.8</title>
+<title>Alleata · Operaciones v3.8.9</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -407,7 +407,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v3.8.8 · 12 jun 2026
+      v3.8.9 · 12 jun 2026
     </div>
   </div>
 </div>
@@ -485,7 +485,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v3.8.8 · 12 jun 2026
+      v3.8.9 · 12 jun 2026
     </div>
   </div>
 </nav>
@@ -525,7 +525,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v3.8.8</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v3.8.9</div>
   </div>
   <div class="content">
 
@@ -4187,7 +4187,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v3.8.8] OK');
+console.log('[Alleata v3.8.9] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -4414,6 +4414,11 @@ const MOD_INFO={home:'Dashboard',sims:'Verificador SIMs',envios:'Envíos',rollou
 function goTo(mod){
   const el=document.getElementById('nav-'+mod);
   if(el&&el.classList.contains('locked'))return;
+  // Módulos que viven FUERA del .content div
+  const outsideMods=new Set(['ally','retencion','distri','terminales','instalaciones']);
+  // Ocultar .content PRIMERO para evitar el bloque negro
+  const contentEl=document.querySelector('.content');
+  if(contentEl) contentEl.style.display=outsideMods.has(mod)?'none':'';
   document.querySelectorAll('.module').forEach(m=>{
     m.classList.remove('active');
     m.removeAttribute('style');
@@ -4422,10 +4427,8 @@ function goTo(mod){
   const target=document.getElementById('mod-'+mod);
   if(!target)return;
   target.classList.add('active');
-  // Ocultar .content cuando el módulo vive fuera de él (evita el bloque negro vacío)
-  const outsideMods=new Set(['ally','retencion','distri','terminales','instalaciones']);
-  const contentEl=document.querySelector('.content');
-  if(contentEl) contentEl.style.display=outsideMods.has(mod)?'none':'';
+  // Padding para módulos externos (no tienen el padding del .content)
+  if(outsideMods.has(mod)) target.style.padding='22px 28px 60px';
   const navEl=document.querySelector(`.nav-item[data-mod="${mod}"]`);
   if(navEl)navEl.classList.add('active');
   document.getElementById('topbar-title').textContent=MOD_INFO[mod]||mod;
