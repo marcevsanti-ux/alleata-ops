@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v3.9.0</title>
+<title>Alleata · Operaciones v3.9.1</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -407,7 +407,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v3.9.0 · 12 jun 2026
+      v3.9.1 · 12 jun 2026
     </div>
   </div>
 </div>
@@ -485,7 +485,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v3.9.0 · 12 jun 2026
+      v3.9.1 · 12 jun 2026
     </div>
   </div>
 </nav>
@@ -525,7 +525,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v3.9.0</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v3.9.1</div>
   </div>
   <div class="content">
 
@@ -1698,6 +1698,10 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     <div style="background:var(--navy-800);border:1px solid var(--border);border-radius:10px;padding:16px 20px">
       <div style="font-size:28px;font-weight:900;color:#f59e0b" id="sk-angel">—</div>
       <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Angel</div>
+    </div>
+    <div style="background:var(--navy-800);border:1px solid var(--border);border-radius:10px;padding:16px 20px">
+      <div style="font-size:28px;font-weight:900;color:#a78bfa" id="sk-general">—</div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Stock AXIUM D7</div>
     </div>
   </div>
 
@@ -4187,7 +4191,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v3.9.0] OK');
+console.log('[Alleata v3.9.1] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -9764,8 +9768,12 @@ async function storeLoad() {
   spin.style.display = 'inline-block';
   wrap.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text-muted);font-size:13px"><div style="font-size:24px;margin-bottom:10px">⟳</div>Consultando Salesforce...</div>';
   try {
-    var res  = await fetch(ALLY_RAILWAY_BASE + '/store/terminales-barracas', { headers: { 'x-automation-secret': '123456' } });
-    var data = await res.json();
+    var [res, resGen] = await Promise.all([
+      fetch(ALLY_RAILWAY_BASE + '/store/terminales-barracas', { headers: { 'x-automation-secret': '123456' } }),
+      fetch(ALLY_RAILWAY_BASE + '/store/stock-general',       { headers: { 'x-automation-secret': '123456' } })
+    ]);
+    var data    = await res.json();
+    var dataGen = await resGen.json();
     if (!data.ok) {
       var msg = typeof data.error === 'string' ? data.error : JSON.stringify(data.error);
       throw new Error(msg || 'Error desconocido');
@@ -9775,6 +9783,7 @@ async function storeLoad() {
     document.getElementById('sk-andres').textContent  = data.resumen.andres;
     document.getElementById('sk-gonzalo').textContent = data.resumen.gonzalo;
     document.getElementById('sk-angel').textContent   = data.resumen.angel;
+    document.getElementById('sk-general').textContent = dataGen.ok ? dataGen.total : '—';
     var ts = new Date(data.actualizado);
     document.getElementById('store-ts').textContent = 'Actualizado: ' + ts.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
     storeRender();
