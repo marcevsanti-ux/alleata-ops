@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v3.9.1</title>
+<title>Alleata · Operaciones v3.9.2</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -407,7 +407,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v3.9.1 · 12 jun 2026
+      v3.9.2 · 12 jun 2026
     </div>
   </div>
 </div>
@@ -485,7 +485,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v3.9.1 · 12 jun 2026
+      v3.9.2 · 12 jun 2026
     </div>
   </div>
 </nav>
@@ -525,7 +525,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v3.9.1</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v3.9.2</div>
   </div>
   <div class="content">
 
@@ -1724,6 +1724,60 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
   </div>
 
   <div id="store-error" style="display:none;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.25);border-radius:10px;padding:14px 16px;margin-top:12px;font-size:13px;color:#ef4444"></div>
+  </div><!-- /store-panel-stock -->
+
+  <!-- TAB: Cargar terminales -->
+  <div id="store-panel-carga" style="display:none">
+
+    <div style="background:var(--navy-800);border:1px solid var(--border);border-radius:12px;padding:24px;max-width:520px">
+      <div style="font-size:14px;font-weight:800;color:var(--text);margin-bottom:4px">📥 Cargar terminal al banco</div>
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:20px">Escaneá el código de barras o ingresá el serial manualmente</div>
+
+      <!-- Input serial -->
+      <div style="margin-bottom:14px">
+        <label style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:6px">N° de Serie</label>
+        <div style="display:flex;gap:8px">
+          <input id="carga-serial" placeholder="Escaneá o escribí el serial..." autofocus
+            style="flex:1;background:var(--navy-700);border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:13px;outline:none"
+            onkeydown="if(event.key==='Enter')cargaBuscar()">
+          <button onclick="cargaBuscar()" style="background:var(--grad);border:none;color:#fff;border-radius:8px;padding:9px 18px;cursor:pointer;font-size:13px;font-weight:700;font-family:'Inter',sans-serif;white-space:nowrap">Buscar</button>
+        </div>
+      </div>
+
+      <!-- Resultado búsqueda -->
+      <div id="carga-resultado" style="display:none;background:var(--navy-700);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:14px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:12px">
+          <div><div style="font-size:10px;color:var(--text-muted);font-weight:700;text-transform:uppercase">Serial</div><div id="cr-serial" style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);margin-top:2px"></div></div>
+          <div><div style="font-size:10px;color:var(--text-muted);font-weight:700;text-transform:uppercase">Producto</div><div id="cr-producto" style="font-size:12px;color:var(--text);margin-top:2px"></div></div>
+          <div><div style="font-size:10px;color:var(--text-muted);font-weight:700;text-transform:uppercase">Estado actual</div><div id="cr-estado" style="font-size:12px;margin-top:2px"></div></div>
+          <div><div style="font-size:10px;color:var(--text-muted);font-weight:700;text-transform:uppercase">Banco actual</div><div id="cr-banco" style="font-size:12px;color:var(--text-muted);margin-top:2px"></div></div>
+        </div>
+        <!-- Selector banco destino -->
+        <div style="margin-bottom:12px">
+          <label style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:8px">Asignar a banco</label>
+          <div style="display:flex;gap:8px;flex-wrap:wrap" id="carga-bancos-btns">
+            <button onclick="cargaSelBanco(this,'andres')"  class="carga-banco-btn" style="flex:1;padding:8px 12px;border-radius:8px;border:1.5px solid var(--border2);background:transparent;color:var(--text-muted);font-size:12px;font-weight:700;cursor:pointer;font-family:'Inter',sans-serif;min-width:100px">Andres Veyga</button>
+            <button onclick="cargaSelBanco(this,'gonzalo')" class="carga-banco-btn" style="flex:1;padding:8px 12px;border-radius:8px;border:1.5px solid var(--border2);background:transparent;color:var(--text-muted);font-size:12px;font-weight:700;cursor:pointer;font-family:'Inter',sans-serif;min-width:100px">Gonzalo Marvaldi</button>
+            <button onclick="cargaSelBanco(this,'angel')"   class="carga-banco-btn" style="flex:1;padding:8px 12px;border-radius:8px;border:1.5px solid var(--border2);background:transparent;color:var(--text-muted);font-size:12px;font-weight:700;cursor:pointer;font-family:'Inter',sans-serif;min-width:100px">Angel Flores</button>
+          </div>
+        </div>
+        <button id="carga-confirmar-btn" onclick="cargaConfirmar()" disabled
+          style="width:100%;background:var(--grad);border:none;color:#fff;border-radius:8px;padding:10px;cursor:pointer;font-size:13px;font-weight:700;font-family:'Inter',sans-serif;opacity:.4;transition:opacity .15s">
+          ✅ Confirmar asignación
+        </button>
+      </div>
+
+      <!-- Mensajes -->
+      <div id="carga-msg" style="min-height:18px;font-size:13px"></div>
+    </div>
+
+    <!-- Historial de carga de la sesión -->
+    <div style="margin-top:20px">
+      <div style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Cargadas en esta sesión</div>
+      <div id="carga-historial" style="font-size:12px;color:var(--text-muted)">Ninguna aún</div>
+    </div>
+
+  </div><!-- /store-panel-carga -->
 
 </div>
 
@@ -4191,7 +4245,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v3.9.1] OK');
+console.log('[Alleata v3.9.2] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -9854,6 +9908,111 @@ function storeInit() {
   if (_storeData.length === 0) storeLoad();
 }
 // ══ /STORE MODULE ════════════════════════════════════════════════════════════
+
+
+
+// ══ STORE — CARGAR TERMINALES ════════════════════════════════════════════════
+var _cargaTerminalId  = null;
+var _cargaBancoSel    = null;
+var _cargaHistorial   = [];
+
+function storeTabSwitch(btn, tab) {
+  document.querySelectorAll('.store-tab').forEach(function(b) {
+    var on = b.dataset.tab === tab;
+    b.style.borderBottomColor = on ? 'var(--teal)' : 'transparent';
+    b.style.color = on ? 'var(--teal)' : 'var(--text-muted)';
+  });
+  document.getElementById('store-panel-stock').style.display = tab === 'stock' ? '' : 'none';
+  document.getElementById('store-panel-carga').style.display = tab === 'carga' ? '' : 'none';
+  if (tab === 'carga') {
+    setTimeout(function() { var el = document.getElementById('carga-serial'); if(el) el.focus(); }, 100);
+  }
+}
+
+async function cargaBuscar() {
+  var serial = (document.getElementById('carga-serial').value || '').trim();
+  var msg    = document.getElementById('carga-msg');
+  var result = document.getElementById('carga-resultado');
+  if (!serial) { msg.innerHTML = '<span style="color:#ef4444">Ingresá un serial</span>'; return; }
+  msg.innerHTML = '<span style="color:var(--text-muted)">Buscando...</span>';
+  result.style.display = 'none';
+  _cargaTerminalId = null; _cargaBancoSel = null;
+  document.getElementById('carga-confirmar-btn').disabled = true;
+  document.getElementById('carga-confirmar-btn').style.opacity = '.4';
+  document.querySelectorAll('.carga-banco-btn').forEach(function(b) {
+    b.style.borderColor = 'var(--border2)'; b.style.background = 'transparent'; b.style.color = 'var(--text-muted)';
+  });
+  try {
+    var res  = await fetch(ALLY_RAILWAY_BASE + '/store/buscar-terminal/' + encodeURIComponent(serial), { headers: { 'x-automation-secret': '123456' } });
+    var data = await res.json();
+    if (!data.ok) { msg.innerHTML = '<span style="color:#ef4444">❌ ' + (data.error || 'No encontrada') + '</span>'; return; }
+    var t = data.terminal;
+    _cargaTerminalId = t.id;
+    document.getElementById('cr-serial').textContent  = t.serial;
+    document.getElementById('cr-producto').textContent = t.producto || t.tipo || '—';
+    var ec = t.estado === 'DISPONIBLE' ? 'var(--teal)' : '#f59e0b';
+    document.getElementById('cr-estado').innerHTML = '<span style="color:' + ec + ';font-weight:700">' + (t.estado || '—') + '</span>';
+    document.getElementById('cr-banco').textContent  = t.banco_nombre || 'Sin banco';
+    result.style.display = '';
+    msg.innerHTML = '';
+  } catch(e) {
+    msg.innerHTML = '<span style="color:#ef4444">❌ ' + e.message + '</span>';
+  }
+}
+
+function cargaSelBanco(btn, banco) {
+  _cargaBancoSel = banco;
+  document.querySelectorAll('.carga-banco-btn').forEach(function(b) {
+    var on = b === btn;
+    b.style.borderColor = on ? 'var(--teal)' : 'var(--border2)';
+    b.style.background  = on ? 'rgba(29,191,142,.12)' : 'transparent';
+    b.style.color       = on ? 'var(--teal)' : 'var(--text-muted)';
+  });
+  var cfm = document.getElementById('carga-confirmar-btn');
+  cfm.disabled = false; cfm.style.opacity = '1';
+}
+
+async function cargaConfirmar() {
+  if (!_cargaTerminalId || !_cargaBancoSel) return;
+  var msg = document.getElementById('carga-msg');
+  var btn = document.getElementById('carga-confirmar-btn');
+  btn.disabled = true; btn.textContent = 'Guardando...';
+  try {
+    var res  = await fetch(ALLY_RAILWAY_BASE + '/store/asignar-terminal', {
+      method: 'POST',
+      headers: { 'x-automation-secret': '123456', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ terminal_id: _cargaTerminalId, banco: _cargaBancoSel })
+    });
+    var data = await res.json();
+    if (!data.ok) throw new Error(data.error || 'Error al asignar');
+    msg.innerHTML = '<span style="color:var(--teal);font-weight:700">✅ ' + data.mensaje + '</span>';
+    // Agregar al historial
+    var serial = document.getElementById('cr-serial').textContent;
+    _cargaHistorial.unshift({ serial: serial, banco: data.banco_nombre, hora: new Date().toLocaleTimeString('es-AR', {hour:'2-digit',minute:'2-digit'}) });
+    var hist = document.getElementById('carga-historial');
+    hist.innerHTML = _cargaHistorial.map(function(h) {
+      return '<div style="display:flex;gap:12px;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)">' +
+        '<span style="font-family:monospace;color:var(--text);font-size:11px">' + h.serial + '</span>' +
+        '<span style="color:var(--teal);font-weight:700;font-size:11px">→ ' + h.banco + '</span>' +
+        '<span style="color:var(--text-muted);font-size:10px;margin-left:auto">' + h.hora + '</span></div>';
+    }).join('');
+    // Reset para siguiente escaneo
+    setTimeout(function() {
+      document.getElementById('carga-serial').value = '';
+      document.getElementById('carga-resultado').style.display = 'none';
+      msg.innerHTML = '';
+      _cargaTerminalId = null; _cargaBancoSel = null;
+      btn.disabled = false; btn.textContent = '✅ Confirmar asignación'; btn.style.opacity = '.4';
+      document.getElementById('carga-serial').focus();
+      // Recargar KPIs de stock
+      if (_storeData.length > 0) storeLoad();
+    }, 1500);
+  } catch(e) {
+    msg.innerHTML = '<span style="color:#ef4444">❌ ' + e.message + '</span>';
+    btn.disabled = false; btn.textContent = '✅ Confirmar asignación'; btn.style.opacity = '1';
+  }
+}
+// ══ /STORE — CARGAR TERMINALES ═══════════════════════════════════════════════
 
 </script>
 
