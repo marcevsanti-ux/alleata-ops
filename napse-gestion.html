@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>GESTIÓN NAPSE — Dashboard</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap');
 
@@ -87,7 +86,6 @@
   .sync-status { font-size:11px; color:var(--muted); display:flex; align-items:center; gap:6px; }
   .sync-dot { width:7px; height:7px; border-radius:50%; background:var(--muted); flex-shrink:0; transition:background .3s; }
   .sync-dot.ok { background:var(--green); }
-  .version-chip   { font-size:10px; color:var(--muted); font-family:'JetBrains Mono',monospace; background:rgba(255,255,255,.05); border:1px solid var(--border); border-radius:20px; padding:3px 10px; }
   .sync-dot.loading { background:var(--gold); animation:pulse 1s infinite; }
   .sync-dot.error { background:var(--red); }
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
@@ -97,7 +95,6 @@
   .btn:active { transform:scale(.97); }
   .btn-teal  { background:linear-gradient(135deg,#1dbf8e,#1a9fd4); color:var(--navy); }
   .btn-ghost { background:rgba(255,255,255,.07); color:var(--text); border:1px solid var(--border); }
-  .btn-green { background:linear-gradient(135deg,#27ae60,#1dbf8e); color:var(--navy); }
   .btn-logout { background:transparent; border:none; color:var(--muted); font-size:11px; cursor:pointer; padding:4px 8px; border-radius:6px; transition:color .2s; }
   .btn-logout:hover { color:var(--red); }
 
@@ -119,15 +116,15 @@
   .turno-badge    { background:rgba(29,191,142,.12); border:1px solid var(--teal); color:var(--teal); padding:4px 14px; border-radius:20px; font-size:12px; font-weight:700; }
 
   /* CARDS */
-  .cards-grid { display:grid; grid-template-columns:repeat(6,1fr); gap:10px; margin-bottom:20px; }
-  @media(max-width:1200px){ .cards-grid { grid-template-columns:repeat(3,1fr); } }
+  .cards-grid { display:grid; grid-template-columns:repeat(5,1fr); gap:12px; margin-bottom:20px; }
+  @media(max-width:1100px){ .cards-grid { grid-template-columns:repeat(3,1fr); } }
   @media(max-width:700px) { .cards-grid { grid-template-columns:repeat(2,1fr); } }
 
-  .stat-card { background:var(--card-bg); border:1px solid var(--border); border-radius:12px; padding:14px 12px 12px; position:relative; overflow:hidden; transition:transform .2s; }
+  .stat-card { background:var(--card-bg); border:1px solid var(--border); border-radius:12px; padding:18px 16px 14px; position:relative; overflow:hidden; transition:transform .2s; }
   .stat-card:hover { transform:translateY(-3px); }
   .stat-card::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; background:var(--accent); }
   .card-label  { font-size:9px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; color:var(--accent); margin-bottom:8px; }
-  .card-number { font-family:'JetBrains Mono',monospace; font-size:36px; font-weight:700; color:var(--white); line-height:1; margin-bottom:4px; transition:all .3s; }
+  .card-number { font-family:'JetBrains Mono',monospace; font-size:44px; font-weight:700; color:var(--white); line-height:1; margin-bottom:4px; transition:all .3s; }
   .card-pct    { font-size:11px; color:var(--muted); }
   .card-pct span { color:var(--accent); font-weight:600; }
   .card-bar      { margin-top:10px; height:3px; background:rgba(255,255,255,.07); border-radius:2px; overflow:hidden; }
@@ -139,6 +136,15 @@
   .total-strip .number { font-family:'JetBrains Mono',monospace; font-size:32px; font-weight:800; color:var(--navy); }
   .total-strip .sublabel { font-size:11px; color:var(--navy); opacity:.7; }
 
+  /* AI INSIGHT */
+  .insight-panel { background:linear-gradient(135deg,rgba(29,191,142,.07),rgba(26,159,212,.07)); border:1px solid rgba(29,191,142,.25); border-radius:12px; padding:18px 20px; margin-bottom:22px; }
+  .insight-label { font-size:9px; font-weight:700; letter-spacing:2px; text-transform:uppercase; color:var(--teal); margin-bottom:8px; }
+  .insight-text  { font-size:13px; color:var(--text); line-height:1.65; min-height:38px; }
+  .dot-anim span { display:inline-block; width:5px; height:5px; border-radius:50%; background:var(--teal); margin:0 2px; animation:bounce 1.2s infinite; }
+  .dot-anim span:nth-child(2) { animation-delay:.2s; }
+  .dot-anim span:nth-child(3) { animation-delay:.4s; }
+  @keyframes bounce { 0%,80%,100%{transform:translateY(0)} 40%{transform:translateY(-5px)} }
+
   /* BOTTOM GRID */
   .bottom-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:22px; }
   @media(max-width:900px){ .bottom-grid { grid-template-columns:1fr; } }
@@ -147,12 +153,13 @@
   .panel-title { font-size:10px; font-weight:700; letter-spacing:2px; text-transform:uppercase; color:var(--muted); margin-bottom:16px; display:flex; align-items:center; gap:8px; }
   .panel-title::after { content:''; flex:1; height:1px; background:var(--border); }
 
+  /* BAR CHART */
+  .bar-row   { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
+  .bar-label { font-size:11px; color:var(--text); width:140px; flex-shrink:0; font-weight:500; }
+  .bar-track { flex:1; height:26px; background:rgba(255,255,255,.05); border-radius:4px; overflow:hidden; }
+  .bar-fill  { height:100%; border-radius:4px; transition:width 1.2s cubic-bezier(.4,0,.2,1); width:0; display:flex; align-items:center; justify-content:center; font-family:'JetBrains Mono',monospace; font-size:12px; font-weight:600; color:var(--navy); white-space:nowrap; min-width:28px; }
+
   /* HISTORY TABLE */
-  /* HISTORIAL SCROLL */
-  .history-scroll { max-height:320px; overflow-y:auto; scrollbar-width:thin; scrollbar-color:var(--teal) var(--navy-3); }
-  .history-scroll::-webkit-scrollbar { width:5px; }
-  .history-scroll::-webkit-scrollbar-track { background:var(--navy-3); border-radius:3px; }
-  .history-scroll::-webkit-scrollbar-thumb { background:var(--teal); border-radius:3px; }
   .history-table { width:100%; border-collapse:collapse; font-size:11px; }
   .history-table th { text-align:left; padding:5px 8px; color:var(--muted); font-weight:600; font-size:9px; letter-spacing:1px; text-transform:uppercase; border-bottom:1px solid var(--border); }
   .history-table td { padding:8px; border-bottom:1px solid rgba(255,255,255,.04); color:var(--text); font-family:'JetBrains Mono',monospace; font-size:11px; }
@@ -161,6 +168,15 @@
   .delta-pos { color:var(--green); } .delta-neg { color:var(--red); } .delta-neu { color:var(--muted); }
   .badge-sf     { background:rgba(29,191,142,.15); color:var(--teal); border-radius:4px; padding:1px 5px; font-size:9px; }
   .badge-manual { background:rgba(245,166,35,.15); color:var(--gold); border-radius:4px; padding:1px 5px; font-size:9px; }
+
+  /* MANUAL FORM */
+  .update-form { background:var(--navy-3); border:1px solid var(--border); border-radius:12px; padding:18px 20px; margin-bottom:22px; }
+  .form-title  { font-size:13px; font-weight:700; color:var(--white); margin-bottom:14px; display:flex; align-items:center; gap:8px; }
+  .form-grid   { display:grid; grid-template-columns:auto auto repeat(5,1fr) auto; gap:8px; align-items:end; }
+  @media(max-width:900px){ .form-grid { grid-template-columns:1fr 1fr; } }
+  .form-field label { display:block; font-size:9px; font-weight:600; color:var(--muted); letter-spacing:1px; text-transform:uppercase; margin-bottom:5px; }
+  .form-field input, .form-field select { background:var(--navy-2); border:1px solid var(--border); color:var(--white); font-family:'JetBrains Mono',monospace; font-size:13px; padding:7px 10px; border-radius:7px; width:100%; outline:none; transition:border-color .2s; }
+  .form-field input:focus, .form-field select:focus { border-color:var(--teal); }
 
   /* TOAST */
   #toast { position:fixed; bottom:24px; right:24px; padding:10px 18px; border-radius:8px; font-weight:700; font-size:13px; opacity:0; transform:translateY(8px); transition:all .3s; pointer-events:none; z-index:999; }
@@ -171,39 +187,6 @@
   .footer { text-align:center; padding:20px; font-size:10px; color:var(--muted); border-top:1px solid var(--border); }
   .footer span { color:var(--teal); font-weight:600; }
   .empty-state { text-align:center; padding:32px; color:var(--muted); font-size:13px; }
-
-  /* CRON INFO PANEL */
-  .cron-info-panel { background:var(--navy-3); border:1px solid var(--border); border-left:3px solid var(--teal); border-radius:8px; padding:10px 18px; margin-bottom:18px; display:flex; align-items:center; justify-content:space-between; }
-  .cron-info-left  { display:flex; align-items:center; gap:12px; }
-  .cron-info-icon  { font-size:16px; }
-  .cron-info-title { font-size:10px; font-weight:700; color:var(--muted); letter-spacing:1.5px; text-transform:uppercase; margin-bottom:5px; }
-  .cron-info-slots { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
-  .cron-slot  { font-size:11px; font-weight:700; color:var(--text); }
-  .cron-time  { font-family:'JetBrains Mono',monospace; font-size:12px; font-weight:700; color:var(--teal); background:rgba(29,191,142,.1); border:1px solid rgba(29,191,142,.2); padding:2px 8px; border-radius:6px; }
-  .cron-sep   { color:var(--muted); font-size:12px; }
-  .cron-info-next { font-size:11px; color:var(--muted); margin-left:4px; }
-  .cron-info-next strong { color:var(--gold); font-family:'JetBrains Mono',monospace; }
-
-  /* GRAFICOS */
-  .charts-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:22px; }
-  @media(max-width:900px){ .charts-grid { grid-template-columns:1fr; } }
-  .chart-panel { background:var(--card-bg); border:1px solid var(--border); border-radius:12px; padding:18px 20px; }
-  .chart-title { font-size:10px; font-weight:700; letter-spacing:2px; text-transform:uppercase; color:var(--muted); margin-bottom:16px; display:flex; align-items:center; gap:8px; }
-  .chart-title::after { content:''; flex:1; height:1px; background:var(--border); }
-  .chart-wrap { position:relative; height:220px; }
-
-  /* COSTO INDICATOR */
-  .costo-grid { display:grid; grid-template-columns:repeat(4,1fr) 1.3fr; gap:12px; margin-bottom:22px; }
-  @media(max-width:1100px){ .costo-grid { grid-template-columns:repeat(2,1fr); } }
-  .costo-card { background:var(--card-bg); border:1px solid var(--border); border-radius:12px; padding:16px; }
-  .costo-card.total { background:linear-gradient(135deg,rgba(29,191,142,.12),rgba(26,159,212,.08)); border-color:rgba(29,191,142,.3); }
-  .costo-label { font-size:9px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; color:var(--muted); margin-bottom:6px; }
-  .costo-ots   { font-size:11px; color:var(--muted); margin-bottom:4px; }
-  .costo-ots span { color:var(--text); font-weight:600; font-family:'JetBrains Mono',monospace; }
-  .costo-amount { font-family:'JetBrains Mono',monospace; font-size:22px; font-weight:700; color:var(--white); }
-  .costo-card.total .costo-amount { font-size:28px; color:var(--teal); }
-  .costo-prom { margin-top:10px; padding-top:10px; border-top:1px solid rgba(255,255,255,.08); font-size:10px; color:var(--muted); line-height:1.5; }
-  .costo-prom span { color:var(--teal); font-family:'JetBrains Mono',monospace; font-size:13px; font-weight:700; }
 </style>
 </head>
 <body>
@@ -246,14 +229,13 @@
         <div class="sync-dot" id="sync-dot"></div>
         <span id="sync-label">Cargando…</span>
       </div>
-      <div class="version-chip">v2.5.4</div>
       <div id="live-clock">--:--:--</div>
       <div class="user-chip">
         <div class="user-avatar" id="user-avatar">G</div>
         <span id="user-name">—</span>
       </div>
       <button class="btn btn-ghost" onclick="syncFromRailway()">↻ Sync SF</button>
-      <button class="btn btn-green" id="btn-fullsync" onclick="fullSync()">⚡ Full Sync</button>
+      <button class="btn btn-teal"  onclick="generateInsight()">✦ Análisis IA</button>
       <button class="btn-logout" onclick="doLogout()">Salir</button>
     </div>
   </div>
@@ -265,8 +247,8 @@
       <span>Filtros SF activos:</span>
       <span class="filter-tag">Perfil = NAPSE</span>
       <span class="filter-tag">Tipo = Instalación Equipo + Simcard | Cambio de Terminal</span>
-      <span class="filter-tag">Estado = todos activos + Retirar Terminal</span>
-      <span class="filter-tag">Todas las fechas</span>
+      <span class="filter-tag">Estado = todos activos</span>
+      <span class="filter-tag">Fecha ≥ 01/06/2026</span>
     </div>
 
     <!-- SNAPSHOT HEADER -->
@@ -278,25 +260,9 @@
       <div class="turno-badge" id="current-turno">—</div>
     </div>
 
-
-    <!-- CRON INFO -->
-    <div class="cron-info-panel">
-      <div class="cron-info-left">
-        <span class="cron-info-icon">⏱</span>
-        <div>
-          <div class="cron-info-title">Actualización automática desde SF</div>
-          <div class="cron-info-slots">
-            <span class="cron-slot">Lun–Vie</span>
-            <span class="cron-time">10:00</span>
-            <span class="cron-sep">·</span>
-            <span class="cron-time">14:00</span>
-            <span class="cron-sep">·</span>
-            <span class="cron-time">17:00</span>
-            <span class="cron-sep">·</span>
-            <span class="cron-info-next">Próximo: <strong id="next-cron">—</strong></span>
-          </div>
-        </div>
-      </div>
+    <!-- CARDS -->
+    <div class="cards-grid" id="cards-grid">
+      <div class="empty-state" style="grid-column:1/-1">Cargando datos…</div>
     </div>
 
     <!-- TOTAL STRIP -->
@@ -306,59 +272,54 @@
       <div><div class="sublabel" id="total-sublabel">—</div></div>
     </div>
 
-    <!-- CARDS -->
-    <div class="cards-grid" id="cards-grid">
-      <div class="empty-state" style="grid-column:1/-1">Cargando datos…</div>
-    </div>
-
-    <!-- HISTORIAL -->
-    <div class="panel" style="margin-bottom:22px;">
-      <div class="panel-title" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
-        <span>Historial de snapshots</span>
-        <label style="display:flex;align-items:center;gap:6px;font-size:10px;color:var(--muted);font-weight:400;letter-spacing:0;text-transform:none;cursor:pointer;">
-          <input type="checkbox" id="show-manual" style="accent-color:var(--teal);cursor:pointer;">
-          Mostrar Full Sync manuales
-        </label>
+    <!-- AI INSIGHT -->
+    <div class="insight-panel">
+      <div class="insight-label">✦ Análisis Ally</div>
+      <div class="insight-text" id="insight-text">
+        <span style="color:var(--muted)">Hacé clic en "Análisis IA" para obtener un diagnóstico del estado operativo actual.</span>
       </div>
-      <div id="history-container" class="history-scroll"><div class="empty-state">Sin datos</div></div>
-    </div>
-
-
-    <!-- GRAFICOS -->
-    <div class="charts-grid">
-
-      <!-- Gráfico 2: Tipo de OT -->
-      <div class="chart-panel">
-        <div class="chart-title">OTs por tipo</div>
-        <div class="chart-wrap"><canvas id="chart-tipo"></canvas></div>
-      </div>
-
-      <!-- Gráfico 3: Logística -->
-      <div class="chart-panel">
-        <div class="chart-title">OTs por logística (Despachado + Exitoso)</div>
-        <div class="chart-wrap"><canvas id="chart-logistica"></canvas></div>
-      </div>
-
-    </div>
-
-    <!-- COSTOS POR LOGISTICA -->
-    <div class="panel-title" style="margin-bottom:12px;font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:8px;">
-      Costo por logística (Despachado + Exitoso)
-      <span style="flex:1;height:1px;background:var(--border);display:block"></span>
-    </div>
-    <div class="costo-grid" id="costo-grid">
-      <!-- Llenado por JS -->
     </div>
 
     <!-- BOTTOM GRID -->
     <div class="bottom-grid">
+      <div class="panel">
+        <div class="panel-title">Distribución por estado</div>
+        <div id="bar-chart"><div class="empty-state">Sin datos</div></div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">Historial de snapshots</div>
+        <div id="history-container"><div class="empty-state">Sin datos</div></div>
+      </div>
     </div>
 
+    <!-- CARGA MANUAL -->
+    <div class="update-form">
+      <div class="form-title">
+        📥 Carga manual
+        <span style="font-size:10px;font-weight:400;color:var(--muted)">— fallback si Railway no está disponible</span>
+      </div>
+      <div class="form-grid">
+        <div class="form-field"><label>Fecha</label><input type="date" id="f-fecha"></div>
+        <div class="form-field">
+          <label>Turno</label>
+          <select id="f-turno">
+            <option value="🌅 Mañana (9:00)">🌅 Turno Mañana</option>
+            <option value="🌆 Tarde (17:00)">🌆 Turno Tarde</option>
+          </select>
+        </div>
+        <div class="form-field"><label>Config. Terminal</label><input type="number" id="f-conf" min="0" placeholder="0"></div>
+        <div class="form-field"><label>En Proceso</label>     <input type="number" id="f-proc" min="0" placeholder="0"></div>
+        <div class="form-field"><label>Pre-Colecta</label>    <input type="number" id="f-pre"  min="0" placeholder="0"></div>
+        <div class="form-field"><label>Despachado</label>     <input type="number" id="f-desp" min="0" placeholder="0"></div>
+        <div class="form-field"><label>Exitoso</label>        <input type="number" id="f-exit" min="0" placeholder="0"></div>
+        <button class="btn btn-teal" onclick="saveManual()" style="height:36px;align-self:end;">Guardar →</button>
+      </div>
+    </div>
 
   </div><!-- /main -->
 
   <div class="footer">
-    <span>Alleata Ops</span> · NAPSE Dashboard · Moretti e Hijos S.A. · v2.5.4
+    <span>Alleata Ops</span> · NAPSE Dashboard · Moretti e Hijos S.A. · v2.0.0
   </div>
 
 </div><!-- /app -->
@@ -382,7 +343,6 @@ const ESTADOS = [
   { key:'en_proceso',          label:'En Proceso',          accent:'#1a9fd4' },
   { key:'pre_colecta',         label:'Pre-Colecta',         accent:'#f5a623' },
   { key:'despachado',          label:'Despachado',          accent:'#3a7bd5' },
-  { key:'retirar_terminal',    label:'Retirar Terminal',    accent:'#9b59b6' },
   { key:'exitoso',             label:'Exitoso',             accent:'#27ae60' },
 ];
 
@@ -397,18 +357,6 @@ function fmtDate(iso) {
   const [y,m,dd] = d.split('-');
   return `${dd}/${m}/${y}`;
 }
-function fmtTime(iso) {
-  if (!iso) return '—';
-  // iso puede ser "2026-06-10T23:49:00Z" o similar
-  try {
-    const d = new Date(iso);
-    const p = n => String(n).padStart(2,'0');
-    // Convertir a ART (UTC-3)
-    const ar = new Date(d.getTime() - 3*60*60*1000);
-    return `${p(ar.getUTCHours())}:${p(ar.getUTCMinutes())}`;
-  } catch { return '—'; }
-}
-
 function fmtDatetime(d) {
   const p = n => String(n).padStart(2,'0');
   return `${p(d.getDate())}/${p(d.getMonth()+1)} ${p(d.getHours())}:${p(d.getMinutes())}`;
@@ -416,48 +364,10 @@ function fmtDatetime(d) {
 function loadLocal()      { try { return JSON.parse(localStorage.getItem('napse_snaps_v2')||'[]'); } catch { return []; } }
 function saveLocal(snaps) { try { localStorage.setItem('napse_snaps_v2', JSON.stringify(snaps.slice(0,200))); } catch {} }
 
-
-// ── Próximo cron NAPSE (9:00 y 17:00 ART, L-V) ───────────────────────────────
-function proximoCronNAPSE() {
-  // Hora actual en ART (UTC-3)
-  const now = new Date();
-  const ar  = new Date(now.getTime() - 3 * 60 * 60 * 1000);
-  const dow  = ar.getUTCDay();   // 0=Dom, 1=Lun ... 5=Vie, 6=Sab
-  const h    = ar.getUTCHours();
-  const m    = ar.getUTCMinutes();
-  const hm   = h * 60 + m;
-
-  const slots = [10 * 60, 14 * 60, 17 * 60]; // 10:00, 14:00 y 17:00 en minutos
-
-  // Buscar próximo slot en días hábiles
-  for (let dayOffset = 0; dayOffset <= 7; dayOffset++) {
-    const targetDow = (dow + dayOffset) % 7;
-    const esHabil = targetDow >= 1 && targetDow <= 5;
-    if (!esHabil) continue;
-
-    for (const slot of slots) {
-      if (dayOffset === 0 && slot <= hm) continue; // ya pasó hoy
-      const slotH = Math.floor(slot / 60);
-      const slotM = slot % 60;
-      const p = n => String(n).padStart(2, '0');
-
-      if (dayOffset === 0) return `hoy ${p(slotH)}:${p(slotM)}`;
-      if (dayOffset === 1) return `mañana ${p(slotH)}:${p(slotM)}`;
-      const dias = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
-      return `${dias[targetDow]} ${p(slotH)}:${p(slotM)}`;
-    }
-  }
-  return '—';
-}
-
 // ── Clock ─────────────────────────────────────────────────────────
 function updateClock() {
   const p=n=>String(n).padStart(2,'0'), n=new Date();
   document.getElementById('live-clock').textContent=`${p(n.getHours())}:${p(n.getMinutes())}:${p(n.getSeconds())}`;
-  // Actualizar próximo cron cada minuto
-  if (n.getSeconds() === 0 || document.getElementById('next-cron').textContent === '—') {
-    document.getElementById('next-cron').textContent = proximoCronNAPSE();
-  }
 }
 setInterval(updateClock,1000); updateClock();
 
@@ -523,6 +433,11 @@ async function onLogin(user) {
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app').style.display = 'block';
 
+  // Init form
+  document.getElementById('f-fecha').value = new Date().toISOString().split('T')[0];
+  const h = new Date().getHours();
+  document.getElementById('f-turno').value = h < 13 ? '🌅 Mañana (9:00)' : '🌆 Tarde (17:00)';
+
   // Cargar datos
   snapshots = loadLocal();
   if (snapshots.length) { render(); setSyncStatus('ok','Caché local'); }
@@ -551,42 +466,8 @@ document.getElementById('login-email').addEventListener('keydown', e => {
 });
 
 // ════════════════════════════════════════════════════════════════
-// FULL SYNC — dispara snapshot en Railway (consulta SF ahora)
+// SYNC desde Railway
 // ════════════════════════════════════════════════════════════════
-async function fullSync() {
-  const btn = document.getElementById('btn-fullsync');
-  btn.disabled = true;
-  btn.textContent = '⏳ Consultando SF…';
-  setSyncStatus('loading', 'Consultando SF…');
-
-  try {
-    // 1. Disparar snapshot en Railway (consulta SF y guarda en Supabase)
-    const snap = await fetch(`${RAILWAY_BASE}/automations/napse/snapshot`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-automation-secret': AUTOMATION_SECRET
-      }
-    });
-    if (!snap.ok) throw new Error(`HTTP ${snap.status}`);
-    const snapJson = await snap.json();
-    if (!snapJson.ok) throw new Error(snapJson.error || 'Error en snapshot');
-
-    // 2. Traer los snapshots actualizados
-    await syncFromRailway();
-    toast('✓ Full Sync OK — datos traídos desde SF', 'ok');
-
-  } catch(err) {
-    console.error('[Full Sync]', err);
-    setSyncStatus('error', 'Error en Full Sync');
-    toast(`Error: ${err.message}`, 'error');
-  } finally {
-    btn.disabled = false;
-    btn.textContent = '⚡ Full Sync';
-  }
-}
-
-
 function setSyncStatus(state, text) {
   document.getElementById('sync-dot').className = 'sync-dot ' + state;
   document.getElementById('sync-label').textContent = text;
@@ -649,19 +530,29 @@ function render() {
   document.getElementById('total-sublabel').textContent =
     `${snapshots.length} registros · ${snapshots.filter(s=>s._source==='sf').length} desde SF`;
 
-  // Gráficos
-  renderCharts(snapshots);
+  // Bar chart
+  const maxVal = Math.max(...ESTADOS.map(e => latest[e.key]||0), 1);
+  document.getElementById('bar-chart').innerHTML = ESTADOS.map(e => {
+    const val = latest[e.key]||0;
+    const w   = Math.round(val/maxVal*100);
+    return `<div class="bar-row">
+      <div class="bar-label">${e.label}</div>
+      <div class="bar-track">
+        <div class="bar-fill" data-w="${w}" style="background:${e.accent}">${val}</div>
+      </div>
+    </div>`;
+  }).join('');
+  requestAnimationFrame(() => {
+    document.querySelectorAll('.bar-fill').forEach(el => el.style.width = el.dataset.w+'%');
+  });
 
-
-  // Historial: filtrar manuales según toggle (solo afecta la tabla, no las cards)
-  const showManual = document.getElementById('show-manual')?.checked;
-  const allRows = snapshots.slice(0, 60);
-  const rows = showManual ? allRows : allRows.filter(r => r.origen !== 'manual' && r._source !== 'manual');
+  // History table
+  const rows = snapshots.slice(0,40);
   document.getElementById('history-container').innerHTML = `
     <table class="history-table">
       <thead><tr>
-        <th>Fecha</th><th>Hora</th><th>Turno</th><th>Conf.</th><th>Proc.</th>
-        <th>Pre-Col.</th><th>Desp.</th><th>Éxit.</th><th>Ret.</th><th>Total</th><th>Δ</th><th>Src</th>
+        <th>Fecha</th><th>Turno</th><th>Conf.</th><th>Proc.</th>
+        <th>Pre-Col.</th><th>Desp.</th><th>Éxit.</th><th>Total</th><th>Δ</th><th>Src</th>
       </tr></thead>
       <tbody>${rows.map((r,i) => {
         const tot     = getTotal(r);
@@ -678,12 +569,10 @@ function render() {
           : '<span class="badge-manual">manual</span>';
         return `<tr>
           <td>${fmtDate(r.fecha||r.created_at)}</td>
-          <td style="color:var(--muted)">${fmtTime(r.created_at)}</td>
           <td class="${tc}">${ts}</td>
           <td>${r.configurar_terminal||0}</td><td>${r.en_proceso||0}</td>
           <td>${r.pre_colecta||0}</td><td>${r.despachado||0}</td>
           <td>${r.exitoso||0}</td>
-          <td style="color:#9b59b6;font-weight:600">${r.retirar_terminal||0}</td>
           <td style="color:var(--teal);font-weight:700">${tot}</td>
           <td>${deltaStr}</td><td>${src}</td>
         </tr>`;
@@ -691,163 +580,66 @@ function render() {
     </table>`;
 }
 
-
-
-
 // ════════════════════════════════════════════════════════════════
-// GRÁFICOS
+// CARGA MANUAL
 // ════════════════════════════════════════════════════════════════
-let chartTipo      = null;
-let chartLogistica = null;
-
-const CHART_DEFAULTS = {
-  responsive: true,
-  maintainAspectRatio: false,
-  plugins: { legend: { labels: { color: '#7a91a8', font: { family: 'Inter', size: 11 } } } },
-};
-
-function destroyCharts() {
-  [chartTipo, chartLogistica].forEach(c => { if (c) c.destroy(); });
+function saveManual() {
+  const fecha = document.getElementById('f-fecha').value;
+  const turno = document.getElementById('f-turno').value;
+  if (!fecha) { toast('Ingresá una fecha', 'error'); return; }
+  const snap = {
+    fecha, turno, _source:'manual',
+    created_at: new Date().toISOString(),
+    configurar_terminal: parseInt(document.getElementById('f-conf').value)||0,
+    en_proceso:          parseInt(document.getElementById('f-proc').value)||0,
+    pre_colecta:         parseInt(document.getElementById('f-pre').value) ||0,
+    despachado:          parseInt(document.getElementById('f-desp').value)||0,
+    exitoso:             parseInt(document.getElementById('f-exit').value)||0,
+  };
+  snap.total = getTotal(snap);
+  snapshots  = [snap, ...snapshots];
+  saveLocal(snapshots);
+  render();
+  ['f-conf','f-proc','f-pre','f-desp','f-exit'].forEach(id => document.getElementById(id).value='');
+  toast('✓ Guardado localmente', 'ok');
 }
 
-function renderCharts(snaps) {
-  if (!snaps.length) return;
-  destroyCharts();
+// ════════════════════════════════════════════════════════════════
+// AI INSIGHT
+// ════════════════════════════════════════════════════════════════
+async function generateInsight() {
+  if (!snapshots.length) { toast('Primero sincronizá los datos', 'error'); return; }
+  const insightEl = document.getElementById('insight-text');
+  insightEl.innerHTML = `<span style="color:var(--muted);display:flex;align-items:center;gap:8px">
+    <span class="dot-anim"><span></span><span></span><span></span></span> Ally analizando…
+  </span>`;
 
-  const latest = snaps[0];
+  const latest = snapshots[0];
+  const total  = getTotal(latest);
+  const hist   = snapshots.slice(0,6).map(r =>
+    `${fmtDate(r.fecha||r.created_at)} ${r.turno||''}: CT=${r.configurar_terminal||0}, EP=${r.en_proceso||0}, PC=${r.pre_colecta||0}, D=${r.despachado||0}, EX=${r.exitoso||0}, T=${getTotal(r)}`
+  ).join('\n');
 
-  // ── Gráfico 2: Tipo de OT ───────────────────────────────────────
-  const inst   = latest.instalacion_equipo  || 0;
-  const cambio = latest.cambio_terminal     || 0;
-  chartTipo = new Chart(document.getElementById('chart-tipo'), {
-    type: 'bar',
-    data: {
-      labels: ['Instalación Equipo + Simcard', 'Cambio de Terminal'],
-      datasets: [{
-        label: 'OTs',
-        data: [inst, cambio],
-        backgroundColor: ['rgba(29,191,142,.7)', 'rgba(26,159,212,.7)'],
-        borderColor:     ['#1dbf8e', '#1a9fd4'],
-        borderWidth: 1,
-        borderRadius: 6,
-      }],
-    },
-    options: {
-      ...CHART_DEFAULTS,
-      indexAxis: 'y',
-      plugins: {
-        ...CHART_DEFAULTS.plugins,
-        legend: { display: false },
-        tooltip: { callbacks: { label: ctx => ` ${ctx.parsed.x} OTs` } },
-      },
-      scales: {
-        x: { ticks: { color:'#7a91a8', font:{size:10} }, grid: { color:'rgba(255,255,255,.04)' }, beginAtZero:true, max: Math.max(inst,cambio) * 1.18 },
-        y: { ticks: { color:'#e2e8f0', font:{size:11} }, grid: { display:false } },
-      },
-      animation: { onComplete(ctx) {
-        const chart = ctx.chart;
-        const { ctx: c, data } = chart;
-        c.save();
-        c.font = 'bold 13px JetBrains Mono, monospace';
-        c.fillStyle = '#e2e8f0';
-        c.textAlign = 'left';
-        c.textBaseline = 'middle';
-        data.datasets[0].data.forEach((val, i) => {
-          const meta = chart.getDatasetMeta(0);
-          const bar  = meta.data[i];
-          c.fillText(val + ' OTs', bar.x + 8, bar.y);
-        });
-        c.restore();
-      }},
-    },
-  });
+  const prompt = `Sos Ally, agente operativo de Alleata. Analizá el pipeline NAPSE (instalaciones terminales POS) en 2-3 oraciones concretas. Español argentino, directo, con números.
 
-  // ── Gráfico 3: Logística ────────────────────────────────────────
-  const logLabels = ['ALLEATA', 'Correo Arg.', 'EPSA', 'Cabify', 'Otros'];
-  const logData   = [
-    latest.alleata_ots          || 0,
-    latest.correo_argentino_ots || 0,
-    latest.epsa_ots             || 0,
-    latest.cabify_ots           || 0,
-    latest.otros_ots            || 0,
-  ].filter((v,i,a) => v > 0 || i < 4); // mostrar aunque sea 0 las principales
+SNAPSHOT ACTUAL (${fmtDate(latest.fecha||latest.created_at)} · ${latest.turno||''}):
+Config.Terminal=${latest.configurar_terminal||0} | En Proceso=${latest.en_proceso||0} | Pre-Colecta=${latest.pre_colecta||0} | Despachado=${latest.despachado||0} | Exitoso=${latest.exitoso||0} | TOTAL=${total}
 
-  const logColors = ['rgba(29,191,142,.75)','rgba(26,159,212,.75)','rgba(245,166,35,.75)','rgba(231,76,60,.75)','rgba(122,145,168,.5)'];
+HISTORIAL:
+${hist}
 
-  const logDataVals = [
-    latest.alleata_ots||0, latest.correo_argentino_ots||0,
-    latest.epsa_ots||0,    latest.cabify_ots||0, latest.otros_ots||0,
-  ];
-  chartLogistica = new Chart(document.getElementById('chart-logistica'), {
-    type: 'bar',
-    data: {
-      labels: logLabels,
-      datasets: [{
-        label: 'OTs',
-        data: logDataVals,
-        backgroundColor: logColors,
-        borderColor: logColors.map(c => c.replace('.75','.9').replace('.5','.8')),
-        borderWidth: 1,
-        borderRadius: 6,
-      }],
-    },
-    options: {
-      ...CHART_DEFAULTS,
-      plugins: { ...CHART_DEFAULTS.plugins, legend: { display: false } },
-      scales: {
-        x: { ticks: { color:'#e2e8f0', font:{size:11} }, grid: { display:false } },
-        y: { ticks: { color:'#7a91a8', font:{size:10} }, grid: { color:'rgba(255,255,255,.04)' }, beginAtZero:true, max: Math.max(...logDataVals) * 1.2 },
-      },
-      animation: { onComplete(ctx) {
-        const chart = ctx.chart;
-        const { ctx: c } = chart;
-        c.save();
-        c.font = 'bold 12px JetBrains Mono, monospace';
-        c.fillStyle = '#e2e8f0';
-        c.textAlign = 'center';
-        c.textBaseline = 'bottom';
-        chart.getDatasetMeta(0).data.forEach((bar, i) => {
-          const val = logDataVals[i];
-          if (val > 0) c.fillText(val, bar.x, bar.y - 4);
-        });
-        c.restore();
-      }},
-    },
-  });
+Flujo: Configurar Terminal → En Proceso → Pre-Colecta → Despachado → Exitoso. ¿Dónde acumula? ¿% Exitoso? ¿Cuello de botella? Recomendá una acción concreta.`;
 
-  // ── Costos por logística ────────────────────────────────────────
-  const fmt = n => '$' + (n||0).toLocaleString('es-AR', {minimumFractionDigits:0, maximumFractionDigits:0});
-  const logisticas = [
-    { label:'ALLEATA',        ots: latest.alleata_ots||0,          costo: latest.alleata_costo||0,          color:'#1dbf8e' },
-    { label:'Correo Arg.',    ots: latest.correo_argentino_ots||0,  costo: latest.correo_argentino_costo||0, color:'#1a9fd4' },
-    { label:'EPSA',           ots: latest.epsa_ots||0,             costo: latest.epsa_costo||0,             color:'#f5a623' },
-    { label:'Cabify',         ots: latest.cabify_ots||0,           costo: latest.cabify_costo||0,           color:'#e74c3c' },
-  ];
-  const costoTotal = latest.costo_total || logisticas.reduce((s,l)=>s+l.costo,0);
-
-  const totalOts    = logisticas.reduce((s,l)=>s+l.ots,0);
-  const otsConCosto = logisticas.filter(l=>l.label!=='ALLEATA').reduce((s,l)=>s+l.ots,0);
-  const promTotal   = otsConCosto > 0 ? costoTotal / otsConCosto : 0;
-
-  document.getElementById('costo-grid').innerHTML =
-    logisticas.map(l => {
-      const prom = l.ots > 0 ? l.costo / l.ots : 0;
-      const promLine = (l.label !== 'ALLEATA' && l.ots > 0)
-        ? `<div class="costo-prom">Costo por envío ${l.label}<br><span>${fmt(prom)}</span></div>`
-        : '';
-      return `<div class="costo-card">
-        <div class="costo-label" style="color:${l.color}">${l.label}</div>
-        <div class="costo-ots"><span>${l.ots}</span> OTs</div>
-        <div class="costo-amount">${fmt(l.costo)}</div>
-        ${promLine}
-      </div>`;
-    }).join('') +
-    `<div class="costo-card total">
-      <div class="costo-label">TOTAL</div>
-      <div class="costo-ots"><span>${totalOts}</span> OTs</div>
-      <div class="costo-amount">${fmt(costoTotal)}</div>
-      ${otsConCosto > 0 ? `<div class="costo-prom">Costo promedio por envío<br><span>${fmt(promTotal)}</span><br><em style="font-size:9px;color:var(--muted);font-style:normal">* No contempla envíos Alleata</em></div>` : ''}
-    </div>`;
+  try {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ model:'claude-sonnet-4-20250514', max_tokens:1000, messages:[{role:'user',content:prompt}] })
+    });
+    const data = await resp.json();
+    insightEl.textContent = data.content?.find(b=>b.type==='text')?.text || 'Sin respuesta.';
+  } catch(e) {
+    insightEl.innerHTML = `<span style="color:var(--red)">Error al conectar con Ally.</span>`;
+  }
 }
 
 // ════════════════════════════════════════════════════════════════
