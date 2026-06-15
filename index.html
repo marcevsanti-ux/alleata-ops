@@ -6890,6 +6890,30 @@ async function consultarTracking(id, trackNum){
 
       await sb.from('sf_workorders').update(updateData).eq('id', id);
       loadBadges(); renderEnvios();
+
+      // ── Write-back a SF: Observacion_sobre_estado_de_OT__c ────────────
+      if(otNumero){
+        try {
+          const sfResp = await fetch(
+            'https://alleata-agent-production.up.railway.app/automations/run/sf_ca_tracker_one',
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type':        'application/json',
+                'x-automation-secret': '123456'
+              },
+              body: JSON.stringify({ ot_numero: otNumero })
+            }
+          );
+          const sfData = await sfResp.json();
+          if(sfData.ok && sfData.actualizadas > 0){
+            showTrackingToast('📝 Observación actualizada en SF', 'teal');
+          }
+          console.log('[consultarTracking] SF write-back result:', sfData);
+        } catch(sfErr){
+          console.warn('[consultarTracking] SF write-back error:', sfErr.message);
+        }
+      }
     }
 
     // ── Disparar Ally Rules via backend si hubo cambio de estado ─────────────
