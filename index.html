@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.0.1</title>
+<title>Alleata · Operaciones v4.0.2</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -407,7 +407,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.0.1 · 12 jun 2026
+      v4.0.2 · 12 jun 2026
     </div>
   </div>
 </div>
@@ -485,7 +485,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.0.1 · 12 jun 2026
+      v4.0.2 · 12 jun 2026
     </div>
   </div>
 </nav>
@@ -525,7 +525,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.0.1</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.0.2</div>
   </div>
   <div class="content">
 
@@ -3593,16 +3593,37 @@ function dsRutaCSV(){
 // ── KPI: Pendientes de gestión ────────────────────────────────────────────
 // Una OT requiere gestión si no tiene Gestión Retiros ni Status Gestión asignados
 function dsGestion_ActualizarKPI(datos){
-  const d = datos||[];
-  const s=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v;};
-  s('ds-num-pendiente',  d.filter(o=>(o.estado||'')==='Pendiente').length);
-  s('ds-num-enproceso',  d.filter(o=>(o.estado||'')==='En Proceso').length);
-  s('ds-num-noresponde', d.filter(o=>(o.estado||'').toUpperCase()==='NO RESPONDE').length);
-  s('ds-num-extraviada', d.filter(o=>(o.estado||'')==='Extraviada').length);
-  // legacy
+  // Intentar con datos pasados, o con DesinModule si existe, o leer del DOM
+  const d = datos || window.DesinModule?.datos || window.DesinModule?.filtrados || [];
+  const s=(id,v)=>{const el=document.getElementById(id);if(el&&v>=0)el.textContent=v;};
+  if(d.length > 0){
+    s('ds-num-pendiente',  d.filter(o=>(o.estado||'')==='Pendiente').length);
+    s('ds-num-enproceso',  d.filter(o=>(o.estado||'')==='En Proceso').length);
+    s('ds-num-noresponde', d.filter(o=>(o.estado||'').toUpperCase()==='NO RESPONDE').length);
+    s('ds-num-extraviada', d.filter(o=>(o.estado||'')==='Extraviada').length);
+  } else {
+    // Fallback: leer del DOM contando filas por data-estado
+    const rows = document.querySelectorAll('#ds-tbody tr[data-estado]');
+    const counts = {};
+    rows.forEach(r=>{ const e=r.dataset.estado||''; counts[e]=(counts[e]||0)+1; });
+    s('ds-num-pendiente',  counts['Pendiente']||0);
+    s('ds-num-enproceso',  counts['En Proceso']||0);
+    s('ds-num-noresponde', counts['NO RESPONDE']||counts['No Responde']||0);
+    s('ds-num-extraviada', counts['Extraviada']||0);
+  }
   const el = document.getElementById('ds-num-gestion');
   if(el) el.textContent = d.filter(o=>!o.gestion_retiros&&!o.status_gestion_retiros).length;
 }
+
+// Observar cambios en la tabla de desinstalaciones para actualizar KPIs
+(function watchDsTable(){
+  const tbody = document.getElementById('ds-tbody');
+  if(!tbody) return;
+  new MutationObserver(()=>{
+    // Esperar un tick para que el DOM termine
+    setTimeout(()=> dsGestion_ActualizarKPI([]), 100);
+  }).observe(tbody, { childList: true, subtree: false });
+})();
 
 function dsFiltrarPendientesGestion(){
   // Filter listado to show only OTs without gestión assigned
@@ -4294,7 +4315,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.0.1] OK');
+console.log('[Alleata v4.0.2] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
