@@ -874,7 +874,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
           <button id="btnPrintSelected" onclick="printSelectedRotulos()" style="display:none;background:var(--grad);color:#fff;border:none;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;gap:6px;align-items:center">
             🖨️ Imprimir seleccionados (<span id="selectedCount">0</span>)
           </button>
-          <button id="btnAutoTracking" onclick="autoActualizarTracking()" title="Actualizar estados de todos los envíos activos desde Correo Argentino" style="background:rgba(26,159,212,.15);border:1px solid rgba(26,159,212,.4);color:var(--blue);padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;transition:all .2s" onmouseover="this.style.background='rgba(26,159,212,.25)'" onmouseout="this.style.background='rgba(26,159,212,.15)'">
+          <button id="btnAutoTracking" disabled title="Auto-tracking en validación manual — usar lupa por OT" style="background:var(--surface2);border:1px solid var(--border);color:var(--text-muted);padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:not-allowed;display:flex;align-items:center;gap:6px;opacity:.45">
             🔄 Auto-tracking
           </button>
 
@@ -1167,6 +1167,21 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <div class="stat-label">PROBLEMA</div>
     </div>
   </div>
+  <!-- Filtro logística Rollout -->
+  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
+    <span style="font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px">Logística:</span>
+    <button onclick="rlFiltrarLogistica('')" id="rl-log-todos" style="background:var(--teal);color:#fff;border:none;padding:4px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer">📦 Todos</button>
+    <button onclick="rlFiltrarLogistica('Correo Arg.')" id="rl-log-ca" style="background:var(--surface2);border:1px solid var(--border2);color:var(--text-secondary);padding:4px 14px;border-radius:20px;font-size:12px;cursor:pointer">📮 Correo Arg.</button>
+    <button onclick="rlFiltrarLogistica('Cabify')" id="rl-log-cabify" style="background:var(--surface2);border:1px solid var(--border2);color:var(--text-secondary);padding:4px 14px;border-radius:20px;font-size:12px;cursor:pointer">🚕 Cabify</button>
+    <button onclick="rlFiltrarLogistica('EPSA')" id="rl-log-epsa" style="background:var(--surface2);border:1px solid var(--border2);color:var(--text-secondary);padding:4px 14px;border-radius:20px;font-size:12px;cursor:pointer">🚚 EPSA</button>
+    <button onclick="rlFiltrarLogistica('Alleata')" id="rl-log-alleata" style="background:var(--surface2);border:1px solid var(--border2);color:var(--text-secondary);padding:4px 14px;border-radius:20px;font-size:12px;cursor:pointer">📘 Alleata</button>
+    <div style="margin-left:auto">
+      <button disabled title="Auto-tracking en validación manual — usar lupa por OT" style="background:var(--surface2);border:1px solid var(--border);color:var(--text-muted);padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:not-allowed;display:flex;align-items:center;gap:6px;opacity:.45">
+        🔄 Auto-tracking
+      </button>
+    </div>
+  </div>
+
   <div class="card">
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px">
       <input class="input" id="rl-buscar" placeholder="🔍 OT, cuenta, ciudad..." style="width:200px;font-size:12px;padding:6px 10px" oninput="rlRenderTabla()">
@@ -4846,6 +4861,20 @@ function rlPopularFiltroResp(){
   sel.innerHTML='<option value="">Todos los responsables</option>'+resps.map(r=>`<option>${r}</option>`).join('');
 }
 
+let _rlLogisticaFiltro = '';
+function rlFiltrarLogistica(log){
+  _rlLogisticaFiltro = log;
+  // Resaltar botón activo
+  ['rl-log-todos','rl-log-ca','rl-log-cabify','rl-log-epsa','rl-log-alleata'].forEach(id=>{
+    const btn=document.getElementById(id);
+    if(btn) btn.style.background='var(--surface2)', btn.style.color='var(--text-secondary)';
+  });
+  const btnMap={'':'rl-log-todos','Correo Arg.':'rl-log-ca','Cabify':'rl-log-cabify','EPSA':'rl-log-epsa','Alleata':'rl-log-alleata'};
+  const activeBtn=document.getElementById(btnMap[log]||'rl-log-todos');
+  if(activeBtn) activeBtn.style.background='var(--teal)', activeBtn.style.color='#fff';
+  rlRenderTabla();
+}
+
 function rlFiltrarEstado(estado){
   _rlEstadoFiltro=estado;
   const sel=document.getElementById('rl-f-estado');
@@ -4861,6 +4890,7 @@ function rlRenderTabla(){
   let list=_rlData.filter(e=>{
     if(_rlEstadoFiltro&&e.estado!==_rlEstadoFiltro)return false;
     if(resp&&e.responsable!==resp)return false;
+    if(_rlLogisticaFiltro&&(e.logistica||'')!==_rlLogisticaFiltro)return false;
     if(buscar){
       const _bNorm=normalizeOT(buscar);
       const hay=[e.ot_numero,e.cuenta,e.ciudad,e.provincia,e.track].join(' ').toLowerCase();
