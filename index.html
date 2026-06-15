@@ -4869,9 +4869,18 @@ function rlFiltrarLogistica(log){
     const btn=document.getElementById(id);
     if(btn) btn.style.background='var(--surface2)', btn.style.color='var(--text-secondary)';
   });
-  const btnMap={'':'rl-log-todos','Correo Arg.':'rl-log-ca','Cabify':'rl-log-cabify','EPSA':'rl-log-epsa','Alleata':'rl-log-alleata'};
+  const btnMap={'':'rl-log-todos','CORREO ARGENTINO':'rl-log-ca','CABIFY':'rl-log-cabify','EPSA':'rl-log-epsa','ALLEATA':'rl-log-alleata'};
   const activeBtn=document.getElementById(btnMap[log]||'rl-log-todos');
   if(activeBtn) activeBtn.style.background='var(--teal)', activeBtn.style.color='#fff';
+  // Si filtra por CA → usar la tabla de Envíos (mismo layout)
+  if(log === 'CORREO ARGENTINO'){
+    const caList = _rlData.filter(e=>(e.logistica||'').toUpperCase()==='CORREO ARGENTINO');
+    // Mostrar tabla Rollout con mismo render que Envíos
+    const rlCard = document.querySelector('#mod-rollout .card');
+    rlRenderTabla(); // render normal primero para mantener tbody
+    renderEnviosTable(caList); // sobreescribir con el render de Envíos
+    return;
+  }
   rlRenderTabla();
 }
 
@@ -4902,6 +4911,22 @@ function rlRenderTabla(){
   const estados=['Pre-Colecta','Despachado','En tránsito','En camino','En espera en sucursal','Entregado','Retirar Terminal','Fallido','Perdido','Devuelto'];
   tbody.innerHTML=list.map(e=>{
     const tieneRetorno=esOTConRetorno(e.tipo);
+    const esCA=(e.logistica||'').toUpperCase()==='CORREO ARGENTINO';
+    if(esCA){
+      return`<tr>
+        <td><div style="font-weight:700;font-size:12px;color:var(--teal)">${e.ot_numero||'\u2014'}</div><div style="font-size:10px;color:var(--text-muted)">${e.tipo||''}</div><div style="font-size:10px;color:var(--text-muted)">${e.cuenta||''}</div></td>
+        <td style="font-size:13px;font-weight:600">${e.responsable||'\u2014'}</td>
+        <td><div style="font-size:12px">${e.ciudad||'\u2014'}</div><div style="font-size:10px;color:var(--text-muted)">${e.provincia||''}</div></td>
+        <td><div class="mono" style="font-size:10px;word-break:break-all">${e.track||'\u2014'}</div>${e.track?`<a href="https://www.correoargentino.com.ar/formularios/e-commerce?id=${e.track}" target="_blank" style="font-size:10px;color:var(--blue);text-decoration:none;">\U0001f517 Correo Arg.</a>`:''}
+          ${tieneRetorno?`<div style="margin-top:5px;padding-top:5px;border-top:1px dashed rgba(245,158,11,.4)"><div style="font-size:9px;font-weight:700;color:#f59e0b;text-transform:uppercase;margin-bottom:2px">\u21a9\ufe0f Retorno</div>${e.track_devolucion?`<div class="mono" style="font-size:10px;word-break:break-all;color:#f59e0b">${e.track_devolucion}</div><a href="https://www.correoargentino.com.ar/formularios/e-commerce?id=${e.track_devolucion}" target="_blank" style="font-size:10px;color:var(--blue);">\U0001f517 Retorno CA</a>`:`<button onclick="openCargarTrackRetorno('${e.id}')" style="font-size:10px;color:#f59e0b;background:rgba(245,158,11,.1);border:1px dashed #f59e0b;border-radius:6px;padding:3px 7px;cursor:pointer">+ Cargar tracking</button>`}</div>`:''}
+        </td>
+        <td><select class="select" style="width:150px;padding:4px 8px;font-size:11px" onchange="rlCambiarEstado('${e.id}',this.value,'${(e.estado||'').replace(/'/g,"\\'")}')">${estados.map(s=>`<option ${e.estado===s?'selected':''}>${s}</option>`).join('')}</select>${e.ultimo_evento_fecha?`<div style="font-size:10px;color:var(--text-muted);margin-top:3px;font-family:'JetBrains Mono',monospace">${formatFechaCA(e.ultimo_evento_fecha)}</div>`:''}
+          ${tieneRetorno?`<select class="select" style="width:150px;padding:4px 8px;font-size:11px;margin-top:4px;border-color:rgba(245,158,11,.5)" onchange="updateEstadoDevolucion('${e.id}',this.value)">${['Pendiente r\u00f3tulo','R\u00f3tulo generado','En camino retorno','Recibido \u2705'].map(s=>`<option ${(e.estado_devolucion||'Pendiente r\u00f3tulo')===s?'selected':''}>${s}</option>`).join('')}</select>`:''}
+        </td>
+        <td style="max-width:180px">${e.ultimo_evento&&e.ultimo_evento!=='Importado desde SF'?`<div style="font-size:10px;color:var(--teal);margin-top:2px">${e.ultimo_evento}</div>`:'\u2014'}${e.foto_evidencia?`<a href="${e.foto_evidencia}" target="_blank"><img src="${e.foto_evidencia}" style="width:50px;height:38px;object-fit:cover;border-radius:5px;border:1px solid var(--border2);margin-top:4px"></a>`:''}</td>
+        <td><div style="display:flex;gap:4px;flex-wrap:wrap"><button title="Editar" style="background:var(--surface2);border:1px solid var(--border2);color:var(--text-muted);font-size:11px;padding:4px 7px;border-radius:6px;cursor:pointer" onclick="openUpdateEvento('${e.id}','${(e.ultimo_evento||'').replace(/'/g,'&#39;')}')">\u270f\ufe0f</button>${e.track?`<button id="rl-track-btn-${e.id}" title="Tracking CA" style="background:var(--surface2);border:1px solid var(--border2);color:var(--blue);font-size:11px;padding:4px 7px;border-radius:6px;cursor:pointer" onclick="consultarTracking('${e.id}','${e.track}')">\U0001f50d</button>`:''}</div></td>
+      </tr>`;
+    }
     return`<tr>
       <td><div style="font-size:12px;font-weight:700;color:var(--teal)">${e.ot_numero||'—'}</div>
           <div style="font-size:11px;color:var(--text-muted)">${e.tipo||''}</div>
