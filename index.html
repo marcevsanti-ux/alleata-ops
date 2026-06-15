@@ -443,7 +443,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <span class="nav-badge" id="nb-desins">0</span>
     </div>
     <div class="nav-item" data-mod="napse" id="nav-napse" onclick="goTo('napse')">
-      <div class="active-bar"></div><span class="nav-icon-wrap">🔍</span> NAPSE
+      <div class="active-bar"></div><span class="nav-icon-wrap">🔍</span> Napse
     </div>
 
     <div class="nav-item" data-mod="store" id="nav-store" onclick="goTo('store')" style="display:none">
@@ -1089,7 +1089,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
             <div class="mod-pill active" data-mod="sims" onclick="toggleCreateMod(this)"><span class="pill-dot"></span>📡 SIMs</div>
             <div class="mod-pill active" data-mod="envios" onclick="toggleCreateMod(this)"><span class="pill-dot"></span>🚚 Envíos</div>
             <div class="mod-pill" data-mod="desinstalaciones" onclick="toggleCreateMod(this)"><span class="pill-dot"></span>📦 Desinstalaciones</div>
-            <div class="mod-pill" data-mod="napse" onclick="toggleCreateMod(this)"><span class="pill-dot"></span>🔍 NAPSE</div>
+            <div class="mod-pill" data-mod="napse" onclick="toggleCreateMod(this)"><span class="pill-dot"></span>🔍 Napse</div>
             <div class="mod-pill active" data-mod="horas" onclick="toggleCreateMod(this)"><span class="pill-dot"></span>⏱ Horas</div>
             <div class="mod-pill" data-mod="terminales" onclick="toggleCreateMod(this)"><span class="pill-dot"></span>🖥️ Terminales</div>
             <div class="mod-pill" data-mod="sf" onclick="toggleCreateMod(this)"><span class="pill-dot"></span>☁ SF-Integración</div>
@@ -1183,17 +1183,34 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
   </div>
 
   <div class="card">
-    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px">
-      <input class="input" id="rl-buscar" placeholder="🔍 OT, cuenta, ciudad..." style="width:200px;font-size:12px;padding:6px 10px" oninput="rlRenderTabla()">
-      <select class="select" id="rl-f-resp" onchange="rlRenderTabla()" style="font-size:12px;padding:6px 8px">
-        <option value="">Todos los responsables</option>
-      </select>
-      <select class="select" id="rl-f-estado" onchange="rlFiltrarEstado(this.value)" style="font-size:12px;padding:6px 8px">
-        <option value="">Todos los estados</option>
-        <option>Pre-Colecta</option><option>Despachado</option><option>En tránsito</option>
-        <option>En camino</option><option>Entregado</option><option>Retirar Terminal</option>
-        <option>Fallido</option><option>Devuelto</option>
-      </select>
+    <!-- Filtros estilo Envíos -->
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px">
+      <div style="display:flex;flex-direction:column;gap:3px">
+        <span style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;font-weight:600">Filtrar por responsable</span>
+        <select class="select" id="rl-f-resp" onchange="rlRenderTabla()" style="font-size:12px;padding:6px 10px;min-width:180px">
+          <option value="">Todos</option>
+        </select>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:3px">
+        <span style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;font-weight:600">Estado</span>
+        <select class="select" id="rl-f-estado" onchange="rlFiltrarEstado(this.value)" style="font-size:12px;padding:6px 10px;min-width:160px">
+          <option value="">Todos</option>
+          <option>Pre-Colecta</option><option>Despachado</option><option>En tránsito</option>
+          <option>En camino</option><option>Entregado</option><option>Retirar Terminal</option>
+          <option>Fallido</option><option>Devuelto</option>
+        </select>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:3px;flex:1;min-width:200px">
+        <span style="font-size:10px;color:var(--text-muted);opacity:0">&nbsp;</span>
+        <div style="position:relative">
+          <svg style="position:absolute;left:10px;top:50%;transform:translateY(-50%);opacity:.4;pointer-events:none" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          <input class="input" id="rl-buscar" style="padding-left:32px;width:100%" placeholder="Buscar por OT, tracking o cuenta..." oninput="rlRenderTabla()">
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:3px">
+        <span style="font-size:10px;color:var(--text-muted);opacity:0">&nbsp;</span>
+        <button class="btn-ghost btn-sm" onclick="document.getElementById('rl-buscar').value='';document.getElementById('rl-f-resp').value='';document.getElementById('rl-f-estado').value='';_rlEstadoFiltro='';rlRenderTabla()">Limpiar filtros</button>
+      </div>
     </div>
     <div class="table-wrap">
       <table class="table">
@@ -4583,7 +4600,7 @@ const ALL_MODS = [
   {id:'sims',      label:'📡 SIMs'},
   {id:'envios',    label:'🚚 Envíos'},
   {id:'desinstalaciones', label:'📦 Desinstalaciones'},
-  {id:'napse', label:'🔍 NAPSE'},
+  {id:'napse', label:'🔍 Napse'},
   {id:'horas',     label:'⏱ Horas'},
   {id:'terminales',label:'🖥️ Terminales'},
   {id:'sf',        label:'☁ SF-Integración'},
@@ -4923,8 +4940,10 @@ function rlRenderTabla(){
         <td><select class="select" style="width:150px;padding:4px 8px;font-size:11px" onchange="rlCambiarEstado('${e.id}',this.value,'${(e.estado||'').replace(/'/g,"\\'")}')">${estados.map(s=>`<option ${e.estado===s?'selected':''}>${s}</option>`).join('')}</select>${e.ultimo_evento_fecha?`<div style="font-size:10px;color:var(--text-muted);margin-top:3px;font-family:'JetBrains Mono',monospace">${formatFechaCA(e.ultimo_evento_fecha)}</div>`:''}
           ${tieneRetorno?`<select class="select" style="width:150px;padding:4px 8px;font-size:11px;margin-top:4px;border-color:rgba(245,158,11,.5)" onchange="updateEstadoDevolucion('${e.id}',this.value)">${['Pendiente r\u00f3tulo','R\u00f3tulo generado','En camino retorno','Recibido \u2705'].map(s=>`<option ${(e.estado_devolucion||'Pendiente r\u00f3tulo')===s?'selected':''}>${s}</option>`).join('')}</select>`:''}
         </td>
-        <td style="max-width:180px">${e.ultimo_evento&&e.ultimo_evento!=='Importado desde SF'?`<div style="font-size:10px;color:var(--teal);margin-top:2px">${e.ultimo_evento}</div>`:'\u2014'}${e.foto_evidencia?`<a href="${e.foto_evidencia}" target="_blank"><img src="${e.foto_evidencia}" style="width:50px;height:38px;object-fit:cover;border-radius:5px;border:1px solid var(--border2);margin-top:4px"></a>`:''}</td>
-        <td><div style="display:flex;gap:4px;flex-wrap:wrap"><button title="Editar" style="background:var(--surface2);border:1px solid var(--border2);color:var(--text-muted);font-size:11px;padding:4px 7px;border-radius:6px;cursor:pointer" onclick="openUpdateEvento('${e.id}','${(e.ultimo_evento||'').replace(/'/g,'&#39;')}')">\u270f\ufe0f</button>${e.track?`<button id="rl-track-btn-${e.id}" title="Tracking CA" style="background:var(--surface2);border:1px solid var(--border2);color:var(--blue);font-size:11px;padding:4px 7px;border-radius:6px;cursor:pointer" onclick="consultarTracking('${e.id}','${e.track}')">\U0001f50d</button>`:''}</div></td>
+        <td style="max-width:180px">${e.ultimo_evento&&e.ultimo_evento!=='Importado desde SF'?`<div style="font-size:10px;color:var(--teal);margin-top:2px">${e.ultimo_evento}</div>`:'\u2014'}${e.foto_evidencia?`<a href="${e.foto_evidencia}" target="_blank"><img src="${e.foto_evidencia}" style="width:50px;height:38px;object-fit:cover;border-radius:5px;border:1px solid var(--border2);margin-top:4px"></a>`:''}
+          ${e.track?`<button id="rl-track-btn2-${e.id}" title="Ver tracking CA" style="background:var(--surface2);border:1px solid var(--border2);color:var(--blue);font-size:11px;padding:4px 7px;border-radius:6px;cursor:pointer;margin-top:4px" onclick="consultarTracking('${e.id}','${e.track}')">\U0001f50d</button>`:''}
+        </td>
+        <td><div style="display:flex;gap:4px;flex-wrap:wrap"><button title="Editar" style="background:var(--surface2);border:1px solid var(--border2);color:var(--text-muted);font-size:11px;padding:4px 7px;border-radius:6px;cursor:pointer" onclick="openUpdateEvento('${e.id}','${(e.ultimo_evento||'').replace(/'/g,'&#39;')}')">\u270f\ufe0f</button></div></td>
       </tr>`;
     }
     return`<tr>
