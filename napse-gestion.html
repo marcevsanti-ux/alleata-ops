@@ -224,7 +224,7 @@
       <div class="logo-pill">Alleata</div>
       <div class="topbar-title">Gestión NAPSE</div>
     </div>
-    <div style="position:absolute;left:50%;transform:translateX(-50%);font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted);font-weight:600;letter-spacing:1px" id="version-badge">v2.5.0</div>
+    <div style="position:absolute;left:50%;transform:translateX(-50%);font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted);font-weight:600;letter-spacing:1px" id="version-badge">v2.6.0</div>
     <div class="topbar-right">
       <div class="sync-status">
         <div class="sync-dot" id="sync-dot"></div>
@@ -298,7 +298,7 @@
   </div><!-- /main -->
 
   <div class="footer">
-    <span>Alleata Ops</span> · NAPSE Dashboard · Moretti e Hijos S.A. · v2.5.0
+    <span>Alleata Ops</span> · NAPSE Dashboard · Moretti e Hijos S.A. · v2.6.0
   </div>
 
 </div><!-- /app -->
@@ -552,10 +552,11 @@ function render() {
     { label:'EPSA',             ots: latest.epsa_ots||0,             costo: latest.epsa_costo||0,             color:'#f39c12' },
     { label:'Alleata',          ots: latest.alleata_ots||0,          costo: latest.alleata_costo||0,          color:'#1dbf8e' },
     { label:'Cabify',           ots: latest.cabify_ots||0,           costo: latest.cabify_costo||0,           color:'#9b59b6' },
-    { label:'Otros',            ots: latest.otros_ots||0,            costo: latest.otros_costo||0,            color:'#7f8c8d' },
   ].filter(e => e.ots > 0 || e.costo > 0);
-  const totOts   = logProvs.reduce((s,e) => s + e.ots, 0);
-  const totCosto = latest.costo_total || logProvs.reduce((s,e) => s + e.costo, 0);
+  // Total excluye Alleata (envios propios sin costo externo)
+  const provsTotales = logProvs.filter(e => e.label !== 'Alleata');
+  const totOts   = provsTotales.reduce((s,e) => s + e.ots, 0);
+  const totCosto = provsTotales.reduce((s,e) => s + e.costo, 0);
   const cards = logProvs.map(e => {
     const prom = e.ots ? Math.round(e.costo/e.ots) : 0;
     return `<div class="stat-card" style="--accent:${e.color};border-color:${e.color}22">
