@@ -219,11 +219,12 @@
 <div id="app">
 
   <!-- TOPBAR -->
-  <div class="topbar">
+  <div class="topbar" style="display:flex;align-items:center;justify-content:space-between">
     <div class="topbar-left">
       <div class="logo-pill">Alleata</div>
       <div class="topbar-title">Gestión NAPSE</div>
     </div>
+    <div style="position:absolute;left:50%;transform:translateX(-50%);font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted);font-weight:600;letter-spacing:1px" id="version-badge">v2.3.0</div>
     <div class="topbar-right">
       <div class="sync-status">
         <div class="sync-dot" id="sync-dot"></div>
@@ -280,28 +281,28 @@
       <div id="history-container"><div class="empty-state">Sin datos</div></div>
     </div>
 
-    <!-- DISTRIBUCION -->
-    <div class="panel" style="margin-bottom:16px">
-      <div class="panel-title">Distribución por estado</div>
-      <div id="bar-chart"><div class="empty-state">Sin datos</div></div>
-    </div>
-
-    <!-- TIPO DE OT + FACTURADOR -->
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+    <!-- DOS GRAFICOS LADO A LADO -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+      <div class="panel">
+        <div class="panel-title">Logística</div>
+        <div id="terminal-chart"><div class="empty-state">Sin datos</div></div>
+      </div>
       <div class="panel">
         <div class="panel-title">Tipo de OT</div>
         <div id="tipo-chart"><div class="empty-state">Sin datos</div></div>
       </div>
-      <div class="panel">
-        <div class="panel-title">Tipo de terminal</div>
-        <div id="terminal-chart"><div class="empty-state">Sin datos — requiere campo en SF</div></div>
-      </div>
+    </div>
+
+    <!-- DISTRIBUCION ABAJO -->
+    <div class="panel">
+      <div class="panel-title">Distribución por estado</div>
+      <div id="bar-chart"><div class="empty-state">Sin datos</div></div>
     </div></div>
 
   </div><!-- /main -->
 
   <div class="footer">
-    <span>Alleata Ops</span> · NAPSE Dashboard · Moretti e Hijos S.A. · v2.2.0
+    <span>Alleata Ops</span> · NAPSE Dashboard · Moretti e Hijos S.A. · v2.3.0
   </div>
 
 </div><!-- /app -->
@@ -559,6 +560,30 @@ function render() {
   }).join('');
   requestAnimationFrame(() => {
     document.querySelectorAll('#tipo-chart .bar-fill').forEach(el => el.style.width = el.dataset.w+'%');
+  });
+
+  // Gráfico Logística
+  const logItems = [
+    { label:'Correo Arg.', val: latest.correo_argentino_ots||0, color:'#e74c3c' },
+    { label:'EPSA',        val: latest.epsa_ots||0,             color:'#f39c12' },
+    { label:'Alleata',     val: latest.alleata_ots||0,          color:'#1dbf8e' },
+    { label:'Cabify',      val: latest.cabify_ots||0,           color:'#9b59b6' },
+    { label:'Otros',       val: latest.otros_ots||0,            color:'#7f8c8d' },
+  ].filter(e => e.val > 0);
+  const maxLog = Math.max(...logItems.map(e => e.val), 1);
+  document.getElementById('terminal-chart').innerHTML = logItems.length
+    ? logItems.map(e => {
+        const w = Math.round(e.val / maxLog * 100);
+        return `<div class="bar-row">
+          <div class="bar-label">${e.label}</div>
+          <div class="bar-track">
+            <div class="bar-fill" data-w="${w}" style="background:${e.color}">${e.val}</div>
+          </div>
+        </div>`;
+      }).join('')
+    : '<div class="empty-state">Sin datos de logística</div>';
+  requestAnimationFrame(() => {
+    document.querySelectorAll('#terminal-chart .bar-fill').forEach(el => el.style.width = el.dataset.w+'%');
   });
 
   // History table
