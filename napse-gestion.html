@@ -235,6 +235,7 @@
         <span id="user-name">—</span>
       </div>
       <button class="btn btn-ghost" onclick="syncFromRailway()">↻ Sync SF</button>
+      <button class="btn btn-teal" onclick="fullSync()">⚡ Full Sync</button>
       <button class="btn-logout" onclick="doLogout()">Salir</button>
     </div>
   </div>
@@ -273,16 +274,16 @@
 
 
 
-    <!-- BOTTOM GRID -->
-    <div class="bottom-grid">
-      <div class="panel">
-        <div class="panel-title">Distribución por estado</div>
-        <div id="bar-chart"><div class="empty-state">Sin datos</div></div>
-      </div>
-      <div class="panel">
-        <div class="panel-title">Historial de snapshots</div>
-        <div id="history-container"><div class="empty-state">Sin datos</div></div>
-      </div>
+    <!-- DISTRIBUCION -->
+    <div class="panel" style="margin-bottom:16px">
+      <div class="panel-title">Distribución por estado</div>
+      <div id="bar-chart"><div class="empty-state">Sin datos</div></div>
+    </div>
+
+    <!-- HISTORIAL FULL WIDTH -->
+    <div class="panel">
+      <div class="panel-title">Historial de snapshots</div>
+      <div id="history-container"><div class="empty-state">Sin datos</div></div>
     </div></div>
 
   </div><!-- /main -->
@@ -438,6 +439,23 @@ function setSyncStatus(state, text) {
   document.getElementById('sync-label').textContent = text;
 }
 
+async function fullSync() {
+  setSyncStatus('loading', 'Full Sync en curso…');
+  try {
+    const resp = await fetch(`${RAILWAY_BASE}/automations/run/sf_sync`, {
+      method: 'POST',
+      headers: { 'x-automation-secret': AUTOMATION_SECRET, 'Content-Type': 'application/json' }
+    });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    toast('✓ Full Sync iniciado — los datos se actualizarán en segundos', 'ok');
+    setTimeout(() => syncFromRailway(), 8000);
+  } catch(err) {
+    console.error('[FullSync]', err);
+    toast('Error al iniciar Full Sync', 'error');
+    setSyncStatus('error', 'Error Full Sync');
+  }
+}
+
 async function syncFromRailway() {
   setSyncStatus('loading', 'Consultando SF…');
   try {
@@ -512,11 +530,11 @@ function render() {
   });
 
   // History table
-  const rows = snapshots.slice(0,40);
+  const rows = snapshots.filter(s => s._source === 'sf').slice(0,40);
   document.getElementById('history-container').innerHTML = `
     <table class="history-table">
       <thead><tr>
-        <th>Fecha</th><th>Turno</th><th>Conf.</th><th>Proc.</th>
+        <th>Fecha</th><th>Hora</th><th>Turno</th><th>Conf.</th><th>Proc.</th>
         <th>Pre-Col.</th><th>Desp.</th><th>Ret.</th><th>Éxit.</th><th>Total</th><th>Δ</th><th>Src</th>
       </tr></thead>
       <tbody>${rows.map((r,i) => {
@@ -532,8 +550,10 @@ function render() {
         const src = r._source==='sf'
           ? '<span class="badge-sf">SF</span>'
           : '<span class="badge-manual">manual</span>';
+        const hora = r.created_at ? new Date(r.created_at).toLocaleTimeString('es-AR',{timeZone:'America/Argentina/Buenos_Aires',hour:'2-digit',minute:'2-digit'}) : '—';
         return `<tr>
           <td>${fmtDate(r.fecha||r.created_at)}</td>
+          <td style="font-family:'JetBrains Mono',monospace;font-size:11px">${hora}</td>
           <td class="${tc}">${ts}</td>
           <td>${r.configurar_terminal||0}</td><td>${r.en_proceso||0}</td>
           <td>${r.pre_colecta||0}</td><td>${r.despachado||0}</td>
