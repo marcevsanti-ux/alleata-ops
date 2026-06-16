@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.0.9</title>
+<title>Alleata · Operaciones v4.1.0</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -407,7 +407,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.0.9 · 12 jun 2026
+      v4.1.0 · 16 jun 2026
     </div>
   </div>
 </div>
@@ -485,7 +485,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.0.9 · 12 jun 2026
+      v4.1.0 · 16 jun 2026
     </div>
   </div>
 </nav>
@@ -525,7 +525,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.0.9</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.1.0</div>
   </div>
   <div class="content">
 
@@ -3053,7 +3053,15 @@ function toggleSidebar(){
   const sb=document.getElementById('mainSidebar');
   const main=document.querySelector('.main');
   sb.classList.toggle('collapsed');
-  main.style.marginLeft=sb.classList.contains('collapsed')?'60px':'224px';
+  const sbW=sb.classList.contains('collapsed')?60:224;
+  main.style.marginLeft=sbW+'px';
+  // Actualizar módulos outside si hay uno activo
+  const outsideMods=new Set(['ally','retencion','distri','terminales','instalaciones']);
+  const activeOutside=document.querySelector('.module.active');
+  if(activeOutside){
+    const mod=activeOutside.id.replace('mod-','');
+    if(outsideMods.has(mod)) activeOutside.style.marginLeft=sbW+'px';
+  }
 }
 
 // ── Desinstalaciones tabs ─────────────────────────────────────────────
@@ -4337,7 +4345,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.0.9] OK');
+console.log('[Alleata v4.1.0] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -4577,8 +4585,18 @@ function goTo(mod){
   const target=document.getElementById('mod-'+mod);
   if(!target)return;
   target.classList.add('active');
-  // Padding para módulos externos (no tienen el padding del .content)
-  if(outsideMods.has(mod)) target.style.padding='22px 28px 60px';
+  // Padding + margin para módulos externos (viven fuera del .main wrapper)
+  if(outsideMods.has(mod)){
+    const sb=document.getElementById('mainSidebar');
+    const sbW=sb&&sb.classList.contains('collapsed')?60:224;
+    target.style.marginLeft=sbW+'px';
+    target.style.paddingTop='74px'; // 52px topbar + 22px padding interno
+    target.style.paddingLeft='28px';
+    target.style.paddingRight='28px';
+    target.style.paddingBottom='60px';
+    target.style.minHeight='100vh';
+    target.style.boxSizing='border-box';
+  }
   const navEl=document.querySelector(`.nav-item[data-mod="${mod}"]`);
   if(navEl)navEl.classList.add('active');
   document.getElementById('topbar-title').textContent=MOD_INFO[mod]||mod;
