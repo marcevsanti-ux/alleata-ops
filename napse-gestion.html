@@ -224,7 +224,7 @@
       <div class="logo-pill">Alleata</div>
       <div class="topbar-title">Gestión NAPSE</div>
     </div>
-    <div style="position:absolute;left:50%;transform:translateX(-50%);font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted);font-weight:600;letter-spacing:1px" id="version-badge">v2.4.0</div>
+    <div style="position:absolute;left:50%;transform:translateX(-50%);font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted);font-weight:600;letter-spacing:1px" id="version-badge">v2.5.0</div>
     <div class="topbar-right">
       <div class="sync-status">
         <div class="sync-dot" id="sync-dot"></div>
@@ -283,9 +283,9 @@
 
     <!-- DOS GRAFICOS LADO A LADO -->
     <div style="display:grid;grid-template-columns:1fr;gap:16px;margin-bottom:16px">
-      <div class="panel" style="grid-column:1/-1">
-        <div class="panel-title">Logística — costo de envíos</div>
-        <div id="terminal-chart"><div class="empty-state">Sin datos</div></div>
+      <div style="grid-column:1/-1">
+        <div class="panel-title" style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:12px;display:flex;align-items:center;gap:8px">Logística — costo de envíos<span style="flex:1;height:1px;background:var(--border);display:block"></span></div>
+        <div id="terminal-chart" class="cards-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))"><div class="empty-state" style="grid-column:1/-1">Sin datos</div></div>
       </div>
       <div class="panel">
         <div class="panel-title">Tipo de OT</div>
@@ -298,7 +298,7 @@
   </div><!-- /main -->
 
   <div class="footer">
-    <span>Alleata Ops</span> · NAPSE Dashboard · Moretti e Hijos S.A. · v2.4.0
+    <span>Alleata Ops</span> · NAPSE Dashboard · Moretti e Hijos S.A. · v2.5.0
   </div>
 
 </div><!-- /app -->
@@ -556,27 +556,29 @@ function render() {
   ].filter(e => e.ots > 0 || e.costo > 0);
   const totOts   = logProvs.reduce((s,e) => s + e.ots, 0);
   const totCosto = latest.costo_total || logProvs.reduce((s,e) => s + e.costo, 0);
-  const cards = logProvs.map(e => `
-    <div style="background:var(--navy-2);border:1px solid ${e.color}33;border-top:3px solid ${e.color};border-radius:10px;padding:16px 18px;min-width:150px">
-      <div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:${e.color};margin-bottom:10px">${e.label}</div>
-      <div style="display:flex;gap:20px;flex-wrap:wrap">
-        <div><div style="font-size:10px;color:var(--muted);margin-bottom:2px">OTs</div><div style="font-size:22px;font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--white)">${e.ots}</div></div>
-        <div><div style="font-size:10px;color:var(--muted);margin-bottom:2px">Costo total</div><div style="font-size:16px;font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--white)">${fmt$(e.costo)}</div></div>
-        <div><div style="font-size:10px;color:var(--muted);margin-bottom:2px">Promedio/envío</div><div style="font-size:16px;font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--white)">${fmtProm(e.costo,e.ots)}</div></div>
-      </div>
-    </div>`).join('');
-  const cardTotal = `
-    <div style="background:linear-gradient(135deg,rgba(29,191,142,.12),rgba(26,159,212,.12));border:1px solid rgba(29,191,142,.4);border-top:3px solid var(--teal);border-radius:10px;padding:16px 18px;min-width:150px">
-      <div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--teal);margin-bottom:10px">TOTAL ENVÍOS</div>
-      <div style="display:flex;gap:20px;flex-wrap:wrap">
-        <div><div style="font-size:10px;color:var(--muted);margin-bottom:2px">OTs</div><div style="font-size:22px;font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--teal)">${totOts}</div></div>
-        <div><div style="font-size:10px;color:var(--muted);margin-bottom:2px">Costo total</div><div style="font-size:16px;font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--teal)">${fmt$(totCosto)}</div></div>
-        <div><div style="font-size:10px;color:var(--muted);margin-bottom:2px">Promedio/envío</div><div style="font-size:16px;font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--teal)">${fmtProm(totCosto,totOts)}</div></div>
-      </div>
+  const cards = logProvs.map(e => {
+    const prom = e.ots ? Math.round(e.costo/e.ots) : 0;
+    return `<div class="stat-card" style="--accent:${e.color};border-color:${e.color}22">
+      <div class="card-label">${e.label}</div>
+      <div class="card-number" style="font-size:32px">${e.ots}</div>
+      <div class="card-pct" style="margin-top:4px"><span style="color:var(--muted);font-weight:400">OTs &nbsp;·&nbsp;</span><span>${fmt$(e.costo)}</span></div>
+      <div class="card-pct">Prom. <span>${fmt$(prom)}</span>/envío</div>
+      <div class="card-bar"><div class="log-bar-fill" data-w="100" style="background:${e.color};width:0"></div></div>
     </div>`;
+  }).join('');
+  const cardTotal = `<div class="stat-card" style="--accent:var(--teal);border-color:rgba(29,191,142,.25);background:linear-gradient(135deg,rgba(29,191,142,.08),rgba(26,159,212,.08))">
+    <div class="card-label">TOTAL ENVÍOS</div>
+    <div class="card-number" style="font-size:32px;color:var(--teal)">${totOts}</div>
+    <div class="card-pct" style="margin-top:4px"><span style="color:var(--muted);font-weight:400">OTs &nbsp;·&nbsp;</span><span style="color:var(--teal)">${fmt$(totCosto)}</span></div>
+    <div class="card-pct">Prom. <span style="color:var(--teal)">${fmtProm(totCosto,totOts)}</span>/envío</div>
+    <div class="card-bar"><div class="log-bar-fill" data-w="100" style="background:var(--teal);width:0"></div></div>
+  </div>`;
   document.getElementById('terminal-chart').innerHTML = logProvs.length
-    ? `<div style="display:flex;flex-direction:column;gap:10px">${cards}${cardTotal}</div>`
-    : '<div class="empty-state">Sin datos de logística</div>';
+    ? cards + cardTotal
+    : '<div class="empty-state" style="grid-column:1/-1">Sin datos de logística</div>';
+  requestAnimationFrame(() => {
+    document.querySelectorAll('#terminal-chart .log-bar-fill').forEach(el => el.style.width = el.dataset.w+'%');
+  });
 
   // History table
   const rows = snapshots.filter(s => s._source === 'sf' && s.origen === 'cron').slice(0,40);
