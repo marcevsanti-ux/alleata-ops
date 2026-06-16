@@ -281,15 +281,27 @@
     </div>
 
     <!-- DISTRIBUCION -->
-    <div class="panel">
+    <div class="panel" style="margin-bottom:16px">
       <div class="panel-title">Distribución por estado</div>
       <div id="bar-chart"><div class="empty-state">Sin datos</div></div>
+    </div>
+
+    <!-- TIPO DE OT + FACTURADOR -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div class="panel">
+        <div class="panel-title">Tipo de OT</div>
+        <div id="tipo-chart"><div class="empty-state">Sin datos</div></div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">Tipo de terminal</div>
+        <div id="terminal-chart"><div class="empty-state">Sin datos — requiere campo en SF</div></div>
+      </div>
     </div></div>
 
   </div><!-- /main -->
 
   <div class="footer">
-    <span>Alleata Ops</span> · NAPSE Dashboard · Moretti e Hijos S.A. · v2.1.0
+    <span>Alleata Ops</span> · NAPSE Dashboard · Moretti e Hijos S.A. · v2.2.0
   </div>
 
 </div><!-- /app -->
@@ -527,6 +539,26 @@ function render() {
   }).join('');
   requestAnimationFrame(() => {
     document.querySelectorAll('.bar-fill').forEach(el => el.style.width = el.dataset.w+'%');
+  });
+
+  // Gráfico Tipo de OT
+  const inst  = latest.instalacion_equipo || 0;
+  const camb  = latest.cambio_terminal    || 0;
+  const totTipo = inst + camb || 1;
+  document.getElementById('tipo-chart').innerHTML = [
+    { label:'Instalación Equipo + Simcard', val:inst,  color:'#1dbf8e' },
+    { label:'Cambio de Terminal',           val:camb,  color:'#1a9fd4' },
+  ].map(e => {
+    const w = Math.round(e.val / totTipo * 100);
+    return `<div class="bar-row">
+      <div class="bar-label">${e.label}</div>
+      <div class="bar-track">
+        <div class="bar-fill" data-w="${w}" style="background:${e.color}">${e.val}</div>
+      </div>
+    </div>`;
+  }).join('');
+  requestAnimationFrame(() => {
+    document.querySelectorAll('#tipo-chart .bar-fill').forEach(el => el.style.width = el.dataset.w+'%');
   });
 
   // History table
