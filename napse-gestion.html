@@ -288,7 +288,7 @@
   </div><!-- /main -->
 
   <div class="footer">
-    <span>Alleata Ops</span> · NAPSE Dashboard · Moretti e Hijos S.A. · v2.0.0
+    <span>Alleata Ops</span> · NAPSE Dashboard · Moretti e Hijos S.A. · v2.1.0
   </div>
 
 </div><!-- /app -->
@@ -402,11 +402,6 @@ async function onLogin(user) {
   // Transición login → app
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app').style.display = 'block';
-
-  // Init form
-  document.getElementById('f-fecha').value = new Date().toISOString().split('T')[0];
-  const h = new Date().getHours();
-  document.getElementById('f-turno').value = h < 13 ? '🌅 Mañana (9:00)' : '🌆 Tarde (17:00)';
 
   // Cargar datos
   snapshots = loadLocal();
@@ -551,68 +546,8 @@ function render() {
     </table>`;
 }
 
-// ════════════════════════════════════════════════════════════════
-// CARGA MANUAL
-// ════════════════════════════════════════════════════════════════
-function saveManual() {
-  const fecha = document.getElementById('f-fecha').value;
-  const turno = document.getElementById('f-turno').value;
-  if (!fecha) { toast('Ingresá una fecha', 'error'); return; }
-  const snap = {
-    fecha, turno, _source:'manual',
-    created_at: new Date().toISOString(),
-    configurar_terminal: parseInt(document.getElementById('f-conf').value)||0,
-    en_proceso:          parseInt(document.getElementById('f-proc').value)||0,
-    pre_colecta:         parseInt(document.getElementById('f-pre').value) ||0,
-    despachado:          parseInt(document.getElementById('f-desp').value)||0,
-    retirar_terminal:    parseInt(document.getElementById('f-ret').value) ||0,
-    exitoso:             parseInt(document.getElementById('f-exit').value)||0,
-  };
-  snap.total = getTotal(snap);
-  snapshots  = [snap, ...snapshots];
-  saveLocal(snapshots);
-  render();
-  ['f-conf','f-proc','f-pre','f-desp','f-ret','f-exit'].forEach(id => document.getElementById(id).value='');
-  toast('✓ Guardado localmente', 'ok');
-}
 
-// ════════════════════════════════════════════════════════════════
-// AI INSIGHT
-// ════════════════════════════════════════════════════════════════
-async function generateInsight() {
-  if (!snapshots.length) { toast('Primero sincronizá los datos', 'error'); return; }
-  const insightEl = document.getElementById('insight-text');
-  insightEl.innerHTML = `<span style="color:var(--muted);display:flex;align-items:center;gap:8px">
-    <span class="dot-anim"><span></span><span></span><span></span></span> Ally analizando…
-  </span>`;
 
-  const latest = snapshots[0];
-  const total  = getTotal(latest);
-  const hist   = snapshots.slice(0,6).map(r =>
-    `${fmtDate(r.fecha||r.created_at)} ${r.turno||''}: CT=${r.configurar_terminal||0}, EP=${r.en_proceso||0}, PC=${r.pre_colecta||0}, D=${r.despachado||0}, RT=${r.retirar_terminal||0}, EX=${r.exitoso||0}, T=${getTotal(r)}`
-  ).join('\n');
-
-  const prompt = `Sos Ally, agente operativo de Alleata. Analizá el pipeline NAPSE (instalaciones terminales POS) en 2-3 oraciones concretas. Español argentino, directo, con números.
-
-SNAPSHOT ACTUAL (${fmtDate(latest.fecha||latest.created_at)} · ${latest.turno||''}):
-Config.Terminal=${latest.configurar_terminal||0} | En Proceso=${latest.en_proceso||0} | Pre-Colecta=${latest.pre_colecta||0} | Despachado=${latest.despachado||0} | Retirar Terminal=${latest.retirar_terminal||0} | Exitoso=${latest.exitoso||0} | TOTAL=${total}
-
-HISTORIAL:
-${hist}
-
-Flujo: Configurar Terminal → En Proceso → Pre-Colecta → Despachado → Exitoso. ¿Dónde acumula? ¿% Exitoso? ¿Cuello de botella? Recomendá una acción concreta.`;
-
-  try {
-    const resp = await fetch('https://api.anthropic.com/v1/messages', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ model:'claude-sonnet-4-20250514', max_tokens:1000, messages:[{role:'user',content:prompt}] })
-    });
-    const data = await resp.json();
-    insightEl.textContent = data.content?.find(b=>b.type==='text')?.text || 'Sin respuesta.';
-  } catch(e) {
-    insightEl.innerHTML = `<span style="color:var(--red)">Error al conectar con Ally.</span>`;
-  }
-}
 
 // ════════════════════════════════════════════════════════════════
 // TOAST
