@@ -877,6 +877,9 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
           <button id="btnAutoTracking" disabled title="Auto-tracking en validación manual — usar lupa por OT" style="background:var(--surface2);border:1px solid var(--border);color:var(--text-muted);padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:not-allowed;display:flex;align-items:center;gap:6px;opacity:.45">
             🔄 Auto-tracking
           </button>
+          <button id="btnSortEnvios" onclick="toggleSortEnvios()" title="Ordenar por fecha de despacho" style="background:var(--surface2);border:1px solid var(--border2);color:var(--text-muted);padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:5px">
+            ↓ Más recientes
+          </button>
 
 
         </div>
@@ -6056,6 +6059,9 @@ function normalizarSFWorkorder(r){
 }
 
 async function renderEnvios(){
+  _mostrandoExitosas = false;
+  const label = document.getElementById('envTablaLabel');
+  if(label) label.textContent = 'Todos los envíos';
   const isAdmin=currentProfile?.rol==='admin';
   const isLogistica=currentProfile?.rol==='logistica';
   const filtroEstOrden=document.getElementById('envFiltroEstado')?.value||'';
@@ -6067,7 +6073,7 @@ async function renderEnvios(){
   let query=sb.from('sf_workorders')
     .select('*')
     .in('record_type', TIPOS_ENVIO)
-    .order('fecha_despacho',{ascending:false});
+    .order('fecha_despacho',{ascending:_enviosSortAsc});
 
   // Estados activos: Pre-Colecta o Despachado — logística ALLEATA / CORREO ARGENTINO / CABIFY
   const STATUSES_ACTIVOS = ['Pre-Colecta','Despachado','En Proceso'];
@@ -6208,11 +6214,43 @@ function renderLogisticaStats(list){
       <div style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-top:2px">${lbl}</div>
     </div>`;
 
+  // Contar exitosas (Entregado, fecha_despacho >= 2026-06-01) — query async
+  (async () => {
+    try {
+      const LOG_MAP2 = {ALLEATA:'ALLEATA', CORREO:'CORREO ARGENTINO', CABIFY:'CABIFY', EPSA:'EPSA'};
+      let qEx = sb.from('sf_workorders')
+        .select('id,logistica,fecha_despacho')
+        .in('record_type', ['Instalación Equipo + Simcard','Instalación Simcard','Asistencia Tecnica','Cambio de Terminal'])
+        .eq('status','Entregado')
+        .gte('fecha_despacho','2026-06-01');
+      if(_canalActivo !== 'TODOS' && _canalActivo !== 'OTROS'){
+        qEx = qEx.eq('logistica', LOG_MAP2[_canalActivo]||_canalActivo);
+      }
+      const {data: exRaw=[]} = await qEx;
+      let exList = exRaw||[];
+      if(_canalActivo==='OTROS') exList=exList.filter(e=>!['ALLEATA','CORREO ARGENTINO','CABIFY','EPSA'].includes((e.logistica||'').toUpperCase().trim()));
+      const exitosas = exList.length;
+      // Agregar/actualizar card EXITOSAS al stats row
+      let exCard = document.getElementById('stat-exitosas-envios');
+      if(!exCard){
+        exCard = document.createElement('div');
+        exCard.id = 'stat-exitosas-envios';
+        exCard.onclick = () => { document.getElementById('envFiltroEstado').value='Entregado'; _mostrandoExitosas=true; renderExitosas(); };
+        exCard.style.cssText = 'background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.3);border-radius:10px;padding:10px 18px;text-align:center;min-width:80px;cursor:pointer;transition:all .15s;';
+        exCard.onmouseover = () => exCard.style.background='rgba(16,185,129,.2)';
+        exCard.onmouseout  = () => exCard.style.background='rgba(16,185,129,.1)';
+        el.appendChild(exCard);
+      }
+      exCard.innerHTML = `<div style="font-size:22px;font-weight:800;font-family:'JetBrains Mono',monospace;color:#10b981">${exitosas}</div><div style="font-size:9px;color:#6ee7b7;text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-top:2px">✅ Exitosas</div><div style="font-size:8px;color:var(--text-muted);margin-top:1px">desde 1/6</div>`;
+    } catch(e){ console.warn('exitosas stat:', e.message); }
+  })();
+
   el.innerHTML =
     stat(g.total,      'Total',       'var(--text)') +
     stat(g.precolecta, 'Pre-Colecta', '#f59e0b') +
     stat(g.transito,   'En Tránsito', '#1a9fd4') +
     stat(g.despachado, 'Despachado',  '#1dbf8e');
+  // La card de exitosas se agrega async (ver bloque anterior)
 }
 
 // ── SLA CORREO ARGENTINO ──
@@ -6841,7 +6879,49 @@ async function updateEstadoDevolucion(id,estado){
 
 // ── CANAL SELECTOR ──
 let _canalActivo = 'TODOS'; // 'TODOS' | 'ALLEATA' | 'CORREO' | 'CABIFY'
+let _enviosSortAsc = false; // false = más recientes primero (desc), true = más antiguos primero (asc)
+let _mostrandoExitosas = false; // si estamos mostrando las exitosas
 let selectedEnvios = new Set();
+
+function toggleSortEnvios(){
+  _enviosSortAsc = !_enviosSortAsc;
+  const btn = document.getElementById('btnSortEnvios');
+  if(btn) btn.innerHTML = _enviosSortAsc ? '↑ Más antiguas' : '↓ Más recientes';
+  if(_mostrandoExitosas) renderExitosas();
+  else renderEnvios();
+}
+
+// Render de exitosas (Entregado, desde 1/6)
+async function renderExitosas(){
+  _mostrandoExitosas = true;
+  const el = document.getElementById('enviosTable');
+  const empty = document.getElementById('enviosEmpty');
+  const label = document.getElementById('envTablaLabel');
+  const contador = document.getElementById('envContador');
+  if(label) label.innerHTML = '✅ Exitosas <span style="font-size:10px;color:var(--text-muted);font-weight:400">desde 1/6</span>';
+  if(el) el.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:20px;color:var(--text-muted);font-size:12px">Cargando...</td></tr>';
+
+  const LOG_MAP2 = {ALLEATA:'ALLEATA', CORREO:'CORREO ARGENTINO', CABIFY:'CABIFY', EPSA:'EPSA'};
+  try {
+    let q = sb.from('sf_workorders')
+      .select('*')
+      .in('record_type', ['Instalación Equipo + Simcard','Instalación Simcard','Asistencia Tecnica','Cambio de Terminal'])
+      .eq('status','Entregado')
+      .gte('fecha_despacho','2026-06-01')
+      .order('fecha_despacho', {ascending: _enviosSortAsc});
+    if(_canalActivo !== 'TODOS' && _canalActivo !== 'OTROS') q=q.eq('logistica', LOG_MAP2[_canalActivo]||_canalActivo);
+    let {data:raw=[]} = await q;
+    let list = (raw||[]).map(normalizarSFWorkorder);
+    if(_canalActivo==='OTROS') list=list.filter(e=>!['ALLEATA','CORREO ARGENTINO','CABIFY','EPSA'].includes((e.logistica||'').toUpperCase().trim()));
+    const buscar=(document.getElementById('envBuscar')?.value||'').trim().toLowerCase();
+    if(buscar) list=list.filter(e=>[e.ot_numero,e.track,e.cuenta,e.responsable].join(' ').toLowerCase().includes(buscar));
+    if(contador){ contador.textContent=list.length; contador.style.display=list.length?'inline':'none'; }
+    if(!list.length){ if(el)el.innerHTML=''; if(empty)empty.style.display='block'; return; }
+    if(empty)empty.style.display='none';
+    renderEnviosTable(list);
+  } catch(e){ console.error('renderExitosas:', e); }
+}
+
 function updateSelectedCount(){
   const checks = document.querySelectorAll('.envio-chk');
   selectedEnvios.clear();
