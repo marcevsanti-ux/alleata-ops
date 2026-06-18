@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Alleata · Presupuesto Operaciones</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   :root {
     --navy-900:#0d1b2a; --navy-800:#112236; --navy-700:#162d45;
@@ -19,16 +21,13 @@
   h1{font-size:22px;font-weight:800;margin-bottom:4px}
   .sub{font-size:12px;color:var(--text-muted);margin-bottom:24px}
 
-  /* Mes selector */
   .mes-bar{display:flex;gap:4px;background:var(--surface2);border-radius:10px;padding:4px;width:fit-content;margin-bottom:20px}
   .mes-btn{padding:6px 14px;border-radius:7px;font-size:12px;font-weight:600;border:none;cursor:pointer;transition:all .15s;background:transparent;color:var(--text-muted);font-family:'Inter',sans-serif}
   .mes-btn.active{background:var(--teal);color:#fff}
 
-  /* Filtro */
   .toolbar{display:flex;align-items:center;gap:10px;margin-bottom:20px;flex-wrap:wrap}
   select{background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:7px 12px;border-radius:8px;font-size:12px;font-weight:600;font-family:'Inter',sans-serif}
 
-  /* Cards */
   .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:24px}
   .card{background:var(--surface);border:1px solid var(--border2);border-radius:12px;padding:16px 20px}
   .card-label{font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px;font-weight:700}
@@ -40,7 +39,6 @@
   .bar-fill{height:100%;border-radius:2px;transition:width .3s}
   .bar-pct{font-size:10px;font-weight:700}
 
-  /* Tabla */
   .tabla-wrap{background:var(--surface);border:1px solid var(--border2);border-radius:12px;overflow:hidden}
   table{width:100%;border-collapse:collapse;font-size:13px}
   thead tr{background:var(--surface2);border-bottom:1px solid var(--border2)}
@@ -56,8 +54,10 @@
   .badge{padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;white-space:nowrap}
   .btn-edit{background:var(--surface2);border:1px solid var(--border2);color:var(--text-muted);padding:4px 10px;border-radius:6px;cursor:pointer;font-size:11px}
   .btn-edit:hover{border-color:var(--teal);color:var(--teal)}
+  .btn-edit.logi{border-color:rgba(29,191,142,.3);color:var(--teal)}
+  .btn-edit.logi:hover{background:rgba(29,191,142,.1)}
 
-  /* Modal */
+  /* ── Modal simple ── */
   .modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:999;align-items:center;justify-content:center}
   .modal-bg.open{display:flex}
   .modal{background:var(--navy-800);border:1px solid var(--border2);border-radius:16px;padding:28px;min-width:320px;max-width:400px}
@@ -68,6 +68,77 @@
   .modal-btns{display:flex;gap:10px;justify-content:flex-end}
   .btn-cancel{padding:8px 18px;background:var(--surface2);border:1px solid var(--border2);color:var(--text);border-radius:8px;cursor:pointer;font-size:13px;font-family:'Inter',sans-serif}
   .btn-save{padding:8px 18px;background:var(--grad);border:none;color:#fff;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;font-family:'Inter',sans-serif}
+
+  /* ── Modal Logicalis ── */
+  .logi-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:999;align-items:flex-start;justify-content:center;padding:24px;overflow-y:auto}
+  .logi-bg.open{display:flex}
+  .logi-modal{background:var(--navy-800);border:1px solid var(--border2);border-radius:18px;padding:28px;width:100%;max-width:780px;margin:auto}
+  .logi-modal h3{font-size:17px;font-weight:800;margin-bottom:2px}
+  .logi-modal .msub{font-size:12px;color:var(--text-muted);margin-bottom:22px}
+
+  /* KPIs chicos dentro del modal */
+  .logi-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:22px}
+  .lk{background:var(--navy-900);border:1px solid var(--border2);border-radius:10px;padding:12px 14px}
+  .lk-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:5px}
+  .lk-val{font-size:17px;font-weight:800;font-family:'JetBrains Mono',monospace;color:var(--text)}
+  .lk-val.green{color:var(--teal)}
+  .lk-val.red{color:#f87171}
+  .lk-val.amber{color:#f59e0b}
+  .lk-sub{font-size:10px;color:var(--text-muted);margin-top:2px}
+  .lk-prog{height:3px;background:rgba(255,255,255,.08);border-radius:2px;margin-top:8px;overflow:hidden}
+  .lk-prog-bar{height:100%;border-radius:2px;background:var(--grad)}
+  .lk-prog-bar.warn{background:#f59e0b}
+  .lk-prog-bar.over{background:#f87171}
+
+  /* Upload grid */
+  .up-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+  .up-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:8px}
+  .up-zone{border:1.5px dashed rgba(255,255,255,.15);border-radius:12px;padding:20px 12px;text-align:center;cursor:pointer;transition:all .2s;position:relative;background:var(--navy-900);min-height:100px}
+  .up-zone:hover,.up-zone.drag{border-color:var(--teal);background:rgba(29,191,142,.05)}
+  .up-zone.loaded{border-color:var(--teal);border-style:solid}
+  .up-zone input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+  .up-zone .uz-icon{font-size:24px;margin-bottom:6px}
+  .up-zone .uz-lbl{font-size:12px;color:var(--text-muted);font-weight:600}
+  .up-zone .uz-sub{font-size:10px;color:rgba(232,237,243,.25);margin-top:3px}
+  .up-zone .uz-fn{font-size:11px;color:var(--teal);margin-top:5px;font-family:'JetBrains Mono',monospace;display:none;word-break:break-all}
+  .up-msg{font-size:11px;font-weight:600;padding:6px 10px;border-radius:7px;margin-top:8px;display:none}
+  .up-msg.ok{background:rgba(29,191,142,.1);color:var(--teal);border:1px solid rgba(29,191,142,.2);display:block}
+  .up-msg.err{background:rgba(248,113,113,.1);color:#f87171;border:1px solid rgba(248,113,113,.2);display:block}
+  .up-preview{background:var(--navy-900);border:1px solid var(--border2);border-radius:9px;padding:10px 12px;margin-top:10px;display:none}
+  .up-prow{display:flex;justify-content:space-between;font-size:11px;padding:3px 0;border-bottom:1px solid var(--border)}
+  .up-prow:last-child{border-bottom:none}
+  .up-prow .pk{color:var(--text-muted)}
+  .up-prow .pv{font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;text-align:right}
+
+  /* TC row */
+  .tc-row{display:flex;align-items:center;gap:12px;padding:11px 14px;background:var(--navy-900);border:1px solid var(--border2);border-radius:10px;margin-bottom:14px}
+  .tc-row label{font-size:11px;font-weight:700;color:var(--text-muted)}
+  .tc-inp{background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:6px 12px;border-radius:8px;font-size:15px;font-weight:700;font-family:'JetBrains Mono',monospace;width:110px;text-align:right}
+  .tc-inp:focus{outline:none;border-color:var(--teal)}
+
+  /* Btn confirmar */
+  .btn-confirm{display:none;width:100%;padding:12px;border-radius:10px;border:none;background:var(--grad);color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:'Inter',sans-serif;margin-bottom:18px}
+  .btn-confirm:hover{opacity:.85}
+
+  /* Tabla facturas dentro del modal */
+  .fac-wrap{overflow-x:auto;margin-top:4px}
+  .fac-tbl{width:100%;border-collapse:collapse;font-size:11px}
+  .fac-tbl th{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);padding:5px 8px 8px;border-bottom:1px solid var(--border2);white-space:nowrap;text-align:left}
+  .fac-tbl td{padding:8px;border-bottom:1px solid var(--border);color:var(--text);vertical-align:middle}
+  .fac-tbl tr:last-child td{border-bottom:none}
+  .fac-tbl .nr{text-align:right;font-family:'JetBrains Mono',monospace;font-size:10px}
+  .fac-tbl .hi{color:var(--teal);font-weight:700}
+  .tag-ok{font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;background:rgba(29,191,142,.15);color:var(--teal)}
+  .fac-empty{text-align:center;padding:20px;font-size:12px;color:var(--text-muted)}
+
+  /* Series */
+  .series-wrap{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:4px;max-height:160px;overflow-y:auto;margin-top:10px}
+  .serie-chip{font-size:10px;font-family:'JetBrains Mono',monospace;background:var(--navy-900);border:1px solid var(--border2);border-radius:5px;padding:3px 8px;color:var(--text-muted)}
+
+  .sec-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin:18px 0 10px;display:flex;align-items:center;gap:8px}
+  .sec-lbl span{flex:1;height:1px;background:var(--border2)}
+
+  .logi-footer{display:flex;justify-content:flex-end;margin-top:20px}
 
   .empty{text-align:center;padding:32px;color:var(--text-muted);font-size:13px}
   .toast{position:fixed;bottom:24px;right:24px;background:#1dbf8e;color:#fff;padding:10px 18px;border-radius:10px;font-size:13px;font-weight:600;opacity:0;transition:opacity .3s;pointer-events:none;z-index:9999}
@@ -111,7 +182,7 @@
   </table>
 </div>
 
-<!-- Modal -->
+<!-- Modal simple (todos los proveedores excepto Logicalis) -->
 <div class="modal-bg" id="modalBg">
   <div class="modal">
     <h3 id="mTitle"></h3>
@@ -125,9 +196,80 @@
   </div>
 </div>
 
+<!-- Modal Logicalis -->
+<div class="logi-bg" id="logiBg">
+  <div class="logi-modal">
+    <h3>Logicalis Argentina SA</h3>
+    <p class="msub" id="logiSub"></p>
+
+    <div class="logi-kpis" id="logiKpis"></div>
+
+    <div class="sec-lbl">Cargar factura <span></span></div>
+
+    <div class="up-grid">
+      <div>
+        <div class="up-title">📄 Factura (PDF)</div>
+        <div class="up-zone" id="upZonePdf"
+          ondragover="event.preventDefault();this.classList.add('drag')"
+          ondragleave="this.classList.remove('drag')"
+          ondrop="this.classList.remove('drag');logiHandlePDF({files:event.dataTransfer.files});event.preventDefault()">
+          <input type="file" id="inpPdf" accept=".pdf" onchange="logiHandlePDF(this)">
+          <div class="uz-icon">📑</div>
+          <div class="uz-lbl">Soltá o seleccioná el PDF</div>
+          <div class="uz-sub">FC_29A2334.pdf</div>
+          <div class="uz-fn" id="pdfName"></div>
+        </div>
+        <div class="up-preview" id="prevPdf"></div>
+        <div class="up-msg" id="msgPdf"></div>
+      </div>
+      <div>
+        <div class="up-title">📊 RTO (Excel)</div>
+        <div class="up-zone" id="upZoneXls"
+          ondragover="event.preventDefault();this.classList.add('drag')"
+          ondragleave="this.classList.remove('drag')"
+          ondrop="this.classList.remove('drag');logiHandleXLS({files:event.dataTransfer.files});event.preventDefault()">
+          <input type="file" id="inpXls" accept=".xlsx,.xls" onchange="logiHandleXLS(this)">
+          <div class="uz-icon">📋</div>
+          <div class="uz-lbl">Soltá o seleccioná el Excel</div>
+          <div class="uz-sub">Facturación_Moretti_*.xlsx</div>
+          <div class="uz-fn" id="xlsName"></div>
+        </div>
+        <div class="up-preview" id="prevXls"></div>
+        <div class="up-msg" id="msgXls"></div>
+      </div>
+    </div>
+
+    <div class="tc-row">
+      <label>T.C. Banco Nación ($/USD)</label>
+      <input class="tc-inp" type="number" id="logiTC" value="1428" min="1" step="1" oninput="logiCurrentTC=parseFloat(this.value)||1428;logiRenderKPIs()">
+      <span style="font-size:11px;color:var(--text-muted)">Se usa para convertir Subtotal USD → $</span>
+    </div>
+
+    <button class="btn-confirm" id="btnConfirm" onclick="logiAgregar()">
+      ✓ Confirmar y agregar factura
+    </button>
+
+    <div class="sec-lbl">Facturas cargadas este mes <span></span></div>
+    <div id="logiFacturasWrap">
+      <div class="fac-empty">Todavía no cargaste ninguna factura</div>
+    </div>
+
+    <div id="logiSeriesSection" style="display:none">
+      <div class="sec-lbl">Series registradas <span></span></div>
+      <div class="series-wrap" id="logiSeriesWrap"></div>
+    </div>
+
+    <div class="logi-footer">
+      <button class="btn-cancel" onclick="closeLogiModal()">Cerrar</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
 const MESES = ['mar','abr','may','jun','jul','ago'];
 const MESES_LABEL = {mar:'Marzo',abr:'Abril',may:'Mayo',jun:'Junio',jul:'Julio',ago:'Agosto'};
 const RUBRO_STYLE = {
@@ -138,71 +280,78 @@ const RUBRO_STYLE = {
 };
 
 const DATA = [
-  // LOGÍSTICA
   {id:'epsa',      r:'LOGISTICA',  p:'EPSA',                      d:'Servicios de mensajería',    prev:{ene:3750000,feb:2500000,mar:0,abr:0,may:0,jun:2000000,jul:2000000,ago:2000000}, real:{ene:2068235,feb:3296134,mar:0,abr:0,may:0,jun:836863,jul:0,ago:0}},
   {id:'ca',        r:'LOGISTICA',  p:'Correo Argentino',           d:'Servicios de mensajería',    prev:{ene:0,feb:0,mar:0,abr:0,may:0,jun:2500000,jul:2500000,ago:2500000},             real:{ene:1280994,feb:1314066,mar:0,abr:0,may:0,jun:0,jul:0,ago:0}},
   {id:'cabify',    r:'LOGISTICA',  p:'Cabify (CALOG SA)',           d:'Servicio de logística',      prev:{ene:1275000,feb:1275000,mar:0,abr:0,may:0,jun:400000,jul:400000,ago:400000},   real:{ene:229140,feb:248630,mar:0,abr:0,may:0,jun:0,jul:0,ago:0}},
   {id:'enviamelo', r:'LOGISTICA',  p:'SPP — Enviamelo',             d:'Servicio de logística',      prev:{ene:900000,feb:900000,mar:0,abr:0,may:0,jun:900000,jul:900000,ago:900000},     real:{ene:900000,feb:900000,mar:0,abr:0,may:0,jun:0,jul:0,ago:0}},
   {id:'andreani',  r:'LOGISTICA',  p:'Correo Andreani',             d:'Servicios de mensajería',    prev:{ene:0,feb:0,mar:0,abr:0,may:0,jun:150000,jul:150000,ago:150000},               real:{ene:0,feb:0,mar:0,abr:0,may:0,jun:0,jul:0,ago:0}},
-  // TECNOLOGÍA
   {id:'napse',     r:'TECNOLOGIA', p:'Napse SRL',                   d:'Gateway de pagos',           prev:{ene:1600000,feb:4300000,mar:0,abr:0,may:0,jun:1550000,jul:9400000,ago:9400000}, real:{ene:1592743,feb:1543652,mar:0,abr:0,may:0,jun:0,jul:0,ago:0}},
   {id:'amazon',    r:'TECNOLOGIA', p:'Amazon',                      d:'Infraestructura cloud',      prev:{ene:12000000,feb:12000000,mar:0,abr:0,may:0,jun:10000000,jul:10000000,ago:10000000}, real:{ene:9233510,feb:8329075,mar:0,abr:0,may:0,jun:0,jul:0,ago:0}},
   {id:'ecobyte',   r:'TECNOLOGIA', p:'Ecobyte SRL',                 d:'Honorarios desarrollo',      prev:{ene:55200000,feb:57000000,mar:0,abr:0,may:0,jun:57000000,jul:57000000,ago:57000000}, real:{ene:54955296,feb:53480625,mar:0,abr:0,may:0,jun:0,jul:0,ago:0}},
-  {id:'logicalis', r:'TECNOLOGIA', p:'Logicalis Argentina SA',      d:'Honorarios software',        prev:{ene:0,feb:0,mar:0,abr:0,may:0,jun:26000000,jul:26000000,ago:26000000},          real:{ene:0,feb:5549660,mar:0,abr:0,may:0,jun:8630792,jul:0,ago:0}},
+  {id:'logicalis', r:'TECNOLOGIA', p:'Logicalis Argentina SA',      d:'Honorarios software',        prev:{ene:0,feb:0,mar:0,abr:0,may:0,jun:26000000,jul:26000000,ago:26000000},          real:{ene:0,feb:5549660,mar:0,abr:0,may:0,jun:0,jul:0,ago:0}},
   {id:'oriontech', r:'TECNOLOGIA', p:'Oriontech SA',                d:'Honorarios Alleata',         prev:{ene:0,feb:2500000,mar:0,abr:0,may:0,jun:4313650,jul:1450000,ago:1450000},       real:{ene:0,feb:0,mar:0,abr:0,may:0,jun:0,jul:0,ago:0}},
   {id:'claro',     r:'TECNOLOGIA', p:'Claro (AMX Argentina)',       d:'Chips Alleata',              prev:{ene:8003466,feb:8000000,mar:0,abr:0,may:0,jun:9000000,jul:9000000,ago:9000000}, real:{ene:8003466,feb:8249570,mar:0,abr:0,may:0,jun:8473154,jul:0,ago:0}},
   {id:'telecom',   r:'TECNOLOGIA', p:'Telecom Personal',            d:'Servicios telefonía',        prev:{ene:2500000,feb:2500000,mar:0,abr:0,may:0,jun:5600000,jul:5800000,ago:6000000}, real:{ene:2402982,feb:4950095,mar:0,abr:0,may:0,jun:0,jul:0,ago:0}},
-  // INSUMOS
   {id:'bolsas',    r:'INSUMOS',    p:'Casco Flavia (Bolsas Rojas)', d:'Bolsas pluribol',            prev:{ene:0,feb:0,mar:0,abr:0,may:0,jun:200000,jul:0,ago:200000},                    real:{ene:0,feb:0,mar:0,abr:0,may:0,jun:0,jul:0,ago:0}},
   {id:'limpieza',  r:'INSUMOS',    p:'CLP SRL (Casa Thames)',       d:'Insumos de limpieza',        prev:{ene:0,feb:0,mar:0,abr:0,may:0,jun:50000,jul:0,ago:50000},                      real:{ene:0,feb:0,mar:0,abr:0,may:0,jun:0,jul:0,ago:0}},
-  // SISTEMAS
   {id:'botmaker',  r:'SISTEMAS',   p:'Botmaker',                    d:'Chatbot',                    prev:{ene:0,feb:300000,mar:0,abr:0,may:0,jun:213000,jul:355000,ago:355000},            real:{ene:217569,feb:214560,mar:0,abr:0,may:0,jun:0,jul:0,ago:0}},
   {id:'phoneiq',   r:'SISTEMAS',   p:'Phone IQ',                    d:'Central telefónica virtual', prev:{ene:0,feb:1254000,mar:0,abr:0,may:0,jun:940000,jul:940000,ago:940000},           real:{ene:0,feb:0,mar:0,abr:0,may:0,jun:0,jul:0,ago:0}},
   {id:'ifx',       r:'SISTEMAS',   p:'IFX Networks',                d:'Licencia Office 365',        prev:{ene:0,feb:0,mar:0,abr:0,may:0,jun:250000,jul:250000,ago:250000},                real:{ene:229311,feb:218051,mar:0,abr:0,may:0,jun:212841,jul:0,ago:0}},
 ];
 
-// Estado local — en prod vendrá de Supabase
 let mes = 'jun';
-let reales = {}; // key: `${id}_${mes}` → monto
+let reales = {};
 let editando = null;
 
-// Precargar reales históricos de la planilla
+// Precarga históricos
 DATA.forEach(it => {
-  Object.entries(it.real).forEach(([m, v]) => {
-    if (v) reales[`${it.id}_${m}`] = v;
-  });
+  Object.entries(it.real).forEach(([m,v]) => { if(v) reales[`${it.id}_${m}`]=v; });
 });
 
-function getReal(id, m) {
-  return reales[`${id}_${m}`] ?? 0;
+// ── Logicalis state ──────────────────────────────────────────────────────────
+// logiFacturas[mes] = array de facturas cargadas
+const logiFacturas = {};
+let logiPendingFac = null;
+let logiPendingRTO = null;
+let logiCurrentTC  = 1428;
+let logiMesActual  = 'jun';
+
+function logiGetFacturas(m) {
+  return logiFacturas[m] || [];
+}
+function logiRealPesos(m) {
+  return logiGetFacturas(m).reduce((s,f) => s + f.subtotalUSD * logiCurrentTC, 0);
+}
+function logiSyncReal() {
+  // Actualiza reales[] para que el portal principal se entere
+  MESES.forEach(m => {
+    const r = logiRealPesos(m);
+    if(r > 0) reales[`logicalis_${m}`] = r;
+  });
 }
 
-function fmt(n) {
-  if (!n && n !== 0) return '—';
-  if (n === 0) return '—';
-  return '$' + Math.round(n).toLocaleString('es-AR');
+// ── Helpers fmt ──────────────────────────────────────────────────────────────
+function fmt(n)       { if(!n&&n!==0) return '—'; if(n===0) return '—'; return '$'+Math.round(n).toLocaleString('es-AR'); }
+function fmtUSD(n)    { return 'USD '+parseFloat(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function fmtDesv(n,p) { if(!p&&!n) return '—'; return (n>=0?'+':'')+'$'+Math.round(n).toLocaleString('es-AR'); }
+function fmtPct(n)    { return (n>=0?'+':'')+parseFloat(n).toFixed(1)+'%'; }
+function dColor(d)    { return d>0?'#f87171':d<0?'#1dbf8e':'rgba(232,237,243,.45)'; }
+
+function getReal(id,m) {
+  if(id==='logicalis') return logiRealPesos(m);
+  return reales[`${id}_${m}`]??0;
 }
 
-function fmtDesv(n, prev) {
-  if (!prev && !n) return '—';
-  return (n >= 0 ? '+' : '') + '$' + Math.round(n).toLocaleString('es-AR');
-}
-
-function dColor(desv) {
-  return desv > 0 ? '#f87171' : desv < 0 ? '#1dbf8e' : 'rgba(232,237,243,.45)';
-}
-
-// ── Mes buttons ──────────────────────────────────────────────────────────────
+// ── Mes bar ──────────────────────────────────────────────────────────────────
 function initMesBar() {
   const bar = document.getElementById('mesBar');
-  bar.innerHTML = MESES.map(m => `
+  bar.innerHTML = MESES.map(m=>`
     <button class="mes-btn${m===mes?' active':''}" id="mbtn-${m}" onclick="setMes('${m}')">${m.toUpperCase()}</button>
   `).join('');
 }
-
 function setMes(m) {
-  mes = m;
-  document.querySelectorAll('.mes-btn').forEach(b => b.classList.remove('active'));
+  mes=m;
+  document.querySelectorAll('.mes-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById(`mbtn-${m}`)?.classList.add('active');
   render();
 }
@@ -210,29 +359,27 @@ function setMes(m) {
 // ── Render principal ─────────────────────────────────────────────────────────
 function render() {
   const filtro = document.getElementById('filtroRubro').value;
-  const items  = DATA.filter(i => !filtro || i.r === filtro);
+  const items  = DATA.filter(i=>!filtro||i.r===filtro);
   renderCards();
   renderTabla(items);
 }
 
 function renderCards() {
   const rubros = ['LOGISTICA','TECNOLOGIA','INSUMOS','SISTEMAS'];
-  const tot = { prev:0, real:0 };
-
-  let html = '';
-  rubros.forEach(rub => {
-    const rs   = RUBRO_STYLE[rub];
-    const its  = DATA.filter(i => i.r === rub);
-    const prev = its.reduce((s,i) => s + (i.prev[mes]||0), 0);
-    const real = its.reduce((s,i) => s + getReal(i.id, mes), 0);
-    const desv = real - prev;
-    const pct  = prev > 0 ? Math.round(real/prev*100) : (real > 0 ? 100 : 0);
-    tot.prev += prev; tot.real += real;
-
-    html += `
+  const tot = {prev:0,real:0};
+  let html='';
+  rubros.forEach(rub=>{
+    const rs=RUBRO_STYLE[rub];
+    const its=DATA.filter(i=>i.r===rub);
+    const prev=its.reduce((s,i)=>s+(i.prev[mes]||0),0);
+    const real=its.reduce((s,i)=>s+getReal(i.id,mes),0);
+    const desv=real-prev;
+    const pct=prev>0?Math.round(real/prev*100):(real>0?100:0);
+    tot.prev+=prev; tot.real+=real;
+    html+=`
       <div class="card" style="background:${rs.bg};border-color:${rs.color}33">
         <div class="card-label" style="color:${rs.color}">${rs.label}</div>
-        <div class="card-value" style="color:var(--text)">${fmt(prev)||'—'}</div>
+        <div class="card-value">${fmt(prev)||'—'}</div>
         <div class="card-sub">Real: <span style="color:${dColor(desv)};font-weight:600">${fmt(real)||'—'}</span></div>
         <div class="bar-wrap">
           <div class="bar-track"><div class="bar-fill" style="width:${Math.min(pct,100)}%;background:${dColor(desv)}"></div></div>
@@ -240,64 +387,55 @@ function renderCards() {
         </div>
       </div>`;
   });
-
-  // Card total
-  const totDesv = tot.real - tot.prev;
-  const totPct  = tot.prev > 0 ? Math.round(tot.real/tot.prev*100) : 0;
-  html = `
-    <div class="card">
-      <div class="card-label">📊 Total ${MESES_LABEL[mes]}</div>
-      <div class="card-value">${fmt(tot.prev)}</div>
-      <div class="card-sub">Real: <span style="color:${dColor(totDesv)};font-weight:600">${fmt(tot.real)||'—'}</span></div>
-      <div class="card-desv" style="color:${dColor(totDesv)}">${fmtDesv(totDesv, tot.prev)}</div>
-    </div>` + html;
-
-  document.getElementById('cards').innerHTML = html;
+  const totDesv=tot.real-tot.prev;
+  const totPct=tot.prev>0?Math.round(tot.real/tot.prev*100):0;
+  html=`<div class="card">
+    <div class="card-label">📊 Total ${MESES_LABEL[mes]}</div>
+    <div class="card-value">${fmt(tot.prev)}</div>
+    <div class="card-sub">Real: <span style="color:${dColor(totDesv)};font-weight:600">${fmt(tot.real)||'—'}</span></div>
+    <div class="card-desv" style="color:${dColor(totDesv)}">${fmtDesv(totDesv,tot.prev)}</div>
+  </div>`+html;
+  document.getElementById('cards').innerHTML=html;
 }
 
 function renderTabla(items) {
-  const tbody = document.getElementById('tbody');
-  const tfoot = document.getElementById('tfoot');
-  let rows = '';
-  let totPrev = 0, totReal = 0;
-
-  const rubroOrder = ['LOGISTICA','TECNOLOGIA','INSUMOS','SISTEMAS'];
-  rubroOrder.forEach(rub => {
-    const its = items.filter(i => i.r === rub);
-    if (!its.length) return;
-    const rs = RUBRO_STYLE[rub];
-
-    its.forEach(it => {
-      const prev = it.prev[mes] || 0;
-      const real = getReal(it.id, mes);
-      const desv = real - prev;
-      const pct  = prev > 0 ? Math.round(real/prev*100) : (real > 0 ? 999 : null);
-      totPrev += prev; totReal += real;
-
-      const dc = dColor(desv);
-      const pctBadge = pct !== null
-        ? `<span class="badge" style="background:${dc}22;color:${dc}">${pct === 999 ? '∞' : pct}%</span>`
-        : '<span style="color:var(--text-muted);font-size:11px">—</span>';
-
-      rows += `
+  const tbody=document.getElementById('tbody');
+  const tfoot=document.getElementById('tfoot');
+  let rows='', totPrev=0, totReal=0;
+  ['LOGISTICA','TECNOLOGIA','INSUMOS','SISTEMAS'].forEach(rub=>{
+    const its=items.filter(i=>i.r===rub);
+    if(!its.length) return;
+    const rs=RUBRO_STYLE[rub];
+    its.forEach(it=>{
+      const prev=it.prev[mes]||0;
+      const real=getReal(it.id,mes);
+      const desv=real-prev;
+      const pct=prev>0?Math.round(real/prev*100):(real>0?999:null);
+      totPrev+=prev; totReal+=real;
+      const dc=dColor(desv);
+      const pctBadge=pct!==null
+        ?`<span class="badge" style="background:${dc}22;color:${dc}">${pct===999?'∞':pct}%</span>`
+        :'<span style="color:var(--text-muted);font-size:11px">—</span>';
+      const isLogi=it.id==='logicalis';
+      rows+=`
         <tr>
-          <td style="font-weight:600">${it.p}</td>
+          <td style="font-weight:600">${it.p}${isLogi&&logiGetFacturas(mes).length?` <span class="badge" style="background:rgba(29,191,142,.1);color:var(--teal);font-size:9px">${logiGetFacturas(mes).length} fc</span>`:''}</td>
           <td style="color:var(--text-muted);font-size:12px">${it.d}</td>
           <td><span class="badge" style="background:${rs.bg};color:${rs.color}">${rs.label}</span></td>
-          <td class="mono" style="color:var(--text-muted)">${prev ? fmt(prev) : '—'}</td>
-          <td class="mono" style="color:${real ? 'var(--text)' : 'var(--text-muted)'}; font-weight:${real?'600':'400'}">${real ? fmt(real) : '—'}</td>
-          <td class="mono" style="color:${dc}">${(prev||real) ? fmtDesv(desv,prev) : '—'}</td>
+          <td class="mono" style="color:var(--text-muted)">${prev?fmt(prev):'—'}</td>
+          <td class="mono" style="color:${real?'var(--text)':'var(--text-muted)'};font-weight:${real?'600':'400'}">${real?fmt(real):'—'}</td>
+          <td class="mono" style="color:${dc}">${(prev||real)?fmtDesv(desv,prev):'—'}</td>
           <td style="text-align:center">${pctBadge}</td>
-          <td style="text-align:center"><button class="btn-edit" onclick="openModal('${it.id}','${it.p}','${it.d}')">✏️</button></td>
+          <td style="text-align:center">
+            <button class="btn-edit${isLogi?' logi':''}" onclick="${isLogi?`openLogiModal('${mes}')`:`openModal('${it.id}','${it.p}','${it.d}')`}">${isLogi?'📎':'✏️'}</button>
+          </td>
         </tr>`;
     });
   });
-
-  tbody.innerHTML = rows || `<tr><td colspan="8" class="empty">Sin ítems</td></tr>`;
-
-  const totDesv = totReal - totPrev;
-  const dc = dColor(totDesv);
-  tfoot.innerHTML = `
+  tbody.innerHTML=rows||`<tr><td colspan="8" class="empty">Sin ítems</td></tr>`;
+  const totDesv=totReal-totPrev;
+  const dc=dColor(totDesv);
+  tfoot.innerHTML=`
     <tr>
       <td colspan="3" style="font-size:12px;text-transform:uppercase;letter-spacing:.5px">Total ${MESES_LABEL[mes]}</td>
       <td class="mono">${fmt(totPrev)}</td>
@@ -307,43 +445,261 @@ function renderTabla(items) {
     </tr>`;
 }
 
-// ── Modal ────────────────────────────────────────────────────────────────────
-function openModal(id, proveedor, detalle) {
-  editando = { id, mes };
-  document.getElementById('mTitle').textContent = proveedor;
-  document.getElementById('mSub').textContent   = `${MESES_LABEL[mes]} 2026 · ${detalle}`;
-  document.getElementById('mInput').value       = getReal(id, mes) || '';
+// ── Modal simple ─────────────────────────────────────────────────────────────
+function openModal(id,proveedor,detalle) {
+  editando={id,mes};
+  document.getElementById('mTitle').textContent=proveedor;
+  document.getElementById('mSub').textContent=`${MESES_LABEL[mes]} 2026 · ${detalle}`;
+  document.getElementById('mInput').value=getReal(id,mes)||'';
   document.getElementById('modalBg').classList.add('open');
-  setTimeout(() => document.getElementById('mInput').focus(), 50);
+  setTimeout(()=>document.getElementById('mInput').focus(),50);
 }
-
 function closeModal() {
   document.getElementById('modalBg').classList.remove('open');
-  editando = null;
+  editando=null;
 }
-
 function guardar() {
-  if (!editando) return;
-  const monto = parseFloat(document.getElementById('mInput').value) || 0;
-  reales[`${editando.id}_${editando.mes}`] = monto;
-  // TODO: persistir en Supabase cuando se integre al portal
+  if(!editando) return;
+  const monto=parseFloat(document.getElementById('mInput').value)||0;
+  reales[`${editando.id}_${editando.mes}`]=monto;
   closeModal();
   render();
   showToast('✅ Real guardado');
 }
 
-function showToast(msg) {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 2500);
+// ── Modal Logicalis ──────────────────────────────────────────────────────────
+function openLogiModal(m) {
+  logiMesActual=m;
+  document.getElementById('logiSub').textContent=`${MESES_LABEL[m]} 2026 · Honorarios software`;
+  logiCurrentTC=parseFloat(document.getElementById('logiTC').value)||1428;
+  logiPendingFac=null;
+  logiPendingRTO=null;
+  resetLogiForm();
+  logiRenderKPIs();
+  logiRenderFacturas();
+  logiRenderSeries();
+  document.getElementById('logiBg').classList.add('open');
+}
+function closeLogiModal() {
+  document.getElementById('logiBg').classList.remove('open');
+  logiSyncReal();
+  render();
 }
 
-document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') closeModal();
+function resetLogiForm() {
+  ['prevPdf','prevXls'].forEach(id=>{const e=document.getElementById(id);e.style.display='none';e.innerHTML='';});
+  ['msgPdf','msgXls'].forEach(id=>{const e=document.getElementById(id);e.className='up-msg';e.textContent='';});
+  ['inpPdf','inpXls'].forEach(id=>{document.getElementById(id).value='';});
+  ['upZonePdf','upZoneXls'].forEach(id=>{document.getElementById(id).classList.remove('loaded');});
+  ['pdfName','xlsName'].forEach(id=>{const e=document.getElementById(id);e.style.display='none';e.textContent='';});
+  document.getElementById('btnConfirm').style.display='none';
+}
+
+function logiRenderKPIs() {
+  const m=logiMesActual;
+  const prev=DATA.find(i=>i.id==='logicalis').prev[m]||0;
+  const facs=logiGetFacturas(m);
+  const real=facs.reduce((s,f)=>s+f.subtotalUSD*logiCurrentTC,0);
+  const desv=real-prev;
+  const desvPct=prev>0?((real-prev)/prev)*100:0;
+  const ejecPct=prev>0?Math.min(200,(real/prev)*100):0;
+
+  const kpis=[
+    {label:'PREV '+MESES_LABEL[m].substring(0,3).toUpperCase()+' 26', val:fmt(prev)||'—', sub:'presupuestado', cls:''},
+    {label:'REAL '+MESES_LABEL[m].substring(0,3).toUpperCase()+' 26', val:real>0?fmt(real):'—', sub:facs.length+' factura(s)', cls:real>0?'green':''},
+    {label:'TOTAL JUN 26', val:facs.length?fmtPct(desvPct):'—', sub:desvPct<=0?'por debajo':'por encima', cls:facs.length?(Math.abs(desvPct)>20?'red':'green'):''},
+    {label:'EJECUCIÓN', val:facs.length?ejecPct.toFixed(1)+'%':'—', sub:'del presupuesto', cls:'', prog:ejecPct},
+  ];
+  document.getElementById('logiKpis').innerHTML=kpis.map(k=>`
+    <div class="lk">
+      <div class="lk-label">${k.label}</div>
+      <div class="lk-val ${k.cls}">${k.val}</div>
+      <div class="lk-sub">${k.sub}</div>
+      ${k.prog!==undefined?`<div class="lk-prog"><div class="lk-prog-bar ${k.prog>100?'over':k.prog>80?'warn':''}" style="width:${Math.min(100,k.prog)}%"></div></div>`:''}
+    </div>`).join('');
+}
+
+function logiRenderFacturas() {
+  const m=logiMesActual;
+  const facs=logiGetFacturas(m);
+  const el=document.getElementById('logiFacturasWrap');
+  if(!facs.length){ el.innerHTML='<div class="fac-empty">Todavía no cargaste ninguna factura este mes</div>'; return; }
+  el.innerHTML=`<div class="fac-wrap"><table class="fac-tbl">
+    <thead><tr>
+      <th>N° factura</th><th>Fecha</th><th>Vto.</th><th>Descripción</th>
+      <th style="text-align:right">T.C.</th><th style="text-align:right">Subtotal USD</th>
+      <th style="text-align:right">IVA USD</th><th style="text-align:right">Otros imp.</th>
+      <th style="text-align:right">Total USD</th><th style="text-align:right;color:var(--teal)">Subtotal $</th>
+      <th style="text-align:center">Term.</th><th style="text-align:center">Series</th>
+    </tr></thead>
+    <tbody>${facs.map(f=>{
+      const sub$=f.subtotalUSD*logiCurrentTC;
+      return `<tr>
+        <td style="font-family:'JetBrains Mono',monospace">${f.numero}</td>
+        <td>${f.fecha}</td><td>${f.vto}</td>
+        <td>${f.desc}</td>
+        <td class="nr">${f.tc.toLocaleString('es-AR')}</td>
+        <td class="nr">${fmtUSD(f.subtotalUSD)}</td>
+        <td class="nr">${fmtUSD(f.ivaUSD)}</td>
+        <td class="nr">${fmtUSD(f.otrosImp)}</td>
+        <td class="nr">${fmtUSD(f.totalUSD)}</td>
+        <td class="nr hi">${fmt(sub$)}</td>
+        <td style="text-align:center;font-weight:700">${f.terminales||'—'}</td>
+        <td style="text-align:center"><span class="tag-ok">${f.series?f.series.length:0}</span></td>
+      </tr>`;
+    }).join('')}</tbody>
+  </table></div>`;
+}
+
+function logiRenderSeries() {
+  const all=logiGetFacturas(logiMesActual).flatMap(f=>f.series||[]);
+  const sec=document.getElementById('logiSeriesSection');
+  if(!all.length){sec.style.display='none';return;}
+  sec.style.display='';
+  document.getElementById('logiSeriesWrap').innerHTML=all.map(s=>`<div class="serie-chip">${s}</div>`).join('');
+}
+
+function logiShowMsg(id,txt,type){
+  const e=document.getElementById(id);
+  e.className='up-msg '+type;
+  e.textContent=txt;
+}
+function logiShowPreview(id,rows){
+  const e=document.getElementById(id);
+  e.style.display='block';
+  e.innerHTML=rows.map(r=>`<div class="up-prow"><span class="pk">${r[0]}</span><span class="pv">${r[1]}</span></div>`).join('');
+}
+function logiCheckBtn(){
+  document.getElementById('btnConfirm').style.display=logiPendingFac?'block':'none';
+}
+
+async function logiHandlePDF(input){
+  const file=input.files[0]; if(!file) return;
+  document.getElementById('pdfName').textContent=file.name;
+  document.getElementById('pdfName').style.display='block';
+  logiShowMsg('msgPdf','Leyendo PDF...','ok');
+  try{
+    const buf=await file.arrayBuffer();
+    const pdf=await pdfjsLib.getDocument({data:buf}).promise;
+    let text='';
+    for(let i=1;i<=pdf.numPages;i++){
+      const pg=await pdf.getPage(i);
+      const ct=await pg.getTextContent();
+      text+=ct.items.map(it=>it.str).join(' ')+'\n';
+    }
+    const fac=logiParsePDF(text);
+    if(!fac){logiShowMsg('msgPdf','No se pudo leer. Verificá que sea un PDF de Logicalis.','err');return;}
+    logiPendingFac=fac;
+    document.getElementById('upZonePdf').classList.add('loaded');
+    logiShowPreview('prevPdf',[
+      ['N° factura', fac.numero],
+      ['Fecha', fac.fecha],
+      ['Fecha Vto.', fac.vto],
+      ['Descripción', fac.desc.substring(0,45)+'…'],
+      ['Subtotal USD', fmtUSD(fac.subtotalUSD)],
+      ['IVA USD', fmtUSD(fac.ivaUSD)],
+      ['Otros imp. USD', fmtUSD(fac.otrosImp)],
+      ['Total USD', fmtUSD(fac.totalUSD)],
+    ]);
+    logiShowMsg('msgPdf','✓ Factura leída correctamente','ok');
+    logiCheckBtn();
+  }catch(e){logiShowMsg('msgPdf','Error: '+e.message,'err');}
+}
+
+function logiParsePDF(text){
+  try{
+    const numero=(text.match(/(\d{4}-\d{8})/)||[])[1]||'—';
+    const fecha=(text.match(/Fecha\s*[:\s]*(\d{1,2}\/\d{1,2}\/\d{4})/i)||[])[1]||'—';
+    const vto=(text.match(/Vto[\.:\s]+(\d{1,2}\/\d{1,2}\/\d{4})/i)||[])[1]||'—';
+    const descM=text.match(/Cambio de Perfil[^\n\r]*/i)||text.match(/([A-Z][a-zA-Záéíóú ]{4,60}(?:v\d|D\d)[^\n\r]*)/);
+    const desc=descM?descM[0].trim().substring(0,80):'Honorarios Software';
+    const subtotalUSD=logiParseNum((text.match(/Subtotal\s*[:\s]*USD\s*([\d.,]+)/i)||[])[1]);
+    const ivaUSD=logiParseNum((text.match(/Total IVA\s*[:\s]*USD\s*([\d.,]+)/i)||[])[1]);
+    const otrosImp=logiParseNum((text.match(/Otros Impuestos\s*[:\s]*USD\s*([\d.,]+)/i)||[])[1]);
+    const totalUSD=logiParseNum((text.match(/Total\s*[:\s]*USD\s*([\d.,]+)/i)||[])[1]);
+    const tcM=text.match(/T\.C[:\s.]*([\d.,]+)/i);
+    const tc=tcM?logiParseNum(tcM[1]):logiCurrentTC;
+    return{numero,fecha,vto,desc,subtotalUSD,ivaUSD,otrosImp,totalUSD,tc:tc||logiCurrentTC};
+  }catch(e){return null;}
+}
+
+function logiParseNum(s){
+  if(!s) return 0;
+  s=String(s).trim();
+  if(s.includes(',')&&s.includes('.')){
+    const ld=s.lastIndexOf('.'),lc=s.lastIndexOf(',');
+    s=lc>ld?s.replace(/\./g,'').replace(',','.'):s.replace(/,/g,'');
+  } else if(s.includes(',')) s=s.replace(',','.');
+  return parseFloat(s)||0;
+}
+
+async function logiHandleXLS(input){
+  const file=input.files[0]; if(!file) return;
+  document.getElementById('xlsName').textContent=file.name;
+  document.getElementById('xlsName').style.display='block';
+  logiShowMsg('msgXls','Leyendo Excel...','ok');
+  try{
+    const buf=await file.arrayBuffer();
+    const wb=XLSX.read(buf,{type:'array'});
+    let terminales=0,series=[];
+
+    const nameInf=wb.SheetNames.find(n=>n.toLowerCase().includes('informe')||n.toLowerCase().includes('final'))||wb.SheetNames[0];
+    if(nameInf){
+      const data=XLSX.utils.sheet_to_json(wb.Sheets[nameInf],{header:1,defval:''});
+      for(const row of data){
+        for(const cell of row){
+          const n=parseInt(cell);
+          if(!isNaN(n)&&n>50&&n<5000&&String(cell).trim()===String(n)) terminales=terminales||n;
+        }
+      }
+    }
+    const nameDet=wb.SheetNames.find(n=>n.toLowerCase().includes('detalle')||n.toLowerCase().includes('despacho'))||wb.SheetNames[1];
+    if(nameDet){
+      const data=XLSX.utils.sheet_to_json(wb.Sheets[nameDet],{header:1,defval:''});
+      const header=data[0]||[];
+      const col=Math.max(0,header.findIndex(h=>String(h).toLowerCase().includes('serie')));
+      for(let i=1;i<data.length;i++){
+        const v=String(data[i][col]||'').trim();
+        if(v&&v.length>8&&/^\d+$/.test(v)) series.push(v);
+      }
+    }
+    logiPendingRTO={terminales:terminales||series.length,series};
+    document.getElementById('upZoneXls').classList.add('loaded');
+    logiShowPreview('prevXls',[
+      ['Terminales despachadas',(terminales||series.length).toString()],
+      ['Series registradas',series.length.toString()],
+    ]);
+    logiShowMsg('msgXls','✓ RTO leído: '+series.length+' series','ok');
+    logiCheckBtn();
+  }catch(e){logiShowMsg('msgXls','Error: '+e.message,'err');}
+}
+
+function logiAgregar(){
+  if(!logiPendingFac) return;
+  const fac={...logiPendingFac,tc:logiCurrentTC};
+  if(logiPendingRTO){fac.terminales=logiPendingRTO.terminales;fac.series=logiPendingRTO.series;}
+  if(!logiFacturas[logiMesActual]) logiFacturas[logiMesActual]=[];
+  logiFacturas[logiMesActual].push(fac);
+  logiPendingFac=null;
+  logiPendingRTO=null;
+  resetLogiForm();
+  logiRenderKPIs();
+  logiRenderFacturas();
+  logiRenderSeries();
+  showToast('✅ Factura agregada — '+fmtUSD(fac.subtotalUSD));
+}
+
+// ── Toast ────────────────────────────────────────────────────────────────────
+function showToast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2500);
+}
+
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){closeModal();closeLogiModal();}
 });
 
-// ── Init ─────────────────────────────────────────────────────────────────────
 initMesBar();
 render();
 </script>
