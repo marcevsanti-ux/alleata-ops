@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Alleata · Presupuesto Operaciones v1.2.3</title>
+<title>Alleata · Presupuesto Operaciones v1.2.4</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -154,7 +154,7 @@
 <body>
 
 <h1>💰 Presupuesto Operaciones</h1>
-<p class="sub">Alleata · 2026 · Solo Admin <span style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 8px;border-radius:4px;border:1px solid var(--border2);font-size:10px;margin-left:6px">v1.2.3</span></p>
+<p class="sub">Alleata · 2026 · Solo Admin <span style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 8px;border-radius:4px;border:1px solid var(--border2);font-size:10px;margin-left:6px">v1.2.4</span></p>
 
 <div class="toolbar">
   <div class="mes-bar" id="mesBar"></div>
@@ -174,8 +174,8 @@
     <thead>
       <tr>
         <th>Proveedor</th>
-        <th>Detalle</th>
         <th>Rubro</th>
+        <th>Nro Factura</th>
         <th class="num">Previsto</th>
         <th class="num">Real</th>
         <th class="num">Desvío</th>
@@ -423,11 +423,21 @@ function renderTabla(items) {
         ?`<span class="badge" style="background:${dc}22;color:${dc}">${pct===999?'∞':pct}%</span>`
         :'<span style="color:var(--text-muted);font-size:11px">—</span>';
       const isLogi=it.id==='logicalis';
+      // Nro facturas para columna
+      const logiFacs = isLogi ? logiGetFacturas(mes) : [];
+      const nroFacCell = isLogi
+        ? (logiFacs.length
+            ? logiFacs.map(f=>`<span style="font-family:'JetBrains Mono',monospace;font-size:10px;background:rgba(29,191,142,.08);color:var(--teal);padding:1px 6px;border-radius:4px;border:1px solid rgba(29,191,142,.2);display:inline-block;margin:1px">${f.numero}</span>`).join(' ')
+            : '<span style="color:var(--text-muted);font-size:11px">—</span>')
+        : '<span style="color:var(--text-muted);font-size:11px">—</span>';
       rows+=`
         <tr>
-          <td style="font-weight:600">${it.p}${isLogi&&logiGetFacturas(mes).length?` <span class="badge" style="background:rgba(29,191,142,.1);color:var(--teal);font-size:9px">${logiGetFacturas(mes).length} fc</span>`:''}</td>
-          <td style="color:var(--text-muted);font-size:12px">${it.d}</td>
+          <td>
+            <div style="font-weight:600">${it.p}</div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:2px">${it.d}</div>
+          </td>
           <td><span class="badge" style="background:${rs.bg};color:${rs.color}">${rs.label}</span></td>
+          <td>${nroFacCell}</td>
           <td class="mono" style="color:var(--text-muted)">${prev?fmt(prev):'—'}</td>
           <td class="mono" style="color:${real?'var(--text)':'var(--text-muted)'};font-weight:${real?'600':'400'}">${real?fmt(real):'—'}</td>
           <td class="mono" style="color:${dc}">${(prev||real)?fmtDesv(desv,prev):'—'}</td>
@@ -727,18 +737,23 @@ async function logiHandleXLS(input){
 
 function logiAgregar(){
   if(!logiPendingFac&&!logiPendingRTO) return;
-  // Si solo hay RTO sin PDF, crear entrada parcial
   let fac = logiPendingFac ? {...logiPendingFac, tc:logiCurrentTC} : {
     numero:'RTO s/factura', fecha:'—', vto:'—', desc:'Pendiente adjuntar PDF',
     subtotalUSD:0, ivaUSD:0, otrosImp:0, totalUSD:0, tc:logiCurrentTC
   };
   if(logiPendingRTO){fac.terminales=logiPendingRTO.terminales;fac.series=logiPendingRTO.series;}
   if(!logiFacturas[logiMesActual]) logiFacturas[logiMesActual]=[];
+  // Validación duplicado
+  const yaExiste = logiFacturas[logiMesActual].find(f => f.numero === fac.numero && fac.numero !== 'RTO s/factura');
+  if(yaExiste){
+    showToast('⚠️ Boludo, ya cargaste la '+fac.numero);
+    return;
+  }
   logiFacturas[logiMesActual].push(fac);
   const msg = logiPendingFac ? '✅ Factura '+fac.numero+' agregada' : '✅ RTO guardado (falta PDF)';
   logiPendingFac=null;
   logiPendingRTO=null;
-  resetLogiForm(); // deja el modal listo para la siguiente
+  resetLogiForm();
   logiRenderKPIs();
   logiRenderFacturas();
   logiRenderSeries();
