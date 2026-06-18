@@ -517,7 +517,9 @@ function logiRenderKPIs() {
     {label:'TOTAL JUN 26', val:facs.length?fmtPct(desvPct):'—', sub:desvPct<=0?'por debajo':'por encima', cls:facs.length?(Math.abs(desvPct)>20?'red':'green'):''},
     {label:'EJECUCIÓN', val:facs.length?ejecPct.toFixed(1)+'%':'—', sub:'del presupuesto', cls:'', prog:ejecPct},
   ];
-  document.getElementById('logiKpis').innerHTML=kpis.map(k=>`
+  const logiKpisEl=document.getElementById('logiKpis');
+  if(!logiKpisEl) return;
+  logiKpisEl.innerHTML=kpis.map(k=>`
     <div class="lk">
       <div class="lk-label">${k.label}</div>
       <div class="lk-val ${k.cls}">${k.val}</div>
@@ -530,6 +532,7 @@ function logiRenderFacturas() {
   const m=logiMesActual;
   const facs=logiGetFacturas(m);
   const el=document.getElementById('logiFacturasWrap');
+  if(!el) return;
   if(!facs.length){ el.innerHTML='<div class="fac-empty">Todavía no cargaste ninguna factura este mes</div>'; return; }
   el.innerHTML=`<div class="fac-wrap"><table class="fac-tbl">
     <thead><tr>
@@ -561,6 +564,7 @@ function logiRenderFacturas() {
 function logiRenderSeries() {
   const all=logiGetFacturas(logiMesActual).flatMap(f=>f.series||[]);
   const sec=document.getElementById('logiSeriesSection');
+  if(!sec) return;
   if(!all.length){sec.style.display='none';return;}
   sec.style.display='';
   document.getElementById('logiSeriesWrap').innerHTML=all.map(s=>`<div class="serie-chip">${s}</div>`).join('');
@@ -570,6 +574,7 @@ function logiRenderAcum() {
   const facs=logiGetFacturas(logiMesActual);
   const el=document.getElementById('logiAcum');
   const badge=document.getElementById('logisFacBadge');
+  if(!el||!badge) return; // modal no está en DOM todavía
   if(!facs.length){el.style.display='none';badge.textContent='';return;}
   el.style.display='flex';
   badge.textContent=facs.length+' factura'+(facs.length!==1?'s':'');
@@ -577,11 +582,16 @@ function logiRenderAcum() {
   const totPesos=facs.reduce((s,f)=>s+f.subtotalUSD*logiCurrentTC,0);
   const totTerm=facs.reduce((s,f)=>s+(f.terminales||0),0);
   const totSeries=facs.reduce((s,f)=>s+(f.series?f.series.length:0),0);
-  document.getElementById('acumFacs').textContent=facs.length;
-  document.getElementById('acumUSD').textContent=fmtUSD(totUSD);
-  document.getElementById('acumPesos').textContent=fmt(totPesos);
-  document.getElementById('acumTerm').textContent=totTerm||'—';
-  document.getElementById('acumSeries').textContent=totSeries||'—';
+  const eAcumFacs=document.getElementById('acumFacs');
+  const eAcumUSD=document.getElementById('acumUSD');
+  const eAcumPesos=document.getElementById('acumPesos');
+  const eAcumTerm=document.getElementById('acumTerm');
+  const eAcumSeries=document.getElementById('acumSeries');
+  if(eAcumFacs) eAcumFacs.textContent=facs.length;
+  if(eAcumUSD) eAcumUSD.textContent=fmtUSD(totUSD);
+  if(eAcumPesos) eAcumPesos.textContent=fmt(totPesos);
+  if(eAcumTerm) eAcumTerm.textContent=totTerm||'—';
+  if(eAcumSeries) eAcumSeries.textContent=totSeries||'—';
 }
 
 function logiShowMsg(id,txt,type){
