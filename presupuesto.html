@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Alleata · Presupuesto Operaciones</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy-900:#0d1b2a; --navy-800:#112236; --navy-700:#162d45;
+    --teal:#1dbf8e; --blue:#1a9fd4;
+    --grad:linear-gradient(135deg,#1dbf8e,#1a9fd4);
+    --surface:var(--navy-800); --surface2:var(--navy-700);
+    --border:rgba(255,255,255,.07); --border2:rgba(255,255,255,.12);
+    --text:#e8edf3; --text-muted:rgba(232,237,243,.45);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--navy-900);color:var(--text);font-family:'Inter',sans-serif;min-height:100vh;padding:24px}
+  h1{font-size:22px;font-weight:800;margin-bottom:4px}
+  .sub{font-size:12px;color:var(--text-muted);margin-bottom:24px}
+
+  /* Mes selector */
+  .mes-bar{display:flex;gap:4px;background:var(--surface2);border-radius:10px;padding:4px;width:fit-content;margin-bottom:20px}
+  .mes-btn{padding:6px 14px;border-radius:7px;font-size:12px;font-weight:600;border:none;cursor:pointer;transition:all .15s;background:transparent;color:var(--text-muted);font-family:'Inter',sans-serif}
+  .mes-btn.active{background:var(--teal);color:#fff}
+
+  /* Filtro */
+  .toolbar{display:flex;align-items:center;gap:10px;margin-bottom:20px;flex-wrap:wrap}
+  select{background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:7px 12px;border-radius:8px;font-size:12px;font-weight:600;font-family:'Inter',sans-serif}
+
+  /* Cards */
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:24px}
+  .card{background:var(--surface);border:1px solid var(--border2);border-radius:12px;padding:16px 20px}
+  .card-label{font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px;font-weight:700}
+  .card-value{font-size:20px;font-weight:800;font-family:'JetBrains Mono',monospace}
+  .card-sub{font-size:11px;color:var(--text-muted);margin-top:4px}
+  .card-desv{font-size:11px;margin-top:2px;font-weight:600}
+  .bar-wrap{display:flex;align-items:center;gap:8px;margin-top:6px}
+  .bar-track{flex:1;height:4px;background:rgba(255,255,255,.08);border-radius:2px;overflow:hidden}
+  .bar-fill{height:100%;border-radius:2px;transition:width .3s}
+  .bar-pct{font-size:10px;font-weight:700}
+
+  /* Tabla */
+  .tabla-wrap{background:var(--surface);border:1px solid var(--border2);border-radius:12px;overflow:hidden}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  thead tr{background:var(--surface2);border-bottom:1px solid var(--border2)}
+  th{padding:11px 14px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);font-weight:700;white-space:nowrap}
+  th.num{text-align:right}
+  tbody tr{border-bottom:1px solid rgba(255,255,255,.04);transition:background .1s}
+  tbody tr:hover{background:rgba(255,255,255,.02)}
+  td{padding:11px 14px;vertical-align:middle}
+  td.mono{font-family:'JetBrains Mono',monospace;text-align:right;font-size:12px}
+  tfoot tr{background:var(--surface2);border-top:2px solid var(--border2)}
+  tfoot td{padding:12px 14px;font-weight:700}
+
+  .badge{padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;white-space:nowrap}
+  .btn-edit{background:var(--surface2);border:1px solid var(--border2);color:var(--text-muted);padding:4px 10px;border-radius:6px;cursor:pointer;font-size:11px}
+  .btn-edit:hover{border-color:var(--teal);color:var(--teal)}
+
+  /* Modal */
+  .modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:999;align-items:center;justify-content:center}
+  .modal-bg.open{display:flex}
+  .modal{background:var(--navy-800);border:1px solid var(--border2);border-radius:16px;padding:28px;min-width:320px;max-width:400px}
+  .modal h3{font-size:16px;margin-bottom:4px}
+  .modal p{font-size:12px;color:var(--text-muted);margin-bottom:20px}
+  .modal label{font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:6px}
+  .modal input{width:100%;padding:10px 14px;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:16px;font-family:'JetBrains Mono',monospace;margin-bottom:20px}
+  .modal-btns{display:flex;gap:10px;justify-content:flex-end}
+  .btn-cancel{padding:8px 18px;background:var(--surface2);border:1px solid var(--border2);color:var(--text);border-radius:8px;cursor:pointer;font-size:13px;font-family:'Inter',sans-serif}
+  .btn-save{padding:8px 18px;background:var(--grad);border:none;color:#fff;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;font-family:'Inter',sans-serif}
+
+  .empty{text-align:center;padding:32px;color:var(--text-muted);font-size:13px}
+  .toast{position:fixed;bottom:24px;right:24px;background:#1dbf8e;color:#fff;padding:10px 18px;border-radius:10px;font-size:13px;font-weight:600;opacity:0;transition:opacity .3s;pointer-events:none;z-index:9999}
+  .toast.show{opacity:1}
+</style>
+</head>
+<body>
+
+<h1>💰 Presupuesto Operaciones</h1>
+<p class="sub">Alleata · 2026 · Solo Admin</p>
+
+<div class="toolbar">
+  <div class="mes-bar" id="mesBar"></div>
+  <select id="filtroRubro" onchange="render()">
+    <option value="">Todos los rubros</option>
+    <option value="LOGISTICA">🚚 Logística</option>
+    <option value="TECNOLOGIA">💻 Tecnología</option>
+    <option value="INSUMOS">📦 Insumos</option>
+    <option value="SISTEMAS">⚙️ Sistemas</option>
+  </select>
+</div>
+
+<div class="cards" id="cards"></div>
+
+<div class="tabla-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Proveedor</th>
+        <th>Detalle</th>
+        <th>Rubro</th>
+        <th class="num">Previsto</th>
+        <th class="num">Real</th>
+        <th class="num">Desvío</th>
+        <th class="num">%</th>
+        <th class="num">✏️</th>
+      </tr>
+    </thead>
+    <tbody id="tbody"></tbody>
+    <tfoot id="tfoot"></tfoot>
+  </table>
+</div>
+
+<!-- Modal -->
+<div class="modal-bg" id="modalBg">
+  <div class="modal">
+    <h3 id="mTitle"></h3>
+    <p id="mSub"></p>
+    <label>Monto real ($)</label>
+    <input type="number" id="mInput" step="1000">
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeModal()">Cancelar</button>
+      <button class="btn-save" onclick="guardar()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const MESES = ['mar','abr','may','jun','jul','ago'];
+const MESES_LABEL = {mar:'Marzo',abr:'Abril',may:'Mayo',jun:'Junio',jul:'Julio',ago:'Agosto'};
+const RUBRO_STYLE = {
+  LOGISTICA:  {bg:'rgba(26,159,212,.12)',  color:'#1a9fd4', label:'🚚 Logística'},
+  TECNOLOGIA: {bg:'rgba(139,92,246,.12)',  color:'#8b5cf6', label:'💻 Tecnología'},
+  INSUMOS:    {bg:'rgba(245,158,11,.12)',  color:'#f59e0b', label:'📦 Insumos'},
+  SISTEMAS:   {bg:'rgba(29,191,142,.12)',  color:'#1dbf8e', label:'⚙️ Sistemas'},
+};
+
+const DATA = [
+  // LOGÍSTICA
+  {id:'epsa',      r:'LOGISTICA',  p:'EPSA',                      d:'Servicios de mensajería',    prev:{ene:3750000,feb:2500000,mar:0,abr:0,may:0,jun:2000000,jul:2000000,ago:2000000}, real:{ene:2068235,feb:3296134,mar:0,abr:0,may:0,jun:836863,jul:0,ago:0}},
+  {id:'ca',        r:'LOGISTICA',  p:'Correo Argentino',           d:'Servicios de mensajería',    prev:{ene:0,feb:0,mar:0,abr:0,may:0,jun:2500000,jul:2500000,ago:2500000},             real:{ene:1280994,feb:1314066,mar:0,abr:0,may:0,jun:0,jul:0,ago:0}},
+  {id:'cabify',    r:'LOGISTICA',  p:'Cabify (CALOG SA)',           d:'Servicio de logística',      prev:{ene:1275000,feb:1275000,mar:0,abr:0,may:0,jun:400000,jul:400000,ago:400000},   real:{ene:229140,feb:248630,mar:0,abr:0,may:0,jun:0,jul:0,ago:0}},
+  {id:'enviamelo', r:'LOGISTICA',  p:'SPP — Enviamelo',             d:'Servicio de logística',      prev:{ene:900000,feb:900000,mar:0,abr:0,may:0,jun:900000,jul:900000,ago:900000},     real:{ene:900000,feb:900000,mar:0,abr:0,may:0,jun:0,jul:0,ago:0}},
+  {id:'andreani',  r:'LOGISTICA',  p:'Correo Andreani',             d:'Servicios de mensajería',    prev:{ene:0,feb:0,mar:0,abr:0,may:0,jun:150000,jul:150000,ago:150000},               real:{ene:0,feb:0,mar:0,abr:0,may:0,jun:0,jul:0,ago:0}},
+  // TECNOLOGÍA
+  {id:'napse',     r:'TECNOLOGIA', p:'Napse SRL',                   d:'Gateway de pagos',           prev:{ene:1600000,feb:4300000,mar:0,abr:0,may:0,jun:1550000,jul:9400000,ago:9400000}, real:{ene:1592743,feb:1543652,mar:0,abr:0,may:0,jun:0,jul:0,ago:0}},
+  {id:'amazon',    r:'TECNOLOGIA', p:'Amazon',                      d:'Infraestructura cloud',      prev:{ene:12000000,feb:12000000,mar:0,abr:0,may:0,jun:10000000,jul:10000000,ago:10000000}, real:{ene:9233510,feb:8329075,mar:0,abr:0,may:0,jun:0,jul:0,ago:0}},
+  {id:'ecobyte',   r:'TECNOLOGIA', p:'Ecobyte SRL',                 d:'Honorarios desarrollo',      prev:{ene:55200000,feb:57000000,mar:0,abr:0,may:0,jun:57000000,jul:57000000,ago:57000000}, real:{ene:54955296,feb:53480625,mar:0,abr:0,may:0,jun:0,jul:0,ago:0}},
+  {id:'logicalis', r:'TECNOLOGIA', p:'Logicalis Argentina SA',      d:'Honorarios software',        prev:{ene:0,feb:0,mar:0,abr:0,may:0,jun:26000000,jul:26000000,ago:26000000},          real:{ene:0,feb:5549660,mar:0,abr:0,may:0,jun:8630792,jul:0,ago:0}},
+  {id:'oriontech', r:'TECNOLOGIA', p:'Oriontech SA',                d:'Honorarios Alleata',         prev:{ene:0,feb:2500000,mar:0,abr:0,may:0,jun:4313650,jul:1450000,ago:1450000},       real:{ene:0,feb:0,mar:0,abr:0,may:0,jun:0,jul:0,ago:0}},
+  {id:'claro',     r:'TECNOLOGIA', p:'Claro (AMX Argentina)',       d:'Chips Alleata',              prev:{ene:8003466,feb:8000000,mar:0,abr:0,may:0,jun:9000000,jul:9000000,ago:9000000}, real:{ene:8003466,feb:8249570,mar:0,abr:0,may:0,jun:8473154,jul:0,ago:0}},
+  {id:'telecom',   r:'TECNOLOGIA', p:'Telecom Personal',            d:'Servicios telefonía',        prev:{ene:2500000,feb:2500000,mar:0,abr:0,may:0,jun:5600000,jul:5800000,ago:6000000}, real:{ene:2402982,feb:4950095,mar:0,abr:0,may:0,jun:0,jul:0,ago:0}},
+  // INSUMOS
+  {id:'bolsas',    r:'INSUMOS',    p:'Casco Flavia (Bolsas Rojas)', d:'Bolsas pluribol',            prev:{ene:0,feb:0,mar:0,abr:0,may:0,jun:200000,jul:0,ago:200000},                    real:{ene:0,feb:0,mar:0,abr:0,may:0,jun:0,jul:0,ago:0}},
+  {id:'limpieza',  r:'INSUMOS',    p:'CLP SRL (Casa Thames)',       d:'Insumos de limpieza',        prev:{ene:0,feb:0,mar:0,abr:0,may:0,jun:50000,jul:0,ago:50000},                      real:{ene:0,feb:0,mar:0,abr:0,may:0,jun:0,jul:0,ago:0}},
+  // SISTEMAS
+  {id:'botmaker',  r:'SISTEMAS',   p:'Botmaker',                    d:'Chatbot',                    prev:{ene:0,feb:300000,mar:0,abr:0,may:0,jun:213000,jul:355000,ago:355000},            real:{ene:217569,feb:214560,mar:0,abr:0,may:0,jun:0,jul:0,ago:0}},
+  {id:'phoneiq',   r:'SISTEMAS',   p:'Phone IQ',                    d:'Central telefónica virtual', prev:{ene:0,feb:1254000,mar:0,abr:0,may:0,jun:940000,jul:940000,ago:940000},           real:{ene:0,feb:0,mar:0,abr:0,may:0,jun:0,jul:0,ago:0}},
+  {id:'ifx',       r:'SISTEMAS',   p:'IFX Networks',                d:'Licencia Office 365',        prev:{ene:0,feb:0,mar:0,abr:0,may:0,jun:250000,jul:250000,ago:250000},                real:{ene:229311,feb:218051,mar:0,abr:0,may:0,jun:212841,jul:0,ago:0}},
+];
+
+// Estado local — en prod vendrá de Supabase
+let mes = 'jun';
+let reales = {}; // key: `${id}_${mes}` → monto
+let editando = null;
+
+// Precargar reales históricos de la planilla
+DATA.forEach(it => {
+  Object.entries(it.real).forEach(([m, v]) => {
+    if (v) reales[`${it.id}_${m}`] = v;
+  });
+});
+
+function getReal(id, m) {
+  return reales[`${id}_${m}`] ?? 0;
+}
+
+function fmt(n) {
+  if (!n && n !== 0) return '—';
+  if (n === 0) return '—';
+  return '$' + Math.round(n).toLocaleString('es-AR');
+}
+
+function fmtDesv(n, prev) {
+  if (!prev && !n) return '—';
+  return (n >= 0 ? '+' : '') + '$' + Math.round(n).toLocaleString('es-AR');
+}
+
+function dColor(desv) {
+  return desv > 0 ? '#f87171' : desv < 0 ? '#1dbf8e' : 'rgba(232,237,243,.45)';
+}
+
+// ── Mes buttons ──────────────────────────────────────────────────────────────
+function initMesBar() {
+  const bar = document.getElementById('mesBar');
+  bar.innerHTML = MESES.map(m => `
+    <button class="mes-btn${m===mes?' active':''}" id="mbtn-${m}" onclick="setMes('${m}')">${m.toUpperCase()}</button>
+  `).join('');
+}
+
+function setMes(m) {
+  mes = m;
+  document.querySelectorAll('.mes-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(`mbtn-${m}`)?.classList.add('active');
+  render();
+}
+
+// ── Render principal ─────────────────────────────────────────────────────────
+function render() {
+  const filtro = document.getElementById('filtroRubro').value;
+  const items  = DATA.filter(i => !filtro || i.r === filtro);
+  renderCards();
+  renderTabla(items);
+}
+
+function renderCards() {
+  const rubros = ['LOGISTICA','TECNOLOGIA','INSUMOS','SISTEMAS'];
+  const tot = { prev:0, real:0 };
+
+  let html = '';
+  rubros.forEach(rub => {
+    const rs   = RUBRO_STYLE[rub];
+    const its  = DATA.filter(i => i.r === rub);
+    const prev = its.reduce((s,i) => s + (i.prev[mes]||0), 0);
+    const real = its.reduce((s,i) => s + getReal(i.id, mes), 0);
+    const desv = real - prev;
+    const pct  = prev > 0 ? Math.round(real/prev*100) : (real > 0 ? 100 : 0);
+    tot.prev += prev; tot.real += real;
+
+    html += `
+      <div class="card" style="background:${rs.bg};border-color:${rs.color}33">
+        <div class="card-label" style="color:${rs.color}">${rs.label}</div>
+        <div class="card-value" style="color:var(--text)">${fmt(prev)||'—'}</div>
+        <div class="card-sub">Real: <span style="color:${dColor(desv)};font-weight:600">${fmt(real)||'—'}</span></div>
+        <div class="bar-wrap">
+          <div class="bar-track"><div class="bar-fill" style="width:${Math.min(pct,100)}%;background:${dColor(desv)}"></div></div>
+          <span class="bar-pct" style="color:${dColor(desv)}">${pct}%</span>
+        </div>
+      </div>`;
+  });
+
+  // Card total
+  const totDesv = tot.real - tot.prev;
+  const totPct  = tot.prev > 0 ? Math.round(tot.real/tot.prev*100) : 0;
+  html = `
+    <div class="card">
+      <div class="card-label">📊 Total ${MESES_LABEL[mes]}</div>
+      <div class="card-value">${fmt(tot.prev)}</div>
+      <div class="card-sub">Real: <span style="color:${dColor(totDesv)};font-weight:600">${fmt(tot.real)||'—'}</span></div>
+      <div class="card-desv" style="color:${dColor(totDesv)}">${fmtDesv(totDesv, tot.prev)}</div>
+    </div>` + html;
+
+  document.getElementById('cards').innerHTML = html;
+}
+
+function renderTabla(items) {
+  const tbody = document.getElementById('tbody');
+  const tfoot = document.getElementById('tfoot');
+  let rows = '';
+  let totPrev = 0, totReal = 0;
+
+  const rubroOrder = ['LOGISTICA','TECNOLOGIA','INSUMOS','SISTEMAS'];
+  rubroOrder.forEach(rub => {
+    const its = items.filter(i => i.r === rub);
+    if (!its.length) return;
+    const rs = RUBRO_STYLE[rub];
+
+    its.forEach(it => {
+      const prev = it.prev[mes] || 0;
+      const real = getReal(it.id, mes);
+      const desv = real - prev;
+      const pct  = prev > 0 ? Math.round(real/prev*100) : (real > 0 ? 999 : null);
+      totPrev += prev; totReal += real;
+
+      const dc = dColor(desv);
+      const pctBadge = pct !== null
+        ? `<span class="badge" style="background:${dc}22;color:${dc}">${pct === 999 ? '∞' : pct}%</span>`
+        : '<span style="color:var(--text-muted);font-size:11px">—</span>';
+
+      rows += `
+        <tr>
+          <td style="font-weight:600">${it.p}</td>
+          <td style="color:var(--text-muted);font-size:12px">${it.d}</td>
+          <td><span class="badge" style="background:${rs.bg};color:${rs.color}">${rs.label}</span></td>
+          <td class="mono" style="color:var(--text-muted)">${prev ? fmt(prev) : '—'}</td>
+          <td class="mono" style="color:${real ? 'var(--text)' : 'var(--text-muted)'}; font-weight:${real?'600':'400'}">${real ? fmt(real) : '—'}</td>
+          <td class="mono" style="color:${dc}">${(prev||real) ? fmtDesv(desv,prev) : '—'}</td>
+          <td style="text-align:center">${pctBadge}</td>
+          <td style="text-align:center"><button class="btn-edit" onclick="openModal('${it.id}','${it.p}','${it.d}')">✏️</button></td>
+        </tr>`;
+    });
+  });
+
+  tbody.innerHTML = rows || `<tr><td colspan="8" class="empty">Sin ítems</td></tr>`;
+
+  const totDesv = totReal - totPrev;
+  const dc = dColor(totDesv);
+  tfoot.innerHTML = `
+    <tr>
+      <td colspan="3" style="font-size:12px;text-transform:uppercase;letter-spacing:.5px">Total ${MESES_LABEL[mes]}</td>
+      <td class="mono">${fmt(totPrev)}</td>
+      <td class="mono" style="color:${dc}">${fmt(totReal)||'—'}</td>
+      <td class="mono" style="color:${dc}">${fmtDesv(totDesv,totPrev)}</td>
+      <td colspan="2"></td>
+    </tr>`;
+}
+
+// ── Modal ────────────────────────────────────────────────────────────────────
+function openModal(id, proveedor, detalle) {
+  editando = { id, mes };
+  document.getElementById('mTitle').textContent = proveedor;
+  document.getElementById('mSub').textContent   = `${MESES_LABEL[mes]} 2026 · ${detalle}`;
+  document.getElementById('mInput').value       = getReal(id, mes) || '';
+  document.getElementById('modalBg').classList.add('open');
+  setTimeout(() => document.getElementById('mInput').focus(), 50);
+}
+
+function closeModal() {
+  document.getElementById('modalBg').classList.remove('open');
+  editando = null;
+}
+
+function guardar() {
+  if (!editando) return;
+  const monto = parseFloat(document.getElementById('mInput').value) || 0;
+  reales[`${editando.id}_${editando.mes}`] = monto;
+  // TODO: persistir en Supabase cuando se integre al portal
+  closeModal();
+  render();
+  showToast('✅ Real guardado');
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeModal();
+});
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+initMesBar();
+render();
+</script>
+</body>
+</html>
