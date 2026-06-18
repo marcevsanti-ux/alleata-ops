@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Alleata · Presupuesto Operaciones v1.2.5</title>
+<title>Alleata · Presupuesto Operaciones v1.2.7</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -154,7 +154,7 @@
 <body>
 
 <h1>💰 Presupuesto Operaciones</h1>
-<p class="sub">Alleata · 2026 · Solo Admin <span style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 8px;border-radius:4px;border:1px solid var(--border2);font-size:10px;margin-left:6px">v1.2.5</span></p>
+<p class="sub">Alleata · 2026 · Solo Admin <span style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 8px;border-radius:4px;border:1px solid var(--border2);font-size:10px;margin-left:6px">v1.2.7</span></p>
 
 <div class="toolbar">
   <div class="mes-bar" id="mesBar"></div>
@@ -326,7 +326,7 @@ function logiGetFacturas(m) {
   return logiFacturas[m] || [];
 }
 function logiRealPesos(m) {
-  return logiGetFacturas(m).reduce((s,f) => s + f.subtotalUSD * logiCurrentTC, 0);
+  return logiGetFacturas(m).reduce((s,f) => s + f.totalUSD * logiCurrentTC, 0);
 }
 function logiSyncReal() {
   // Actualiza reales[] para que el portal principal se entere
@@ -518,7 +518,7 @@ function logiRenderKPIs() {
   const m=logiMesActual;
   const prev=DATA.find(i=>i.id==='logicalis').prev[m]||0;
   const facs=logiGetFacturas(m);
-  const real=facs.reduce((s,f)=>s+f.subtotalUSD*logiCurrentTC,0);
+  const real=facs.reduce((s,f)=>s+f.totalUSD*logiCurrentTC,0);
   const desv=real-prev;
   const desvPct=prev>0?((real-prev)/prev)*100:0;
   const ejecPct=prev>0?Math.min(200,(real/prev)*100):0;
@@ -549,9 +549,11 @@ function logiRenderFacturas() {
   el.innerHTML=`<div class="fac-wrap"><table class="fac-tbl">
     <thead><tr>
       <th>N° factura</th><th>Fecha</th><th>Vto.</th><th>Descripción</th>
-      <th style="text-align:right">T.C.</th><th style="text-align:right">Subtotal USD</th>
+      <th style="text-align:right">T.C. $/USD</th>
+      <th style="text-align:right">Neto USD</th>
+      <th style="text-align:right;color:var(--teal);font-size:10px">▶ REAL EN $ (Total×TC)</th>
       <th style="text-align:right">IVA USD</th><th style="text-align:right">Otros imp.</th>
-      <th style="text-align:right">Total USD</th><th style="text-align:right;color:var(--teal)">Subtotal $</th>
+      <th style="text-align:right">Total USD</th>
       <th style="text-align:center">Term.</th><th style="text-align:center">Series</th>
     </tr></thead>
     <tbody>${facs.map(f=>{
@@ -561,11 +563,11 @@ function logiRenderFacturas() {
         <td>${f.fecha}</td><td>${f.vto}</td>
         <td>${f.desc}</td>
         <td class="nr">${f.tc.toLocaleString('es-AR')}</td>
-        <td class="nr">${fmtUSD(f.subtotalUSD)}</td>
-        <td class="nr">${fmtUSD(f.ivaUSD)}</td>
-        <td class="nr">${fmtUSD(f.otrosImp)}</td>
-        <td class="nr">${fmtUSD(f.totalUSD)}</td>
-        <td class="nr hi">${fmt(sub$)}</td>
+        <td class="nr" style="color:var(--text-muted)">${fmtUSD(f.subtotalUSD)}</td>
+        <td class="nr" style="background:rgba(29,191,142,.07);font-weight:800;font-size:13px;color:var(--teal)">$ ${Math.round(f.totalUSD*logiCurrentTC).toLocaleString('es-AR')}</td>
+        <td class="nr" style="color:var(--text-muted)">${fmtUSD(f.ivaUSD)}</td>
+        <td class="nr" style="color:var(--text-muted)">${fmtUSD(f.otrosImp)}</td>
+        <td class="nr" style="color:var(--text-muted)">${fmtUSD(f.totalUSD)}</td>
         <td style="text-align:center;font-weight:700">${f.terminales||'—'}</td>
         <td style="text-align:center"><span class="tag-ok">${f.series?f.series.length:0}</span></td>
       </tr>`;
@@ -591,7 +593,7 @@ function logiRenderAcum() {
   el.style.display='flex';
   badge.textContent=facs.length+' factura'+(facs.length!==1?'s':'');
   const totUSD=facs.reduce((s,f)=>s+f.subtotalUSD,0);
-  const totPesos=facs.reduce((s,f)=>s+f.subtotalUSD*logiCurrentTC,0);
+  const totPesos=facs.reduce((s,f)=>s+f.totalUSD*logiCurrentTC,0);
   const totTerm=facs.reduce((s,f)=>s+(f.terminales||0),0);
   const totSeries=facs.reduce((s,f)=>s+(f.series?f.series.length:0),0);
   const eAcumFacs=document.getElementById('acumFacs');
@@ -650,7 +652,7 @@ async function logiHandlePDF(input){
       ['Descripción', fac.desc.substring(0,45)+'…'],
       ['T.C. (de factura)', fac.tc.toLocaleString('es-AR')],
       ['Subtotal USD', fmtUSD(fac.subtotalUSD)],
-      ['Subtotal $', fmt(fac.subtotalUSD * fac.tc)],
+      ['Total $ (a pagar)', fmt(fac.totalUSD * fac.tc)],
       ['IVA USD', fmtUSD(fac.ivaUSD)],
       ['Total USD', fmtUSD(fac.totalUSD)],
     ]);
