@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Alleata · Presupuesto Operaciones v1.2.7</title>
+<title>Alleata · Presupuesto Operaciones v1.2.8</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -154,7 +154,7 @@
 <body>
 
 <h1>💰 Presupuesto Operaciones</h1>
-<p class="sub">Alleata · 2026 · Solo Admin <span style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 8px;border-radius:4px;border:1px solid var(--border2);font-size:10px;margin-left:6px">v1.2.7</span></p>
+<p class="sub">Alleata · 2026 · Solo Admin <span style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 8px;border-radius:4px;border:1px solid var(--border2);font-size:10px;margin-left:6px">v1.2.8</span></p>
 
 <div class="toolbar">
   <div class="mes-bar" id="mesBar"></div>
@@ -679,7 +679,10 @@ function logiParsePDF(text){
     const subtotalUSD=logiParseNum((text.match(/Subtotal\s*[:\s]*USD\s*([\d.,]+)/i)||[])[1]);
     const ivaUSD=logiParseNum((text.match(/Total IVA\s*[:\s]*USD\s*([\d.,]+)/i)||[])[1]);
     const otrosImp=logiParseNum((text.match(/Otros Impuestos\s*[:\s]*USD\s*([\d.,]+)/i)||[])[1]);
-    const totalUSD=logiParseNum((text.match(/Total\s*[:\s]*USD\s*([\d.,]+)/i)||[])[1]);
+    // Total: debe matchear el total final, no el subtotal — buscar el último "Total" que no sea "Subtotal" ni "Total IVA"
+    const totalMatch = text.match(/(?:^|[\s▌])Total\s*[:\s]*USD\s*([\d.,]+)/im) ||
+                       text.match(/\bTotal[^I][^V][^A][^\w]*USD\s*([\d.,]+)/i);
+    const totalUSD = totalMatch ? logiParseNum(totalMatch[1]) : subtotalUSD + ivaUSD + otrosImp;
     const tcM=text.match(/T\.C[:\s.]*([\d.,]+)/i);
     const tc=tcM?logiParseNum(tcM[1]):logiCurrentTC;
     return{numero,fecha,vto,desc,subtotalUSD,ivaUSD,otrosImp,totalUSD,tc:tc||logiCurrentTC};
