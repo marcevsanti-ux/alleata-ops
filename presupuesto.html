@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Alleata · Presupuesto Operaciones v1.4.0</title>
+<title>Alleata · Presupuesto Operaciones v1.4.1</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -190,7 +190,7 @@
   <div class="login-box">
     <h2>💰 Presupuesto</h2>
     <p class="login-sub">Alleata · Solo Admin</p>
-    <div style="position:absolute;bottom:12px;right:16px;font-size:10px;font-family:'JetBrains Mono',monospace;color:rgba(232,237,243,.2)">v1.4.0</div>
+    <div style="position:absolute;bottom:12px;right:16px;font-size:10px;font-family:'JetBrains Mono',monospace;color:rgba(232,237,243,.2)">v1.4.1</div>
     <div class="login-field">
       <label>Email</label>
       <input type="email" id="loginEmail" placeholder="tu@email.com" onkeydown="if(event.key==='Enter')doLogin()">
@@ -206,7 +206,7 @@
 
 <div id="appContent" style="display:none">
 <h1>💰 Presupuesto Operaciones</h1>
-<p class="sub">Alleata · 2026 · Solo Admin <span style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 8px;border-radius:4px;border:1px solid var(--border2);font-size:10px;margin-left:6px">v1.4.0</span></p>
+<p class="sub">Alleata · 2026 · Solo Admin <span style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 8px;border-radius:4px;border:1px solid var(--border2);font-size:10px;margin-left:6px">v1.4.1</span></p>
 
 <div class="toolbar">
   <div class="mes-bar" id="mesBar"></div>
@@ -1038,7 +1038,7 @@ async function claroHandleXLS(input) {
       document.getElementById('claroDetail').style.display='block';
     }
 
-    claroShowMsg('claroMsgXls','✓ Planilla leída · SUBTOTAL Alleata: '+fmt(subtotalAlleata),'ok');
+    claroShowMsg('claroMsgXls','✓ Planilla leída · '+MESES_LABEL[m]+' → SUBTOTAL Alleata: '+fmt(subtotalAlleata),'ok');
     claroCheckBtn();
   } catch(e){ claroShowMsg('claroMsgXls','Error: '+e.message,'err'); }
 }
@@ -1068,15 +1068,30 @@ async function claroHandlePDF(input) {
     const totalMatch=text.match(/Total a Pagar\s*[:\$]?\s*([\d\.,]+)/i)||text.match(/TOTAL A PAGAR\s*\$([\d\.,]+)/i);
     const totalFac=totalMatch?logiParseNum(totalMatch[1]):0;
 
-    claroPendingPDF={ nroFac, fecha, periodo, totalFac };
+    // Detectar mes de la fecha de factura
+    const MES_MAP = {'01':'ene','02':'feb','03':'mar','04':'abr','05':'may','06':'jun','07':'jul','08':'ago','09':'sep','10':'oct','11':'nov','12':'dic'};
+    let mesFac = claroMesActual;
+    if(fecha && fecha !== '—'){
+      const partes = fecha.split('/'); // dd/mm/yyyy
+      if(partes.length>=2) mesFac = MES_MAP[partes[1]] || claroMesActual;
+    }
+    // Si el mes detectado difiere del seleccionado, actualizar
+    if(mesFac !== claroMesActual){
+      claroMesActual = mesFac;
+      document.getElementById('claroSub').textContent = MESES_LABEL[mesFac]+' 2026 · Chips Alleata · (mes detectado del PDF)';
+    }
+
+    claroPendingPDF={ nroFac, fecha, periodo, totalFac, mesFac };
     document.getElementById('claroZonePdf').classList.add('loaded');
     claroShowPreview('claroPrevPdf',[
       ['N° Factura', nroFac],
       ['Fecha', fecha],
+      ['Mes imputado', MESES_LABEL[mesFac]+' 2026'],
       ['Período', periodo],
-      ['Total a Pagar', fmt(totalFac)||totalFac],
+      ['Total a Pagar', fmt(totalFac)],
     ]);
-    claroShowMsg('claroMsgPdf','✓ Factura leída correctamente','ok');
+    claroShowMsg('claroMsgPdf','✓ Factura leída · imputada en '+MESES_LABEL[mesFac],'ok');
+    claroRenderKPIs();
     claroCheckBtn();
   } catch(e){ claroShowMsg('claroMsgPdf','Error: '+e.message,'err'); }
 }
@@ -1105,7 +1120,8 @@ function claroCheckBtn(){
 
 async function claroGuardar(){
   if(!claroPendingXLS) return;
-  const m=claroMesActual;
+  // Usar mes del PDF si está disponible, sino el seleccionado
+  const m = claroPendingPDF?.mesFac || claroMesActual;
   claroData[m]={
     subtotalAlleata: claroPendingXLS.subtotalAlleata,
     totalFactura:    claroPendingXLS.totalFactura,
@@ -1115,7 +1131,6 @@ async function claroGuardar(){
     periodo:         claroPendingPDF?.periodo||'—',
     totalFacPDF:     claroPendingPDF?.totalFac||0,
   };
-  // Actualizar reales[]
   reales['claro_'+m]=claroPendingXLS.subtotalAlleata;
   // Guardar en Supabase si hay sesión
   if(currentUser) await claraSaveDB(m);
