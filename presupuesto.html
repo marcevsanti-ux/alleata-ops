@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Alleata · Presupuesto Operaciones v1.3.4</title>
+<title>Alleata · Presupuesto Operaciones v1.4.0</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -142,6 +142,19 @@
   .series-wrap{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:4px;max-height:160px;overflow-y:auto;margin-top:10px}
   .serie-chip{font-size:10px;font-family:'JetBrains Mono',monospace;background:var(--navy-900);border:1px solid var(--border2);border-radius:5px;padding:3px 8px;color:var(--text-muted)}
 
+  /* ── Modal Claro ── */
+  .claro-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:999;align-items:flex-start;justify-content:center;padding:24px;overflow-y:auto}
+  .claro-bg.open{display:flex}
+  .claro-modal{background:var(--navy-800);border:1px solid var(--border2);border-radius:18px;padding:28px;width:100%;max-width:720px;margin:auto}
+  .claro-modal h3{font-size:17px;font-weight:800;margin-bottom:2px}
+  .claro-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:22px}
+  .claro-detail{background:var(--navy-900);border:1px solid var(--border2);border-radius:10px;padding:12px 16px;margin-bottom:14px;display:none}
+  .claro-detail-row{display:flex;justify-content:space-between;font-size:12px;padding:4px 0;border-bottom:1px solid var(--border)}
+  .claro-detail-row:last-child{border-bottom:none}
+  .claro-detail-row .dk{color:var(--text-muted)}
+  .claro-detail-row .dv{font-weight:600;font-family:'JetBrains Mono',monospace;font-size:11px}
+  .claro-detail-row .dv.hi{color:var(--teal)}
+
   .sec-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin:18px 0 10px;display:flex;align-items:center;gap:8px}
   .sec-lbl span{flex:1;height:1px;background:var(--border2)}
 
@@ -177,7 +190,7 @@
   <div class="login-box">
     <h2>💰 Presupuesto</h2>
     <p class="login-sub">Alleata · Solo Admin</p>
-    <div style="position:absolute;bottom:12px;right:16px;font-size:10px;font-family:'JetBrains Mono',monospace;color:rgba(232,237,243,.2)">v1.3.4</div>
+    <div style="position:absolute;bottom:12px;right:16px;font-size:10px;font-family:'JetBrains Mono',monospace;color:rgba(232,237,243,.2)">v1.4.0</div>
     <div class="login-field">
       <label>Email</label>
       <input type="email" id="loginEmail" placeholder="tu@email.com" onkeydown="if(event.key==='Enter')doLogin()">
@@ -193,7 +206,7 @@
 
 <div id="appContent" style="display:none">
 <h1>💰 Presupuesto Operaciones</h1>
-<p class="sub">Alleata · 2026 · Solo Admin <span style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 8px;border-radius:4px;border:1px solid var(--border2);font-size:10px;margin-left:6px">v1.3.4</span></p>
+<p class="sub">Alleata · 2026 · Solo Admin <span style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 8px;border-radius:4px;border:1px solid var(--border2);font-size:10px;margin-left:6px">v1.4.0</span></p>
 
 <div class="toolbar">
   <div class="mes-bar" id="mesBar"></div>
@@ -463,6 +476,7 @@ function renderTabla(items) {
         ?`<span class="badge" style="background:${dc}22;color:${dc}">${pct===999?'∞':pct}%</span>`
         :'<span style="color:var(--text-muted);font-size:11px">—</span>';
       const isLogi=it.id==='logicalis';
+      const isClaro=it.id==='claro';
       // Nro facturas para columna
       const logiFacs = isLogi ? logiGetFacturas(mes) : [];
       const nroFacCell = isLogi
@@ -487,7 +501,7 @@ function renderTabla(items) {
           <td class="mono" style="color:${dc}">${(prev||real)?fmtDesv(desv,prev):'—'}</td>
           <td style="text-align:center">${pctBadge}</td>
           <td style="text-align:center">
-            <button class="btn-edit${isLogi?' logi':''}" onclick="${isLogi?`openLogiModal('${mes}')`:`openModal('${it.id}','${it.p}','${it.d}')`}">${isLogi?'📎':'✏️'}</button>
+            <button class="btn-edit${(isLogi||isClaro)?' logi':''}" onclick="${isLogi?`openLogiModal('${mes}')`:isClaro?`openClaroModal('${mes}')`:`openModal('${it.id}','${it.p}','${it.d}')`}">${(isLogi||isClaro)?'📎':'✏️'}</button>
           </td>
         </tr>`;
     });
@@ -904,6 +918,228 @@ document.addEventListener('keydown',e=>{
 initMesBar();
 render();
 
+// ── Claro state ──────────────────────────────────────────────────────────────
+const claroData   = {}; // claroData[mes] = {subtotalAlleata, totalFactura, detalle, nroFac, fecha, periodo, fileName}
+let claroPendingXLS = null;
+let claroPendingPDF = null;
+let claroMesActual  = 'jun';
+
+function openClaroModal(m) {
+  claroMesActual = m;
+  document.getElementById('claroSub').textContent = MESES_LABEL[m]+' 2026 · Chips Alleata';
+  claroPendingXLS = null;
+  claroPendingPDF = null;
+  resetClaroForm();
+  claroRenderKPIs();
+  document.getElementById('claroBg').classList.add('open');
+}
+function closeClaroModal() {
+  document.getElementById('claroBg').classList.remove('open');
+  render();
+}
+function resetClaroForm() {
+  ['claroPrevPdf','claroPrevXls'].forEach(id=>{const e=document.getElementById(id);if(e){e.style.display='none';e.innerHTML='';}});
+  ['claroMsgPdf','claroMsgXls'].forEach(id=>{const e=document.getElementById(id);if(e){e.className='up-msg';e.textContent='';}});
+  ['claroPdfInp','claroXlsInp'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['claroZonePdf','claroZoneXls'].forEach(id=>{document.getElementById(id)?.classList.remove('loaded');});
+  ['claroPdfName','claroXlsName'].forEach(id=>{const e=document.getElementById(id);if(e){e.style.display='none';e.textContent='';}});
+  document.getElementById('claroBtnConfirm').style.display='none';
+  const d=document.getElementById('claroDetail');if(d)d.style.display='none';
+}
+
+function claroRenderKPIs() {
+  const m=claroMesActual;
+  const prev=DATA.find(i=>i.id==='claro').prev[m]||0;
+  const saved=claroData[m];
+  const real=saved?saved.subtotalAlleata:getReal('claro',m);
+  const desv=real-prev;
+  const desvPct=prev>0?((real-prev)/prev)*100:0;
+  const kpis=[
+    {label:'PREV '+MESES_LABEL[m].substring(0,3).toUpperCase()+' 26',val:fmt(prev)||'—',sub:'presupuestado',cls:''},
+    {label:'REAL '+MESES_LABEL[m].substring(0,3).toUpperCase()+' 26',val:real>0?fmt(real):'—',sub:'SUBTOTAL Alleata',cls:real>0?'green':''},
+    {label:'DESVÍO',val:real>0?fmtPct(desvPct):'—',sub:desvPct<=0?'por debajo':'por encima',cls:real>0?(Math.abs(desvPct)>20?'warn':'ok'):''},
+  ];
+  const el=document.getElementById('claroKpis');
+  if(!el)return;
+  el.innerHTML=kpis.map(k=>`<div class="lk"><div class="lk-label">${k.label}</div><div class="lk-val ${k.cls}">${k.val}</div><div class="lk-sub">${k.sub}</div></div>`).join('');
+}
+
+// Mapeo columna → mes: la planilla tiene bloques de 6 cols por mes
+const CLARO_MES_ORDER = ['ene','feb','mar','abr','may','jun'];
+
+async function claroHandleXLS(input) {
+  const file=input.files[0]; if(!file) return;
+  document.getElementById('claroXlsName').textContent=file.name;
+  document.getElementById('claroXlsName').style.display='block';
+  claroShowMsg('claroMsgXls','Leyendo planilla...','ok');
+  try {
+    const buf=await file.arrayBuffer();
+    const wb=XLSX.read(buf,{type:'array'});
+    const sheetName=wb.SheetNames.find(n=>n.toLowerCase().includes('desglose mensual 26'))||wb.SheetNames[0];
+    const ws=wb.Sheets[sheetName];
+    const data=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+
+    // Encontrar el mes actual en los encabezados VTO
+    const m=claroMesActual;
+    const mesLabel=MESES_LABEL[m].toUpperCase(); // 'JUNIO'
+    const colIdx=CLARO_MES_ORDER.indexOf(m); // 0-5
+    const colOffset=colIdx*6; // cada bloque ocupa 6 columnas
+
+    // Buscar fila con SUBTOTAL Alleata y TOTAL
+    let subtotalAlleata=0, totalFactura=0;
+    let detalle={lineasTel:{cant:0,monto:0},simTerm:{cant:0,monto:0},cargosVar:0,impuestos:0};
+    let inAlleata=false;
+
+    for(const row of data){
+      const col0=String(row[colOffset]||'').trim();
+      const col1=String(row[colOffset+1]||'').trim();
+      const col2=String(row[colOffset+2]||'').trim();
+      const monto=parseFloat(String(row[colOffset+2]||'').replace(/[^0-9.,]/g,'').replace(',','.'));
+      const cant=parseInt(String(row[colOffset+1]||''));
+
+      if(/^Alleata$/i.test(col0)) { inAlleata=true; continue; }
+      if(/^Moretti$/i.test(col0)) { inAlleata=false; continue; }
+
+      if(inAlleata){
+        if(/Lineas Telefonicas/i.test(col0)) { detalle.lineasTel={cant:isNaN(cant)?0:cant,monto:isNaN(monto)?0:monto}; }
+        if(/SIM Terminales/i.test(col0))     { detalle.simTerm={cant:isNaN(cant)?0:cant,monto:isNaN(monto)?0:monto}; }
+        if(/Cargos variables/i.test(col0))   { detalle.cargosVar=isNaN(monto)?0:monto; }
+        if(/Impuestos Alleata/i.test(col0))  { detalle.impuestos=isNaN(monto)?0:monto; }
+        if(/^SUBTOTAL$/i.test(col0))         { subtotalAlleata=isNaN(monto)?0:monto; inAlleata=false; }
+      }
+      if(/^TOTAL$/i.test(col0) && !inAlleata && monto>0) { totalFactura=isNaN(monto)?0:monto; }
+    }
+
+    if(!subtotalAlleata){ claroShowMsg('claroMsgXls','No se encontró SUBTOTAL Alleata para '+MESES_LABEL[m]+'. Verificá la planilla.','err'); return; }
+
+    claroPendingXLS={ subtotalAlleata, totalFactura, detalle, mes:m };
+
+    // Preview
+    claroShowPreview('claroPrevXls',[
+      ['Líneas Telefónicas', detalle.lineasTel.cant+' líneas · '+fmt(detalle.lineasTel.monto)],
+      ['SIM Terminales',     detalle.simTerm.cant+' SIMs · '+fmt(detalle.simTerm.monto)],
+      ...(detalle.cargosVar?[['Cargos Variables', fmt(detalle.cargosVar)]]:[]),
+      ['Impuestos Alleata',  fmt(detalle.impuestos)],
+      ['━━ SUBTOTAL ALLEATA', fmt(subtotalAlleata)],
+      ['Total Factura (ref.)', fmt(totalFactura)],
+    ]);
+
+    // Detalle card
+    const dc=document.getElementById('claroDetailRows');
+    if(dc){
+      dc.innerHTML=[
+        ['Líneas Telefónicas', detalle.lineasTel.cant+' · '+fmt(detalle.lineasTel.monto)],
+        ['SIM Terminales', detalle.simTerm.cant+' · '+fmt(detalle.simTerm.monto)],
+        ...(detalle.cargosVar?[['Cargos Variables', fmt(detalle.cargosVar)]]:[]),
+        ['Impuestos Alleata', fmt(detalle.impuestos)],
+        ['SUBTOTAL ALLEATA ▶', fmt(subtotalAlleata)],
+        ['Total Factura', fmt(totalFactura)],
+      ].map(r=>`<div class="claro-detail-row"><span class="dk">${r[0]}</span><span class="dv${r[0].includes('SUBTOTAL')||r[0].includes('▶')?' hi':''}">${r[1]}</span></div>`).join('');
+      document.getElementById('claroDetail').style.display='block';
+    }
+
+    claroShowMsg('claroMsgXls','✓ Planilla leída · SUBTOTAL Alleata: '+fmt(subtotalAlleata),'ok');
+    claroCheckBtn();
+  } catch(e){ claroShowMsg('claroMsgXls','Error: '+e.message,'err'); }
+}
+
+async function claroHandlePDF(input) {
+  const file=input.files[0]; if(!file) return;
+  document.getElementById('claroPdfName').textContent=file.name;
+  document.getElementById('claroPdfName').style.display='block';
+  claroShowMsg('claroMsgPdf','Leyendo PDF...','ok');
+  try {
+    const buf=await file.arrayBuffer();
+    const pdf=await pdfjsLib.getDocument({data:buf}).promise;
+    let text='';
+    for(let i=1;i<=Math.min(pdf.numPages,2);i++){
+      const pg=await pdf.getPage(i);
+      const ct=await pg.getTextContent();
+      text+=ct.items.map(it=>it.str).join(' ')+'
+';
+    }
+    // Parse Claro PDF
+    const nroMatch=text.match(/Factura\s*N[°º]\s*([\d\-]+)/i)||text.match(/(1331-[\d]+)/);
+    const nroFac=nroMatch?nroMatch[1]:'—';
+    const fechaMatch=text.match(/Fecha de Factura\s*(\d{1,2}\/\d{2}\/\d{4})/i);
+    const fecha=fechaMatch?fechaMatch[1]:'—';
+    const periodoMatch=text.match(/Per[ií]odo Facturado desde\s*([\d\/]+)\s*hasta\s*([\d\/]+)/i);
+    const periodo=periodoMatch?periodoMatch[1]+' → '+periodoMatch[2]:'—';
+    const totalMatch=text.match(/Total a Pagar\s*[:\$]?\s*([\d\.,]+)/i)||text.match(/TOTAL A PAGAR\s*\$([\d\.,]+)/i);
+    const totalFac=totalMatch?logiParseNum(totalMatch[1]):0;
+
+    claroPendingPDF={ nroFac, fecha, periodo, totalFac };
+    document.getElementById('claroZonePdf').classList.add('loaded');
+    claroShowPreview('claroPrevPdf',[
+      ['N° Factura', nroFac],
+      ['Fecha', fecha],
+      ['Período', periodo],
+      ['Total a Pagar', fmt(totalFac)||totalFac],
+    ]);
+    claroShowMsg('claroMsgPdf','✓ Factura leída correctamente','ok');
+    claroCheckBtn();
+  } catch(e){ claroShowMsg('claroMsgPdf','Error: '+e.message,'err'); }
+}
+
+function claroCheckBtn(){
+  const btn=document.getElementById('claroBtnConfirm');
+  const msg=document.getElementById('claroMsgConfirm');
+  if(!btn)return;
+  // XLS es obligatorio (tiene el REAL), PDF es recomendado
+  if(claroPendingXLS){
+    btn.style.display='block';
+    btn.disabled=false;
+    btn.style.opacity='1';
+    if(!claroPendingPDF && msg){
+      msg.style.display='block';
+      msg.style.color='#f59e0b';
+      msg.style.background='rgba(245,158,11,.1)';
+      msg.style.border='1px solid rgba(245,158,11,.2)';
+      msg.textContent='💡 Podés confirmar sin el PDF, pero se recomienda subirlo para trazabilidad.';
+    } else if(msg){ msg.style.display='none'; }
+  } else {
+    btn.style.display=claroPendingPDF?'block':'none';
+    if(claroPendingPDF){ btn.disabled=true; btn.style.opacity='.5'; btn.textContent='⚠️ Falta la planilla de Axel (Excel)'; }
+  }
+}
+
+async function claroGuardar(){
+  if(!claroPendingXLS) return;
+  const m=claroMesActual;
+  claroData[m]={
+    subtotalAlleata: claroPendingXLS.subtotalAlleata,
+    totalFactura:    claroPendingXLS.totalFactura,
+    detalle:         claroPendingXLS.detalle,
+    nroFac:          claroPendingPDF?.nroFac||'—',
+    fecha:           claroPendingPDF?.fecha||'—',
+    periodo:         claroPendingPDF?.periodo||'—',
+    totalFacPDF:     claroPendingPDF?.totalFac||0,
+  };
+  // Actualizar reales[]
+  reales['claro_'+m]=claroPendingXLS.subtotalAlleata;
+  // Guardar en Supabase si hay sesión
+  if(currentUser) await claraSaveDB(m);
+  showToast('✅ REAL Claro '+MESES_LABEL[m]+' guardado: '+fmt(claroPendingXLS.subtotalAlleata));
+  resetClaroForm();
+  claroRenderKPIs();
+  closeClaroModal();
+}
+
+async function claraSaveDB(m){
+  const d=claroData[m];
+  const row={
+    user_id:currentUser.id, proveedor:'claro', mes:m,
+    real_pesos:d.subtotalAlleata, total_factura:d.totalFactura,
+    nro_factura:d.nroFac, fecha:d.fecha, periodo:d.periodo,
+    detalle:d.detalle
+  };
+  const {error}=await sb.from('presupuesto_reales').upsert(row,{onConflict:'proveedor,mes'});
+  if(error) console.error('Error guardando Claro:',error);
+}
+
+function claroShowMsg(id,txt,type){ const e=document.getElementById(id);if(e){e.className='up-msg '+type;e.textContent=txt;} }
+function claroShowPreview(id,rows){ const e=document.getElementById(id);if(e){e.style.display='block';e.innerHTML=rows.map(r=>`<div class="up-prow"><span class="pk">${r[0]}</span><span class="pv">${r[1]}</span></div>`).join('');} }
+
 // ── Supabase ─────────────────────────────────────────────────────────────────
 const SB_URL = 'https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
@@ -969,30 +1205,40 @@ async function saveFacturaDB(fac, mesKey) {
 }
 
 async function loadFacturasFromDB() {
+  // Cargar facturas Logicalis
   const { data, error } = await sb.from('presupuesto_facturas').select('*').order('fecha');
-  if(error){ console.error('Error cargando facturas:', error); return; }
-  if(!data||!data.length) return;
-  data.forEach(row => {
-    const m = row.mes;
-    if(!logiFacturas[m]) logiFacturas[m]=[];
-    // evitar duplicados al cargar
-    if(!logiFacturas[m].find(f=>f.numero===row.numero)) {
-      logiFacturas[m].push({
-        numero:       row.numero,
-        fecha:        row.fecha,
-        vto:          row.vto,
-        desc:         row.descripcion,
-        tc:           row.tc,
-        subtotalUSD:  row.subtotal_usd,
-        ivaUSD:       row.iva_usd,
-        otrosImp:     row.otros_imp,
-        totalUSD:     row.total_usd,
-        terminales:   row.terminales,
-        series:       row.series || []
-      });
-    }
-  });
-  render(); // actualizar tabla principal con datos de DB
+  if(!error && data && data.length) {
+    data.forEach(row => {
+      const m = row.mes;
+      if(!logiFacturas[m]) logiFacturas[m]=[];
+      if(!logiFacturas[m].find(f=>f.numero===row.numero)) {
+        logiFacturas[m].push({
+          numero:row.numero, fecha:row.fecha, vto:row.vto, desc:row.descripcion,
+          tc:row.tc, subtotalUSD:row.subtotal_usd, ivaUSD:row.iva_usd,
+          otrosImp:row.otros_imp, totalUSD:row.total_usd,
+          terminales:row.terminales, series:row.series||[]
+        });
+      }
+    });
+  }
+  // Cargar reales genéricos (Claro, etc.)
+  const { data: realesData, error: realesErr } = await sb.from('presupuesto_reales').select('*');
+  if(!realesErr && realesData && realesData.length) {
+    realesData.forEach(row => {
+      reales[row.proveedor+'_'+row.mes] = row.real_pesos;
+      if(row.proveedor==='claro') {
+        claroData[row.mes] = {
+          subtotalAlleata: row.real_pesos,
+          totalFactura:    row.total_factura,
+          nroFac:          row.nro_factura||'—',
+          fecha:           row.fecha||'—',
+          periodo:         row.periodo||'—',
+          detalle:         row.detalle||{}
+        };
+      }
+    });
+  }
+  render();
 }
 
 // Hook: al agregar factura, también guardar en DB
@@ -1027,6 +1273,64 @@ logiAgregar = async function() {
   }
 })();
 </script>
+<!-- Modal Claro -->
+<div class="claro-bg" id="claroBg">
+  <div class="claro-modal">
+    <h3>Claro (AMX Argentina)</h3>
+    <p class="msub" id="claroSub" style="font-size:12px;color:var(--text-muted);margin-bottom:22px"></p>
+
+    <div class="claro-kpis" id="claroKpis"></div>
+
+    <div class="sec-lbl">Cargar documentos <span></span></div>
+    <div class="up-grid">
+      <div>
+        <div class="up-title">📄 Factura Claro (PDF)</div>
+        <div class="up-zone" id="claroZonePdf"
+          ondragover="event.preventDefault();this.classList.add('drag')"
+          ondragleave="this.classList.remove('drag')"
+          ondrop="this.classList.remove('drag');claroHandlePDF({files:event.dataTransfer.files});event.preventDefault()">
+          <input type="file" id="claroPdfInp" accept=".pdf" onchange="claroHandlePDF(this)">
+          <div class="uz-icon">📑</div>
+          <div class="uz-lbl">Soltá o seleccioná el PDF</div>
+          <div class="uz-sub">FACT-CLARO_*.pdf</div>
+          <div class="uz-fn" id="claroPdfName"></div>
+        </div>
+        <div class="up-preview" id="claroPrevPdf"></div>
+        <div class="up-msg" id="claroMsgPdf"></div>
+      </div>
+      <div>
+        <div class="up-title">📊 Planilla Axel (Excel)</div>
+        <div class="up-zone" id="claroZoneXls"
+          ondragover="event.preventDefault();this.classList.add('drag')"
+          ondragleave="this.classList.remove('drag')"
+          ondrop="this.classList.remove('drag');claroHandleXLS({files:event.dataTransfer.files});event.preventDefault()">
+          <input type="file" id="claroXlsInp" accept=".xlsx,.xls" onchange="claroHandleXLS(this)">
+          <div class="uz-icon">📋</div>
+          <div class="uz-lbl">Soltá o seleccioná el Excel</div>
+          <div class="uz-sub">Claro_desglose_mensual_*.xlsx</div>
+          <div class="uz-fn" id="claroXlsName"></div>
+        </div>
+        <div class="up-preview" id="claroPrevXls"></div>
+        <div class="up-msg" id="claroMsgXls"></div>
+      </div>
+    </div>
+
+    <!-- Detalle Alleata del mes -->
+    <div class="claro-detail" id="claroDetail">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:8px">Detalle Alleata — mes seleccionado</div>
+      <div id="claroDetailRows"></div>
+    </div>
+
+    <button class="btn-confirm" id="claroBtnConfirm" onclick="claroGuardar()" style="display:none">
+      ✓ Confirmar y guardar REAL
+    </button>
+    <div id="claroMsgConfirm" style="display:none;font-size:12px;font-weight:600;padding:8px 12px;border-radius:8px;margin-bottom:14px"></div>
+
+    <div class="logi-footer">
+      <button class="btn-cancel" onclick="closeClaroModal()">Cerrar</button>
+    </div>
+  </div>
+</div>
 </div><!-- /appContent -->
 </body>
 </html>
