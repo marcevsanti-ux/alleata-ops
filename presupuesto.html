@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Alleata · Presupuesto Operaciones v1.2.4</title>
+<title>Alleata · Presupuesto Operaciones v1.2.5</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -154,7 +154,7 @@
 <body>
 
 <h1>💰 Presupuesto Operaciones</h1>
-<p class="sub">Alleata · 2026 · Solo Admin <span style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 8px;border-radius:4px;border:1px solid var(--border2);font-size:10px;margin-left:6px">v1.2.4</span></p>
+<p class="sub">Alleata · 2026 · Solo Admin <span style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 8px;border-radius:4px;border:1px solid var(--border2);font-size:10px;margin-left:6px">v1.2.5</span></p>
 
 <div class="toolbar">
   <div class="mes-bar" id="mesBar"></div>
@@ -637,18 +637,25 @@ async function logiHandlePDF(input){
     const fac=logiParsePDF(text);
     if(!fac){logiShowMsg('msgPdf','No se pudo leer. Verificá que sea un PDF de Logicalis.','err');return;}
     logiPendingFac=fac;
+    // Si la factura trae T.C., actualizar el input automáticamente
+    if(fac.tc && fac.tc !== logiCurrentTC) {
+      logiCurrentTC = fac.tc;
+      document.getElementById('logiTC').value = fac.tc;
+    }
     document.getElementById('upZonePdf').classList.add('loaded');
     logiShowPreview('prevPdf',[
       ['N° factura', fac.numero],
       ['Fecha', fac.fecha],
       ['Fecha Vto.', fac.vto],
       ['Descripción', fac.desc.substring(0,45)+'…'],
+      ['T.C. (de factura)', fac.tc.toLocaleString('es-AR')],
       ['Subtotal USD', fmtUSD(fac.subtotalUSD)],
+      ['Subtotal $', fmt(fac.subtotalUSD * fac.tc)],
       ['IVA USD', fmtUSD(fac.ivaUSD)],
-      ['Otros imp. USD', fmtUSD(fac.otrosImp)],
       ['Total USD', fmtUSD(fac.totalUSD)],
     ]);
-    logiShowMsg('msgPdf','✓ Factura leída correctamente','ok');
+    logiShowMsg('msgPdf','✓ Factura leída · T.C. $'+fac.tc.toLocaleString('es-AR')+' tomado de la factura','ok');
+    logiRenderKPIs();
     logiCheckBtn();
   }catch(e){logiShowMsg('msgPdf','Error: '+e.message,'err');}
 }
