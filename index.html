@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.1.3</title>
+<title>Alleata · Operaciones v4.2.0</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -407,7 +407,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.1.3 · 17 jun 2026
+      v4.2.0 · 17 jun 2026
     </div>
   </div>
 </div>
@@ -485,7 +485,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.1.3 · 17 jun 2026
+      v4.2.0 · 17 jun 2026
     </div>
   </div>
 </nav>
@@ -525,7 +525,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.1.3</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.2.0</div>
   </div>
   <div class="content">
 
@@ -851,7 +851,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
             <select class="select" id="envFiltroEstado" onchange="renderEnvios()">
               <option value="">Todos</option>
               <option>Pre-Colecta</option><option>Despachado</option><option>En tránsito</option><option>En camino</option>
-              <option>En espera en sucursal</option><option>Entregado</option><option>Retirar Terminal</option><option>Fallido</option>
+              <option>En espera en sucursal</option><option>Exitoso</option><option>Entregado</option><option>Retirar Terminal</option><option>Fallido</option>
               <option>Perdido</option><option>Devuelto</option>
             </select>
           </div>
@@ -3150,7 +3150,7 @@ async function dsConsultarCA(otId, trackNum, otNum){
     }
 
     // 3. Mostrar modal con historial — idéntico a consultarTracking()
-    mostrarModalTrackingCA(trackNum, { eventos, pieza }, 'ok');
+    mostrarModalTrackingCA(trackNum, { eventos, pieza }, 'ok', '', otNum || '');
 
     // 4. Persistir en ordenes_trabajo (no en envios — sin tocar Envíos)
     const ultimo = eventos[0];
@@ -4348,7 +4348,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.1.3] OK');
+console.log('[Alleata v4.2.0] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -5067,7 +5067,7 @@ async function loadBadges(){
       des.push(..._pg);if(_pg.length<_P)break;_f+=_P;
     }
   }
-  const envCount=(env||[]).filter(e=>!['Entregado','Fallido','Devuelto','Perdido'].includes(e.status)).length;
+  const envCount=(env||[]).filter(e=>!['Entregado','Exitoso','Fallido','Devuelto','Perdido'].includes(e.status)).length;
   const desCount=(des||[]).filter(d=>!['Terminal recuperada','Extraviada'].includes(d.estado)).length;
   const nbEnv=document.getElementById('nb-envios');if(nbEnv)nbEnv.textContent=envCount;
   const nbDes=document.getElementById('nb-desins');if(nbDes)nbDes.textContent=desCount;
@@ -5114,7 +5114,7 @@ async function loadOpsPanel(isAdmin){
   }
 
   const directas=envios.filter(e=>e.estado&&!['Recibido ✅','Pendiente rótulo','Rótulo generado','En camino retorno'].includes(e.estado));
-  const ESTADOS_CERRADOS=['Entregado','Fallido','Devuelto','Perdido'];
+  const ESTADOS_CERRADOS=['Entregado','Exitoso','Fallido','Devuelto','Perdido'];
 
   // ── GRÁFICO 1: Instaladas hoy (KPI grande) ──
   const instaladas=envios.filter(e=>e.estado==='Entregado'&&(e.fecha||'').startsWith(today)).length;
@@ -6221,7 +6221,7 @@ function renderLogisticaStats(list){
       let qEx = sb.from('sf_workorders')
         .select('id,logistica,fecha_despacho')
         .in('record_type', ['Instalación Equipo + Simcard','Instalación Simcard','Asistencia Tecnica','Cambio de Terminal'])
-        .eq('status','Entregado')
+        .in('status',['Entregado','Exitoso'])
         .gte('fecha_despacho','2026-06-01');
       if(_canalActivo !== 'TODOS' && _canalActivo !== 'OTROS'){
         qEx = qEx.eq('logistica', LOG_MAP2[_canalActivo]||_canalActivo);
@@ -6803,7 +6803,7 @@ function renderEnviosTable(list){
       <td>
         <!-- SELECT ESTADO ENVÍO -->
         <select class="select" style="width:160px;padding:4px 8px;font-size:11px" onchange="updateEnvioEstado('${e.id}',this.value)">
-          ${['Pre-Colecta','Despachado','En tránsito','En camino','En espera en sucursal','Entregado','Retirar Terminal','Fallido','Perdido','Devuelto'].map(s=>`<option ${(e.estado||'Pre-Colecta')===s?'selected':''}>${s}</option>`).join('')}
+          ${['Pre-Colecta','Despachado','En tránsito','En camino','En espera en sucursal','Exitoso','Entregado','Retirar Terminal','Fallido','Perdido','Devuelto'].map(s=>`<option ${(e.estado||'Pre-Colecta')===s?'selected':''}>${s}</option>`).join('')}
         </select>
         ${e.ultimo_evento_fecha ? `<div style="font-size:10px;color:var(--text-muted);margin-top:4px;font-family:'JetBrains Mono',monospace;letter-spacing:0.3px">${formatFechaCA(e.ultimo_evento_fecha)}</div>` : ''}
         <!-- SELECT ESTADO RETORNO (solo si tiene retorno) -->
@@ -6906,7 +6906,7 @@ async function renderExitosas(){
     let q = sb.from('sf_workorders')
       .select('*')
       .in('record_type', ['Instalación Equipo + Simcard','Instalación Simcard','Asistencia Tecnica','Cambio de Terminal'])
-      .eq('status','Entregado')
+      .in('status',['Entregado','Exitoso'])
       .gte('fecha_despacho','2026-06-01')
       .order('fecha_despacho', {ascending: _enviosSortAsc});
     if(_canalActivo !== 'TODOS' && _canalActivo !== 'OTROS') q=q.eq('logistica', LOG_MAP2[_canalActivo]||_canalActivo);
@@ -7073,12 +7073,11 @@ async function consultarTracking(id, trackNum){
       mostrarModalTrackingCA(trackNum, null, 'error', 'Sin eventos registrados para este número');
       return;
     }
-    mostrarModalTrackingCA(trackNum, { eventos, pieza }, 'ok');
-
     // ── SLA: calcular y persistir ────────────────────────────────────────────
     const { data: envData } = await sb.from('sf_workorders').select('workorder_number, record_type').eq('id', id).single();
     const tipoOT   = envData?.record_type || '';
     const otNumero = envData?.workorder_number || '';
+    mostrarModalTrackingCA(trackNum, { eventos, pieza }, 'ok', '', otNumero);
     const ultimo   = eventos[0];
     const estadoMapeado = mapearEstadoCA(ultimo.historia, ultimo.estadoCA, tipoOT);
 
@@ -7087,7 +7086,8 @@ async function consultarTracking(id, trackNum){
         ultimo_evento_envio:       ultimo.estadoCA ? `${ultimo.historia} — ${ultimo.estadoCA}` : ultimo.historia,
         ultimo_evento_envio_fecha: ultimo.fecha
       };
-      if(estadoMapeado) updateData.status = estadoMapeado;
+      // CA informa Entregado → en SF/app el estado final es Exitoso
+      if(estadoMapeado) updateData.status = estadoMapeado === 'Entregado' ? 'Exitoso' : estadoMapeado;
 
       const sla = calcularSLA(eventos);
       if(sla.fecha_repesaje)         updateData.fecha_repesaje       = sla.fecha_repesaje;
@@ -7366,7 +7366,9 @@ async function autoActualizarTracking(){
         if(sla.sla_total_dias !== null) updateAT.sla_total_dias     = sla.sla_total_dias;
 
         if(estadoMapeado && estadoMapeado !== envio.estado){
-          updateAT.status = estadoMapeado;
+          // CA informa Entregado → en SF/app el estado final es Exitoso
+          const estadoFinal = estadoMapeado === 'Entregado' ? 'Exitoso' : estadoMapeado;
+          updateAT.status = estadoFinal;
           await sb.from('sf_workorders').update(updateAT).eq('id', envio.id);
           // Disparar processAllyRules vía backend para CUALQUIER cambio de estado
           // Esto evalúa ally_notification_rules y envía notificaciones al grupo correcto
@@ -7379,7 +7381,7 @@ async function autoActualizarTracking(){
             atAddLog('alerta', otLabel, envio.responsable, envio.cuenta, `⚠️ ${visitaLabel||'ALERTA'} — ${detalle}`);
             alertas++;
           } else {
-            atAddLog('cambio', otLabel, envio.responsable, envio.cuenta, `${envio.estado} → ${estadoMapeado}`);
+            atAddLog('cambio', otLabel, envio.responsable, envio.cuenta, `${envio.estado} → ${estadoFinal}`);
             actualizados++;
           }
         } else {
@@ -7473,7 +7475,7 @@ async function autoActualizarTracking(){
   renderEnvios(); loadBadges();
 }
 
-function mostrarModalTrackingCA(trackNum, caData, estado, errorMsg=''){
+function mostrarModalTrackingCA(trackNum, caData, estado, errorMsg='', otNumero=''){
   document.getElementById('modal-tracking-ca')?.remove();
 
   let contenido='';
@@ -7533,6 +7535,10 @@ function mostrarModalTrackingCA(trackNum, caData, estado, errorMsg=''){
           <p style="margin:0;font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:600;">${trackNum}</p>
           ${caData?.pieza?`<p style="margin:4px 0 0;font-size:11px;color:var(--text-secondary);">Pieza: ${caData.pieza}</p>`:''}
         </div>
+        ${otNumero ? `<div style="background:rgba(26,159,212,.12);border:1px solid rgba(26,159,212,.25);border-radius:10px;padding:8px 14px;text-align:center;">
+          <p style="margin:0 0 1px;font-size:9px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;">OT</p>
+          <p style="margin:0;font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:700;color:var(--teal)">${otNumero}</p>
+        </div>` : ''}
         <div style="margin-left:auto;">${estadoBadge}</div>
       </div>
       <div style="background:var(--navy-900);border-radius:10px;overflow:hidden;">
