@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Alleata · Presupuesto Operaciones</title>
+<title>Alleata · Presupuesto Operaciones v1.2.2</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -120,6 +120,12 @@
   .btn-confirm{display:none;width:100%;padding:12px;border-radius:10px;border:none;background:var(--grad);color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:'Inter',sans-serif;margin-bottom:18px}
   .btn-confirm:hover{opacity:.85}
 
+  /* Acumulado multi-factura */
+  .logi-acum{background:rgba(29,191,142,.07);border:1px solid rgba(29,191,142,.2);border-radius:10px;padding:12px 16px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+  .logi-acum-item{text-align:center;min-width:80px}
+  .logi-acum-item .av{font-size:15px;font-weight:800;font-family:'JetBrains Mono',monospace;color:var(--teal)}
+  .logi-acum-item .al{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:rgba(29,191,142,.55);margin-top:2px}
+
   /* Tabla facturas dentro del modal */
   .fac-wrap{overflow-x:auto;margin-top:4px}
   .fac-tbl{width:100%;border-collapse:collapse;font-size:11px}
@@ -148,7 +154,7 @@
 <body>
 
 <h1>💰 Presupuesto Operaciones</h1>
-<p class="sub">Alleata · 2026 · Solo Admin</p>
+<p class="sub">Alleata · 2026 · Solo Admin <span style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 8px;border-radius:4px;border:1px solid var(--border2);font-size:10px;margin-left:6px">v1.2.2</span></p>
 
 <div class="toolbar">
   <div class="mes-bar" id="mesBar"></div>
@@ -478,6 +484,7 @@ function openLogiModal(m) {
   logiRenderKPIs();
   logiRenderFacturas();
   logiRenderSeries();
+  logiRenderAcum();
   document.getElementById('logiBg').classList.add('open');
 }
 function closeLogiModal() {
@@ -559,6 +566,24 @@ function logiRenderSeries() {
   document.getElementById('logiSeriesWrap').innerHTML=all.map(s=>`<div class="serie-chip">${s}</div>`).join('');
 }
 
+function logiRenderAcum() {
+  const facs=logiGetFacturas(logiMesActual);
+  const el=document.getElementById('logiAcum');
+  const badge=document.getElementById('logisFacBadge');
+  if(!facs.length){el.style.display='none';badge.textContent='';return;}
+  el.style.display='flex';
+  badge.textContent=facs.length+' factura'+(facs.length!==1?'s':'');
+  const totUSD=facs.reduce((s,f)=>s+f.subtotalUSD,0);
+  const totPesos=facs.reduce((s,f)=>s+f.subtotalUSD*logiCurrentTC,0);
+  const totTerm=facs.reduce((s,f)=>s+(f.terminales||0),0);
+  const totSeries=facs.reduce((s,f)=>s+(f.series?f.series.length:0),0);
+  document.getElementById('acumFacs').textContent=facs.length;
+  document.getElementById('acumUSD').textContent=fmtUSD(totUSD);
+  document.getElementById('acumPesos').textContent=fmt(totPesos);
+  document.getElementById('acumTerm').textContent=totTerm||'—';
+  document.getElementById('acumSeries').textContent=totSeries||'—';
+}
+
 function logiShowMsg(id,txt,type){
   const e=document.getElementById(id);
   e.className='up-msg '+type;
@@ -570,7 +595,7 @@ function logiShowPreview(id,rows){
   e.innerHTML=rows.map(r=>`<div class="up-prow"><span class="pk">${r[0]}</span><span class="pv">${r[1]}</span></div>`).join('');
 }
 function logiCheckBtn(){
-  document.getElementById('btnConfirm').style.display=logiPendingFac?'block':'none';
+  document.getElementById('btnConfirm').style.display=(logiPendingFac||logiPendingRTO)?'block':'none';
 }
 
 async function logiHandlePDF(input){
@@ -611,8 +636,15 @@ function logiParsePDF(text){
     const numero=(text.match(/(\d{4}-\d{8})/)||[])[1]||'—';
     const fecha=(text.match(/Fecha\s*[:\s]*(\d{1,2}\/\d{1,2}\/\d{4})/i)||[])[1]||'—';
     const vto=(text.match(/Vto[\.:\s]+(\d{1,2}\/\d{1,2}\/\d{4})/i)||[])[1]||'—';
-    const descM=text.match(/Cambio de Perfil[^\n\r]*/i)||text.match(/([A-Z][a-zA-Záéíóú ]{4,60}(?:v\d|D\d)[^\n\r]*)/);
-    const desc=descM?descM[0].trim().substring(0,80):'Honorarios Software';
+    // Descripción: extraer línea limpia del ítem facturado
+    let desc='Honorarios Software';
+    const descM1=text.match(/Cambio de Perfil[^\n\r0-9]{0,40}/i);
+    const descM2=text.match(/(?:Código|Descripción)[^\n\r]*\n([^\n\r]{5,80})/i);
+    const descM3=text.match(/([A-Z][a-zA-Záéíóú ]{3,40}(?:v\d|D7)[a-zA-Z0-9_ ]*)/);
+    if(descM1) desc=descM1[0].replace(/\s+/g,' ').trim();
+    else if(descM2) desc=descM2[1].replace(/\s+/g,' ').trim();
+    else if(descM3) desc=descM3[0].replace(/\s+/g,' ').trim();
+    desc=desc.substring(0,70);
     const subtotalUSD=logiParseNum((text.match(/Subtotal\s*[:\s]*USD\s*([\d.,]+)/i)||[])[1]);
     const ivaUSD=logiParseNum((text.match(/Total IVA\s*[:\s]*USD\s*([\d.,]+)/i)||[])[1]);
     const otrosImp=logiParseNum((text.match(/Otros Impuestos\s*[:\s]*USD\s*([\d.,]+)/i)||[])[1]);
@@ -646,10 +678,17 @@ async function logiHandleXLS(input){
     const nameInf=wb.SheetNames.find(n=>n.toLowerCase().includes('informe')||n.toLowerCase().includes('final'))||wb.SheetNames[0];
     if(nameInf){
       const data=XLSX.utils.sheet_to_json(wb.Sheets[nameInf],{header:1,defval:''});
+      // Buscar "Total general" o valor de qty en la tabla resumen (excluye años y valores >5000)
       for(const row of data){
-        for(const cell of row){
+        for(let ci=0;ci<row.length;ci++){
+          const cell=row[ci];
           const n=parseInt(cell);
-          if(!isNaN(n)&&n>50&&n<5000&&String(cell).trim()===String(n)) terminales=terminales||n;
+          // Excluir: años (1900-2100), valores muy grandes, celdas no numéricas puras
+          if(!isNaN(n)&&n>10&&n<5000&&n<1900&&String(cell).trim()===String(n)){
+            // Preferir si hay un encabezado "Total general" o "Qty" cerca
+            const ctx=row.slice(Math.max(0,ci-3),ci).join(' ').toLowerCase();
+            if(!terminales || ctx.includes('total')||ctx.includes('qty')) terminales=n;
+          }
         }
       }
     }
@@ -675,18 +714,24 @@ async function logiHandleXLS(input){
 }
 
 function logiAgregar(){
-  if(!logiPendingFac) return;
-  const fac={...logiPendingFac,tc:logiCurrentTC};
+  if(!logiPendingFac&&!logiPendingRTO) return;
+  // Si solo hay RTO sin PDF, crear entrada parcial
+  let fac = logiPendingFac ? {...logiPendingFac, tc:logiCurrentTC} : {
+    numero:'RTO s/factura', fecha:'—', vto:'—', desc:'Pendiente adjuntar PDF',
+    subtotalUSD:0, ivaUSD:0, otrosImp:0, totalUSD:0, tc:logiCurrentTC
+  };
   if(logiPendingRTO){fac.terminales=logiPendingRTO.terminales;fac.series=logiPendingRTO.series;}
   if(!logiFacturas[logiMesActual]) logiFacturas[logiMesActual]=[];
   logiFacturas[logiMesActual].push(fac);
+  const msg = logiPendingFac ? '✅ Factura '+fac.numero+' agregada' : '✅ RTO guardado (falta PDF)';
   logiPendingFac=null;
   logiPendingRTO=null;
-  resetLogiForm();
+  resetLogiForm(); // deja el modal listo para la siguiente
   logiRenderKPIs();
   logiRenderFacturas();
   logiRenderSeries();
-  showToast('✅ Factura agregada — '+fmtUSD(fac.subtotalUSD));
+  logiRenderAcum();
+  showToast(msg);
 }
 
 // ── Toast ────────────────────────────────────────────────────────────────────
