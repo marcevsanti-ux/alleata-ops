@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.3.0</title>
+<title>Alleata · Operaciones v4.1.3</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -407,7 +407,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.3.0 · 17 jun 2026
+      v4.1.3 · 17 jun 2026
     </div>
   </div>
 </div>
@@ -450,15 +450,650 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <div class="active-bar"></div><span class="nav-icon-wrap">🏪</span> Store
     </div>
 
-    <div class="nav-item" data-mod="presupuesto" id="nav-presupuesto" onclick="goTo('presupuesto')" style="display:none">
-      <div class="active-bar"></div><span class="nav-icon-wrap">💰</span> Presupuesto
-    </div>
-
     <div class="nav-item" data-mod="horas" id="nav-horas" style="opacity:0.4;pointer-events:none;cursor:default;">
       <div class="active-bar"></div><span class="nav-icon-wrap">⏱</span> Horas
       <span class="nav-badge" id="nb-horas">—</span>
     </div>
-<div class="mod-pill" data-mod="store" onclick="toggleCreateMod(this)"><span class="pill-dot"></span>🏪 Store</div>
+    <div class="nav-item" data-mod="sf" id="nav-sf" onclick="goTo('sf')" style="display:none">
+      <div class="active-bar"></div><span class="nav-icon-wrap">☁️</span> SF-Integración
+      <span class="nav-badge" id="nb-sf">—</span>
+    </div>
+    <div class="nav-section" id="nav-section-config" style="display:none">Configuración</div>
+    <div class="nav-item" data-mod="ajustes" id="nav-ajustes" style="display:none" onclick="goTo('ajustes')">
+      <div class="active-bar"></div><span class="nav-icon-wrap">⚙️</span> Ajustes
+    </div>
+    <div class="nav-item" data-mod="retencion" id="nav-retencion" onclick="goTo('retencion')">
+      <div class="active-bar"></div><span class="nav-icon-wrap">🛡️</span> Retención
+    </div>
+    <div class="nav-item" data-mod="terminales" id="nav-terminales" onclick="goTo('terminales')">
+      <div class="active-bar"></div><span class="nav-icon-wrap">🖥️</span> Terminales
+    </div>
+    <div class="nav-item" data-mod="distri" id="nav-distri" onclick="goTo('distri')" style="display:none">
+      <div class="active-bar"></div><span class="nav-icon-wrap">🚚</span> Distribuidores
+    </div>
+  </div>
+  <div class="nav-item" data-mod="ally" id="nav-ally" onclick="goTo('ally')" style="display:none">
+    <div class="active-bar"></div><span class="nav-icon-wrap">🤖</span> Config. Ally
+  </div>
+  <div class="sidebar-footer">
+    <div class="user-chip">
+      <div class="user-avatar" id="sideUserAvatar">?</div>
+      <div>
+        <div class="user-name" id="sideUserName">—</div>
+        <div class="user-role" id="sideUserRole">—</div>
+      </div>
+    </div>
+    <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
+    <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
+      v4.1.3 · 17 jun 2026
+    </div>
+  </div>
+</nav>
+
+<div class="main">
+  <div class="topbar">
+    <div class="topbar-crumb">
+      <span class="crumb-home">Alleata</span>
+      <span class="crumb-sep"> › </span>
+      <span class="crumb-current" id="topbar-title">Dashboard</span>
+    </div>
+    <div class="topbar-right" id="topbar-date"></div>
+    <button onclick="refreshCurrentModule()" title="Actualizar" style="background:none;border:1px solid var(--border2);color:var(--text-muted);border-radius:7px;padding:4px 10px;cursor:pointer;font-size:13px;margin-left:10px;transition:all .2s" onmouseover="this.style.color='var(--teal)';this.style.borderColor='var(--teal)'" onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border2)'">↺</button>
+    <!-- SF Sync global — solo admin -->
+    <div id="global-sf-sync-wrap" style="display:none;align-items:center;gap:8px;margin-left:12px;padding:4px 10px 4px 12px;background:rgba(255,255,255,.04);border:1px solid var(--border2);border-radius:9px;">
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:1px">
+        <div id="sf-last-sync" style="font-size:9px;color:var(--text-muted);font-family:'JetBrains Mono',monospace"></div>
+        <div id="sf-next-sync" style="font-size:9px;color:var(--teal);font-family:'JetBrains Mono',monospace"></div>
+        <div id="sf-last-ca-tracker" style="font-size:9px;color:var(--text-muted);font-family:'JetBrains Mono',monospace"></div>
+        <div id="sf-next-ca-tracker" style="font-size:9px;color:var(--blue);font-family:'JetBrains Mono',monospace"></div>
+      </div>
+      <button id="global-sf-sync-btn" onclick="globalSFSync()" title="Full Sync: trae todas las OTs activas desde Salesforce"
+        style="display:flex;align-items:center;gap:5px;background:rgba(29,191,142,.1);border:1px solid rgba(29,191,142,.3);color:var(--teal);border-radius:7px;padding:5px 12px;cursor:pointer;font-size:11px;font-weight:600;white-space:nowrap;transition:all .2s"
+        onmouseover="this.style.background='rgba(29,191,142,.2)'" onmouseout="this.style.background='rgba(29,191,142,.1)'">
+        <svg id="global-sf-sync-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+        Full Sync
+      </button>
+      <div id="sf-sync-progress-panel" style="display:none;position:fixed;top:48px;right:12px;z-index:9999;background:var(--navy-800);border:1px solid rgba(29,191,142,.3);border-radius:10px;padding:14px 16px;min-width:260px;box-shadow:0 8px 32px rgba(0,0,0,.5);">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+          <span style="font-size:12px;font-weight:700;color:var(--teal);">Full Sync en curso</span>
+          <span id="sf-sync-elapsed" style="font-size:10px;color:var(--text-muted);font-family:'JetBrains Mono',monospace">0s</span>
+        </div>
+        <div id="sf-sync-steps" style="display:flex;flex-direction:column;gap:5px;margin-bottom:10px;"></div>
+        <div style="background:var(--navy-700);border-radius:4px;height:4px;overflow:hidden;">
+          <div id="sf-sync-bar" style="height:4px;background:linear-gradient(90deg,#1dbf8e,#1a9fd4);width:0%;transition:width .4s ease;border-radius:4px;"></div>
+        </div>
+        <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
+      </div>
+    </div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.1.3</div>
+  </div>
+  <div class="content">
+
+    <!-- SF-INTEGRACIÓN -->
+    <div class="module" id="mod-sf">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+        <div>
+          <h2 style="font-size:20px;font-weight:800;color:#fff;margin:0">☁️ SF — Integración</h2>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:3px">Salesforce UAT · Solo lectura</div>
+        </div>
+        <div style="font-size:11px;color:var(--text-muted)">El sync se controla desde el botón <strong style="color:var(--teal)">Full Sync</strong> en el topbar.</div>
+      </div>
+
+      <!-- Stats -->
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px">
+        <div class="card" style="padding:16px">
+          <div style="font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px">Total activas</div>
+          <div id="sf-stat-total" style="font-size:28px;font-weight:800;color:var(--teal);margin-top:4px">—</div>
+        </div>
+        <div class="card" style="padding:16px">
+          <div style="font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px">Despachado</div>
+          <div id="sf-stat-despachado" style="font-size:28px;font-weight:800;color:var(--blue);margin-top:4px">—</div>
+        </div>
+        <div class="card" style="padding:16px">
+          <div style="font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px">En Proceso</div>
+          <div id="sf-stat-proceso" style="font-size:28px;font-weight:800;color:var(--yellow);margin-top:4px">—</div>
+        </div>
+        <div class="card" style="padding:16px">
+          <div style="font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px">Retirar Terminal</div>
+          <div id="sf-stat-retiro" style="font-size:28px;font-weight:800;color:var(--purple);margin-top:4px">—</div>
+        </div>
+      </div>
+
+      <!-- Tabla OTs -->
+      <div class="card" style="padding:0;overflow:hidden">
+        <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+          <div style="font-size:13px;font-weight:600;color:var(--text)">OTs activas — Correo Argentino</div>
+          <input class="input" id="sf-search" placeholder="Buscar OT, cuenta, tracking..." style="width:240px;padding:6px 10px;font-size:12px" oninput="sfFilterTable()">
+        </div>
+        <div style="overflow-x:auto">
+          <table style="width:100%;border-collapse:collapse;font-size:12px">
+            <thead>
+              <tr style="background:var(--navy-800)">
+                <th style="padding:10px 14px;text-align:left;color:var(--text-muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap">OT</th>
+                <th style="padding:10px 14px;text-align:left;color:var(--text-muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Tipo</th>
+                <th style="padding:10px 14px;text-align:left;color:var(--text-muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Estado SF</th>
+                <th style="padding:10px 14px;text-align:left;color:var(--text-muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Cuenta</th>
+                <th style="padding:10px 14px;text-align:left;color:var(--text-muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Tracking envío</th>
+                <th style="padding:10px 14px;text-align:left;color:var(--text-muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Estado CA</th>
+                <th style="padding:10px 14px;text-align:left;color:var(--text-muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Fecha despacho</th>
+                <th style="padding:10px 14px;text-align:left;color:var(--text-muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Responsable</th>
+              </tr>
+            </thead>
+            <tbody id="sf-tbody">
+              <tr><td colspan="8" style="padding:40px;text-align:center;color:var(--text-muted)">Cargando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <!-- Logs de sync -->
+      <div class="card" style="padding:0;overflow:hidden;margin-top:16px">
+        <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+          <div style="font-size:13px;font-weight:600;color:var(--text)">📋 Historial de sincronizaciones</div>
+          <button class="btn btn-sm" onclick="sfCargarLogs()" style="font-size:11px;padding:4px 10px">↺ Actualizar</button>
+        </div>
+        <div style="overflow-x:auto">
+          <table style="width:100%;border-collapse:collapse;font-size:11px">
+            <thead>
+              <tr style="background:var(--navy-800)">
+                <th style="padding:8px 14px;text-align:left;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px">Fecha</th>
+                <th style="padding:8px 14px;text-align:left;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px">Tipo</th>
+                <th style="padding:8px 14px;text-align:left;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px">Origen</th>
+                <th style="padding:8px 14px;text-align:left;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px">Status</th>
+                <th style="padding:8px 14px;text-align:left;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px">Total</th>
+                <th style="padding:8px 14px;text-align:left;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px">Actualizadas</th>
+                <th style="padding:8px 14px;text-align:left;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px">Duración</th>
+                <th style="padding:8px 14px;text-align:left;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px">Detalle</th>
+              </tr>
+            </thead>
+            <tbody id="sf-logs-tbody">
+              <tr><td colspan="8" style="padding:20px;text-align:center;color:var(--text-muted)">Cargando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <!-- /SF-INTEGRACIÓN -->
+
+    <!-- HOME -->
+    <div class="module active" id="mod-home">
+
+      <!-- HEADER BIENVENIDA -->
+      <div id="ops-header" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+        <div>
+          <h2 id="welcomeMsg" style="font-size:20px;font-weight:800;color:#fff;margin:0"></h2>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:3px" id="ops-timestamp">Panel de Operaciones</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px">
+
+          <div id="qrCanvas" style="background:#fff;border-radius:10px;padding:6px;width:68px;height:68px;display:flex;align-items:center;justify-content:center;"></div>
+        </div>
+      </div>
+
+      <!-- GRÁFICOS TOP -->
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;margin-bottom:20px" id="ops-charts-grid">
+        <div class="ops-chart-card" id="chart-instaladas" style="display:none"></div>
+        <div class="ops-chart-card" id="chart-precolecta" style="display:none"></div>
+        <div class="ops-chart-card" id="chart-entregas" style="display:none"></div>
+        <div class="ops-chart-card" id="chart-desins"></div>
+      </div>
+
+      <!-- BREAKDOWN POR OPERADOR (solo admin, vista equipo) -->
+      <div id="ops-breakdown" style="display:none;margin-bottom:20px">
+        <div class="sec-title" style="margin-bottom:12px">
+          <div class="sec-dot" style="background:#f59e0b"></div>
+          <span>Resumen por operador</span>
+        </div>
+        <div id="ops-breakdown-table"></div>
+      </div>
+
+      <!-- KPIs ABAJO -->
+      <div id="ops-kpis" class="stats-row" style="flex-wrap:wrap;margin-bottom:20px;gap:10px"></div>
+
+      <!-- SLA POR TIPO -->
+      <div class="sec-title" style="margin-bottom:12px">
+        <div class="sec-dot" style="background:var(--blue)"></div>
+        <span>SLA — Antigüedad de OTs activas</span>
+      </div>
+      <div id="ops-sla-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-bottom:20px"></div>
+
+      <!-- KPIs CORREO ARGENTINO (solo admin) -->
+      <div id="ca-kpi-section" style="display:none;margin-bottom:20px">
+        <div class="sec-title" style="margin-bottom:12px">
+          <div class="sec-dot" style="background:#E30613"></div>
+          <span>Performance Correo Argentino</span>
+          <span id="ca-kpi-sla-label" style="font-size:10px;color:var(--text-muted);margin-left:8px;font-family:'JetBrains Mono',monospace">SLA target: 7 días</span>
+        </div>
+        <!-- KPI chips -->
+        <div id="ca-kpi-chips" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px"></div>
+        <!-- Tabla por provincia -->
+        <div style="background:var(--navy-800);border:1px solid var(--border);border-radius:10px;overflow:hidden">
+          <div style="padding:10px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px">
+            <span style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px">SLA por provincia</span>
+            <span style="font-size:10px;color:var(--text-muted)">— OTs entregadas con datos de tracking</span>
+          </div>
+          <div id="ca-kpi-tabla" style="overflow-x:auto">
+            <table style="width:100%;border-collapse:collapse;font-size:12px">
+              <thead>
+                <tr style="background:var(--navy-700)">
+                  <th style="padding:8px 12px;text-align:left;color:var(--text-muted);font-weight:600;font-size:10px;text-transform:uppercase;letter-spacing:.5px">Provincia</th>
+                  <th style="padding:8px 12px;text-align:center;color:var(--text-muted);font-weight:600;font-size:10px;text-transform:uppercase;letter-spacing:.5px">OTs</th>
+                  <th style="padding:8px 12px;text-align:center;color:var(--text-muted);font-weight:600;font-size:10px;text-transform:uppercase;letter-spacing:.5px">SLA prom.</th>
+                  <th style="padding:8px 12px;text-align:center;color:var(--text-muted);font-weight:600;font-size:10px;text-transform:uppercase;letter-spacing:.5px">≤7 días ✅</th>
+                  <th style="padding:8px 12px;text-align:center;color:var(--text-muted);font-weight:600;font-size:10px;text-transform:uppercase;letter-spacing:.5px">&gt;7 días ⚠️</th>
+                  <th style="padding:8px 12px;text-align:center;color:var(--text-muted);font-weight:600;font-size:10px;text-transform:uppercase;letter-spacing:.5px">Intentos prom.</th>
+                  <th style="padding:8px 12px;text-align:center;color:var(--text-muted);font-weight:600;font-size:10px;text-transform:uppercase;letter-spacing:.5px">1er intento ✅</th>
+                </tr>
+              </thead>
+              <tbody id="ca-kpi-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ACCESOS RÁPIDOS -->
+      <div style="border-top:1px solid var(--border);padding-top:16px">
+        <div class="sec-title" style="margin-bottom:12px">
+          <div class="sec-dot" style="background:var(--text-muted)"></div>
+          <span>Módulos</span>
+        </div>
+        <div class="dash-grid" id="dashGrid"></div>
+      </div>
+
+    </div>
+    <!-- SIMS -->
+    <div class="module" id="mod-sims">
+      <div class="upload-zone" id="simDropZone">
+        <input type="file" id="simFileInput" multiple accept="image/*">
+        <div style="font-size:30px;margin-bottom:8px">📷</div>
+        <h3>Subir fotos de chips SIM</h3>
+        <p>Arrastrá imágenes o hacé clic · JPG, PNG · Múltiples archivos</p>
+      </div>
+      <div class="thumbs" id="simThumbs"></div>
+      <div class="progress-box" id="simProgress">
+        <div class="progress-text" id="simProgressText">Procesando...</div>
+        <div class="progress-track"><div class="progress-fill" id="simProgressFill"></div></div>
+      </div>
+      <div id="simError"></div>
+      <div class="stats-row" id="simStats" style="display:none">
+        <div class="stat-box s-teal"><div class="stat-num" id="ss-total">0</div><div class="stat-label">Detectadas</div></div>
+        <div class="stat-box s-green"><div class="stat-num" id="ss-ok">0</div><div class="stat-label">En base</div></div>
+        <div class="stat-box s-red"><div class="stat-num" id="ss-baja">0</div><div class="stat-label">Sin registro</div></div>
+      </div>
+      <div id="simResults"></div>
+      <div class="sec-title" style="margin-top:22px"><div class="sec-dot" style="background:var(--teal)"></div>Búsqueda manual</div>
+      <div class="card">
+        <div class="row">
+          <div class="field"><input class="input" id="simManualInput" placeholder="Serie, sufijo del chip (ej: 056426839) o número de línea..." /></div>
+          <div style="display:flex;align-items:flex-end"><button class="btn btn-sm" style="white-space:nowrap" onclick="simSearchManual()">Buscar SIM</button></div>
+        </div>
+        <div id="simManualResult"></div>
+      </div>
+    </div>
+
+    <!-- ENVIOS -->
+    <div class="module" id="mod-envios">
+
+      <!-- Stats row -->
+      <!-- Stats por logística (admin) — oculto, solo para JS -->
+      <div id="envLogisticaStats" style="display:none"></div>
+      <!-- Stats por zona -->
+      <div class="stats-row" id="envZonaRow" style="display:none">
+        <div class="stat-box" id="zcard-caba" onclick="filtrarZona('CABA')" style="border-left:3px solid #1a9fd4;cursor:pointer;transition:all .2s" onmouseover="this.style.background='rgba(26,159,212,.1)'" onmouseout="this.style.background=''">
+          <div class="stat-num" style="color:#1a9fd4;font-size:22px" id="z-caba">0</div>
+          <div class="stat-label">🏙️ CABA</div>
+          <div style="font-size:9px;color:var(--text-muted);margin-top:2px" id="z-caba-km"></div>
+        </div>
+        <div class="stat-box" id="zcard-norte" onclick="filtrarZona('Zona Norte')" style="border-left:3px solid #10b981;cursor:pointer;transition:all .2s" onmouseover="this.style.background='rgba(16,185,129,.1)'" onmouseout="this.style.background=''">
+          <div class="stat-num" style="color:#10b981;font-size:22px" id="z-norte">0</div>
+          <div class="stat-label">⬆️ Zona Norte</div>
+          <div style="font-size:9px;color:var(--text-muted);margin-top:2px" id="z-norte-km"></div>
+        </div>
+        <div class="stat-box" id="zcard-sur" onclick="filtrarZona('Zona Sur')" style="border-left:3px solid #f59e0b;cursor:pointer;transition:all .2s" onmouseover="this.style.background='rgba(245,158,11,.1)'" onmouseout="this.style.background=''">
+          <div class="stat-num" style="color:#f59e0b;font-size:22px" id="z-sur">0</div>
+          <div class="stat-label">⬇️ Zona Sur</div>
+          <div style="font-size:9px;color:var(--text-muted);margin-top:2px" id="z-sur-km"></div>
+        </div>
+        <div class="stat-box" id="zcard-oeste" onclick="filtrarZona('Zona Oeste')" style="border-left:3px solid #8b5cf6;cursor:pointer;transition:all .2s" onmouseover="this.style.background='rgba(139,92,246,.1)'" onmouseout="this.style.background=''">
+          <div class="stat-num" style="color:#8b5cf6;font-size:22px" id="z-oeste">0</div>
+          <div class="stat-label">⬅️ Zona Oeste</div>
+          <div style="font-size:9px;color:var(--text-muted);margin-top:2px" id="z-oeste-km"></div>
+        </div>
+        <div class="stat-box" id="zcard-fuera" onclick="filtrarZona('Fuera AMBA')" style="border-left:3px solid #ef4444;cursor:pointer;transition:all .2s" onmouseover="this.style.background='rgba(239,68,68,.1)'" onmouseout="this.style.background=''">
+          <div class="stat-num" style="color:#ef4444;font-size:22px" id="z-fuera">0</div>
+          <div class="stat-label">📦 Fuera AMBA</div>
+        </div>
+        <div class="stat-box" id="zcard-todas" onclick="filtrarZona('')" style="border-left:3px solid var(--border2);cursor:pointer;transition:all .2s" onmouseover="this.style.background='rgba(255,255,255,.05)'" onmouseout="this.style.background=''">
+          <div class="stat-num" style="color:var(--text-muted);font-size:22px" id="z-total">0</div>
+          <div class="stat-label">📋 Todas</div>
+        </div>
+      </div>
+
+      <!-- SELECTOR DE LOGÍSTICA (pills) -->
+      <div id="sfImportCard" style="margin-bottom:14px;display:none">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <span style="font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em;white-space:nowrap">Logística:</span>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;" id="logisticaPills">
+            <button id="pill-TODOS" onclick="setCanalEnvios('TODOS')"
+              style="padding:7px 16px;border-radius:20px;font-size:13px;font-weight:700;font-family:'Inter',sans-serif;cursor:pointer;transition:all .15s;border:2px solid var(--teal);background:var(--teal);color:#fff;">
+              Todos <span id="pill-cnt-TODOS" style="opacity:.8;font-size:10px;margin-left:4px"></span>
+            </button>
+            <button id="pill-ALLEATA" onclick="setCanalEnvios('ALLEATA')"
+              style="padding:7px 16px;border-radius:20px;font-size:13px;font-weight:700;font-family:'Inter',sans-serif;cursor:pointer;transition:all .15s;border:2px solid var(--border2);background:transparent;color:var(--text-muted);">
+              🗺️ Alleata <span id="pill-cnt-ALLEATA" style="opacity:.8;font-size:10px;margin-left:4px"></span>
+            </button>
+            <button id="pill-CORREO" onclick="setCanalEnvios('CORREO')"
+              style="padding:7px 16px;border-radius:20px;font-size:13px;font-weight:700;font-family:'Inter',sans-serif;cursor:pointer;transition:all .15s;border:2px solid var(--border2);background:transparent;color:var(--text-muted);">
+              📮 Correo Arg. <span id="pill-cnt-CORREO" style="opacity:.8;font-size:10px;margin-left:4px"></span>
+            </button>
+            <button id="pill-CABIFY" onclick="setCanalEnvios('CABIFY')"
+              style="padding:7px 16px;border-radius:20px;font-size:13px;font-weight:700;font-family:'Inter',sans-serif;cursor:pointer;transition:all .15s;border:2px solid var(--border2);background:transparent;color:var(--text-muted);">
+              🚗 Cabify <span id="pill-cnt-CABIFY" style="opacity:.8;font-size:10px;margin-left:4px"></span>
+            </button>
+            <button id="pill-EPSA" onclick="setCanalEnvios('EPSA')"
+              style="padding:7px 16px;border-radius:20px;font-size:13px;font-weight:700;font-family:'Inter',sans-serif;cursor:pointer;transition:all .15s;border:2px solid var(--border2);background:transparent;color:var(--text-muted);">
+              🚚 EPSA <span id="pill-cnt-EPSA" style="opacity:.8;font-size:10px;margin-left:4px"></span>
+            </button>
+            <button id="pill-OTROS" onclick="setCanalEnvios('OTROS')"
+              style="padding:7px 16px;border-radius:20px;font-size:13px;font-weight:700;font-family:'Inter',sans-serif;cursor:pointer;transition:all .15s;border:2px solid var(--border2);background:transparent;color:var(--text-muted);">
+              📦 Otros <span id="pill-cnt-OTROS" style="opacity:.8;font-size:10px;margin-left:4px"></span>
+            </button>
+          </div>
+        </div>
+        <!-- IDs legacy necesarios para código existente -->
+        <div id="canalActiveBadgeAlleata" style="display:none"></div>
+        <div id="canalActiveBadgeCorreo" style="display:none"></div>
+        <div id="alleataCardStats" style="display:none"></div>
+        <div id="correoCardStats" style="display:none"></div>
+        <div id="canalBtnAlleata" style="display:none"></div>
+        <div id="canalBtnCorreo" style="display:none"></div>
+      </div>
+
+      <!-- Stats card para operador (no-admin) -->
+      <div id="envStatsOperador" style="display:none;margin-bottom:14px">
+        <div style="background:var(--navy-800);border:1px solid var(--border2);border-radius:12px;padding:16px 20px;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+            <span style="font-size:14px;">📦</span>
+            <span style="font-size:13px;font-weight:700;color:var(--text)">Mis envíos</span>
+            <span id="opNombreLabel" style="font-size:11px;color:var(--text-muted);margin-left:4px;"></span>
+          </div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;">
+            <div onclick="document.getElementById('envFiltroEstado').value='';renderEnvios()" style="background:var(--navy-700);border-radius:8px;padding:10px 16px;text-align:center;cursor:pointer;min-width:70px;transition:all .15s;" onmouseover="this.style.background='var(--navy-600)'" onmouseout="this.style.background='var(--navy-700)'">
+              <div id="opStatTotal" style="font-size:20px;font-weight:800;font-family:'JetBrains Mono',monospace;color:var(--text)">0</div>
+              <div style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-top:2px">Total</div>
+            </div>
+            <div onclick="document.getElementById('envFiltroEstado').value='En tránsito';renderEnvios()" style="background:rgba(245,158,11,.1);border-radius:8px;padding:10px 16px;text-align:center;cursor:pointer;min-width:70px;transition:all .15s;" onmouseover="this.style.opacity='.8'" onmouseout="this.style.opacity='1'">
+              <div id="opStatTransito" style="font-size:20px;font-weight:800;font-family:'JetBrains Mono',monospace;color:var(--yellow)">0</div>
+              <div style="font-size:9px;color:var(--yellow);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-top:2px;opacity:.8">Tránsito</div>
+            </div>
+            <div onclick="document.getElementById('envFiltroEstado').value='Entregado';renderEnvios()" style="background:rgba(16,185,129,.1);border-radius:8px;padding:10px 16px;text-align:center;cursor:pointer;min-width:70px;transition:all .15s;" onmouseover="this.style.opacity='.8'" onmouseout="this.style.opacity='1'">
+              <div id="opStatEntregado" style="font-size:20px;font-weight:800;font-family:'JetBrains Mono',monospace;color:var(--green)">0</div>
+              <div style="font-size:9px;color:var(--green);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-top:2px;opacity:.8">Entregados</div>
+            </div>
+            <div onclick="document.getElementById('envFiltroEstado').value='Fallido';renderEnvios()" style="background:rgba(239,68,68,.1);border-radius:8px;padding:10px 16px;text-align:center;cursor:pointer;min-width:70px;transition:all .15s;" onmouseover="this.style.opacity='.8'" onmouseout="this.style.opacity='1'">
+              <div id="opStatProblema" style="font-size:20px;font-weight:800;font-family:'JetBrains Mono',monospace;color:var(--red)">0</div>
+              <div style="font-size:9px;color:var(--red);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-top:2px;opacity:.8">Problema</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Filtros + Buscador (todos los roles) -->
+      <div id="envFiltrosCard" style="display:none;margin-bottom:14px">
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+          <div id="envFiltroRespWrap" class="field" style="margin:0;min-width:180px;display:none">
+            <label class="label">Filtrar por responsable</label>
+            <select class="select" id="envFiltroResp" onchange="renderEnvios()">
+              <option value="">Todos</option>
+            </select>
+          </div>
+          <div class="field" style="margin:0;min-width:160px">
+            <label class="label">Estado</label>
+            <select class="select" id="envFiltroEstado" onchange="renderEnvios()">
+              <option value="">Todos</option>
+              <option>Pre-Colecta</option><option>Despachado</option><option>En tránsito</option><option>En camino</option>
+              <option>En espera en sucursal</option><option>Entregado</option><option>Retirar Terminal</option><option>Fallido</option>
+              <option>Perdido</option><option>Devuelto</option>
+            </select>
+          </div>
+          <div style="position:relative;min-width:260px">
+            <svg style="position:absolute;left:10px;top:50%;transform:translateY(-50%);opacity:0.4;pointer-events:none" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+            <input id="envBuscar" class="input" style="padding-left:32px" placeholder="Buscar por OT, tracking o cuenta..." oninput="renderEnvios()">
+          </div>
+          <button class="btn-ghost btn-sm" onclick="limpiarFiltros()">Limpiar filtros</button>
+        </div>
+      </div>
+
+      <!-- Tabla OTs -->
+      <div class="sec-title" style="display:flex;align-items:center;justify-content:space-between">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div class="sec-dot" style="background:var(--blue)"></div>
+          <span id="envTablaLabel">Todos los envíos</span>
+          <span id="envContador" style="background:rgba(26,159,212,.15);color:var(--blue);font-size:11px;font-weight:700;padding:2px 9px;border-radius:20px;font-family:'JetBrains Mono',monospace;display:none">0</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <button id="btnPrintSelected" onclick="printSelectedRotulos()" style="display:none;background:var(--grad);color:#fff;border:none;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;gap:6px;align-items:center">
+            🖨️ Imprimir seleccionados (<span id="selectedCount">0</span>)
+          </button>
+          <button id="btnAutoTracking" disabled title="Auto-tracking en validación manual — usar lupa por OT" style="background:var(--surface2);border:1px solid var(--border);color:var(--text-muted);padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:not-allowed;display:flex;align-items:center;gap:6px;opacity:.45">
+            🔄 Auto-tracking
+          </button>
+
+
+        </div>
+      </div>
+      <div class="card"><div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th style="width:32px" id="thChkAll"><input type="checkbox" id="chkAll" onclick="toggleAllEnvios(this)" style="cursor:pointer"></th>
+            <th>OT / Cuenta</th>
+            <th>Responsable</th>
+            <th id="thZonaEnvios">Zona</th>
+            <th>Tracking</th>
+            <th id="thDistanciaEnvios">Distancia</th>
+            <th>Destino</th>
+            <th>Costo</th>
+            <th>Estado</th>
+            <th>Obs.</th>
+            <th></th>
+          </tr></thead>
+          <tbody id="enviosTable"></tbody>
+        </table>
+        <div class="empty" id="enviosEmpty">
+          <div class="empty-icon">📭</div>
+          <p id="enviosEmptyMsg">No hay OTs asignadas</p>
+        </div>
+      </div></div>
+    </div>
+      
+
+    <!-- DEVOLUCIONES -->
+    <div class="module" id="mod-devoluciones">
+      <div class="card">
+        <div class="card-title">➕ Registrar devolución</div>
+        <div class="row">
+          <div class="field"><label class="label">Cliente</label><input class="input" id="devCliente" placeholder="Nombre del cliente" /></div>
+          <div class="field"><label class="label">Producto</label><input class="input" id="devProducto" placeholder="SIM CLARO x2" /></div>
+        </div>
+        <div class="row">
+          <div class="field"><label class="label">Motivo</label>
+            <select class="select" id="devMotivo">
+              <option value="">Seleccioná un motivo...</option>
+              <option>Producto defectuoso</option><option>Error en el pedido</option>
+              <option>No funciona</option><option>Cliente no lo recibió</option><option>Otro</option>
+            </select>
+          </div>
+          <div class="field"><label class="label">Estado</label>
+            <select class="select" id="devEstado"><option>Pendiente</option><option>En proceso</option><option>Resuelta</option></select>
+          </div>
+        </div>
+        <div class="field"><label class="label">Notas</label><input class="input" id="devNotas" placeholder="Detalle adicional..." /></div>
+        <button class="btn btn-sm" onclick="addDevolucion()">Registrar devolución</button>
+      </div>
+      <div class="sec-title"><div class="sec-dot" style="background:var(--orange)"></div>Devoluciones</div>
+      <div class="card"><div class="table-wrap">
+        <table><thead><tr><th>Fecha</th><th>Cliente</th><th>Producto</th><th>Motivo</th><th>Estado</th><th>Notas</th><th></th></tr></thead>
+        <tbody id="devsTable"></tbody></table>
+        <div class="empty" id="devsEmpty"><div class="empty-icon">📦</div><p>No hay devoluciones registradas</p></div>
+      </div></div>
+    </div>
+
+    <!-- HORAS -->
+    <div class="module" id="mod-horas">
+      <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:flex-end">
+        <div class="field" style="margin:0"><label class="label">Semana</label><input class="input" id="horasWeek" type="week" style="width:190px" /></div>
+        <button class="btn btn-sm" onclick="renderHoras()">Ver semana</button>
+        <button class="btn-ghost btn-sm" onclick="openAddHoras()">+ Cargar horas</button>
+      </div>
+      <div class="team-grid" id="teamGrid"></div>
+      <div class="sec-title" style="margin-top:14px"><div class="sec-dot" style="background:var(--purple)"></div>Detalle de registros</div>
+      <div class="card"><div class="table-wrap">
+        <table><thead><tr><th>Fecha</th><th>Persona</th><th>Horas</th><th>Tarea</th><th></th></tr></thead>
+        <tbody id="horasTable"></tbody></table>
+        <div class="empty" id="horasEmpty"><div class="empty-icon">🕐</div><p>No hay horas cargadas</p></div>
+      </div></div>
+    </div>
+
+    <!-- AJUSTES -->
+    <div class="module" id="mod-ajustes">
+
+      <!-- Horarios CA Tracker -->
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-title">⏱ Horarios CA Tracker — Actualización hacia SF</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:16px;line-height:1.6">
+          Configurá en qué horarios corre el CA Tracker automático (actualiza estados y cierra OTs en SF).
+          Formato: horas separadas por coma. Ejemplo: <code style="background:var(--navy-700);padding:1px 5px;border-radius:4px">9,13,18</code>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:14px">
+          <div style="background:var(--navy-700);border-radius:10px;padding:14px 16px">
+            <div style="font-size:11px;font-weight:700;color:var(--text);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Lun – Vie</div>
+            <input id="cron-lv" type="text" class="input" placeholder="9,13,18"
+              style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:600;text-align:center" />
+          </div>
+          <div style="background:var(--navy-700);border-radius:10px;padding:14px 16px">
+            <div style="font-size:11px;font-weight:700;color:var(--text);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Sábado</div>
+            <input id="cron-sab" type="text" class="input" placeholder="14"
+              style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:600;text-align:center" />
+          </div>
+          <div style="background:var(--navy-700);border-radius:10px;padding:14px 16px">
+            <div style="font-size:11px;font-weight:700;color:var(--text);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Domingo</div>
+            <input id="cron-dom" type="text" class="input" placeholder="vacío = no corre"
+              style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:600;text-align:center" />
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <button onclick="guardarCronHorarios()" style="background:var(--grad);color:#fff;border:none;padding:9px 22px;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;cursor:pointer;border-radius:8px">
+            💾 Guardar horarios
+          </button>
+          <div id="cron-horarios-msg" style="font-size:12px;color:var(--text-muted)"></div>
+        </div>
+      </div>
+
+      <!-- Actualizar base SIMs (solo admin) -->
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-title">📡 Base de datos SIMs</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px;line-height:1.6;">
+          Subí el Excel de CLARO con el listado actualizado de SIMs. El sistema hará un <strong style="color:var(--text)">upsert</strong> por número de serie — actualizará los existentes y agregará los nuevos sin borrar registros que no vengan en el archivo.
+        </div>
+        <div id="simsDbStats" style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap"></div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <label style="background:var(--grad);color:#fff;border:none;padding:9px 18px;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;cursor:pointer;border-radius:8px;display:inline-flex;align-items:center;gap:8px;">
+            📂 Seleccionar Excel SIMs
+            <input type="file" id="simsFileInput" accept=".xlsx,.xls" style="display:none" onchange="importSIMs(event)">
+          </label>
+          <div id="simsImportMsg" style="font-size:12px;color:var(--text-muted)"></div>
+        </div>
+        <div id="simsImportProgress" style="display:none;margin-top:10px">
+          <div class="progress-text" id="simsProgressText">Procesando...</div>
+          <div class="progress-track" style="margin-top:6px"><div class="progress-fill" id="simsProgressFill"></div></div>
+        </div>
+        <div id="simsImportResult" style="margin-top:10px"></div>
+      </div>
+      <!-- Configuración SLA -->
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-title">⚙️ Configuración SLA</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:16px;line-height:1.6">
+          Umbrales de días para clasificar envíos como cumplidos o fuera de SLA en el dashboard de Performance.
+        </div>
+        <div id="slaConfigGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div style="background:var(--navy-700);border-radius:10px;padding:14px 16px">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+              <img src="https://www.correoargentino.com.ar/sites/default/files/logo-correo.png" style="height:18px;filter:brightness(0) invert(1);opacity:.7">
+              <span style="font-size:12px;font-weight:700;color:var(--text)">Correo Argentino</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px">
+              <input id="sla-ca-input" type="number" min="1" max="30" class="input" style="width:70px;text-align:center;font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:800;padding:8px" />
+              <span style="font-size:13px;color:var(--text-muted)">días</span>
+            </div>
+            <div style="font-size:10px;color:var(--text-muted);margin-top:6px">OTs entregadas en ≤ N días = ✅ cumplido</div>
+          </div>
+          <div style="background:var(--navy-700);border-radius:10px;padding:14px 16px">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+              <span style="font-size:16px">🗺️</span>
+              <span style="font-size:12px;font-weight:700;color:var(--teal)">Logística Alleata</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px">
+              <input id="sla-alleata-input" type="number" min="1" max="30" class="input" style="width:70px;text-align:center;font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:800;padding:8px" />
+              <span style="font-size:13px;color:var(--text-muted)">días</span>
+            </div>
+            <div style="font-size:10px;color:var(--text-muted);margin-top:6px">Para KPIs de Alleata (próximamente)</div>
+          </div>
+        </div>
+        <div style="margin-top:14px;display:flex;align-items:center;gap:10px">
+          <button onclick="guardarConfigSLA()" style="background:var(--grad);color:#fff;border:none;padding:9px 22px;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;cursor:pointer;border-radius:8px">
+            💾 Guardar configuración
+          </button>
+          <div id="slaConfigMsg" style="font-size:12px;color:var(--text-muted)"></div>
+        </div>
+      </div>
+
+      <!-- Backfill SLA CA -->
+      <div class="card" style="margin-bottom:16px;border:1px solid rgba(227,6,19,.2)">
+        <div class="card-title">📊 Backfill SLA Correo Argentino</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px;line-height:1.6;">
+          Consulta el historial de tracking en CA para todas las OTs que aún no tienen datos de SLA (<code style="background:var(--navy-700);padding:1px 5px;border-radius:4px">sla_ca_dias = null</code>). 
+          Ejecutar una sola vez para poblar los datos históricos. Delay de 800ms por OT para no saturar CA.
+        </div>
+        <div id="backfillSLAStats" style="font-size:12px;color:var(--text-muted);margin-bottom:12px"></div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <button onclick="backfillSLACA()" id="btnBackfillSLA" style="background:rgba(227,6,19,.15);border:1px solid rgba(227,6,19,.4);color:#ff6b6b;padding:9px 18px;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;cursor:pointer;border-radius:8px;display:inline-flex;align-items:center;gap:8px;">
+            🔄 Iniciar Backfill SLA
+          </button>
+          <div id="backfillSLAMsg" style="font-size:12px;color:var(--text-muted)"></div>
+        </div>
+        <!-- Log en tiempo real -->
+        <div id="backfillSLALog" style="display:none;margin-top:14px;background:var(--navy-900);border:1px solid var(--border);border-radius:8px;padding:10px 14px;max-height:280px;overflow-y:auto;font-family:'JetBrains Mono',monospace;font-size:11px;line-height:1.7"></div>
+        <div id="backfillSLAResumen" style="display:none;margin-top:10px"></div>
+      </div>
+
+      <!-- Nuevo usuario -->
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-title">👤 Crear nuevo usuario</div>
+        <div class="row">
+          <div class="field"><label class="label">Nombre completo</label><input class="input" id="ajNombre" placeholder="Ej: Gonzalo Pérez" /></div>
+          <div class="field"><label class="label">Email</label><input class="input" id="ajEmail" type="email" placeholder="gonzalo@alleata.com" /></div>
+        </div>
+        <div class="row">
+          <div class="field"><label class="label">Contraseña inicial</label><div style="position:relative;display:flex;align-items:center"><input class="input" id="ajPass" type="password" placeholder="Mínimo 6 caracteres" style="padding-right:42px" /><button type="button" onclick="togglePassVisibility('ajPass',this)" style="position:absolute;right:10px;background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:16px;padding:4px;line-height:1;transition:color .2s" title="Mostrar/ocultar contraseña">👁</button></div></div>
+          <div class="field"><label class="label">Celular</label><input class="input" id="ajCelular" type="tel" placeholder="+54 11 1234-5678" /></div>
+          <div class="field"><label class="label">Rol</label>
+            <select class="select" id="ajRol">
+              <option value="operador">Operador</option>
+              <option value="logistica">Logística</option>
+              <option value="admin">Administrador</option>
+            </select>
+          </div>
+        </div>
+        <div class="field">
+          <label class="label" style="margin-bottom:10px">Módulos habilitados</label>
+          <div class="mod-pills" id="createModPills">
+            <div class="mod-pill active" data-mod="sims" onclick="toggleCreateMod(this)"><span class="pill-dot"></span>📡 SIMs</div>
+            <div class="mod-pill active" data-mod="envios" onclick="toggleCreateMod(this)"><span class="pill-dot"></span>🚚 Envíos</div>
+            <div class="mod-pill" data-mod="desinstalaciones" onclick="toggleCreateMod(this)"><span class="pill-dot"></span>📦 Desinstalaciones</div>
+            <div class="mod-pill" data-mod="napse" onclick="toggleCreateMod(this)"><span class="pill-dot"></span>🔍 Napse</div>
+            <div class="mod-pill active" data-mod="horas" onclick="toggleCreateMod(this)"><span class="pill-dot"></span>⏱ Horas</div>
+            <div class="mod-pill" data-mod="terminales" onclick="toggleCreateMod(this)"><span class="pill-dot"></span>🖥️ Terminales</div>
+            <div class="mod-pill" data-mod="sf" onclick="toggleCreateMod(this)"><span class="pill-dot"></span>☁ SF-Integración</div>
+            <div class="mod-pill" data-mod="store" onclick="toggleCreateMod(this)"><span class="pill-dot"></span>🏪 Store</div>
           </div>
         </div>
         <div id="ajMsg"></div>
@@ -1064,74 +1699,6 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
 </div>
 
 <!-- ── MÓDULO STORE ── -->
-<!-- MÓDULO PRESUPUESTO -->
-<div class="module" id="mod-presupuesto">
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px">
-    <div>
-      <h2 style="margin:0;font-size:20px;font-weight:700">💰 Presupuesto Operaciones</h2>
-      <p style="margin:4px 0 0;font-size:12px;color:var(--text-muted)">Alleata · Mar–Ago 2026 · Solo Admin</p>
-    </div>
-    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-      <!-- Selector de mes -->
-      <div style="display:flex;gap:4px;background:var(--surface2);border-radius:10px;padding:4px">
-        <button onclick="presupuestoSetMes('mar')" id="pres-btn-mar" class="pres-mes-btn" style="padding:5px 12px;border-radius:7px;font-size:12px;font-weight:600;border:none;cursor:pointer;transition:all .15s;background:transparent;color:var(--text-muted)">MAR</button>
-        <button onclick="presupuestoSetMes('abr')" id="pres-btn-abr" class="pres-mes-btn" style="padding:5px 12px;border-radius:7px;font-size:12px;font-weight:600;border:none;cursor:pointer;transition:all .15s;background:transparent;color:var(--text-muted)">ABR</button>
-        <button onclick="presupuestoSetMes('may')" id="pres-btn-may" class="pres-mes-btn" style="padding:5px 12px;border-radius:7px;font-size:12px;font-weight:600;border:none;cursor:pointer;transition:all .15s;background:transparent;color:var(--text-muted)">MAY</button>
-        <button onclick="presupuestoSetMes('jun')" id="pres-btn-jun" class="pres-mes-btn" style="padding:5px 12px;border-radius:7px;font-size:12px;font-weight:600;border:none;cursor:pointer;transition:all .15s;background:var(--teal);color:#fff">JUN</button>
-        <button onclick="presupuestoSetMes('jul')" id="pres-btn-jul" class="pres-mes-btn" style="padding:5px 12px;border-radius:7px;font-size:12px;font-weight:600;border:none;cursor:pointer;transition:all .15s;background:transparent;color:var(--text-muted)">JUL</button>
-        <button onclick="presupuestoSetMes('ago')" id="pres-btn-ago" class="pres-mes-btn" style="padding:5px 12px;border-radius:7px;font-size:12px;font-weight:600;border:none;cursor:pointer;transition:all .15s;background:transparent;color:var(--text-muted)">AGO</button>
-      </div>
-      <!-- Filtro rubro -->
-      <select id="pres-filtro-rubro" onchange="renderPresupuesto()" style="background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:7px 12px;border-radius:8px;font-size:12px;font-weight:600">
-        <option value="">Todos los rubros</option>
-        <option value="LOGISTICA">🚚 Logística</option>
-        <option value="TECNOLOGIA">💻 Tecnología</option>
-        <option value="INSUMOS">📦 Insumos</option>
-        <option value="SISTEMAS">⚙️ Sistemas</option>
-      </select>
-    </div>
-  </div>
-
-  <!-- Cards resumen -->
-  <div id="pres-cards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:24px"></div>
-
-  <!-- Tabla -->
-  <div style="background:var(--surface);border:1px solid var(--border2);border-radius:12px;overflow:hidden">
-    <table style="width:100%;border-collapse:collapse;font-size:13px">
-      <thead>
-        <tr style="background:var(--surface2);border-bottom:1px solid var(--border2)">
-          <th style="padding:12px 16px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);font-weight:700">Proveedor</th>
-          <th style="padding:12px 16px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);font-weight:700">Detalle</th>
-          <th style="padding:12px 16px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);font-weight:700">Rubro</th>
-          <th style="padding:12px 16px;text-align:right;font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);font-weight:700">Previsto</th>
-          <th style="padding:12px 16px;text-align:right;font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);font-weight:700">Real</th>
-          <th style="padding:12px 16px;text-align:right;font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);font-weight:700">Desvío</th>
-          <th style="padding:12px 16px;text-align:center;font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);font-weight:700">%</th>
-          <th style="padding:12px 16px;text-align:center;font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);font-weight:700">Editar Real</th>
-        </tr>
-      </thead>
-      <tbody id="pres-tbody"></tbody>
-      <tfoot id="pres-tfoot"></tfoot>
-    </table>
-  </div>
-
-  <!-- Modal editar real -->
-  <div id="pres-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9000;align-items:center;justify-content:center">
-    <div style="background:var(--navy-800);border:1px solid var(--border2);border-radius:16px;padding:28px;min-width:320px;max-width:400px">
-      <h3 id="pres-modal-title" style="margin:0 0 6px;font-size:16px"></h3>
-      <p id="pres-modal-sub" style="margin:0 0 20px;font-size:12px;color:var(--text-muted)"></p>
-      <label style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px">Monto real ($)</label>
-      <input id="pres-modal-input" type="number" step="1000" style="width:100%;box-sizing:border-box;margin-top:6px;margin-bottom:20px;padding:10px 14px;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:16px;font-family:'JetBrains Mono',monospace">
-      <div style="display:flex;gap:10px;justify-content:flex-end">
-        <button onclick="presupuestoModalClose()" style="padding:8px 18px;background:var(--surface2);border:1px solid var(--border2);color:var(--text);border-radius:8px;cursor:pointer;font-size:13px">Cancelar</button>
-        <button onclick="presupuestoGuardarReal()" style="padding:8px 18px;background:var(--grad);border:none;color:#fff;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600">Guardar</button>
-      </div>
-    </div>
-  </div>
-</div>
-<!-- /MÓDULO PRESUPUESTO -->
-
-
 <div class="module" id="mod-store">
 
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px">
@@ -2580,7 +3147,7 @@ async function dsConsultarCA(otId, trackNum, otNum){
     }
 
     // 3. Mostrar modal con historial — idéntico a consultarTracking()
-    mostrarModalTrackingCA(trackNum, { eventos, pieza }, 'ok', '', otNum || '');
+    mostrarModalTrackingCA(trackNum, { eventos, pieza }, 'ok');
 
     // 4. Persistir en ordenes_trabajo (no en envios — sin tocar Envíos)
     const ultimo = eventos[0];
@@ -3778,242 +4345,7 @@ async function retRunScorer() {
   }
 }
 
-
-// ══════════════════════════════════════════════════════════════════════════════
-// MÓDULO PRESUPUESTO
-// ══════════════════════════════════════════════════════════════════════════════
-
-const PRES_MESES = ['mar','abr','may','jun','jul','ago'];
-const PRES_MESES_LABEL = {mar:'Marzo',abr:'Abril',may:'Mayo',jun:'Junio',jul:'Julio',ago:'Agosto'};
-const PRES_RUBRO_COLOR = {
-  LOGISTICA:  {bg:'rgba(26,159,212,.12)', color:'#1a9fd4', label:'🚚 Logística'},
-  TECNOLOGIA: {bg:'rgba(139,92,246,.12)', color:'#8b5cf6', label:'💻 Tecnología'},
-  INSUMOS:    {bg:'rgba(245,158,11,.12)', color:'#f59e0b', label:'📦 Insumos'},
-  SISTEMAS:   {bg:'rgba(29,191,142,.12)', color:'#1dbf8e', label:'⚙️ Sistemas'},
-};
-
-let _presMes      = 'jun';
-let _presReales   = {}; // { 'epsa_jun': 836863, ... } — cargado de Supabase
-let _presEditando = null; // { id, mes }
-
-const PRES_DATA = [
-  {id:'epsa',      rubro:'LOGISTICA',  proveedor:'EPSA',                     detalle:'Servicios de mensajería',    prev:{ene:3750000,feb:2500000,mar:0,abr:0,may:0,jun:2000000,jul:2000000,ago:2000000}, real:{ene:2068235,feb:3296134,mar:0,abr:0,may:0,jun:836863,jul:0,ago:0}},
-  {id:'ca',        rubro:'LOGISTICA',  proveedor:'Correo Argentino',          detalle:'Servicios de mensajería',    prev:{ene:0,feb:0,mar:0,abr:0,may:0,jun:2500000,jul:2500000,ago:2500000},             real:{ene:1280994,feb:1314066,mar:0,abr:0,may:0,jun:0,jul:0,ago:0}},
-  {id:'cabify',    rubro:'LOGISTICA',  proveedor:'Cabify (CALOG SA)',          detalle:'Servicio de logística',      prev:{ene:1275000,feb:1275000,mar:0,abr:0,may:0,jun:400000,jul:400000,ago:400000},   real:{ene:229140,feb:248630,mar:0,abr:0,may:0,jun:0,jul:0,ago:0}},
-  {id:'enviamelo', rubro:'LOGISTICA',  proveedor:'SPP — Enviamelo',            detalle:'Servicio de logística',      prev:{ene:900000,feb:900000,mar:0,abr:0,may:0,jun:900000,jul:900000,ago:900000},     real:{ene:900000,feb:900000,mar:0,abr:0,may:0,jun:0,jul:0,ago:0}},
-  {id:'andreani',  rubro:'LOGISTICA',  proveedor:'Correo Andreani',            detalle:'Servicios de mensajería',    prev:{ene:0,feb:0,mar:0,abr:0,may:0,jun:150000,jul:150000,ago:150000},               real:{ene:0,feb:0,mar:0,abr:0,may:0,jun:0,jul:0,ago:0}},
-  {id:'napse',     rubro:'TECNOLOGIA', proveedor:'Napse SRL',                  detalle:'Gateway de pagos',           prev:{ene:1600000,feb:4300000,mar:0,abr:0,may:0,jun:1550000,jul:9400000,ago:9400000}, real:{ene:1592743,feb:1543652,mar:0,abr:0,may:0,jun:0,jul:0,ago:0}},
-  {id:'amazon',    rubro:'TECNOLOGIA', proveedor:'Amazon',                     detalle:'Infraestructura cloud',      prev:{ene:12000000,feb:12000000,mar:0,abr:0,may:0,jun:10000000,jul:10000000,ago:10000000}, real:{ene:9233510,feb:8329075,mar:0,abr:0,may:0,jun:0,jul:0,ago:0}},
-  {id:'ecobyte',   rubro:'TECNOLOGIA', proveedor:'Ecobyte SRL',                detalle:'Honorarios desarrollo',      prev:{ene:55200000,feb:57000000,mar:0,abr:0,may:0,jun:57000000,jul:57000000,ago:57000000}, real:{ene:54955296,feb:53480625,mar:0,abr:0,may:0,jun:0,jul:0,ago:0}},
-  {id:'logicalis', rubro:'TECNOLOGIA', proveedor:'Logicalis Argentina SA',     detalle:'Honorarios software',        prev:{ene:0,feb:0,mar:0,abr:0,may:0,jun:26000000,jul:26000000,ago:26000000},          real:{ene:0,feb:5549660,mar:0,abr:0,may:0,jun:8630792,jul:0,ago:0}},
-  {id:'oriontech', rubro:'TECNOLOGIA', proveedor:'Oriontech SA',               detalle:'Honorarios Alleata',         prev:{ene:0,feb:2500000,mar:0,abr:0,may:0,jun:4313650,jul:1450000,ago:1450000},       real:{ene:0,feb:0,mar:0,abr:0,may:0,jun:0,jul:0,ago:0}},
-  {id:'claro',     rubro:'TECNOLOGIA', proveedor:'Claro (AMX Argentina)',      detalle:'Chips Alleata',              prev:{ene:8003466,feb:8000000,mar:0,abr:0,may:0,jun:9000000,jul:9000000,ago:9000000}, real:{ene:8003466,feb:8249570,mar:0,abr:0,may:0,jun:8473154,jul:0,ago:0}},
-  {id:'telecom',   rubro:'TECNOLOGIA', proveedor:'Telecom Personal',           detalle:'Servicios telefonía',        prev:{ene:2500000,feb:2500000,mar:0,abr:0,may:0,jun:5600000,jul:5800000,ago:6000000}, real:{ene:2402982,feb:4950095,mar:0,abr:0,may:0,jun:0,jul:0,ago:0}},
-  {id:'bolsas',    rubro:'INSUMOS',    proveedor:'Casco Flavia (Bolsas Rojas)','detalle':'Bolsas pluribol',          prev:{ene:0,feb:0,mar:0,abr:0,may:0,jun:200000,jul:0,ago:200000},                    real:{ene:0,feb:0,mar:0,abr:0,may:0,jun:0,jul:0,ago:0}},
-  {id:'limpieza',  rubro:'INSUMOS',    proveedor:'CLP SRL (Casa Thames)',      detalle:'Insumos de limpieza',        prev:{ene:0,feb:0,mar:0,abr:0,may:0,jun:50000,jul:0,ago:50000},                      real:{ene:0,feb:0,mar:0,abr:0,may:0,jun:0,jul:0,ago:0}},
-  {id:'botmaker',  rubro:'SISTEMAS',   proveedor:'Botmaker',                   detalle:'Chatbot',                    prev:{ene:0,feb:300000,mar:0,abr:0,may:0,jun:213000,jul:355000,ago:355000},            real:{ene:217569,feb:214560,mar:0,abr:0,may:0,jun:0,jul:0,ago:0}},
-  {id:'phoneiq',   rubro:'SISTEMAS',   proveedor:'Phone IQ',                   detalle:'Central telefónica virtual', prev:{ene:0,feb:1254000,mar:0,abr:0,may:0,jun:940000,jul:940000,ago:940000},           real:{ene:0,feb:0,mar:0,abr:0,may:0,jun:0,jul:0,ago:0}},
-  {id:'ifx',       rubro:'SISTEMAS',   proveedor:'IFX Networks',               detalle:'Licencia Office 365',        prev:{ene:0,feb:0,mar:0,abr:0,may:0,jun:250000,jul:250000,ago:250000},                real:{ene:229311,feb:218051,mar:0,abr:0,may:0,jun:212841,jul:0,ago:0}},
-];
-
-function presReal(id, mes) {
-  const key = `${id}_${mes}`;
-  if (_presReales[key] !== undefined) return _presReales[key];
-  const item = PRES_DATA.find(i => i.id === id);
-  return item ? (item.real[mes] || 0) : 0;
-}
-
-function presFmt(n) {
-  if (!n && n !== 0) return '—';
-  return '$' + Math.round(n).toLocaleString('es-AR');
-}
-
-function presupuestoSetMes(mes) {
-  _presMes = mes;
-  document.querySelectorAll('.pres-mes-btn').forEach(b => {
-    const active = b.id === `pres-btn-${mes}`;
-    b.style.background = active ? 'var(--teal)' : 'transparent';
-    b.style.color      = active ? '#fff' : 'var(--text-muted)';
-  });
-  renderPresupuesto();
-}
-
-async function presupuestoCargarReales() {
-  if (!sb) return;
-  try {
-    const { data } = await sb.from('presupuesto_reales').select('item_id,mes,monto');
-    _presReales = {};
-    (data||[]).forEach(r => { _presReales[`${r.item_id}_${r.mes}`] = r.monto; });
-  } catch(e) { console.warn('[Presupuesto] No se pudo cargar reales:', e.message); }
-}
-
-function renderPresupuesto() {
-  const mes     = _presMes;
-  const filtro  = document.getElementById('pres-filtro-rubro')?.value || '';
-  const items   = PRES_DATA.filter(i => !filtro || i.rubro === filtro);
-
-  // ── Cards resumen por rubro ───────────────────────────────────────────────
-  const rubros = ['LOGISTICA','TECNOLOGIA','INSUMOS','SISTEMAS'];
-  const cards  = document.getElementById('pres-cards');
-  if (cards) {
-    const totRubro = {};
-    rubros.forEach(r => {
-      const rItems = PRES_DATA.filter(i => i.rubro === r);
-      totRubro[r] = {
-        prev: rItems.reduce((s,i) => s + (i.prev[mes]||0), 0),
-        real: rItems.reduce((s,i) => s + presReal(i.id, mes), 0),
-      };
-    });
-
-    const totalPrev = rubros.reduce((s,r) => s + totRubro[r].prev, 0);
-    const totalReal = rubros.reduce((s,r) => s + totRubro[r].real, 0);
-    const totalDesv = totalReal - totalPrev;
-
-    // Card total primero
-    const desvColor = totalDesv > 0 ? '#f87171' : totalDesv < 0 ? '#1dbf8e' : 'var(--text-muted)';
-    let html = `
-      <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:12px;padding:16px 20px">
-        <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px">Total ${PRES_MESES_LABEL[mes]}</div>
-        <div style="font-size:20px;font-weight:800;font-family:'JetBrains Mono',monospace;color:var(--text)">${presFmt(totalPrev)}</div>
-        <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Real: <span style="color:${desvColor};font-weight:600">${presFmt(totalReal)}</span></div>
-        <div style="font-size:11px;color:${desvColor};margin-top:2px;font-weight:600">${totalDesv >= 0 ? '+' : ''}${presFmt(totalDesv)}</div>
-      </div>`;
-
-    rubros.forEach(r => {
-      const rc   = PRES_RUBRO_COLOR[r];
-      const prev = totRubro[r].prev;
-      const real = totRubro[r].real;
-      const desv = real - prev;
-      const dColor = desv > 0 ? '#f87171' : desv < 0 ? '#1dbf8e' : 'var(--text-muted)';
-      const pct = prev > 0 ? Math.round(real/prev*100) : (real > 0 ? 100 : 0);
-      html += `
-        <div style="background:${rc.bg};border:1px solid ${rc.color}33;border-radius:12px;padding:16px 20px">
-          <div style="font-size:10px;color:${rc.color};text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px;font-weight:700">${rc.label}</div>
-          <div style="font-size:18px;font-weight:800;font-family:'JetBrains Mono',monospace;color:var(--text)">${presFmt(prev)}</div>
-          <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Real: <span style="color:${dColor};font-weight:600">${presFmt(real)}</span></div>
-          <div style="display:flex;align-items:center;gap:8px;margin-top:6px">
-            <div style="flex:1;height:4px;background:rgba(255,255,255,.08);border-radius:2px;overflow:hidden">
-              <div style="height:100%;width:${Math.min(pct,100)}%;background:${dColor};border-radius:2px"></div>
-            </div>
-            <span style="font-size:10px;color:${dColor};font-weight:700">${pct}%</span>
-          </div>
-        </div>`;
-    });
-    cards.innerHTML = html;
-  }
-
-  // ── Tabla ─────────────────────────────────────────────────────────────────
-  const tbody = document.getElementById('pres-tbody');
-  const tfoot = document.getElementById('pres-tfoot');
-  if (!tbody) return;
-
-  const isAdmin = currentProfile?.rol === 'admin';
-  let rows = '';
-  let totPrev = 0, totReal = 0;
-
-  // Agrupar por rubro
-  const rubroOrder = ['LOGISTICA','TECNOLOGIA','INSUMOS','SISTEMAS'];
-  rubroOrder.forEach(rubro => {
-    const rItems = items.filter(i => i.rubro === rubro);
-    if (!rItems.length) return;
-    const rc = PRES_RUBRO_COLOR[rubro];
-
-    rItems.forEach(item => {
-      const prev = item.prev[mes] || 0;
-      const real = presReal(item.id, mes);
-      const desv = real - prev;
-      const pct  = prev > 0 ? Math.round(real/prev*100) : (real > 0 ? 999 : null);
-      totPrev += prev;
-      totReal += real;
-
-      const dColor = desv > 0 ? '#f87171' : desv < 0 ? '#1dbf8e' : 'var(--text-muted)';
-      const pctBadge = pct !== null
-        ? `<span style="background:${desv>0?'rgba(248,113,113,.12)':desv<0?'rgba(29,191,142,.12)':'rgba(255,255,255,.06)'};color:${dColor};padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700">${pct}%</span>`
-        : '<span style="color:var(--text-muted);font-size:11px">—</span>';
-
-      rows += `
-        <tr style="border-bottom:1px solid rgba(255,255,255,.04);transition:background .1s" onmouseover="this.style.background='rgba(255,255,255,.02)'" onmouseout="this.style.background=''">
-          <td style="padding:11px 16px">
-            <div style="font-weight:600;font-size:13px">${item.proveedor}</div>
-          </td>
-          <td style="padding:11px 16px;color:var(--text-muted);font-size:12px">${item.detalle}</td>
-          <td style="padding:11px 16px">
-            <span style="background:${rc.bg};color:${rc.color};padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;white-space:nowrap">${rc.label}</span>
-          </td>
-          <td style="padding:11px 16px;text-align:right;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-muted)">${prev ? presFmt(prev) : '—'}</td>
-          <td style="padding:11px 16px;text-align:right;font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;color:${real ? 'var(--text)' : 'var(--text-muted)'}">${real ? presFmt(real) : '—'}</td>
-          <td style="padding:11px 16px;text-align:right;font-family:'JetBrains Mono',monospace;font-size:12px;color:${dColor}">${(prev||real) ? (desv >= 0 ? '+' : '') + presFmt(desv) : '—'}</td>
-          <td style="padding:11px 16px;text-align:center">${pctBadge}</td>
-          <td style="padding:11px 16px;text-align:center">
-            ${isAdmin ? `<button onclick="presupuestoModalOpen('${item.id}','${mes}')" style="background:var(--surface2);border:1px solid var(--border2);color:var(--text-muted);padding:4px 10px;border-radius:6px;cursor:pointer;font-size:11px" title="Cargar real">✏️</button>` : ''}
-          </td>
-        </tr>`;
-    });
-  });
-
-  tbody.innerHTML = rows || '<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--text-muted)">Sin ítems para mostrar</td></tr>';
-
-  // Total footer
-  const totDesv  = totReal - totPrev;
-  const totDColor = totDesv > 0 ? '#f87171' : totDesv < 0 ? '#1dbf8e' : 'var(--text-muted)';
-  tfoot.innerHTML = `
-    <tr style="background:var(--surface2);border-top:2px solid var(--border2)">
-      <td colspan="3" style="padding:12px 16px;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px">TOTAL ${PRES_MESES_LABEL[mes].toUpperCase()}</td>
-      <td style="padding:12px 16px;text-align:right;font-family:'JetBrains Mono',monospace;font-weight:700">${presFmt(totPrev)}</td>
-      <td style="padding:12px 16px;text-align:right;font-family:'JetBrains Mono',monospace;font-weight:700;color:${totDColor}">${presFmt(totReal)}</td>
-      <td style="padding:12px 16px;text-align:right;font-family:'JetBrains Mono',monospace;font-weight:700;color:${totDColor}">${totDesv >= 0 ? '+' : ''}${presFmt(totDesv)}</td>
-      <td colspan="2"></td>
-    </tr>`;
-}
-
-function presupuestoModalOpen(id, mes) {
-  _presEditando = { id, mes };
-  const item = PRES_DATA.find(i => i.id === id);
-  document.getElementById('pres-modal-title').textContent = item?.proveedor || id;
-  document.getElementById('pres-modal-sub').textContent   = `${PRES_MESES_LABEL[mes]} 2026 · ${item?.detalle || ''}`;
-  document.getElementById('pres-modal-input').value       = presReal(id, mes) || '';
-  document.getElementById('pres-modal').style.display     = 'flex';
-  setTimeout(() => document.getElementById('pres-modal-input').focus(), 50);
-}
-
-function presupuestoModalClose() {
-  document.getElementById('pres-modal').style.display = 'none';
-  _presEditando = null;
-}
-
-async function presupuestoGuardarReal() {
-  if (!_presEditando) return;
-  const { id, mes } = _presEditando;
-  const monto = parseFloat(document.getElementById('pres-modal-input').value) || 0;
-
-  _presReales[`${id}_${mes}`] = monto;
-
-  // Persistir en Supabase
-  if (sb) {
-    try {
-      await sb.from('presupuesto_reales').upsert(
-        { item_id: id, mes, monto, updated_at: new Date().toISOString() },
-        { onConflict: 'item_id,mes' }
-      );
-    } catch(e) { console.warn('[Presupuesto] Error guardando real:', e.message); }
-  }
-
-  presupuestoModalClose();
-  renderPresupuesto();
-}
-
-// Cerrar modal con Escape — se registra una sola vez
-if (!window._presEscRegistered) {
-  window._presEscRegistered = true;
-  document.addEventListener('keydown', e => {
-    if (e.key === 'Escape') {
-      const modal = document.getElementById('pres-modal');
-      if (modal && modal.style.display === 'flex') presupuestoModalClose();
-    }
-  });
-}
-
-console.log('[Alleata v4.3.0] OK');
+console.log('[Alleata v4.1.3] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -4189,6 +4521,8 @@ function showApp(){
     if(navAlly) navAlly.style.display='flex';
     const navDistri=document.getElementById('nav-distri');
     if(navDistri) navDistri.style.display='flex';
+    const navSF=document.getElementById('nav-sf');
+    if(navSF) navSF.style.display='flex';
     // SF Sync global en topbar — solo admins
     mostrarSFSyncSiAdmin();
     document.getElementById('nav-ajustes').style.display='flex';
@@ -4199,8 +4533,6 @@ function showApp(){
   }
   const navStore=document.getElementById('nav-store');
   if(navStore&&(isAdmin||modulos.includes('store')))navStore.style.display='flex';
-  const navPres=document.getElementById('nav-presupuesto');
-  if(navPres&&isAdmin)navPres.style.display='flex';
   ['sims','envios','desinstalaciones','napse','horas','store'].forEach(mod=>{
     const el=document.getElementById('nav-'+mod);
     if(el&&!modulos.includes(mod)&&!isAdmin){el.classList.add('locked');el.onclick=null;}
@@ -4238,7 +4570,7 @@ function buildDashCards(modulos,isAdmin){
   loadOpsPanel(isAdmin);
 }
 
-const MOD_INFO={home:'Dashboard',sims:'Verificador SIMs',envios:'Envíos',rollout:'Rollout',desinstalaciones:'Desinstalaciones',napse:'NAPSE — Logs VTOL',instalaciones:'Instalaciones SF',horas:'Control de Horas',retencion:'Retención de Cuentas',ajustes:'Ajustes',ally:'Configuración Ally',distri:'Distribuidores',terminales:'Terminales — Logicalis',store:'Store — Terminales disponibles',presupuesto:'💰 Presupuesto Operaciones'};
+const MOD_INFO={home:'Dashboard',sims:'Verificador SIMs',envios:'Envíos',rollout:'Rollout',desinstalaciones:'Desinstalaciones',napse:'NAPSE — Logs VTOL',instalaciones:'Instalaciones SF',horas:'Control de Horas',retencion:'Retención de Cuentas',ajustes:'Ajustes',ally:'Configuración Ally',distri:'Distribuidores',terminales:'Terminales — Logicalis',store:'Store — Terminales disponibles'};
 
 function goTo(mod){
   const el=document.getElementById('nav-'+mod);
@@ -4281,6 +4613,7 @@ function goTo(mod){
   if(mod==='distri')window.cargarDistri?.();
   if(mod==='horas')renderHoras();
   if(mod==='ajustes'){loadUsers();loadSimsDbStats();loadConfigSLA();_auditPage=0;loadAuditLog();cargarCronHorarios();}
+  if(mod==='sf')window.cargarSFIntegracion?.();
   if(mod==='retencion')window.cargarRetencion?.();
   if(mod==='terminales')window.termInit?.();
   if(mod==='store')window.storeInit?.(); // store
@@ -4294,7 +4627,6 @@ function refreshCurrentModule(){
   if(btn){btn.textContent='↻';btn.style.color='var(--teal)';}
   setTimeout(()=>{if(btn){btn.textContent='↺';btn.style.color='var(--text-muted)';}},600);
   if(mod==='envios'){renderEnvios();loadBadges();}
-  if(mod==='presupuesto'){presupuestoCargarReales().then(renderPresupuesto);}
   else if(mod==='desinstalaciones'){if(window.cargarDesinstalaciones)window.cargarDesinstalaciones();}
   else if(mod==='horas'){renderHoras();loadBadges();}
   else if(mod==='sims'){loadSimsDbStats();}
@@ -4325,6 +4657,7 @@ const ALL_MODS = [
   {id:'napse', label:'🔍 Napse'},
   {id:'horas',     label:'⏱ Horas'},
   {id:'terminales',label:'🖥️ Terminales'},
+  {id:'sf',        label:'☁ SF-Integración'},
   {id:'store',      label:'🏪 Store'},
 ];
 
@@ -4731,7 +5064,7 @@ async function loadBadges(){
       des.push(..._pg);if(_pg.length<_P)break;_f+=_P;
     }
   }
-  const envCount=(env||[]).filter(e=>!['Entregado','Exitoso','Fallido','Devuelto','Perdido'].includes(e.status)).length;
+  const envCount=(env||[]).filter(e=>!['Entregado','Fallido','Devuelto','Perdido'].includes(e.status)).length;
   const desCount=(des||[]).filter(d=>!['Terminal recuperada','Extraviada'].includes(d.estado)).length;
   const nbEnv=document.getElementById('nb-envios');if(nbEnv)nbEnv.textContent=envCount;
   const nbDes=document.getElementById('nb-desins');if(nbDes)nbDes.textContent=desCount;
@@ -4778,7 +5111,7 @@ async function loadOpsPanel(isAdmin){
   }
 
   const directas=envios.filter(e=>e.estado&&!['Recibido ✅','Pendiente rótulo','Rótulo generado','En camino retorno'].includes(e.estado));
-  const ESTADOS_CERRADOS=['Entregado','Exitoso','Fallido','Devuelto','Perdido'];
+  const ESTADOS_CERRADOS=['Entregado','Fallido','Devuelto','Perdido'];
 
   // ── GRÁFICO 1: Instaladas hoy (KPI grande) ──
   const instaladas=envios.filter(e=>e.estado==='Entregado'&&(e.fecha||'').startsWith(today)).length;
@@ -5723,9 +6056,6 @@ function normalizarSFWorkorder(r){
 }
 
 async function renderEnvios(){
-  _mostrandoExitosas = false;
-  const label = document.getElementById('envTablaLabel');
-  if(label) label.textContent = 'Todos los envíos';
   const isAdmin=currentProfile?.rol==='admin';
   const isLogistica=currentProfile?.rol==='logistica';
   const filtroEstOrden=document.getElementById('envFiltroEstado')?.value||'';
@@ -5737,7 +6067,7 @@ async function renderEnvios(){
   let query=sb.from('sf_workorders')
     .select('*')
     .in('record_type', TIPOS_ENVIO)
-    .order('fecha_despacho',{ascending:_enviosSortAsc});
+    .order('fecha_despacho',{ascending:false});
 
   // Estados activos: Pre-Colecta o Despachado — logística ALLEATA / CORREO ARGENTINO / CABIFY
   const STATUSES_ACTIVOS = ['Pre-Colecta','Despachado','En Proceso'];
@@ -5878,43 +6208,11 @@ function renderLogisticaStats(list){
       <div style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-top:2px">${lbl}</div>
     </div>`;
 
-  // Contar exitosas (Entregado, fecha_despacho >= 2026-06-01) — query async
-  (async () => {
-    try {
-      const LOG_MAP2 = {ALLEATA:'ALLEATA', CORREO:'CORREO ARGENTINO', CABIFY:'CABIFY', EPSA:'EPSA'};
-      let qEx = sb.from('sf_workorders')
-        .select('id,logistica,fecha_despacho')
-        .in('record_type', ['Instalación Equipo + Simcard','Instalación Simcard','Asistencia Tecnica','Cambio de Terminal'])
-        .in('status',['Entregado','Exitoso'])
-        .gte('fecha_despacho','2026-06-01');
-      if(_canalActivo !== 'TODOS' && _canalActivo !== 'OTROS'){
-        qEx = qEx.eq('logistica', LOG_MAP2[_canalActivo]||_canalActivo);
-      }
-      const {data: exRaw=[]} = await qEx;
-      let exList = exRaw||[];
-      if(_canalActivo==='OTROS') exList=exList.filter(e=>!['ALLEATA','CORREO ARGENTINO','CABIFY','EPSA'].includes((e.logistica||'').toUpperCase().trim()));
-      const exitosas = exList.length;
-      // Agregar/actualizar card EXITOSAS al stats row
-      let exCard = document.getElementById('stat-exitosas-envios');
-      if(!exCard){
-        exCard = document.createElement('div');
-        exCard.id = 'stat-exitosas-envios';
-        exCard.onclick = () => { document.getElementById('envFiltroEstado').value='Entregado'; _mostrandoExitosas=true; renderExitosas(); };
-        exCard.style.cssText = 'background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.3);border-radius:10px;padding:10px 18px;text-align:center;min-width:80px;cursor:pointer;transition:all .15s;';
-        exCard.onmouseover = () => exCard.style.background='rgba(16,185,129,.2)';
-        exCard.onmouseout  = () => exCard.style.background='rgba(16,185,129,.1)';
-        el.appendChild(exCard);
-      }
-      exCard.innerHTML = `<div style="font-size:22px;font-weight:800;font-family:'JetBrains Mono',monospace;color:#10b981">${exitosas}</div><div style="font-size:9px;color:#6ee7b7;text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-top:2px">✅ Exitosas</div><div style="font-size:8px;color:var(--text-muted);margin-top:1px">desde 1/6</div>`;
-    } catch(e){ console.warn('exitosas stat:', e.message); }
-  })();
-
   el.innerHTML =
     stat(g.total,      'Total',       'var(--text)') +
     stat(g.precolecta, 'Pre-Colecta', '#f59e0b') +
     stat(g.transito,   'En Tránsito', '#1a9fd4') +
     stat(g.despachado, 'Despachado',  '#1dbf8e');
-  // La card de exitosas se agrega async (ver bloque anterior)
 }
 
 // ── SLA CORREO ARGENTINO ──
@@ -6467,7 +6765,7 @@ function renderEnviosTable(list){
       <td>
         <!-- SELECT ESTADO ENVÍO -->
         <select class="select" style="width:160px;padding:4px 8px;font-size:11px" onchange="updateEnvioEstado('${e.id}',this.value)">
-          ${['Pre-Colecta','Despachado','En tránsito','En camino','En espera en sucursal','Exitoso','Entregado','Retirar Terminal','Fallido','Perdido','Devuelto'].map(s=>`<option ${(e.estado||'Pre-Colecta')===s?'selected':''}>${s}</option>`).join('')}
+          ${['Pre-Colecta','Despachado','En tránsito','En camino','En espera en sucursal','Entregado','Retirar Terminal','Fallido','Perdido','Devuelto'].map(s=>`<option ${(e.estado||'Pre-Colecta')===s?'selected':''}>${s}</option>`).join('')}
         </select>
         ${e.ultimo_evento_fecha ? `<div style="font-size:10px;color:var(--text-muted);margin-top:4px;font-family:'JetBrains Mono',monospace;letter-spacing:0.3px">${formatFechaCA(e.ultimo_evento_fecha)}</div>` : ''}
         <!-- SELECT ESTADO RETORNO (solo si tiene retorno) -->
@@ -6543,49 +6841,7 @@ async function updateEstadoDevolucion(id,estado){
 
 // ── CANAL SELECTOR ──
 let _canalActivo = 'TODOS'; // 'TODOS' | 'ALLEATA' | 'CORREO' | 'CABIFY'
-let _enviosSortAsc = false; // false = más recientes primero (desc), true = más antiguos primero (asc)
-let _mostrandoExitosas = false; // si estamos mostrando las exitosas
 let selectedEnvios = new Set();
-
-function toggleSortEnvios(){
-  _enviosSortAsc = !_enviosSortAsc;
-  const btn = document.getElementById('btnSortEnvios');
-  if(btn) btn.innerHTML = _enviosSortAsc ? '↑ Más antiguas' : '↓ Más recientes';
-  if(_mostrandoExitosas) renderExitosas();
-  else renderEnvios();
-}
-
-// Render de exitosas (Entregado, desde 1/6)
-async function renderExitosas(){
-  _mostrandoExitosas = true;
-  const el = document.getElementById('enviosTable');
-  const empty = document.getElementById('enviosEmpty');
-  const label = document.getElementById('envTablaLabel');
-  const contador = document.getElementById('envContador');
-  if(label) label.innerHTML = '✅ Exitosas <span style="font-size:10px;color:var(--text-muted);font-weight:400">desde 1/6</span>';
-  if(el) el.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:20px;color:var(--text-muted);font-size:12px">Cargando...</td></tr>';
-
-  const LOG_MAP2 = {ALLEATA:'ALLEATA', CORREO:'CORREO ARGENTINO', CABIFY:'CABIFY', EPSA:'EPSA'};
-  try {
-    let q = sb.from('sf_workorders')
-      .select('*')
-      .in('record_type', ['Instalación Equipo + Simcard','Instalación Simcard','Asistencia Tecnica','Cambio de Terminal'])
-      .in('status',['Entregado','Exitoso'])
-      .gte('fecha_despacho','2026-06-01')
-      .order('fecha_despacho', {ascending: _enviosSortAsc});
-    if(_canalActivo !== 'TODOS' && _canalActivo !== 'OTROS') q=q.eq('logistica', LOG_MAP2[_canalActivo]||_canalActivo);
-    let {data:raw=[]} = await q;
-    let list = (raw||[]).map(normalizarSFWorkorder);
-    if(_canalActivo==='OTROS') list=list.filter(e=>!['ALLEATA','CORREO ARGENTINO','CABIFY','EPSA'].includes((e.logistica||'').toUpperCase().trim()));
-    const buscar=(document.getElementById('envBuscar')?.value||'').trim().toLowerCase();
-    if(buscar) list=list.filter(e=>[e.ot_numero,e.track,e.cuenta,e.responsable].join(' ').toLowerCase().includes(buscar));
-    if(contador){ contador.textContent=list.length; contador.style.display=list.length?'inline':'none'; }
-    if(!list.length){ if(el)el.innerHTML=''; if(empty)empty.style.display='block'; return; }
-    if(empty)empty.style.display='none';
-    renderEnviosTable(list);
-  } catch(e){ console.error('renderExitosas:', e); }
-}
-
 function updateSelectedCount(){
   const checks = document.querySelectorAll('.envio-chk');
   selectedEnvios.clear();
@@ -6737,11 +6993,12 @@ async function consultarTracking(id, trackNum){
       mostrarModalTrackingCA(trackNum, null, 'error', 'Sin eventos registrados para este número');
       return;
     }
+    mostrarModalTrackingCA(trackNum, { eventos, pieza }, 'ok');
+
     // ── SLA: calcular y persistir ────────────────────────────────────────────
     const { data: envData } = await sb.from('sf_workorders').select('workorder_number, record_type').eq('id', id).single();
     const tipoOT   = envData?.record_type || '';
     const otNumero = envData?.workorder_number || '';
-    mostrarModalTrackingCA(trackNum, { eventos, pieza }, 'ok', '', otNumero);
     const ultimo   = eventos[0];
     const estadoMapeado = mapearEstadoCA(ultimo.historia, ultimo.estadoCA, tipoOT);
 
@@ -6750,8 +7007,7 @@ async function consultarTracking(id, trackNum){
         ultimo_evento_envio:       ultimo.estadoCA ? `${ultimo.historia} — ${ultimo.estadoCA}` : ultimo.historia,
         ultimo_evento_envio_fecha: ultimo.fecha
       };
-      // CA informa Entregado → en SF/app el estado final es Exitoso
-      if(estadoMapeado) updateData.status = estadoMapeado === 'Entregado' ? 'Exitoso' : estadoMapeado;
+      if(estadoMapeado) updateData.status = estadoMapeado;
 
       const sla = calcularSLA(eventos);
       if(sla.fecha_repesaje)         updateData.fecha_repesaje       = sla.fecha_repesaje;
@@ -7030,9 +7286,7 @@ async function autoActualizarTracking(){
         if(sla.sla_total_dias !== null) updateAT.sla_total_dias     = sla.sla_total_dias;
 
         if(estadoMapeado && estadoMapeado !== envio.estado){
-          // CA informa Entregado → en SF/app el estado final es Exitoso
-          const estadoFinal = estadoMapeado === 'Entregado' ? 'Exitoso' : estadoMapeado;
-          updateAT.status = estadoFinal;
+          updateAT.status = estadoMapeado;
           await sb.from('sf_workorders').update(updateAT).eq('id', envio.id);
           // Disparar processAllyRules vía backend para CUALQUIER cambio de estado
           // Esto evalúa ally_notification_rules y envía notificaciones al grupo correcto
@@ -7045,7 +7299,7 @@ async function autoActualizarTracking(){
             atAddLog('alerta', otLabel, envio.responsable, envio.cuenta, `⚠️ ${visitaLabel||'ALERTA'} — ${detalle}`);
             alertas++;
           } else {
-            atAddLog('cambio', otLabel, envio.responsable, envio.cuenta, `${envio.estado} → ${estadoFinal}`);
+            atAddLog('cambio', otLabel, envio.responsable, envio.cuenta, `${envio.estado} → ${estadoMapeado}`);
             actualizados++;
           }
         } else {
@@ -7139,7 +7393,7 @@ async function autoActualizarTracking(){
   renderEnvios(); loadBadges();
 }
 
-function mostrarModalTrackingCA(trackNum, caData, estado, errorMsg='', otNumero=''){
+function mostrarModalTrackingCA(trackNum, caData, estado, errorMsg=''){
   document.getElementById('modal-tracking-ca')?.remove();
 
   let contenido='';
@@ -7161,18 +7415,10 @@ function mostrarModalTrackingCA(trackNum, caData, estado, errorMsg='', otNumero=
     const ultimo = eventos[0];
     // Priorizar estadoCA (campo Estado de CA) sobre historia para el badge
     const estadoTexto = ultimo?.estadoCA || ultimo?.historia || '';
-    const esEntregado   = estadoTexto.toUpperCase().includes('ENTREGADO');
-    const esDevuelto    = estadoTexto.toUpperCase().includes('DEVUELTO');
-    const esDomCerrado  = estadoTexto.toUpperCase().includes('DOMICILIO CERRADO')
-                       || estadoTexto.toUpperCase().includes('DIRECCIÓN INSUFICIENTE')
-                       || estadoTexto.toUpperCase().includes('DIRECCION INSUFICIENTE')
-                       || estadoTexto.toUpperCase().includes('PLAZO VENCIDO');
-    const colorBadge = esEntregado  ? 'rgba(29,191,142,.15)'
-                     : (esDevuelto || esDomCerrado) ? 'rgba(248,113,113,.15)'
-                     : 'rgba(26,159,212,.12)';
-    const textBadge  = esEntregado  ? 'var(--teal)'
-                     : (esDevuelto || esDomCerrado) ? '#f87171'
-                     : 'var(--blue)';
+    const esEntregado = estadoTexto.toUpperCase().includes('ENTREGADO');
+    const esDevuelto = estadoTexto.toUpperCase().includes('DEVUELTO');
+    const colorBadge = esEntregado ? 'rgba(29,191,142,.15)' : esDevuelto ? 'rgba(248,113,113,.15)' : 'rgba(26,159,212,.12)';
+    const textBadge = esEntregado ? 'var(--teal)' : esDevuelto ? '#f87171' : 'var(--blue)';
 
     const estadoBadge = ultimo
       ? `<span style="background:${colorBadge};color:${textBadge};padding:4px 12px;border-radius:20px;font-size:13px;font-weight:600;">${estadoTexto || caEventoLabel(ultimo.historia)}</span>`
@@ -7207,10 +7453,6 @@ function mostrarModalTrackingCA(trackNum, caData, estado, errorMsg='', otNumero=
           <p style="margin:0;font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:600;">${trackNum}</p>
           ${caData?.pieza?`<p style="margin:4px 0 0;font-size:11px;color:var(--text-secondary);">Pieza: ${caData.pieza}</p>`:''}
         </div>
-        ${otNumero ? `<div style="background:rgba(26,159,212,.12);border:1px solid rgba(26,159,212,.25);border-radius:10px;padding:8px 14px;text-align:center;">
-          <p style="margin:0 0 1px;font-size:9px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;">OT</p>
-          <p style="margin:0;font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:700;color:var(--teal)">${otNumero}</p>
-        </div>` : ''}
         <div style="margin-left:auto;">${estadoBadge}</div>
       </div>
       <div style="background:var(--navy-900);border-radius:10px;overflow:hidden;">
