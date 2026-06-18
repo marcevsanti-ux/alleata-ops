@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.2.0</title>
+<title>Alleata · Operaciones v4.2.1</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -407,7 +407,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.2.0 · 17 jun 2026
+      v4.2.1 · 17 jun 2026
     </div>
   </div>
 </div>
@@ -485,7 +485,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.2.0 · 17 jun 2026
+      v4.2.1 · 17 jun 2026
     </div>
   </div>
 </nav>
@@ -525,7 +525,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.2.0</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.2.1</div>
   </div>
   <div class="content">
 
@@ -4348,7 +4348,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.2.0] OK');
+console.log('[Alleata v4.2.1] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -7497,10 +7497,18 @@ function mostrarModalTrackingCA(trackNum, caData, estado, errorMsg='', otNumero=
     const ultimo = eventos[0];
     // Priorizar estadoCA (campo Estado de CA) sobre historia para el badge
     const estadoTexto = ultimo?.estadoCA || ultimo?.historia || '';
-    const esEntregado = estadoTexto.toUpperCase().includes('ENTREGADO');
-    const esDevuelto = estadoTexto.toUpperCase().includes('DEVUELTO');
-    const colorBadge = esEntregado ? 'rgba(29,191,142,.15)' : esDevuelto ? 'rgba(248,113,113,.15)' : 'rgba(26,159,212,.12)';
-    const textBadge = esEntregado ? 'var(--teal)' : esDevuelto ? '#f87171' : 'var(--blue)';
+    const esEntregado   = estadoTexto.toUpperCase().includes('ENTREGADO');
+    const esDevuelto    = estadoTexto.toUpperCase().includes('DEVUELTO');
+    const esDomCerrado  = estadoTexto.toUpperCase().includes('DOMICILIO CERRADO')
+                       || estadoTexto.toUpperCase().includes('DIRECCIÓN INSUFICIENTE')
+                       || estadoTexto.toUpperCase().includes('DIRECCION INSUFICIENTE')
+                       || estadoTexto.toUpperCase().includes('PLAZO VENCIDO');
+    const colorBadge = esEntregado  ? 'rgba(29,191,142,.15)'
+                     : (esDevuelto || esDomCerrado) ? 'rgba(248,113,113,.15)'
+                     : 'rgba(26,159,212,.12)';
+    const textBadge  = esEntregado  ? 'var(--teal)'
+                     : (esDevuelto || esDomCerrado) ? '#f87171'
+                     : 'var(--blue)';
 
     const estadoBadge = ultimo
       ? `<span style="background:${colorBadge};color:${textBadge};padding:4px 12px;border-radius:20px;font-size:13px;font-weight:600;">${estadoTexto || caEventoLabel(ultimo.historia)}</span>`
