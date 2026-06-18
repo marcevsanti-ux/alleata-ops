@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Alleata · Presupuesto Operaciones v1.2.2</title>
+<title>Alleata · Presupuesto Operaciones v1.2.3</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -154,7 +154,7 @@
 <body>
 
 <h1>💰 Presupuesto Operaciones</h1>
-<p class="sub">Alleata · 2026 · Solo Admin <span style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 8px;border-radius:4px;border:1px solid var(--border2);font-size:10px;margin-left:6px">v1.2.2</span></p>
+<p class="sub">Alleata · 2026 · Solo Admin <span style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 8px;border-radius:4px;border:1px solid var(--border2);font-size:10px;margin-left:6px">v1.2.3</span></p>
 
 <div class="toolbar">
   <div class="mes-bar" id="mesBar"></div>
@@ -476,16 +476,18 @@ function guardar() {
 // ── Modal Logicalis ──────────────────────────────────────────────────────────
 function openLogiModal(m) {
   logiMesActual=m;
+  // Abrir primero para que el DOM esté visible
+  document.getElementById('logiBg').classList.add('open');
   document.getElementById('logiSub').textContent=`${MESES_LABEL[m]} 2026 · Honorarios software`;
   logiCurrentTC=parseFloat(document.getElementById('logiTC').value)||1428;
   logiPendingFac=null;
   logiPendingRTO=null;
   resetLogiForm();
-  logiRenderKPIs();
-  logiRenderFacturas();
-  logiRenderSeries();
-  logiRenderAcum();
-  document.getElementById('logiBg').classList.add('open');
+  // Render después de que el modal está visible
+  try { logiRenderKPIs(); } catch(e) { console.warn('logiRenderKPIs',e); }
+  try { logiRenderFacturas(); } catch(e) { console.warn('logiRenderFacturas',e); }
+  try { logiRenderSeries(); } catch(e) { console.warn('logiRenderSeries',e); }
+  try { logiRenderAcum(); } catch(e) { console.warn('logiRenderAcum',e); }
 }
 function closeLogiModal() {
   document.getElementById('logiBg').classList.remove('open');
