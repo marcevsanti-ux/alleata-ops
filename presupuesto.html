@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Alleata · Presupuesto Operaciones v1.2.8</title>
+<title>Alleata · Presupuesto Operaciones v1.3.0</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
@@ -149,12 +150,49 @@
   .empty{text-align:center;padding:32px;color:var(--text-muted);font-size:13px}
   .toast{position:fixed;bottom:24px;right:24px;background:#1dbf8e;color:#fff;padding:10px 18px;border-radius:10px;font-size:13px;font-weight:600;opacity:0;transition:opacity .3s;pointer-events:none;z-index:9999}
   .toast.show{opacity:1}
+
+  /* ── Login ── */
+  #loginScreen{position:fixed;inset:0;background:var(--navy-900);z-index:9999;display:flex;align-items:center;justify-content:center}
+  .login-box{background:var(--navy-800);border:1px solid var(--border2);border-radius:20px;padding:40px 36px;width:100%;max-width:380px;text-align:center}
+  .login-box h2{font-size:22px;font-weight:800;margin-bottom:4px}
+  .login-box .login-sub{font-size:12px;color:var(--text-muted);margin-bottom:28px}
+  .login-field{text-align:left;margin-bottom:14px}
+  .login-field label{font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:6px}
+  .login-field input{width:100%;padding:11px 14px;background:var(--surface2);border:1px solid var(--border2);border-radius:10px;color:var(--text);font-size:14px;font-family:'Inter',sans-serif}
+  .login-field input:focus{outline:none;border-color:var(--teal)}
+  .btn-login{width:100%;padding:13px;border-radius:10px;border:none;background:var(--grad);color:#fff;font-size:15px;font-weight:700;cursor:pointer;font-family:'Inter',sans-serif;margin-top:6px}
+  .btn-login:hover{opacity:.88}
+  .btn-login:disabled{opacity:.5;cursor:not-allowed}
+  .login-err{font-size:12px;color:#f87171;margin-top:12px;min-height:18px}
+  .login-user{display:flex;align-items:center;gap:10px;margin-left:auto}
+  .login-user span{font-size:12px;color:var(--text-muted)}
+  .btn-logout{background:var(--surface2);border:1px solid var(--border2);color:var(--text-muted);padding:5px 12px;border-radius:7px;cursor:pointer;font-size:11px;font-weight:600;font-family:'Inter',sans-serif}
+  .btn-logout:hover{color:var(--text);border-color:var(--text-muted)}
 </style>
 </head>
 <body>
 
+<!-- Login screen -->
+<div id="loginScreen">
+  <div class="login-box">
+    <h2>💰 Presupuesto</h2>
+    <p class="login-sub">Alleata · Solo Admin</p>
+    <div class="login-field">
+      <label>Email</label>
+      <input type="email" id="loginEmail" placeholder="tu@email.com" onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+    <div class="login-field">
+      <label>Contraseña</label>
+      <input type="password" id="loginPass" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+    <button class="btn-login" id="btnLogin" onclick="doLogin()">Ingresar</button>
+    <div class="login-err" id="loginErr"></div>
+  </div>
+</div>
+
+<div id="appContent" style="display:none">
 <h1>💰 Presupuesto Operaciones</h1>
-<p class="sub">Alleata · 2026 · Solo Admin <span style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 8px;border-radius:4px;border:1px solid var(--border2);font-size:10px;margin-left:6px">v1.2.8</span></p>
+<p class="sub">Alleata · 2026 · Solo Admin <span style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 8px;border-radius:4px;border:1px solid var(--border2);font-size:10px;margin-left:6px">v1.3.0</span></p>
 
 <div class="toolbar">
   <div class="mes-bar" id="mesBar"></div>
@@ -786,6 +824,133 @@ document.addEventListener('keydown',e=>{
 
 initMesBar();
 render();
+
+// ── Supabase ─────────────────────────────────────────────────────────────────
+const SB_URL = 'https://njkstpfmcfhqxdadqbdy.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
+const { createClient } = supabase;
+const sb = createClient(SB_URL, SB_KEY);
+let currentUser = null;
+
+async function doLogin() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const pass  = document.getElementById('loginPass').value;
+  const btn   = document.getElementById('btnLogin');
+  const err   = document.getElementById('loginErr');
+  if(!email||!pass){ err.textContent='Completá email y contraseña'; return; }
+  btn.disabled=true; btn.textContent='Ingresando...'; err.textContent='';
+  const { data, error } = await sb.auth.signInWithPassword({ email, password:pass });
+  if(error){
+    err.textContent = error.message === 'Invalid login credentials' ? 'Email o contraseña incorrectos' : error.message;
+    btn.disabled=false; btn.textContent='Ingresar';
+    return;
+  }
+  currentUser = data.user;
+  onLogin(data.user);
+}
+
+function onLogin(user) {
+  document.getElementById('loginScreen').style.display='none';
+  document.getElementById('appContent').style.display='block';
+  // Mostrar usuario en header
+  const h1 = document.querySelector('h1');
+  const userBar = document.createElement('div');
+  userBar.className='login-user';
+  userBar.innerHTML=`<span>${user.email}</span><button class="btn-logout" onclick="doLogout()">Salir</button>`;
+  h1.parentNode.insertBefore(userBar, h1.nextSibling.nextSibling);
+  // Cargar facturas guardadas
+  loadFacturasFromDB();
+}
+
+async function doLogout() {
+  await sb.auth.signOut();
+  location.reload();
+}
+
+// ── Persistencia facturas ────────────────────────────────────────────────────
+async function saveFacturaDB(fac, mesKey) {
+  const row = {
+    user_id:      currentUser.id,
+    mes:          mesKey,
+    numero:       fac.numero,
+    fecha:        fac.fecha,
+    vto:          fac.vto,
+    descripcion:  fac.desc,
+    tc:           fac.tc,
+    subtotal_usd: fac.subtotalUSD,
+    iva_usd:      fac.ivaUSD,
+    otros_imp:    fac.otrosImp,
+    total_usd:    fac.totalUSD,
+    terminales:   fac.terminales || 0,
+    series:       fac.series || []
+  };
+  const { error } = await sb.from('presupuesto_facturas').upsert(row, { onConflict:'numero,mes' });
+  if(error) console.error('Error guardando factura:', error);
+  else showToast('✅ Guardado en base de datos');
+}
+
+async function loadFacturasFromDB() {
+  const { data, error } = await sb.from('presupuesto_facturas').select('*').order('fecha');
+  if(error){ console.error('Error cargando facturas:', error); return; }
+  if(!data||!data.length) return;
+  data.forEach(row => {
+    const m = row.mes;
+    if(!logiFacturas[m]) logiFacturas[m]=[];
+    // evitar duplicados al cargar
+    if(!logiFacturas[m].find(f=>f.numero===row.numero)) {
+      logiFacturas[m].push({
+        numero:       row.numero,
+        fecha:        row.fecha,
+        vto:          row.vto,
+        desc:         row.descripcion,
+        tc:           row.tc,
+        subtotalUSD:  row.subtotal_usd,
+        ivaUSD:       row.iva_usd,
+        otrosImp:     row.otros_imp,
+        totalUSD:     row.total_usd,
+        terminales:   row.terminales,
+        series:       row.series || []
+      });
+    }
+  });
+  render(); // actualizar tabla principal con datos de DB
+}
+
+// Hook: al agregar factura, también guardar en DB
+const _logiAgregarOrig = logiAgregar;
+logiAgregar = async function() {
+  if(!logiPendingFac&&!logiPendingRTO) return;
+  let fac = logiPendingFac ? {...logiPendingFac, tc:logiCurrentTC} : {
+    numero:'RTO s/factura', fecha:'—', vto:'—', desc:'Pendiente adjuntar PDF',
+    subtotalUSD:0, ivaUSD:0, otrosImp:0, totalUSD:0, tc:logiCurrentTC
+  };
+  if(logiPendingRTO){fac.terminales=logiPendingRTO.terminales;fac.series=logiPendingRTO.series;}
+  if(!logiFacturas[logiMesActual]) logiFacturas[logiMesActual]=[];
+  const yaExiste=logiFacturas[logiMesActual].find(f=>f.numero===fac.numero&&fac.numero!=='RTO s/factura');
+  if(yaExiste){ showToast('⚠️ Boludo, ya cargaste la '+fac.numero); return; }
+  logiFacturas[logiMesActual].push(fac);
+  const msg = logiPendingFac ? '✅ Factura '+fac.numero+' agregada' : '✅ RTO guardado (falta PDF)';
+  logiPendingFac=null;
+  logiPendingRTO=null;
+  resetLogiForm();
+  try{ logiRenderKPIs(); }catch(e){}
+  try{ logiRenderFacturas(); }catch(e){}
+  try{ logiRenderSeries(); }catch(e){}
+  try{ logiRenderAcum(); }catch(e){}
+  logiSyncReal(); render();
+  showToast(msg);
+  if(currentUser) await saveFacturaDB(fac, logiMesActual);
+};
+
+// Check session al cargar
+(async()=>{
+  const { data } = await sb.auth.getSession();
+  if(data.session){
+    currentUser = data.session.user;
+    onLogin(data.session.user);
+  }
+})();
 </script>
+</div><!-- /appContent -->
 </body>
 </html>
