@@ -3,11 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Alleata · Presupuesto Operaciones v1.4.6</title>
+<title>Alleata · Presupuesto Operaciones v1.5.0</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <style>
   :root {
     --navy-900:#0d1b2a; --navy-800:#112236; --navy-700:#162d45;
@@ -190,7 +191,7 @@
   <div class="login-box">
     <h2>💰 Presupuesto</h2>
     <p class="login-sub">Alleata · Solo Admin</p>
-    <div style="position:absolute;bottom:12px;right:16px;font-size:10px;font-family:'JetBrains Mono',monospace;color:rgba(232,237,243,.2)">v1.4.6</div>
+    <div style="position:absolute;bottom:12px;right:16px;font-size:10px;font-family:'JetBrains Mono',monospace;color:rgba(232,237,243,.2)">v1.5.0</div>
     <div class="login-field">
       <label>Email</label>
       <input type="email" id="loginEmail" placeholder="tu@email.com" onkeydown="if(event.key==='Enter')doLogin()">
@@ -206,7 +207,7 @@
 
 <div id="appContent" style="display:none">
 <h1>💰 Presupuesto Operaciones</h1>
-<p class="sub">Alleata · 2026 · Solo Admin <span style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 8px;border-radius:4px;border:1px solid var(--border2);font-size:10px;margin-left:6px">v1.4.6</span></p>
+<p class="sub">Alleata · 2026 · Solo Admin <span style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 8px;border-radius:4px;border:1px solid var(--border2);font-size:10px;margin-left:6px">v1.5.0</span></p>
 
 <div class="toolbar">
   <div class="mes-bar" id="mesBar"></div>
@@ -762,8 +763,24 @@ async function logiHandlePDF(input){
       const ct=await pg.getTextContent();
       text+=ct.items.map(it=>it.str).join(' ')+'\n';
     }
+
+    // Si no hay texto extraíble, es un PDF escaneado/imagen → usar OCR
+    if(text.trim().length < 10){
+      logiShowMsg('msgPdf','PDF sin texto detectado · ejecutando OCR (puede tardar 10-20s)...','ok');
+      text = await logiOcrPdf(pdf);
+      if(!text || text.trim().length < 10){
+        logiShowMsg('msgPdf','⛔ No se pudo leer el PDF ni con OCR. Cargá los datos manualmente.','err');
+        logiShowManualEntry();
+        return;
+      }
+    }
+
     const fac=logiParsePDF(text);
-    if(!fac){logiShowMsg('msgPdf','No se pudo leer. Verificá que sea un PDF de Logicalis.','err');return;}
+    if(!fac){
+      logiShowMsg('msgPdf','No se pudo interpretar el contenido. Cargá los datos manualmente.','err');
+      logiShowManualEntry();
+      return;
+    }
     logiPendingFac=fac;
     if(fac.tc && fac.tc !== logiCurrentTC) {
       logiCurrentTC = fac.tc;
@@ -801,6 +818,90 @@ async function logiHandlePDF(input){
     logiRenderKPIs();
     logiCheckBtn();
   }catch(e){logiShowMsg('msgPdf','Error: '+e.message,'err');}
+}
+
+// ── OCR fallback para PDFs escaneados (imagen sin texto) ────────────────────
+async function logiOcrPdf(pdf){
+  try{
+    const page = await pdf.getPage(1);
+    const viewport = page.getViewport({scale:2.5});
+    const canvas = document.createElement('canvas');
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    const ctx = canvas.getContext('2d');
+    await page.render({canvasContext:ctx, viewport}).promise;
+    const dataUrl = canvas.toDataURL('image/png');
+    const result = await Tesseract.recognize(dataUrl, 'spa', {
+      logger: m => { if(m.status==='recognizing text'){ logiShowMsg('msgPdf','OCR en progreso... '+Math.round(m.progress*100)+'%','ok'); } }
+    });
+    return result.data.text;
+  } catch(e){
+    console.error('OCR error:', e);
+    return '';
+  }
+}
+
+// ── Formulario manual cuando ni texto ni OCR funcionan ───────────────────────
+function logiShowManualEntry(){
+  const prev = document.getElementById('prevPdf');
+  prev.style.display='block';
+  prev.innerHTML = `
+    <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Carga manual — completá los datos de la factura</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+      <input id="manNumero" placeholder="N° factura (0029-00002284)" style="background:var(--navy-900);border:1px solid var(--border2);border-radius:6px;padding:7px 10px;color:var(--text);font-size:12px;font-family:'JetBrains Mono',monospace">
+      <input id="manFecha" placeholder="Fecha (dd/mm/aaaa)" style="background:var(--navy-900);border:1px solid var(--border2);border-radius:6px;padding:7px 10px;color:var(--text);font-size:12px;font-family:'JetBrains Mono',monospace">
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+      <input id="manTC" placeholder="T.C. (1.428)" type="number" step="0.01" style="background:var(--navy-900);border:1px solid var(--border2);border-radius:6px;padding:7px 10px;color:var(--text);font-size:12px;font-family:'JetBrains Mono',monospace">
+      <input id="manSubtotal" placeholder="Subtotal USD" type="number" step="0.01" style="background:var(--navy-900);border:1px solid var(--border2);border-radius:6px;padding:7px 10px;color:var(--text);font-size:12px;font-family:'JetBrains Mono',monospace">
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+      <input id="manIVA" placeholder="IVA USD" type="number" step="0.01" style="background:var(--navy-900);border:1px solid var(--border2);border-radius:6px;padding:7px 10px;color:var(--text);font-size:12px;font-family:'JetBrains Mono',monospace">
+      <input id="manOtros" placeholder="Otros impuestos USD" type="number" step="0.01" style="background:var(--navy-900);border:1px solid var(--border2);border-radius:6px;padding:7px 10px;color:var(--text);font-size:12px;font-family:'JetBrains Mono',monospace">
+    </div>
+    <button onclick="logiConfirmManual()" style="width:100%;padding:9px;border-radius:8px;border:none;background:var(--grad);color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:'Inter',sans-serif">✓ Usar estos datos</button>
+  `;
+}
+
+function logiConfirmManual(){
+  const numero=document.getElementById('manNumero').value.trim()||'—';
+  const fecha=document.getElementById('manFecha').value.trim()||'—';
+  const tc=parseFloat(document.getElementById('manTC').value)||logiCurrentTC;
+  const subtotalUSD=parseFloat(document.getElementById('manSubtotal').value)||0;
+  const ivaUSD=parseFloat(document.getElementById('manIVA').value)||0;
+  const otrosImp=parseFloat(document.getElementById('manOtros').value)||0;
+  const totalUSD=subtotalUSD+ivaUSD+otrosImp;
+
+  if(!numero||numero==='—'||!subtotalUSD){
+    logiShowMsg('msgPdf','Completá al menos N° factura y Subtotal USD.','err');
+    return;
+  }
+
+  const fac={numero, fecha, vto:'—', desc:'Carga manual', subtotalUSD, ivaUSD, otrosImp, totalUSD, tc};
+  logiPendingFac=fac;
+  logiCurrentTC=tc;
+  document.getElementById('logiTC').value=tc;
+  document.getElementById('upZonePdf').classList.add('loaded');
+
+  // Validación de mes también en carga manual
+  const MES_MAP_LOGI2 = {'01':'ene','02':'feb','03':'mar','04':'abr','05':'may','06':'jun','07':'jul','08':'ago','09':'sep','10':'oct','11':'nov','12':'dic'};
+  let mesFacLogi2=null;
+  if(fecha&&fecha!=='—'){ const p=fecha.split('/'); if(p.length>=2) mesFacLogi2=MES_MAP_LOGI2[p[1]]; }
+  const mesNoCoincide2 = mesFacLogi2 && mesFacLogi2 !== logiMesActual;
+  logiPendingFacMesValido = !mesNoCoincide2;
+
+  logiShowPreview('prevPdf',[
+    ['N° factura', numero],['Fecha', fecha],['T.C.', tc],
+    ['Subtotal USD', fmtUSD(subtotalUSD)],['Total $ (a pagar)', fmt(totalUSD*tc)],
+    ['IVA USD', fmtUSD(ivaUSD)],['Total USD', fmtUSD(totalUSD)],
+  ]);
+  if(mesNoCoincide2){
+    logiShowMsg('msgPdf','⛔ Esta factura es de '+MESES_LABEL[mesFacLogi2]+' pero estás cargando '+MESES_LABEL[logiMesActual]+'.','err');
+  } else {
+    logiShowMsg('msgPdf','✓ Datos cargados manualmente','ok');
+  }
+  logiRenderKPIs();
+  logiCheckBtn();
 }
 
 function logiParsePDF(text){
