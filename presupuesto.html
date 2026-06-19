@@ -827,19 +827,29 @@ async function logiHandleXLS(input){
     const nameInf=wb.SheetNames.find(n=>n.toLowerCase().includes('informe')||n.toLowerCase().includes('final'))||wb.SheetNames[0];
     if(nameInf){
       const data=XLSX.utils.sheet_to_json(wb.Sheets[nameInf],{header:1,defval:''});
-      // Buscar "Total general" o valor de qty en la tabla resumen (excluye años y valores >5000)
+      // Buscar específicamente la fila "Cuenta de Serie" (sección DETALLE DE EQUIPOS DESPACHADOS)
+      // Esa fila tiene: ['Cuenta de Serie', <cantidad>, <cantidad total>, ...]
       for(const row of data){
-        for(let ci=0;ci<row.length;ci++){
-          const cell=row[ci];
-          const n=parseInt(cell);
-          // Excluir: años (1900-2100), valores muy grandes, celdas no numéricas puras
-          if(!isNaN(n)&&n>10&&n<5000&&n<1900&&String(cell).trim()===String(n)){
-            // Preferir si hay un encabezado "Total general" o "Qty" cerca
-            const ctx=row.slice(Math.max(0,ci-3),ci).join(' ').toLowerCase();
-            if(!terminales || ctx.includes('total')||ctx.includes('qty')) terminales=n;
+        const rowStr = row.map(c=>String(c).trim()).join('|');
+        if(/cuenta de serie/i.test(rowStr)){
+          // El primer número entero después de "Cuenta de Serie" es la cantidad real de terminales
+          for(let ci=0;ci<row.length;ci++){
+            const cell=String(row[ci]).trim();
+            if(/cuenta de serie/i.test(cell)){
+              // buscar el próximo valor numérico entero en las columnas siguientes
+              for(let cj=ci+1;cj<row.length;cj++){
+                const n=parseInt(row[cj]);
+                if(!isNaN(n)&&n>0&&n<5000&&String(row[cj]).trim()===String(n)){
+                  terminales=n;
+                  break;
+                }
+              }
+            }
           }
+          break; // ya encontramos la fila correcta, no seguir buscando
         }
       }
+      // Fallback: si no se encontró "Cuenta de Serie", usar la cantidad de series del Detalle Despacho (se calcula después)
     }
     const nameDet=wb.SheetNames.find(n=>n.toLowerCase().includes('detalle')||n.toLowerCase().includes('despacho'))||wb.SheetNames[1];
     if(nameDet){
