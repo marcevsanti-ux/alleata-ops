@@ -373,6 +373,7 @@ const logiFacturas = {};
 let logiPendingFac = null;
 let logiPendingRTO = null;
 let logiCurrentTC  = 1428;
+let logiPendingFacMesValido = true;
 let logiMesActual  = 'jun';
 
 function logiGetFacturas(m) {
@@ -564,6 +565,7 @@ function closeLogiModal() {
 }
 
 function resetLogiForm() {
+  logiPendingFacMesValido = true;
   ['prevPdf','prevXls'].forEach(id=>{const e=document.getElementById(id);e.style.display='none';e.innerHTML='';});
   ['msgPdf','msgXls'].forEach(id=>{const e=document.getElementById(id);e.className='up-msg';e.textContent='';});
   ['inpPdf','inpXls'].forEach(id=>{document.getElementById(id).value='';});
@@ -681,6 +683,15 @@ function logiCheckBtn(){
   const hasRto = !!logiPendingRTO;
   const btn = document.getElementById('btnConfirm');
   const msgEl = document.getElementById('msgConfirmReq');
+  if(hasPdf && !logiPendingFacMesValido){
+    btn.style.display='block';
+    btn.disabled=true;
+    btn.style.opacity='.5';
+    btn.style.cursor='not-allowed';
+    btn.textContent='⛔ La factura no corresponde a este mes';
+    if(msgEl) msgEl.style.display='none';
+    return;
+  }
   if(hasPdf && hasRto){
     btn.style.display='block';
     // Validación cruzada RTO vs Factura
@@ -754,12 +765,21 @@ async function logiHandlePDF(input){
     const fac=logiParsePDF(text);
     if(!fac){logiShowMsg('msgPdf','No se pudo leer. Verificá que sea un PDF de Logicalis.','err');return;}
     logiPendingFac=fac;
-    // Si la factura trae T.C., actualizar el input automáticamente
     if(fac.tc && fac.tc !== logiCurrentTC) {
       logiCurrentTC = fac.tc;
       document.getElementById('logiTC').value = fac.tc;
     }
     document.getElementById('upZonePdf').classList.add('loaded');
+
+    // ── Validación: mes de la factura debe coincidir con el mes seleccionado ──
+    const MES_MAP_LOGI = {'01':'ene','02':'feb','03':'mar','04':'abr','05':'may','06':'jun','07':'jul','08':'ago','09':'sep','10':'oct','11':'nov','12':'dic'};
+    let mesFacLogi = null;
+    if(fac.fecha && fac.fecha !== '—'){
+      const partesF = fac.fecha.split('/');
+      if(partesF.length>=2) mesFacLogi = MES_MAP_LOGI[partesF[1]];
+    }
+    const mesNoCoincide = mesFacLogi && mesFacLogi !== logiMesActual;
+
     logiShowPreview('prevPdf',[
       ['N° factura', fac.numero],
       ['Fecha', fac.fecha],
@@ -771,7 +791,13 @@ async function logiHandlePDF(input){
       ['IVA USD', fmtUSD(fac.ivaUSD)],
       ['Total USD', fmtUSD(fac.totalUSD)],
     ]);
-    logiShowMsg('msgPdf','✓ Factura leída · T.C. $'+fac.tc.toLocaleString('es-AR')+' tomado de la factura','ok');
+
+    if(mesNoCoincide){
+      logiShowMsg('msgPdf','⛔ Esta factura es de '+MESES_LABEL[mesFacLogi]+' pero estás cargando '+MESES_LABEL[logiMesActual]+'. Cambiá de mes o subí la factura correcta.','err');
+    } else {
+      logiShowMsg('msgPdf','✓ Factura leída · T.C. $'+fac.tc.toLocaleString('es-AR')+' tomado de la factura','ok');
+    }
+    logiPendingFacMesValido = !mesNoCoincide;
     logiRenderKPIs();
     logiCheckBtn();
   }catch(e){logiShowMsg('msgPdf','Error: '+e.message,'err');}
