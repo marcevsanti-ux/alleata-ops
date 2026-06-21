@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.1.4</title>
+<title>Alleata · Operaciones v4.1.5</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -407,7 +407,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.1.4 · 21 jun 2026
+      v4.1.5 · 21 jun 2026
     </div>
   </div>
 </div>
@@ -485,7 +485,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.1.4 · 21 jun 2026
+      v4.1.5 · 21 jun 2026
     </div>
   </div>
 </nav>
@@ -525,7 +525,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.1.4</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.1.5</div>
   </div>
   <div class="content">
 
@@ -885,14 +885,14 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <table>
           <thead><tr>
             <th style="width:32px" id="thChkAll"><input type="checkbox" id="chkAll" onclick="toggleAllEnvios(this)" style="cursor:pointer"></th>
-            <th>OT / Cuenta</th>
-            <th>Responsable</th>
+            <th onclick="ordenarEnvios('ot')" style="cursor:pointer;user-select:none">OT / Cuenta <span id="thSort-ot" style="opacity:.35;font-size:10px">⇅</span></th>
+            <th onclick="ordenarEnvios('responsable')" style="cursor:pointer;user-select:none">Responsable <span id="thSort-responsable" style="opacity:.35;font-size:10px">⇅</span></th>
             <th id="thZonaEnvios">Zona</th>
             <th>Tracking</th>
             <th id="thDistanciaEnvios">Distancia</th>
-            <th>Destino</th>
-            <th>Costo</th>
-            <th>Estado</th>
+            <th onclick="ordenarEnvios('destino')" style="cursor:pointer;user-select:none">Destino <span id="thSort-destino" style="opacity:.35;font-size:10px">⇅</span></th>
+            <th onclick="ordenarEnvios('costo')" style="cursor:pointer;user-select:none">Costo <span id="thSort-costo" style="opacity:.35;font-size:10px">⇅</span></th>
+            <th onclick="ordenarEnvios('estado')" style="cursor:pointer;user-select:none">Estado <span id="thSort-estado" style="opacity:.35;font-size:10px">⇅</span></th>
             <th>Obs.</th>
             <th></th>
           </tr></thead>
@@ -3128,13 +3128,13 @@ async function dsConsultarCA(otId, trackNum, otNum){
 
   // Timeout de 10 segundos
   const timer = setTimeout(() => {
-    mostrarModalTrackingCA(trackNum, null, 'error', 'Tiempo de espera agotado (10s). Intentar nuevamente.');
+    mostrarModalTrackingCA(trackNum, null, 'error', 'Tiempo de espera agotado (10s). Intentar nuevamente.', otNum);
     if(btn){ btn.textContent = '🔍'; btn.disabled = false; }
     console.warn('[Desins CA] timeout 10s para tracking:', trackNum);
   }, 10000);
 
   // 1. Mostrar modal en estado loading — idéntico a consultarTracking()
-  mostrarModalTrackingCA(trackNum, null, 'loading');
+  mostrarModalTrackingCA(trackNum, null, 'loading', '', otNum);
 
   try {
     // 2. Consultar CA — misma función que Envíos
@@ -3142,12 +3142,12 @@ async function dsConsultarCA(otId, trackNum, otNum){
     clearTimeout(timer);
 
     if(!eventos || eventos.length === 0){
-      mostrarModalTrackingCA(trackNum, null, 'error', 'Sin eventos registrados para este número');
+      mostrarModalTrackingCA(trackNum, null, 'error', 'Sin eventos registrados para este número', otNum);
       return;
     }
 
     // 3. Mostrar modal con historial — idéntico a consultarTracking()
-    mostrarModalTrackingCA(trackNum, { eventos, pieza }, 'ok');
+    mostrarModalTrackingCA(trackNum, { eventos, pieza }, 'ok', '', otNum);
 
     // 4. Persistir en ordenes_trabajo (no en envios — sin tocar Envíos)
     const ultimo = eventos[0];
@@ -3176,7 +3176,7 @@ async function dsConsultarCA(otId, trackNum, otNum){
   } catch(err){
     clearTimeout(timer);
     console.error('[Desins CA] error:', err);
-    mostrarModalTrackingCA(trackNum, null, 'error', err.message);
+    mostrarModalTrackingCA(trackNum, null, 'error', err.message, otNum);
   } finally {
     clearTimeout(timer);
     if(btn){ btn.textContent = '🔍'; btn.disabled = false; }
@@ -4345,7 +4345,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.1.4] OK');
+console.log('[Alleata v4.1.5] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -6797,7 +6797,55 @@ function miniStatsHTML(g){
     </div>`;
 }
 
+// ── ORDEN DE TABLA ENVÍOS (ascendente/descendente por columna) ──────────────
+let _enviosSortField = null;   // 'ot' | 'responsable' | 'destino' | 'costo' | 'estado'
+let _enviosSortDir   = 'asc';  // 'asc' | 'desc'
+
+function ordenarEnvios(campo){
+  if(_enviosSortField === campo){
+    _enviosSortDir = (_enviosSortDir === 'asc') ? 'desc' : 'asc';
+  } else {
+    _enviosSortField = campo;
+    _enviosSortDir = 'asc';
+  }
+  renderEnviosTable(_listAllZonas || []);
+  actualizarIconosOrdenEnvios();
+}
+
+function aplicarOrdenEnvios(list){
+  if(!_enviosSortField) return list;
+  const dir = _enviosSortDir === 'asc' ? 1 : -1;
+  const getVal = (e) => {
+    switch(_enviosSortField){
+      case 'ot':          return (e.ot_numero || '');
+      case 'responsable':return (e.responsable || '');
+      case 'destino':    return [e.ciudad, e.provincia].filter(Boolean).join(' ');
+      case 'costo':      return Number(e.costo_envio) || 0;
+      case 'estado':     return (e.estado || '');
+      default:           return '';
+    }
+  };
+  const copia = [...list];
+  copia.sort((a,b)=>{
+    const va = getVal(a), vb = getVal(b);
+    if(typeof va === 'number' && typeof vb === 'number') return (va - vb) * dir;
+    return String(va).localeCompare(String(vb), 'es', { numeric:true, sensitivity:'base' }) * dir;
+  });
+  return copia;
+}
+
+function actualizarIconosOrdenEnvios(){
+  const campos = ['ot','responsable','destino','costo','estado'];
+  campos.forEach(c=>{
+    const el = document.getElementById('thSort-'+c);
+    if(!el) return;
+    el.textContent = (_enviosSortField === c) ? (_enviosSortDir === 'asc' ? '▲' : '▼') : '⇅';
+    el.style.opacity = (_enviosSortField === c) ? '1' : '.35';
+  });
+}
+
 function renderEnviosTable(list){
+  list = aplicarOrdenEnvios(list);
   const isLogistica=currentProfile?.rol==='logistica';
   const empty=document.getElementById('enviosEmpty');
   empty.style.display=list.length?'none':'block';
@@ -7070,20 +7118,26 @@ async function consultarTracking(id, trackNum){
   if(!trackNum){ showTrackingToast('⚠️ Sin número de tracking','yellow'); return; }
   const btn=document.getElementById(`track-btn-${id}`);
   if(btn){ btn.textContent='⏳'; btn.disabled=true; }
-  mostrarModalTrackingCA(trackNum, null, 'loading');
+
+  // Traer OT numero + tipo ANTES de abrir el modal, para mostrarlo ya en loading
+  let otNumero='', tipoOT='';
+  try{
+    const { data: envData } = await sb.from('sf_workorders').select('workorder_number, record_type').eq('id', id).single();
+    otNumero = envData?.workorder_number || '';
+    tipoOT   = envData?.record_type || '';
+  }catch(e){ console.warn('[consultarTracking] no se pudo obtener OT numero:', e.message); }
+
+  mostrarModalTrackingCA(trackNum, null, 'loading', '', otNumero);
   try {
     // ── Mostrar eventos en el modal (vía ca-proxy, igual que antes) ──────────
     const { eventos, pieza } = await fetchTrackingCA(trackNum);
     if(!eventos || eventos.length === 0){
-      mostrarModalTrackingCA(trackNum, null, 'error', 'Sin eventos registrados para este número');
+      mostrarModalTrackingCA(trackNum, null, 'error', 'Sin eventos registrados para este número', otNumero);
       return;
     }
-    mostrarModalTrackingCA(trackNum, { eventos, pieza }, 'ok');
+    mostrarModalTrackingCA(trackNum, { eventos, pieza }, 'ok', '', otNumero);
 
     // ── SLA: calcular y persistir ────────────────────────────────────────────
-    const { data: envData } = await sb.from('sf_workorders').select('workorder_number, record_type').eq('id', id).single();
-    const tipoOT   = envData?.record_type || '';
-    const otNumero = envData?.workorder_number || '';
     const ultimo   = eventos[0];
     const estadoMapeado = mapearEstadoCA(ultimo.historia, ultimo.estadoCA, tipoOT);
 
@@ -7156,7 +7210,7 @@ async function consultarTracking(id, trackNum){
 
   } catch(err){
     console.error('Tracking CA error:', err);
-    mostrarModalTrackingCA(trackNum, null, 'error', err.message);
+    mostrarModalTrackingCA(trackNum, null, 'error', err.message, otNumero);
   } finally {
     if(btn){ btn.textContent='🔍'; btn.disabled=false; }
   }
@@ -7478,7 +7532,7 @@ async function autoActualizarTracking(){
   renderEnvios(); loadBadges();
 }
 
-function mostrarModalTrackingCA(trackNum, caData, estado, errorMsg=''){
+function mostrarModalTrackingCA(trackNum, caData, estado, errorMsg='', otNumero=''){
   document.getElementById('modal-tracking-ca')?.remove();
 
   let contenido='';
@@ -7563,9 +7617,10 @@ function mostrarModalTrackingCA(trackNum, caData, estado, errorMsg=''){
   modal.style.cssText='position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.65);backdrop-filter:blur(4px);animation:fadeIn .15s ease;';
   modal.innerHTML=`
     <div style="background:var(--navy-800);border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:24px;width:92%;max-width:680px;max-height:85vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.5);animation:slideUp .2s ease;">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
-        <h3 style="margin:0;font-size:17px;font-weight:700;">🚚 Seguimiento Correo Argentino</h3>
-        <button onclick="document.getElementById('modal-tracking-ca').remove()" style="background:rgba(255,255,255,.06);border:none;color:var(--text-primary);width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;">×</button>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;gap:12px;">
+        <h3 style="margin:0;font-size:17px;font-weight:700;white-space:nowrap;">🚚 Seguimiento Correo Argentino</h3>
+        ${otNumero ? `<span style="background:rgba(29,191,142,.12);color:var(--teal);font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;padding:6px 14px;border-radius:8px;white-space:nowrap;">OT ${otNumero}</span>` : '<span></span>'}
+        <button onclick="document.getElementById('modal-tracking-ca').remove()" style="background:rgba(255,255,255,.06);border:none;color:var(--text-primary);width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">×</button>
       </div>
       ${contenido}
     </div>`;
