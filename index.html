@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.1.5</title>
+<title>Alleata · Operaciones v4.1.6</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -407,7 +407,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.1.5 · 21 jun 2026
+      v4.1.6 · 22 jun 2026
     </div>
   </div>
 </div>
@@ -485,7 +485,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.1.5 · 21 jun 2026
+      v4.1.6 · 22 jun 2026
     </div>
   </div>
 </nav>
@@ -525,7 +525,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.1.5</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.1.6</div>
   </div>
   <div class="content">
 
@@ -4394,7 +4394,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.1.5] OK');
+console.log('[Alleata v4.1.6] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -10399,18 +10399,41 @@ async function cargaBuscar() {
   try {
     var res  = await fetch(ALLY_RAILWAY_BASE + '/store/buscar-terminal/' + encodeURIComponent(serial), { headers: { 'x-automation-secret': '123456' } });
     var data = await res.json();
-    if (!data.ok) { msg.innerHTML = '<span style="color:#ef4444">❌ ' + (data.error || 'No encontrada') + '</span>'; return; }
+    if (!data.ok && !data.terminal) { msg.innerHTML = '<span style="color:#ef4444">❌ ' + (data.error || 'No encontrada') + '</span>'; return; }
     var t = data.terminal;
-    // Validar que pertenece al stock general (DISPONIBLE, BARRACAS, AXIUM D7, NAPSE, activo)
-    var esStockGeneral = t.estado === 'DISPONIBLE' &&
-                         t.ubicacion === 'BARRACAS' &&
-                         (t.producto || '').toUpperCase().includes('AXIUM') &&
-                         (t.perfil || '') === 'NAPSE' &&
-                         t.activo !== false;
+    var esStockGeneral = data.disponible === true;
     if (!esStockGeneral) {
-      msg.innerHTML = '<span style="color:#f59e0b">⚠️ Esta terminal no pertenece al stock general disponible.<br>' +
-        '<small style="color:var(--text-muted)">Requiere: DISPONIBLE · BARRACAS · AXIUM D7 · NAPSE · Activo</small><br>' +
-        '<small style="color:var(--text-muted)">Estado: ' + t.estado + ' | Ubic: ' + t.ubicacion + ' | Prod: ' + (t.producto||'—') + ' | Perfil: ' + (t.perfil||'—') + '</small></span>';
+      // Determinar contexto del estado para mostrar info útil
+      var estadoColor = t.estado === 'DISPONIBLE' ? '#10b981' : t.estado === 'ASIGNADA' ? '#f59e0b' : '#ef4444';
+      var estadoIcon  = t.estado === 'DISPONIBLE' ? '🟢' : t.estado === 'ASIGNADA' ? '🟡' : '🔴';
+      var ultimaAct   = (t.ultima_mod||t.ultima_actualizacion) ? new Date(t.ultima_mod||t.ultima_actualizacion).toLocaleString('es-AR',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
+      var bancoTxt    = t.banco_nombre ? '<span style="color:var(--teal);font-weight:600">' + t.banco_nombre + '</span>' : '—';
+      msg.innerHTML = [
+        '<div style="background:var(--navy-800);border:1px solid #f59e0b55;border-radius:10px;padding:14px 16px;max-width:480px">',
+          '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">',
+            '<span style="font-size:18px">⚠️</span>',
+            '<span style="font-size:13px;font-weight:700;color:#f59e0b">Terminal no disponible para el banco</span>',
+          '</div>',
+          '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 16px;margin-bottom:12px">',
+            '<div><div style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:2px">Serial</div>',
+              '<div style="font-size:11px;font-family:JetBrains Mono,monospace;color:var(--text)">' + (t.serial||'—') + '</div></div>',
+            '<div><div style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:2px">Producto</div>',
+              '<div style="font-size:11px;color:var(--text)">' + (t.producto||t.tipo||'—') + '</div></div>',
+            '<div><div style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:2px">Estado</div>',
+              '<div style="font-size:12px;font-weight:700;color:' + estadoColor + '">' + estadoIcon + ' ' + (t.estado||'—') + '</div></div>',
+            '<div><div style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:2px">Ubicación</div>',
+              '<div style="font-size:11px;color:var(--text)">' + (t.ubicacion||'—') + '</div></div>',
+            '<div><div style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:2px">Perfil</div>',
+              '<div style="font-size:11px;color:var(--text)">' + (t.perfil||'—') + '</div></div>',
+            '<div><div style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:2px">Banco de trabajo</div>',
+              '<div style="font-size:11px">' + bancoTxt + '</div></div>',
+          '</div>',
+          '<div style="border-top:1px solid var(--border2);padding-top:10px;display:flex;align-items:center;justify-content:space-between">',
+            '<span style="font-size:10px;color:var(--text-muted)">Última actualización: ' + ultimaAct + '</span>',
+            (t.cuenta ? '<span style="font-size:10px;color:var(--text-muted)">Cuenta: <span style="color:var(--text)">' + t.cuenta + '</span></span>' : ''),
+          '</div>',
+        '</div>'
+      ].join('');
       return;
     }
     _cargaTerminalId = t.id;
