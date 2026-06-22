@@ -634,7 +634,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div class="ops-chart-card" id="chart-instaladas" style="display:none"></div>
         <div class="ops-chart-card" id="chart-precolecta" style="display:none"></div>
         <div class="ops-chart-card" id="chart-entregas" style="display:none"></div>
-        <div class="ops-chart-card" id="chart-desins"></div>
+        <div class="ops-chart-card" id="chart-desins" style="display:none"></div>
       </div>
 
       <!-- BREAKDOWN POR OPERADOR (solo admin, vista equipo) -->
@@ -4607,9 +4607,10 @@ function buildDashCards(modulos,isAdmin){
   if(isAdmin)all.push({mod:'ajustes',icon:'⚙️',title:'Ajustes',desc:'Usuarios y permisos',stat:'gestión'});
   const grid=document.getElementById('dashGrid');
   if(!grid)return;
-  grid.innerHTML=all.map(c=>{
-    const locked=!isAdmin&&!modulos.includes(c.mod);
-    return`<div class="dash-card${locked?' locked':''}" data-mod="${c.mod}" onclick="${locked?'':"goTo('"+ c.mod +"')"}">
+  // Para operadores: filtrar solo módulos habilitados (no mostrar bloqueados)
+  const visibles = isAdmin ? all : all.filter(c=>modulos.includes(c.mod));
+  grid.innerHTML=visibles.map(c=>{
+    return`<div class="dash-card" data-mod="${c.mod}" onclick="goTo('${c.mod}')">
       <div class="dash-card-icon">${c.icon}</div>
       <div class="dash-card-title">${c.title}</div>
       <div class="dash-card-desc">${c.desc}</div>
@@ -5167,6 +5168,10 @@ async function loadOpsPanel(isAdmin){
   const directas=envios.filter(e=>e.estado&&!['Recibido ✅','Pendiente rótulo','Rótulo generado','En camino retorno'].includes(e.estado));
   const ESTADOS_CERRADOS=['Entregado','Fallido','Devuelto','Perdido'];
 
+  // ── GRÁFICOS — solo admin ──
+  if(isAdmin){
+    document.getElementById('chart-desins').style.display='';
+
   // ── GRÁFICO 1: Instaladas hoy (KPI grande) ──
   const instaladas=envios.filter(e=>e.estado==='Entregado'&&(e.fecha||'').startsWith(today)).length;
   renderChartKPI('chart-instaladas','Instaladas hoy',instaladas,'var(--teal)',
@@ -5360,6 +5365,8 @@ async function loadOpsPanel(isAdmin){
       }
     }
   })();
+
+  } // fin if(isAdmin) — gráficos desinstalaciones
 
   // ── KPIs ABAJO ──
   const cambios=directas.filter(e=>!ESTADOS_CERRADOS.includes(e.estado)&&(e.tipo||'').toUpperCase().includes('CAMBIO')).length;
