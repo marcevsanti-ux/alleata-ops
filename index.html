@@ -7087,6 +7087,8 @@ function renderEnviosTable(list){
         <div style="display:flex;gap:5px;flex-wrap:wrap">
           ${(e.logistica||'').toUpperCase()==='CORREO ARGENTINO'
             ? '' // CA: no tiene rótulo Alleata
+            : (e.logistica||'').toUpperCase()==='CABIFY'
+              ? `<button title="Imprimir rótulo Cabify" style="background:rgba(139,92,246,.15);border:1px solid rgba(139,92,246,.4);color:#8b5cf6;font-size:11px;padding:4px 7px;border-radius:6px;cursor:pointer;${isLogistica?'display:none':''}" onclick="printRotuloCabify('${e.id}')">🚗🖨️</button>`
             : (e.estado==='Entregado'||e.estado==='Entregado por logística Alleata')
               ? `<button title="OT ya entregada" style="background:var(--surface2);border:1px solid var(--border2);color:var(--text-muted);font-size:11px;padding:4px 7px;border-radius:6px;cursor:not-allowed;opacity:0.35;${isLogistica?'display:none':''}" disabled>🖨️</button>`
               : `<button title="Imprimir rótulo envío" style="background:var(--surface2);border:1px solid var(--border2);color:var(--teal);font-size:11px;padding:4px 7px;border-radius:6px;cursor:pointer;${isLogistica?'display:none':''}" onclick="printRotulo('${e.id}')">🖨️</button>`
@@ -7871,6 +7873,92 @@ async function updateEnvioEstado(id, estado){
   loadBadges(); renderEnvios();
 }
 // ── Imprimir rótulo envío (logística Alleata) ─────────────────
+async function printRotuloCabify(id) {
+  // Buscar el envío en Supabase para obtener ot_numero y datos
+  const { data: e } = await sb.from('sf_workorders').select('*').eq('id', id).single();
+  if (!e) { alert('OT no encontrada'); return; }
+
+  // Obtener parcel_id de cabify_rides si existe
+  let parcelId = null;
+  let trackingUrl = null;
+  try {
+    const { data: ride } = await sb.from('cabify_rides').select('*').eq('ot_numero', e.ot_numero).order('created_at', {ascending: false}).limit(1).single();
+    if (ride) { parcelId = ride.ride_id; trackingUrl = ride.ride_data?.tracking_url; }
+  } catch {}
+
+  // QR: tracking URL de Cabify o maps
+  function makeQRDataUrl(text, size) {
+    return `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(text)}&color=000000&bgcolor=ffffff&margin=2`;
+  }
+  const qrTarget = trackingUrl || `https://maps.google.com/?q=${encodeURIComponent([e.direccion_completa, e.ciudad, e.provincia, 'Argentina'].filter(Boolean).join(', '))}`;
+  const qrSrc = makeQRDataUrl(qrTarget, 80);
+
+  const w = window.open('', '_blank', 'width=420,height=620');
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
+  <title>Rótulo Cabify — OT ${e.ot_numero}</title>
+  <style>
+    @page { size: 100mm 80mm; margin: 0; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100mm; font-family: Arial, sans-serif; background: #fff; font-size: 10px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .rotulo { width: 100mm; height: 80mm; padding: 2.5mm; display: flex; flex-direction: column; }
+    .hdr { display: flex; align-items: center; justify-content: space-between; background: #1a1a2e; padding: 2mm 3mm; margin-bottom: 2mm; border-radius: 1mm; }
+    .hdr-cabify { font-size: 13px; font-weight: 900; color: #fff; letter-spacing: -0.5px; }
+    .hdr-cabify span { color: #8b5cf6; }
+    .hdr-alleata { font-size: 7px; color: #aaa; text-align: right; line-height: 1.4; }
+    .ref-block { display: flex; align-items: center; justify-content: space-between; border: 1.5px solid #333; padding: 1.5mm 2mm; margin-bottom: 1.5mm; border-radius: 1mm; }
+    .ref-inner .ref-label { font-size: 6.5px; font-weight: 700; text-transform: uppercase; color: #666; }
+    .ref-inner .ref-val { font-size: 14px; font-weight: 900; letter-spacing: -0.5px; }
+    .ref-inner .ref-modal { font-size: 7px; color: #8b5cf6; font-weight: 700; margin-top: 0.5mm; }
+    .de-block { margin-bottom: 1.5mm; }
+    .de-block .sec-lbl { font-size: 7px; font-weight: 700; text-transform: uppercase; color: #555; margin-bottom: 0.5mm; }
+    .de-block .sec-val { font-size: 8.5px; font-weight: 700; color: #000; }
+    .de-block .sec-sub { font-size: 7.5px; color: #444; }
+    .divider { border-top: 0.5px solid #ccc; margin: 1.5mm 0; }
+    .para-block .sec-lbl { font-size: 7px; font-weight: 700; text-transform: uppercase; color: #555; margin-bottom: 0.5mm; }
+    .para-block .para-name { font-size: 11px; font-weight: 900; text-transform: uppercase; color: #000; }
+    .para-block .para-addr { font-size: 8px; color: #333; margin-top: 0.5mm; }
+    .footer { margin-top: auto; border-top: 0.5px solid #ccc; padding-top: 1mm; display: flex; justify-content: space-between; align-items: center; }
+    .footer-date { font-size: 7px; color: #666; }
+    .footer-ot { font-size: 7px; color: #8b5cf6; font-weight: 700; }
+    .btn-print { display: block; width: 95mm; margin: 6px auto 0; padding: 8px; background: #8b5cf6; color: #fff; border: none; font-size: 13px; font-weight: 700; cursor: pointer; border-radius: 5px; font-family: Arial, sans-serif; }
+    @media print { .btn-print { display: none !important; } }
+  </style>
+  </head><body>
+  <div class="rotulo">
+    <div class="hdr">
+      <div class="hdr-cabify">cabify <span>logistics</span></div>
+      <div class="hdr-alleata">Andrés Moretti e Hijos S.A.<br>Logística Cabify</div>
+    </div>
+    <div class="ref-block">
+      <div class="ref-inner">
+        <div class="ref-label">Orden de trabajo</div>
+        <div class="ref-val">${e.ot_numero || '—'}</div>
+        <div class="ref-modal">Entrega en el mismo día</div>
+      </div>
+      ${qrSrc ? `<img src="${qrSrc}" width="60" height="60" style="display:block;border:1px solid #eee">` : ''}
+    </div>
+    <div class="de-block">
+      <div class="sec-lbl">De:</div>
+      <div class="sec-val">Andres Moretti e Hijos SA</div>
+      <div class="sec-sub">Güaminí 3241, Buenos Aires</div>
+    </div>
+    <div class="divider"></div>
+    <div class="para-block">
+      <div class="sec-lbl">Para:</div>
+      <div class="para-name">${e.cuenta || '—'}</div>
+      <div class="para-addr">${[e.direccion_completa, e.ciudad, e.provincia].filter(Boolean).join(', ') || '—'}</div>
+    </div>
+    <div class="footer">
+      <div class="footer-date">${new Date().toLocaleDateString('es-AR')}</div>
+      <div class="footer-ot">Alleata Ops</div>
+    </div>
+  </div>
+  <button class="btn-print" onclick="window.print()">🖨️ Imprimir rótulo Cabify</button>
+  <script>window.onafterprint = () => window.close();<\/script>
+  </body></html>`);
+  w.document.close();
+}
+
 async function printRotulo(id) {
   const { data: rawR } = await sb.from('sf_workorders').select('*').eq('id', id).single();
   if (!rawR) { alert('No se encontró la OT.'); return; }
