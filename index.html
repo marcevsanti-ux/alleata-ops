@@ -1298,12 +1298,82 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <div class="stat-label">EXTRAVIADAS</div>
     </div>
   </div>
+  <!-- Subestados EN PROCESO — visible solo al filtrar por ese estado -->
+  <div id="ds-subestados" style="display:none;margin-bottom:12px">
+    <div style="font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;padding-left:2px">Desglose — En Proceso</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <div id="ds-sub-visita" onclick="dsFiltrarSubestado('visita')" style="cursor:pointer;background:var(--navy-800);border:1px solid rgba(29,191,142,.3);border-left:3px solid #1dbf8e;border-radius:8px;padding:8px 14px;min-width:130px;transition:all .15s" onmouseover="this.style.background='rgba(29,191,142,.08)'" onmouseout="this.style.background='var(--navy-800)'">
+        <div style="font-size:18px;font-weight:800;color:#1dbf8e;font-family:'JetBrains Mono',monospace" id="ds-sub-n-visita">—</div>
+        <div style="font-size:10px;font-weight:700;color:var(--text-muted);margin-top:2px">🏠 VISITA PRESENCIAL</div>
+        <div style="font-size:9px;color:var(--text-muted);margin-top:1px">ALLEATA</div>
+      </div>
+      <div id="ds-sub-despachado" onclick="dsFiltrarSubestado('despachado')" style="cursor:pointer;background:var(--navy-800);border:1px solid rgba(26,159,212,.3);border-left:3px solid #1a9fd4;border-radius:8px;padding:8px 14px;min-width:130px;transition:all .15s" onmouseover="this.style.background='rgba(26,159,212,.08)'" onmouseout="this.style.background='var(--navy-800)'">
+        <div style="font-size:18px;font-weight:800;color:#1a9fd4;font-family:'JetBrains Mono',monospace" id="ds-sub-n-despachado">—</div>
+        <div style="font-size:10px;font-weight:700;color:var(--text-muted);margin-top:2px">📮 DESPACHADO</div>
+        <div style="font-size:9px;color:var(--text-muted);margin-top:1px">CORREO ARGENTINO</div>
+      </div>
+      <div id="ds-sub-rotulo" onclick="dsFiltrarSubestado('rotulo')" style="cursor:pointer;background:var(--navy-800);border:1px solid rgba(139,92,246,.3);border-left:3px solid #8b5cf6;border-radius:8px;padding:8px 14px;min-width:130px;transition:all .15s" onmouseover="this.style.background='rgba(139,92,246,.08)'" onmouseout="this.style.background='var(--navy-800)'">
+        <div style="font-size:18px;font-weight:800;color:#8b5cf6;font-family:'JetBrains Mono',monospace" id="ds-sub-n-rotulo">—</div>
+        <div style="font-size:10px;font-weight:700;color:var(--text-muted);margin-top:2px">🏷️ RÓTULO ENVIADO</div>
+        <div style="font-size:9px;color:var(--text-muted);margin-top:1px">CORREO ARGENTINO</div>
+      </div>
+      <div id="ds-sub-otros" onclick="dsFiltrarSubestado('otros')" style="cursor:pointer;background:var(--navy-800);border:1px solid var(--border2);border-left:3px solid var(--text-muted);border-radius:8px;padding:8px 14px;min-width:130px;transition:all .15s" onmouseover="this.style.background='rgba(128,128,128,.08)'" onmouseout="this.style.background='var(--navy-800)'">
+        <div style="font-size:18px;font-weight:800;color:var(--text-muted);font-family:'JetBrains Mono',monospace" id="ds-sub-n-otros">—</div>
+        <div style="font-size:10px;font-weight:700;color:var(--text-muted);margin-top:2px">📞 OTROS</div>
+        <div style="font-size:9px;color:var(--text-muted);margin-top:1px">Contacto / Sin gestión</div>
+      </div>
+      <button onclick="dsFiltrarSubestado(null)" style="background:none;border:none;color:var(--text-muted);font-size:11px;cursor:pointer;padding:4px 8px;border-radius:6px;align-self:flex-end" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='none'">✕ Ver todos</button>
+    </div>
+  </div>
+
   <script>
+  let _dsSubestadoActivo = null;
+
   function dsFiltrarKPI(estado){
     const sel = document.getElementById('ds-f-estado');
     if(sel) sel.value = estado;
+    const panel = document.getElementById('ds-subestados');
+    if(panel){
+      if(estado === 'En Proceso'){
+        panel.style.display = 'block';
+        _dsSubestadoActivo = null;
+        dsActualizarSubestados();
+      } else {
+        panel.style.display = 'none';
+        _dsSubestadoActivo = null;
+      }
+    }
     if(typeof filtrarDesins === 'function') filtrarDesins();
     else if(typeof window.filtrarDesins === 'function') window.filtrarDesins();
+  }
+
+  function dsActualizarSubestados(){
+    const d = (window.DesinModule?.datos || []).filter(o => (o.estado||'') === 'En Proceso');
+    let visita=0, despachado=0, rotulo=0, otros=0;
+    d.forEach(o => {
+      const log = (o.logistica||'').toUpperCase();
+      const sg  = (o.status_gestion_retiros||o.status_gestion||'');
+      if(sg === 'Visita presencial' && log === 'ALLEATA') visita++;
+      else if(sg === 'Despachado' && log.includes('CORREO')) despachado++;
+      else if(sg === 'Rótulo enviado' && log.includes('CORREO')) rotulo++;
+      else otros++;
+    });
+    const s = (id,v) => { const el=document.getElementById(id); if(el) el.textContent=v; };
+    s('ds-sub-n-visita', visita);
+    s('ds-sub-n-despachado', despachado);
+    s('ds-sub-n-rotulo', rotulo);
+    s('ds-sub-n-otros', otros);
+  }
+
+  function dsFiltrarSubestado(tipo){
+    _dsSubestadoActivo = tipo;
+    ['ds-sub-visita','ds-sub-despachado','ds-sub-rotulo','ds-sub-otros'].forEach(id => {
+      const el = document.getElementById(id);
+      if(el) el.style.outline = 'none';
+    });
+    const map = {visita:'ds-sub-visita', despachado:'ds-sub-despachado', rotulo:'ds-sub-rotulo', otros:'ds-sub-otros'};
+    if(tipo && map[tipo]){ const el=document.getElementById(map[tipo]); if(el) el.style.outline='2px solid rgba(255,255,255,.25)'; }
+    if(typeof window.filtrarDesins === 'function') window.filtrarDesins();
   }
   </script>
 
@@ -1444,6 +1514,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
             <th onclick="dsOrdenar('distancia_km')" style="cursor:pointer" id="ds-th-distancia">Distancia</th>
             <th onclick="dsOrdenar('logistica')" style="cursor:pointer">Logística</th>
             <th onclick="dsOrdenar('nro_seguimiento')" style="cursor:pointer">N° Seguimiento</th>
+            <th style="width:36px;text-align:center" title="Consultar CA">🔍</th>
             <th style="width:32px;text-align:center" title="Iniciar chat WhatsApp"><svg width="16" height="16" viewBox="0 0 24 24" fill="#25D366" xmlns="http://www.w3.org/2000/svg"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg></th>
             
             <th onclick="dsOrdenar('observacion_estado')" style="cursor:pointer">Observación</th>
@@ -3706,6 +3777,7 @@ function dsCargarKPIs(){
   s('ds-num-noresponde', d.filter(o=>e(o)==='NO RESPONDE').length);
   s('ds-num-extraviada', d.filter(o=>e(o)==='Extraviada').length);
   s('ds-num-total', d.length);
+  if(typeof dsActualizarSubestados === 'function') dsActualizarSubestados();
 }
 
 // Hook goTo para disparar KPIs
