@@ -506,7 +506,7 @@ window.cargarDesinstalaciones = async function() {
     const PAGE = 500;
 
     while (true) {
-      let q = window.sb
+      let q = sb
         .from('v_ordenes_con_sla')
         .select('*')
         .eq('tipo', 'desinstalacion')
