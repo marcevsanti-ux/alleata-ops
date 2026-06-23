@@ -3246,77 +3246,37 @@ function dsTabSwitch(tab){
 
 // ── Desinstalaciones: Consulta CA individual (lupa) ──────────────────
 // Reutiliza EXACTAMENTE el mismo flujo que consultarTracking() de Envíos:
-//   mostrarModalTrackingCA → fetchTrackingCA → mostrarModalTrackingCA(ok)
-// La diferencia: persiste en ordenes_trabajo, no en envios, y NO dispara Ally.
+// Solo muestra el modal de tracking CA — sin persistir nada en BD
 async function dsConsultarCA(otId, trackNum, otNum){
-  // Protección: tracking vacío
   if(!trackNum || trackNum.trim() === ''){
-    showTrackingToast('⚠️ Esta OT no tiene N° de seguimiento', 'yellow');
+    alert('⚠️ Esta OT no tiene N° de seguimiento cargado');
     return;
   }
-
-  console.log('[Desins CA] tracking usado:', trackNum);
-  console.log('[Desins CA] usando función: consultarTracking() de Envíos (flujo completo)');
-
-  // Botón — mismo patrón que consultarTracking()
   const btn = document.getElementById(`ds-track-btn-${otId}`);
   if(btn){ btn.textContent = '⏳'; btn.disabled = true; }
 
-  // Timeout de 10 segundos
   const timer = setTimeout(() => {
     mostrarModalTrackingCA(trackNum, null, 'error', 'Tiempo de espera agotado (10s). Intentar nuevamente.', otNum);
     if(btn){ btn.textContent = '🔍'; btn.disabled = false; }
-    console.warn('[Desins CA] timeout 10s para tracking:', trackNum);
   }, 10000);
 
-  // 1. Mostrar modal en estado loading — idéntico a consultarTracking()
   mostrarModalTrackingCA(trackNum, null, 'loading', '', otNum);
 
   try {
-    // 2. Consultar CA — misma función que Envíos
     const { eventos, pieza } = await fetchTrackingCA(trackNum);
     clearTimeout(timer);
-
     if(!eventos || eventos.length === 0){
       mostrarModalTrackingCA(trackNum, null, 'error', 'Sin eventos registrados para este número', otNum);
       return;
     }
-
-    // 3. Mostrar modal con historial — idéntico a consultarTracking()
     mostrarModalTrackingCA(trackNum, { eventos, pieza }, 'ok', '', otNum);
-
-    // 4. Persistir en ordenes_trabajo (no en envios — sin tocar Envíos)
-    const ultimo = eventos[0];
-    const mapEstDS = (historia, estadoCA) => {
-      const H = (historia || '').toUpperCase();
-      const E = (estadoCA  || '').toUpperCase();
-      if(H.includes('ENTREGADO') || H.includes('ENTREGA OK')) return 'Terminal recuperada';
-      if(H.includes('DEVUELTO')  || H.includes('DEVOLUCION')) return 'Fallido';
-      if(H.includes('PERDIDO'))                                return 'Extraviada';
-      if(H.includes('EN PODER DEL DISTRIBUIDOR') || H.includes('INTENTO DE ENTREGA')) return 'En Proceso';
-      if(H.includes('EN ESPERA EN SUCURSAL'))                  return 'En Proceso';
-      if(E.includes('RETORNANDO'))                             return 'Fallido';
-      return null;
-    };
-    const estadoNuevo = mapEstDS(ultimo.historia, ultimo.estadoCA);
-    const det = ultimo.estadoCA ? `${ultimo.historia} — ${ultimo.estadoCA}` : ultimo.historia;
-    const upd = { observaciones: det, updated_at: new Date().toISOString() };
-    if(estadoNuevo) upd.estado = estadoNuevo;
-    // NO se dispara Ally, NO se envían mensajes, NO se toca cron
-    await sb.from('ordenes_trabajo').update(upd).eq('id', otId);
-
-    // Refrescar fila en memoria
-    const ot = DesinModule.datos?.find(x => x.id === otId || x.ot === otNum);
-    if(ot){ ot.observaciones = det; if(estadoNuevo) ot.estado = estadoNuevo; }
-
+    // Sin persistencia en BD — solo lectura
   } catch(err){
     clearTimeout(timer);
-    console.error('[Desins CA] error:', err);
     mostrarModalTrackingCA(trackNum, null, 'error', err.message, otNum);
   } finally {
     clearTimeout(timer);
     if(btn){ btn.textContent = '🔍'; btn.disabled = false; }
-    dsRenderTabla(DesinModule.filtrados || DesinModule.datos || []);
   }
 }
 
