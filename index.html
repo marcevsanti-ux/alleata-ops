@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.2.1</title>
+<title>Alleata · Operaciones v4.2.2</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -407,7 +407,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.2.1 · 22 jun 2026
+      v4.2.2 · 23 jun 2026
     </div>
   </div>
 </div>
@@ -485,7 +485,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.2.1 · 22 jun 2026
+      v4.2.2 · 23 jun 2026
     </div>
   </div>
 </nav>
@@ -525,7 +525,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.2.1</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.2.2</div>
   </div>
   <div class="content">
 
@@ -1327,7 +1327,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
   </div>
 
   <script>
-  let _dsSubestadoActivo = null;
+  window._dsSubestadoActivo = null;
 
   function dsFiltrarKPI(estado){
     const sel = document.getElementById('ds-f-estado');
@@ -1336,11 +1336,11 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     if(panel){
       if(estado === 'En Proceso'){
         panel.style.display = 'block';
-        _dsSubestadoActivo = null;
+        window._dsSubestadoActivo = null;
         dsActualizarSubestados();
       } else {
         panel.style.display = 'none';
-        _dsSubestadoActivo = null;
+        window._dsSubestadoActivo = null;
       }
     }
     if(typeof filtrarDesins === 'function') filtrarDesins();
@@ -1366,13 +1366,16 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
   }
 
   function dsFiltrarSubestado(tipo){
-    _dsSubestadoActivo = tipo;
+    window._dsSubestadoActivo = tipo;
     ['ds-sub-visita','ds-sub-despachado','ds-sub-rotulo','ds-sub-otros'].forEach(id => {
       const el = document.getElementById(id);
       if(el) el.style.outline = 'none';
     });
     const map = {visita:'ds-sub-visita', despachado:'ds-sub-despachado', rotulo:'ds-sub-rotulo', otros:'ds-sub-otros'};
     if(tipo && map[tipo]){ const el=document.getElementById(map[tipo]); if(el) el.style.outline='2px solid rgba(255,255,255,.25)'; }
+    // Asegurar que el filtro de estado sea "En Proceso"
+    const sel = document.getElementById('ds-f-estado');
+    if(sel && tipo) sel.value = 'En Proceso';
     if(typeof window.filtrarDesins === 'function') window.filtrarDesins();
   }
   </script>
@@ -1403,12 +1406,12 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     <!-- Tabs: Listado / Distribución Geográfica -->
     <div style="display:flex;gap:0;margin-bottom:14px;border-bottom:1px solid var(--border)">
       <button id="ds-tab-listado" onclick="dsTabSwitch('listado')" style="background:none;border:none;border-bottom:2px solid var(--teal);color:var(--text);font-size:12px;font-weight:600;padding:7px 18px;cursor:pointer;margin-bottom:-1px;transition:all .15s">📋 Listado OTs</button>
-      <button id="ds-tab-geo" onclick="dsTabSwitch('geo')" style="background:none;border:none;border-bottom:2px solid transparent;color:var(--text-muted);font-size:12px;font-weight:600;padding:7px 18px;cursor:pointer;margin-bottom:-1px;transition:all .15s">📍 Distribución Geográfica</button>
+      <button id="ds-tab-geo" onclick="dsTabSwitch('geo')" style="display:none">📍 Distribución Geográfica</button>
     </div>
 
 
     <!-- Zona AMBA cards — Desinstalaciones -->
-    <div class="stats-row" id="dsZonaRow" style="margin-bottom:12px">
+    <div class="stats-row" id="dsZonaRow" style="margin-bottom:12px;display:none">
       <div class="stat-box" id="ds-zcard-caba" onclick="dsFiltrarZona('CABA')" style="border-left:3px solid #1a9fd4;cursor:pointer;transition:all .2s" onmouseover="this.style.background='rgba(26,159,212,.1)'" onmouseout="this.style.background=''">
         <div class="stat-num" style="color:#1a9fd4;font-size:20px" id="ds-z-caba">0</div>
         <div class="stat-label">🏙️ CABA</div>
@@ -4480,7 +4483,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.2.1] OK');
+console.log('[Alleata v4.2.2] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
