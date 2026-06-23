@@ -374,3 +374,256 @@ window.abrirReporteSF = abrirReporteSF;
 window.sugerirHojaRutaDesdeDash = sugerirHojaRutaDesdeDash;
 window.confirmarHojaRutaDesdeDash = confirmarHojaRutaDesdeDash;
 window.copiarMensajeHojaRuta = copiarMensajeHojaRuta;
+
+// ══════════════════════════════════════════════════════════════
+// DESINMODULE — Carga, filtro y render de desinstalaciones
+// Lee de v_ordenes_con_sla (que apunta a sf_workorders)
+// ══════════════════════════════════════════════════════════════
+
+window.DesinModule = {
+  datos: [],
+  filtrados: [],
+  cargado: false
+};
+
+// ── Clasificar logística ──────────────────────────────────────
+function dsClasificarLogistica(log) {
+  const l = (log || '').toUpperCase();
+  if (l === 'ALLEATA') return 'Logística Alleata';
+  if (l.includes('CORREO')) return 'Correo Argentino';
+  return 'Logísticas Varias';
+}
+
+// ── Badge sidebar ─────────────────────────────────────────────
+function dsActualizarBadge(n) {
+  const el = document.getElementById('nb-desins');
+  if (el) el.textContent = n;
+}
+
+// ── Render tabla principal ────────────────────────────────────
+function dsRenderTabla(datos) {
+  const tbody = document.getElementById('ds-tbody');
+  if (!tbody) return;
+
+  if (!datos || !datos.length) {
+    tbody.innerHTML = '<tr><td colspan="16" style="text-align:center;padding:40px;color:var(--text-muted)">Sin resultados</td></tr>';
+    return;
+  }
+
+  const esc = v => String(v ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+  const estadoColor = est => {
+    const e = (est || '').toLowerCase();
+    if (e === 'pendiente') return '#f59e0b';
+    if (e === 'en proceso') return '#1a9fd4';
+    if (e === 'no responde') return '#f97316';
+    if (e === 'extraviada') return '#ef4444';
+    return 'var(--text-muted)';
+  };
+
+  tbody.innerHTML = datos.map(ot => {
+    const zona  = typeof dsGetZona === 'function' ? dsGetZona(ot) : (ot.zona || '—');
+    const color = estadoColor(ot.estado);
+    const track = ot.nro_seguimiento || '';
+    const trackLink = track
+      ? `<a href="https://www.correoargentino.com.ar/formularios/e-commerce?id=${esc(track)}" target="_blank" style="color:var(--blue);font-family:'JetBrains Mono',monospace;font-size:11px">${esc(track)}</a>`
+      : '—';
+    const dias = ot.dias_transcurridos ?? ot.dias_calc ?? '—';
+    const slaColor = ot.sla_estado_calc === 'critico' ? '#ef4444' : ot.sla_estado_calc === 'alerta' ? '#f59e0b' : '#10b981';
+
+    return `<tr data-id="${esc(ot.id)}" data-ot="${esc(ot.ot)}" data-estado="${esc(ot.estado)}" data-zona="${esc(zona)}" style="cursor:pointer" onclick="dsAbrirModal('${esc(ot.id)}','${esc(ot.ot)}')">
+      <td onclick="event.stopPropagation()"><input type="checkbox" class="ds-chk-ot" value="${esc(ot.ot)}" onclick="dsSelUpdate()" style="accent-color:var(--teal)"></td>
+      <td style="font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--teal)">${esc(ot.ot)}</td>
+      <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(ot.comercio||ot.cuenta)}">${esc(ot.comercio||ot.cuenta||'—')}</td>
+      <td><div style="font-size:12px">${esc(ot.ciudad||'—')}</div><div style="font-size:10px;color:var(--text-muted)">${esc(zona)}</div></td>
+      <td style="color:var(--text-muted);font-size:11px">—</td>
+      <td style="font-size:11px">${esc(ot.logistica||'—')}</td>
+      <td>${trackLink}</td>
+      <td style="text-align:center">
+        ${ot.contacto ? `<a href="https://wa.me/54${esc(ot.contacto).replace(/\D/g,'')}" target="_blank" title="${esc(ot.contacto)}" style="font-size:16px;text-decoration:none">💬</a>` : '—'}
+      </td>
+      <td style="max-width:180px;font-size:11px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(ot.observacion_estado||ot.observaciones)}">${esc(ot.observacion_estado||ot.observaciones||'—')}</td>
+      <td><span style="color:${color};font-weight:600;font-size:11px">${esc(ot.estado||'—')}</span></td>
+      <td style="font-size:11px">${ot.costo_envio ? '$'+Number(ot.costo_envio).toLocaleString('es-AR') : '—'}</td>
+      <td style="font-size:10px;color:var(--text-muted)">${ot.updated_at ? new Date(ot.updated_at).toLocaleDateString('es-AR') : '—'}</td>
+      <td style="font-size:11px">—</td>
+      <td style="font-size:11px">${ot.sla_ca_dias ?? '—'}</td>
+      <td><span style="color:${slaColor};font-size:11px;font-weight:600">${ot.sla_estado_calc||'—'}</span></td>
+      <td style="font-family:'JetBrains Mono',monospace;font-weight:700;color:${slaColor}">${dias}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ── filtrarDesins — aplica búsqueda + filtros ─────────────────
+window.filtrarDesins = function() {
+  const q     = (document.getElementById('ds-buscar')?.value || '').toLowerCase();
+  const fResp = (document.getElementById('ds-f-resp')?.value || '').toLowerCase();
+  const fEst  = (document.getElementById('ds-f-estado')?.value || '');
+  const fZona = (document.getElementById('ds-f-zona')?.value || '');
+
+  DesinModule.filtrados = (DesinModule.datos || []).filter(ot => {
+    if (q) {
+      const hay = [ot.ot, ot.comercio, ot.cuenta, ot.ciudad, ot.nro_seguimiento, ot.responsable]
+        .map(v => (v || '').toLowerCase()).join(' ');
+      if (!hay.includes(q)) return false;
+    }
+    if (fResp && !(ot.responsable || '').toLowerCase().includes(fResp)) return false;
+    if (fEst  && ot.estado !== fEst) return false;
+    if (fZona) {
+      const zona = typeof dsGetZona === 'function' ? dsGetZona(ot) : (ot.zona || '');
+      if (zona !== fZona) return false;
+    }
+    if (window._dsLogFiltro) {
+      const g = typeof dsClasificarLogistica === 'function' ? dsClasificarLogistica(ot.logistica) : '';
+      if (g !== window._dsLogFiltro) return false;
+    }
+    return true;
+  });
+
+  if (typeof dsActualizarZonaCards === 'function') dsActualizarZonaCards(DesinModule.filtrados);
+  if (typeof dsActualizarLogResumen === 'function') dsActualizarLogResumen(DesinModule.filtrados);
+  dsRenderTabla(DesinModule.filtrados);
+};
+
+// ── cargarDesinstalaciones — query paginada a v_ordenes_con_sla ──
+window.cargarDesinstalaciones = async function() {
+  const tbody = document.getElementById('ds-tbody');
+  if (!tbody) return;
+
+  // Evitar doble carga
+  if (DesinModule.cargado) { window.filtrarDesins(); return; }
+
+  // Progress bar
+  const bar = document.getElementById('ds-progress-bar');
+  if (bar) { bar.style.width = '20%'; }
+
+  try {
+    const isAdmin = window.currentProfile?.rol === 'admin';
+    const nombre  = window.currentProfile?.nombre || '';
+
+    let allRows = [];
+    let from = 0;
+    const PAGE = 500;
+
+    while (true) {
+      let q = window.sb
+        .from('v_ordenes_con_sla')
+        .select('*')
+        .eq('tipo', 'desinstalacion')
+        .order('updated_at', { ascending: false })
+        .range(from, from + PAGE - 1);
+
+      if (!isAdmin && nombre) {
+        q = q.ilike('operador_id', '%' + nombre.split(' ')[0] + '%');
+      }
+
+      const { data: pg, error } = await q;
+      if (error) throw error;
+      if (!pg || pg.length === 0) break;
+      allRows.push(...pg);
+      if (bar) bar.style.width = Math.min(90, 20 + allRows.length / 20) + '%';
+      if (pg.length < PAGE) break;
+      from += PAGE;
+    }
+
+    DesinModule.datos   = allRows;
+    DesinModule.filtrados = allRows;
+    DesinModule.cargado = true;
+
+    if (bar) bar.style.width = '100%';
+
+    // Actualizar badge sidebar
+    dsActualizarBadge(allRows.length);
+
+    // Popular selects de filtros
+    dsPopularFiltros(allRows);
+
+    // Render
+    window.filtrarDesins();
+
+    // KPIs
+    if (typeof dsCargarKPIs === 'function') dsCargarKPIs();
+    if (typeof dsGestion_ActualizarKPI === 'function') dsGestion_ActualizarKPI(allRows);
+
+    console.log(`[Desinstalaciones] Cargadas: ${allRows.length} OTs`);
+
+  } catch (err) {
+    console.error('[Desinstalaciones] Error:', err.message);
+    tbody.innerHTML = `<tr><td colspan="16" style="text-align:center;padding:40px;color:var(--red)">⚠ Error: ${err.message}</td></tr>`;
+  }
+};
+
+// ── Popular selects de filtros ────────────────────────────────
+function dsPopularFiltros(datos) {
+  const respSel  = document.getElementById('ds-f-resp');
+  const estSel   = document.getElementById('ds-f-estado');
+  const zonaSel  = document.getElementById('ds-f-zona');
+
+  if (respSel) {
+    const resps = [...new Set(datos.map(o => o.responsable).filter(Boolean))].sort();
+    const cur = respSel.value;
+    respSel.innerHTML = '<option value="">Todos</option>';
+    resps.forEach(r => respSel.innerHTML += `<option value="${r}"${r===cur?' selected':''}>${r}</option>`);
+  }
+
+  if (estSel) {
+    const ests = [...new Set(datos.map(o => o.estado).filter(Boolean))].sort();
+    const cur = estSel.value;
+    estSel.innerHTML = '<option value="">Todos</option>';
+    ests.forEach(e => estSel.innerHTML += `<option value="${e}"${e===cur?' selected':''}>${e}</option>`);
+  }
+
+  if (zonaSel) {
+    const zonas = ['CABA','Zona Norte','Zona Sur','Zona Oeste','Fuera AMBA','Sin zona'];
+    const cur = zonaSel.value;
+    zonaSel.innerHTML = '<option value="">Todas</option>';
+    zonas.forEach(z => zonaSel.innerHTML += `<option value="${z}"${z===cur?' selected':''}>${z}</option>`);
+  }
+}
+
+// ── dsLimpiarFiltros ──────────────────────────────────────────
+window.dsLimpiarFiltros = function() {
+  ['ds-buscar','ds-f-resp','ds-f-estado','ds-f-zona','ds-f-sla','ds-f-gestion','ds-f-status-gestion']
+    .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  window._dsLogFiltro = '';
+  window._dsFiltroGrupo = '';
+  window.filtrarDesins();
+};
+
+// Exponer _dsLogFiltro como window para compatibilidad con dsFiltrarLogistica()
+window._dsLogFiltro = '';
+
+// ── dsAbrirModal — abre el modal de detalle de OT ────────────
+window.dsAbrirModal = async function(id, otNum) {
+  const modal = document.getElementById('dsModalOT');
+  if (!modal) return;
+  const ot = DesinModule.datos?.find(x => x.id === id || x.ot === otNum);
+  if (!ot) return;
+
+  const s = (elId, val) => { const el = document.getElementById(elId); if (el) el.textContent = val ?? '—'; };
+  s('ds-m-ot',            ot.ot);
+  s('ds-m-comercio',      ot.comercio || ot.cuenta);
+  s('ds-m-cuenta',        ot.cuenta);
+  s('ds-m-estado',        ot.estado);
+  s('ds-m-resp',          ot.responsable);
+  s('ds-m-logistica',     ot.logistica);
+  s('ds-m-ciudad',        ot.ciudad);
+  s('ds-m-zona',          typeof dsGetZona === 'function' ? dsGetZona(ot) : ot.zona);
+  s('ds-m-calle',         ot.calle || ot.direccion);
+  s('ds-m-provincia',     ot.provincia);
+  s('ds-m-cp',            ot.cp);
+  s('ds-m-contacto',      ot.contacto);
+  s('ds-m-horario',       ot.horario);
+  s('ds-m-motivo',        ot.motivo || ot.motivo_desinstalacion);
+  s('ds-m-obs',           ot.observacion_estado || ot.observaciones);
+  s('ds-m-gestion',       ot.gestion_retiros);
+  s('ds-m-status-gestion',ot.status_gestion);
+  s('ds-m-gest',          ot.gestion_retiros);
+  s('ds-m-fecha',         ot.fecha_asignacion);
+
+  modal._otId  = id;
+  modal._otNum = otNum;
+  modal.style.display = 'flex';
+};
+
+console.log('[Desinstalaciones] Módulo cargado ✓');
