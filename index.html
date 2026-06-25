@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.2.3</title>
+<title>Alleata · Operaciones v4.2.4</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -407,7 +407,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.2.3 · 25 jun 2026
+      v4.2.4 · 25 jun 2026
     </div>
   </div>
 </div>
@@ -485,7 +485,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.2.3 · 25 jun 2026
+      v4.2.4 · 25 jun 2026
     </div>
   </div>
 </nav>
@@ -525,7 +525,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.2.3</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.2.4</div>
   </div>
   <div class="content">
 
@@ -4443,7 +4443,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.2.3] OK');
+console.log('[Alleata v4.2.4] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -7919,11 +7919,17 @@ function renderCabifyTrackCell(e) {
 function renderCabifyActionCell(e) {
   const ride = _cabifyRidesCache[e.ot_numero];
   if (ride) {
-    // Ya existe ride — mostrar costo si lo hay, o nada
+    const cancelable = !['delivered','requestercancel','internalcancel','returned','deleted'].includes(ride.estado||'');
     const costo = ride.ride_data?.price || ride.ride_data?.cost;
-    return costo
-      ? `<div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--teal);font-weight:600">$${Number(costo).toLocaleString('es-AR')}</div>`
-      : `<div style="font-size:10px;color:var(--text-muted)">Cabify activo</div>`;
+    return `
+      ${costo ? `<div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--teal);font-weight:600;margin-bottom:4px">$${Number(costo).toLocaleString('es-AR')}</div>` : ''}
+      ${cancelable
+        ? `<button onclick="cancelarEnvioCabify('${e.id}')"
+            style="background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.4);color:#ef4444;font-size:10px;font-weight:600;padding:4px 9px;border-radius:6px;cursor:pointer;white-space:nowrap">
+            ✕ Cancelar envío
+          </button>`
+        : `<div style="font-size:10px;color:var(--text-muted)">${ride.estado==='requestercancel'?'❌ Cancelado':'Cabify activo'}</div>`
+      }`;
   }
   // Sin ride — mostrar botón crear solo si Pre-Colecta
   if ((e.status||e.estado||'') !== 'Pre-Colecta') {
@@ -8053,6 +8059,68 @@ async function crearEnvioCabify(id) {
     // Restaurar botón
     if (actionEl) actionEl.innerHTML = renderCabifyActionCell(e);
   }
+
+// ── CABIFY: cancelar envío ─────────────────────────────────────────────────────
+
+async function cancelarEnvioCabify(id) {
+  const { data: raw } = await sb.from('sf_workorders').select('ot_numero,workorder_number').eq('id', id).single();
+  const otNumero = raw?.ot_numero || raw?.workorder_number;
+  const ride = _cabifyRidesCache[otNumero];
+
+  if (!ride) { alert('No hay envío Cabify registrado para esta OT'); return; }
+
+  const ok = confirm(
+    `⚠️ ¿Cancelar el envío Cabify para OT ${otNumero}?
+
+` +
+    `Parcel ID: ${ride.ride_id}
+
+` +
+    `Esto intentará dar de baja el rótulo en Cabify y limpiará el tracking en SF.`
+  );
+  if (!ok) return;
+
+  // Spinner en el botón
+  const actionEl = document.getElementById(`cabify-action-${id}`);
+  if (actionEl) actionEl.innerHTML = `<button disabled style="background:rgba(239,68,68,.08);border:1px dashed rgba(239,68,68,.4);color:#ef4444;font-size:10px;padding:4px 9px;border-radius:6px;opacity:.7">⏳ Cancelando...</button>`;
+
+  try {
+    const res = await fetch(
+      `https://alleata-agent-production.up.railway.app/cabify/parcels/${ride.ride_id}`,
+      {
+        method: 'DELETE',
+        headers: { 'x-automation-secret': '123456' },
+      }
+    );
+    const data = await res.json();
+
+    // Limpiar cache
+    delete _cabifyRidesCache[otNumero];
+
+    if (data.ok) {
+      const msgs = [
+        `✅ OT ${otNumero} — envío Cabify cancelado.`,
+        data.cabify_cancelled ? '✔ Confirmado por Cabify.' : '⚠️ Cabify no confirmó — verificar manualmente en el portal de Cabify.',
+        data.sf_cleared ? '✔ Tracking limpiado en SF.' : '',
+      ].filter(Boolean).join('
+');
+      alert(msgs);
+    } else {
+      alert(`⚠️ Respuesta inesperada del servidor:
+${JSON.stringify(data)}`);
+    }
+
+    // Refrescar fila
+    await loadCabifyRide(otNumero, id);
+
+  } catch(err) {
+    console.error('[Cabify] cancelar error:', err);
+    alert(`❌ Error al cancelar:
+${err.message}`);
+    if (actionEl) actionEl.innerHTML = renderCabifyActionCell({...raw, ot_numero: otNumero});
+  }
+}
+
 }
 
 // ── CABIFY: reimprimir rótulo PDF desde Supabase Storage ───────────────────────
