@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.2.2</title>
+<title>Alleata · Operaciones v4.2.3</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -407,7 +407,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.2.2 · 23 jun 2026
+      v4.2.3 · 25 jun 2026
     </div>
   </div>
 </div>
@@ -485,7 +485,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.2.2 · 23 jun 2026
+      v4.2.3 · 25 jun 2026
     </div>
   </div>
 </nav>
@@ -525,7 +525,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.2.2</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.2.3</div>
   </div>
   <div class="content">
 
@@ -4443,7 +4443,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.2.2] OK');
+console.log('[Alleata v4.2.3] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -7017,11 +7017,13 @@ function actualizarIconosOrdenEnvios(){
   });
 }
 
-function renderEnviosTable(list){
+async function renderEnviosTable(list){
   list = aplicarOrdenEnvios(list);
   const isLogistica=currentProfile?.rol==='logistica';
   const empty=document.getElementById('enviosEmpty');
   empty.style.display=list.length?'none':'block';
+  // Precargar rides Cabify antes de renderizar
+  await preloadCabifyRides(list);
 
   const renderConDistri=(names)=>{
     const distriNames=names||{};
@@ -7042,6 +7044,8 @@ function renderEnviosTable(list){
         ${(e.logistica||'').toUpperCase()==='ALLEATA'
           ? `<div style="font-size:9px;color:var(--text-muted);font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px">🚗 Log. Alleata</div>
              <div style="font-size:12px;color:var(--teal);font-weight:700">${e.track||'—'}</div>`
+          : (e.logistica||'').toUpperCase()==='CABIFY'
+          ? `<div id="cabify-track-${e.id}">${renderCabifyTrackCell(e)}</div>`
           : `<div class="mono" style="font-size:10px;word-break:break-all">${e.track||'—'}</div>
              ${e.track?`<a href="https://www.correoargentino.com.ar/formularios/e-commerce?id=${e.track}" target="_blank" style="font-size:10px;color:var(--blue);text-decoration:none;">🔗 Correo Arg.</a>`:''}`
         }
@@ -7060,7 +7064,9 @@ function renderEnviosTable(list){
         <div style="font-size:10px;color:var(--text-muted)">${e.provincia||''}</div>
       </td>
       <td>
-        ${e.costo_envio
+        ${(e.logistica||'').toUpperCase()==='CABIFY'
+          ? `<div id="cabify-action-${e.id}">${renderCabifyActionCell(e)}</div>`
+          : e.costo_envio
           ? `<div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--teal);font-weight:600">$${Number(e.costo_envio).toLocaleString('es-AR')}</div>
              <button title="Re-cotizar" onclick="abrirCotizador('${e.id}','${e.cp_dest||''}','${e.responsable||''}','${(e.direccion_completa||'').replace(/'/g,'')}','${e.ciudad||''}','${e.provincia||''}')" style="background:none;border:none;color:var(--text-muted);font-size:10px;cursor:pointer;padding:2px 0;text-decoration:underline">recotizar</button>`
           : e.estado === 'Pre-Colecta'
@@ -7091,7 +7097,7 @@ function renderEnviosTable(list){
           ${(e.logistica||'').toUpperCase()==='CORREO ARGENTINO'
             ? '' // CA: no tiene rótulo Alleata
             : (e.logistica||'').toUpperCase()==='CABIFY'
-              ? `<button title="Imprimir rótulo Cabify" style="background:rgba(139,92,246,.15);border:1px solid rgba(139,92,246,.4);color:#8b5cf6;font-size:11px;padding:4px 7px;border-radius:6px;cursor:pointer;${isLogistica?'display:none':''}" onclick="printRotuloCabify('${e.id}')">🚗🖨️</button>`
+              ? `<span id="cabify-print-${e.id}">${renderCabifyPrintBtn(e)}</span>`
             : (e.estado==='Entregado'||e.estado==='Entregado por logística Alleata')
               ? `<button title="OT ya entregada" style="background:var(--surface2);border:1px solid var(--border2);color:var(--text-muted);font-size:11px;padding:4px 7px;border-radius:6px;cursor:not-allowed;opacity:0.35;${isLogistica?'display:none':''}" disabled>🖨️</button>`
               : `<button title="Imprimir rótulo envío" style="background:var(--surface2);border:1px solid var(--border2);color:var(--teal);font-size:11px;padding:4px 7px;border-radius:6px;cursor:pointer;${isLogistica?'display:none':''}" onclick="printRotulo('${e.id}')">🖨️</button>`
@@ -7876,90 +7882,201 @@ async function updateEnvioEstado(id, estado){
   loadBadges(); renderEnvios();
 }
 // ── Imprimir rótulo envío (logística Alleata) ─────────────────
-async function printRotuloCabify(id) {
-  // Buscar el envío en Supabase para obtener ot_numero y datos
-  const { data: e } = await sb.from('sf_workorders').select('*').eq('id', id).single();
-  if (!e) { alert('OT no encontrada'); return; }
+// ── CABIFY: helpers de render ──────────────────────────────────────────────────
 
-  // Obtener parcel_id de cabify_rides si existe
-  let parcelId = null;
-  let trackingUrl = null;
-  try {
-    const { data: ride } = await sb.from('cabify_rides').select('*').eq('ot_numero', e.ot_numero).order('created_at', {ascending: false}).limit(1).single();
-    if (ride) { parcelId = ride.ride_id; trackingUrl = ride.ride_data?.tracking_url; }
-  } catch {}
+// Cache en memoria de rides Cabify para evitar múltiples consultas por render
+const _cabifyRidesCache = {};
 
-  // QR: tracking URL de Cabify o maps
-  function makeQRDataUrl(text, size) {
-    return `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(text)}&color=000000&bgcolor=ffffff&margin=2`;
+function renderCabifyTrackCell(e) {
+  const ride = _cabifyRidesCache[e.ot_numero];
+  if (!ride) {
+    // Sin ride todavía — cargamos en background al primer render
+    loadCabifyRide(e.ot_numero, e.id);
+    return `<div style="font-size:10px;color:var(--text-muted)">Sin despachar</div>`;
   }
-  const qrTarget = trackingUrl || `https://maps.google.com/?q=${encodeURIComponent([e.direccion_completa, e.ciudad, e.provincia, 'Argentina'].filter(Boolean).join(', '))}`;
-  const qrSrc = makeQRDataUrl(qrTarget, 80);
+  const trackUrl = ride.tracking_url || ride.ride_data?.tracking_url;
+  const estado   = ride.estado || 'ready';
+  const ESTADO_LABEL = {
+    ready:'📋 Registrado', readytopickup:'📦 Listo para retiro',
+    onroutetopickup:'🚗 Rider en camino', pickingup:'📤 Retirando',
+    intransit:'🚀 En tránsito', delivering:'🚪 Entregando',
+    delivered:'✅ Entregado', undelivered:'⚠️ No entregado',
+    incident:'🚨 Incidente', pickupfailed:'⚠️ Fallo retiro',
+    receivedonfinalhub:'🏭 En almacén', readytodispatch:'🔄 En hub',
+  };
+  const label = ESTADO_LABEL[estado] || estado;
+  const color = ['delivered'].includes(estado) ? 'var(--teal)'
+              : ['undelivered','incident','pickupfailed'].includes(estado) ? '#ef4444'
+              : '#a78bfa';
+  return `
+    <div style="font-size:11px;font-weight:700;color:${color};margin-bottom:3px">${label}</div>
+    ${trackUrl
+      ? `<a href="${trackUrl}" target="_blank" style="font-size:10px;color:var(--blue);text-decoration:none;display:block;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">🔗 Ver tracking</a>`
+      : ''}
+  `;
+}
 
-  const w = window.open('', '_blank', 'width=420,height=620');
-  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
-  <title>Rótulo Cabify — OT ${e.ot_numero}</title>
-  <style>
-    @page { size: 100mm 80mm; margin: 0; }
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body { width: 100mm; font-family: Arial, sans-serif; background: #fff; font-size: 10px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    .rotulo { width: 100mm; height: 80mm; padding: 2.5mm; display: flex; flex-direction: column; }
-    .hdr { display: flex; align-items: center; justify-content: space-between; background: #1a1a2e; padding: 2mm 3mm; margin-bottom: 2mm; border-radius: 1mm; }
-    .hdr-cabify { font-size: 13px; font-weight: 900; color: #fff; letter-spacing: -0.5px; }
-    .hdr-cabify span { color: #8b5cf6; }
-    .hdr-alleata { font-size: 7px; color: #aaa; text-align: right; line-height: 1.4; }
-    .ref-block { display: flex; align-items: center; justify-content: space-between; border: 1.5px solid #333; padding: 1.5mm 2mm; margin-bottom: 1.5mm; border-radius: 1mm; }
-    .ref-inner .ref-label { font-size: 6.5px; font-weight: 700; text-transform: uppercase; color: #666; }
-    .ref-inner .ref-val { font-size: 14px; font-weight: 900; letter-spacing: -0.5px; }
-    .ref-inner .ref-modal { font-size: 7px; color: #8b5cf6; font-weight: 700; margin-top: 0.5mm; }
-    .de-block { margin-bottom: 1.5mm; }
-    .de-block .sec-lbl { font-size: 7px; font-weight: 700; text-transform: uppercase; color: #555; margin-bottom: 0.5mm; }
-    .de-block .sec-val { font-size: 8.5px; font-weight: 700; color: #000; }
-    .de-block .sec-sub { font-size: 7.5px; color: #444; }
-    .divider { border-top: 0.5px solid #ccc; margin: 1.5mm 0; }
-    .para-block .sec-lbl { font-size: 7px; font-weight: 700; text-transform: uppercase; color: #555; margin-bottom: 0.5mm; }
-    .para-block .para-name { font-size: 11px; font-weight: 900; text-transform: uppercase; color: #000; }
-    .para-block .para-addr { font-size: 8px; color: #333; margin-top: 0.5mm; }
-    .footer { margin-top: auto; border-top: 0.5px solid #ccc; padding-top: 1mm; display: flex; justify-content: space-between; align-items: center; }
-    .footer-date { font-size: 7px; color: #666; }
-    .footer-ot { font-size: 7px; color: #8b5cf6; font-weight: 700; }
-    .btn-print { display: block; width: 95mm; margin: 6px auto 0; padding: 8px; background: #8b5cf6; color: #fff; border: none; font-size: 13px; font-weight: 700; cursor: pointer; border-radius: 5px; font-family: Arial, sans-serif; }
-    @media print { .btn-print { display: none !important; } }
-  </style>
-  </head><body>
-  <div class="rotulo">
-    <div class="hdr">
-      <div class="hdr-cabify">cabify <span>logistics</span></div>
-      <div class="hdr-alleata">Andrés Moretti e Hijos S.A.<br>Logística Cabify</div>
-    </div>
-    <div class="ref-block">
-      <div class="ref-inner">
-        <div class="ref-label">Orden de trabajo</div>
-        <div class="ref-val">${e.ot_numero || '—'}</div>
-        <div class="ref-modal">Entrega en el mismo día</div>
-      </div>
-      ${qrSrc ? `<img src="${qrSrc}" width="60" height="60" style="display:block;border:1px solid #eee">` : ''}
-    </div>
-    <div class="de-block">
-      <div class="sec-lbl">De:</div>
-      <div class="sec-val">Andres Moretti e Hijos SA</div>
-      <div class="sec-sub">Güaminí 3241, Buenos Aires</div>
-    </div>
-    <div class="divider"></div>
-    <div class="para-block">
-      <div class="sec-lbl">Para:</div>
-      <div class="para-name">${e.cuenta || '—'}</div>
-      <div class="para-addr">${[e.direccion_completa, e.ciudad, e.provincia].filter(Boolean).join(', ') || '—'}</div>
-    </div>
-    <div class="footer">
-      <div class="footer-date">${new Date().toLocaleDateString('es-AR')}</div>
-      <div class="footer-ot">Alleata Ops</div>
-    </div>
-  </div>
-  <button class="btn-print" onclick="window.print()">🖨️ Imprimir rótulo Cabify</button>
-  <script>window.onafterprint = () => window.close();<\/script>
-  </body></html>`);
-  w.document.close();
+function renderCabifyActionCell(e) {
+  const ride = _cabifyRidesCache[e.ot_numero];
+  if (ride) {
+    // Ya existe ride — mostrar costo si lo hay, o nada
+    const costo = ride.ride_data?.price || ride.ride_data?.cost;
+    return costo
+      ? `<div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--teal);font-weight:600">$${Number(costo).toLocaleString('es-AR')}</div>`
+      : `<div style="font-size:10px;color:var(--text-muted)">Cabify activo</div>`;
+  }
+  // Sin ride — mostrar botón crear solo si Pre-Colecta
+  if ((e.status||e.estado||'') !== 'Pre-Colecta') {
+    return `<div style="font-size:10px;color:var(--text-muted)">—</div>`;
+  }
+  return `<button onclick="crearEnvioCabify('${e.id}')"
+    style="background:rgba(124,58,237,.2);border:1.5px solid #7C3AED;color:#a78bfa;font-size:11px;font-weight:700;padding:6px 10px;border-radius:7px;cursor:pointer;white-space:nowrap">
+    🚗 Crear envío Cabify
+  </button>`;
+}
+
+function renderCabifyPrintBtn(e) {
+  const ride = _cabifyRidesCache[e.ot_numero];
+  if (!ride) return '';
+  return `<button title="Reimprimir rótulo Cabify" onclick="reimprimirRotuloCabify('${e.id}')"
+    style="background:rgba(139,92,246,.15);border:1px solid rgba(139,92,246,.4);color:#8b5cf6;font-size:11px;padding:4px 7px;border-radius:6px;cursor:pointer">🖨️</button>`;
+}
+
+async function loadCabifyRide(ot_numero, rowId) {
+  if (!ot_numero) return;
+  try {
+    const { data } = await sb.from('cabify_rides')
+      .select('*')
+      .eq('ot_numero', ot_numero)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (data) {
+      _cabifyRidesCache[ot_numero] = data;
+      // Refrescar celdas de esta fila sin re-renderizar toda la tabla
+      const trackEl  = document.getElementById(`cabify-track-${rowId}`);
+      const actionEl = document.getElementById(`cabify-action-${rowId}`);
+      const printEl  = document.getElementById(`cabify-print-${rowId}`);
+      // Necesitamos el objeto e — buscarlo en _enviosData
+      const e = (_enviosData||[]).find(x=>x.id===rowId) || (_enviosData||[]).find(x=>x.ot_numero===ot_numero);
+      if (!e) return;
+      if (trackEl)  trackEl.innerHTML  = renderCabifyTrackCell(e);
+      if (actionEl) actionEl.innerHTML = renderCabifyActionCell(e);
+      if (printEl)  printEl.innerHTML  = renderCabifyPrintBtn(e);
+    }
+  } catch(err) {
+    console.warn('[Cabify] loadCabifyRide error:', err.message);
+  }
+}
+
+// Precargar todos los rides Cabify antes del render de la tabla
+async function preloadCabifyRides(list) {
+  const cabifyOTs = list
+    .filter(e => (e.logistica||'').toUpperCase() === 'CABIFY' && e.ot_numero)
+    .map(e => e.ot_numero);
+  if (!cabifyOTs.length) return;
+  try {
+    const { data } = await sb.from('cabify_rides')
+      .select('*')
+      .in('ot_numero', cabifyOTs)
+      .order('created_at', { ascending: false });
+    (data||[]).forEach(ride => {
+      if (!_cabifyRidesCache[ride.ot_numero]) {
+        _cabifyRidesCache[ride.ot_numero] = ride;
+      }
+    });
+  } catch(err) {
+    console.warn('[Cabify] preloadCabifyRides error:', err.message);
+  }
+}
+
+// ── CABIFY: crear envío ────────────────────────────────────────────────────────
+
+async function crearEnvioCabify(id) {
+  const { data: raw } = await sb.from('sf_workorders').select('*').eq('id', id).single();
+  if (!raw) { alert('OT no encontrada'); return; }
+  const e = normalizarSFWorkorder(raw);
+
+  const ok = confirm(
+    `¿Crear envío Cabify para OT ${e.ot_numero}?\n\n` +
+    `Destinatario: ${e.cuenta}\n` +
+    `Dirección: ${e.direccion_completa||''}, ${e.ciudad||''}\n` +
+    `Horario: ${e.horario_entrega||e.horario||'—'}`
+  );
+  if (!ok) return;
+
+  // Spinner en el botón
+  const actionEl = document.getElementById(`cabify-action-${id}`);
+  if (actionEl) actionEl.innerHTML = `<button disabled style="background:rgba(124,58,237,.1);border:1.5px dashed #7C3AED;color:#7C3AED;font-size:11px;padding:6px 10px;border-radius:7px;cursor:default;opacity:.7">⏳ Procesando...</button>`;
+
+  try {
+    const addr = [e.direccion_completa, e.ciudad, e.provincia, 'Argentina'].filter(Boolean).join(', ');
+    const body = {
+      external_id: e.ot_numero,
+      dropoff_info: {
+        addr: addr,
+        contact: {
+          name:  e.cuenta || '',
+          phone: e.contacto_celular || e.telefono_secundario || '',
+        },
+        instr: e.horario_entrega || e.horario || '',
+      },
+    };
+
+    const res = await fetch(`https://alleata-agent-production.up.railway.app/cabify/parcels/create-and-ship`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-automation-secret': '123456',
+      },
+      body: JSON.stringify(body),
+    });
+
+    const data = await res.json();
+    if (!res.ok || !data.ok) throw new Error(data.error || 'Error al crear parcel');
+
+    // Limpiar cache y recargar ride
+    delete _cabifyRidesCache[e.ot_numero];
+    await loadCabifyRide(e.ot_numero, id);
+
+    // Mostrar tracking URL
+    if (data.tracking_url) {
+      const trackEl = document.getElementById(`cabify-track-${id}`);
+      if (trackEl) trackEl.innerHTML = renderCabifyTrackCell(e);
+    }
+
+    alert(`✅ Envío Cabify creado para OT ${e.ot_numero}\n\nEl rótulo PDF fue guardado. Podés imprimirlo desde el botón 🖨️`);
+
+  } catch(err) {
+    console.error('[Cabify] crearEnvio error:', err);
+    alert(`❌ Error al crear envío Cabify:\n${err.message}`);
+    // Restaurar botón
+    if (actionEl) actionEl.innerHTML = renderCabifyActionCell(e);
+  }
+}
+
+// ── CABIFY: reimprimir rótulo PDF desde Supabase Storage ───────────────────────
+
+async function reimprimirRotuloCabify(id) {
+  const { data: raw } = await sb.from('sf_workorders').select('ot_numero,workorder_number').eq('id', id).single();
+  const ot = raw?.ot_numero || raw?.workorder_number;
+  if (!ot) { alert('OT no encontrada'); return; }
+
+  const ride = _cabifyRidesCache[ot];
+  if (!ride) { alert('No hay envío Cabify registrado para esta OT'); return; }
+
+  // Intentar desde label_url guardada en cabify_rides
+  if (ride.label_url) {
+    window.open(ride.label_url, '_blank');
+    return;
+  }
+
+  // Fallback: pedir PDF directo a Railway (Cabify API)
+  const parcelId = ride.ride_id;
+  if (!parcelId) { alert('No se encontró el Parcel ID'); return; }
+
+  const url = `https://alleata-agent-production.up.railway.app/cabify/parcels/${parcelId}/label`;
+  window.open(url + `?secret=123456`, '_blank');
 }
 
 async function printRotulo(id) {
