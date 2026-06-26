@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.4.0</title>
+<title>Alleata · Operaciones v4.4.1</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -407,7 +407,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.4.0 · 26 jun 2026
+      v4.4.1 · 26 jun 2026
     </div>
   </div>
 </div>
@@ -485,7 +485,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.4.0 · 26 jun 2026
+      v4.4.1 · 26 jun 2026
     </div>
   </div>
 </nav>
@@ -525,7 +525,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.4.0</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.4.1</div>
   </div>
   <div class="content">
 
@@ -4482,7 +4482,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.4.0] OK');
+console.log('[Alleata v4.4.1] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -7128,6 +7128,7 @@ function actualizarIconosOrdenEnvios(){
 async function renderEnviosTable(list){
   list = aplicarOrdenEnvios(list);
   const isLogistica=currentProfile?.rol==='logistica';
+  const isAdmin=currentProfile?.rol==='admin';
   const empty=document.getElementById('enviosEmpty');
   empty.style.display=list.length?'none':'block';
   // Precargar rides Cabify antes de renderizar
@@ -7213,6 +7214,8 @@ async function renderEnviosTable(list){
           <button title="Actualizar observación" style="background:var(--surface2);border:1px solid var(--border2);color:var(--text-muted);font-size:11px;padding:4px 7px;border-radius:6px;cursor:pointer" onclick="openUpdateEvento('${e.id}','${(e.ultimo_evento||'').replace(/'/g,'&#39;')}')">✏️</button>
           ${e.track&&(e.logistica||'').toUpperCase()!=='ALLEATA'?`<button id="track-btn-${e.id}" title="Actualizar tracking CA" style="background:var(--surface2);border:1px solid var(--border2);color:var(--blue);font-size:11px;padding:4px 7px;border-radius:6px;cursor:pointer" onclick="consultarTracking('${e.id}','${e.track}')">🔍</button>`:''}
           ${tieneRetorno?`<button title="Imprimir rótulo RETORNO" style="background:rgba(245,158,11,.15);border:1px solid #f59e0b;color:#f59e0b;font-size:11px;padding:4px 7px;border-radius:6px;cursor:pointer" onclick="printRotuloDevolucion('${e.id}')">↩️🖨️</button>`:''}
+          ${isAdmin?`<button title="Cambiar logística en SF" style="background:var(--surface2);border:1px solid var(--border2);color:var(--text-muted);font-size:11px;padding:4px 7px;border-radius:6px;cursor:pointer" onclick="abrirCambiarLogistica('${e.id}','${e.sf_id}','${e.ot_numero}','${(e.logistica||'')}')">🔄 Log.</button>`:''}
+
 
         </div>
       </td>
@@ -7238,6 +7241,50 @@ function esOTConRetorno(tipo){
   if(!tipo)return false;
   const t=tipo.toUpperCase();
   return t.includes('CAMBIO')||t.includes('ROLLOUT');
+}
+
+async function abrirCambiarLogistica(id, sfId, otNumero, logisticaActual){
+  const opciones = ['ALLEATA','CORREO ARGENTINO','CABIFY','EPSA'];
+  const lista = opciones.map((l,i)=>`${i+1}. ${l}${l===logisticaActual?' (actual)':''}`).join('\n');
+  const respuesta = prompt(
+    `OT ${otNumero} — Logística actual: ${logisticaActual||'—'}\n\nElegí nueva logística:\n${lista}\n\nEscribí el número:`
+  );
+  if(!respuesta) return;
+  const idx = parseInt(respuesta.trim()) - 1;
+  if(isNaN(idx)||idx<0||idx>=opciones.length){ alert('Opción inválida'); return; }
+  const nueva = opciones[idx];
+  if(nueva === logisticaActual){ alert('Es la misma logística, no hay cambio.'); return; }
+  if(!confirm(`¿Cambiar logística de OT ${otNumero} de "${logisticaActual}" a "${nueva}"?\nEsto se actualizará en Salesforce.`)) return;
+
+  try {
+    const res = await fetch('https://alleata-agent-production.up.railway.app/automations/cambiar-logistica',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-automation-secret':'123456'},
+      body: JSON.stringify({ sf_id: sfId, ot_numero: otNumero, nueva_logistica: nueva })
+    });
+    const data = await res.json();
+    if(data.ok){
+      // Actualizar Supabase local inmediatamente
+      await sb.from('sf_workorders').update({ logistica: nueva }).eq('id', id);
+      auditLog({tabla:'sf_workorders',registro_id:id,accion:'CAMBIAR_LOGISTICA',
+        campo:'logistica',valor_antes:logisticaActual,valor_despues:nueva});
+
+      if(data.aviso_cabify){
+        // Mostrar aviso con link al portal Cabify
+        const msg = `✅ Logística actualizada a ${nueva} en SF.\n\n${data.aviso_cabify}\n\n¿Abrís el portal Cabify para cancelar el envío?`;
+        if(confirm(msg)){
+          window.open('https://logistics.cabify.com','_blank');
+        }
+      } else {
+        showTrackingToast?.(`✅ OT ${otNumero} — logística → ${nueva}`,'teal');
+      }
+      renderEnvios();
+    } else {
+      alert('Error al cambiar logística: '+(data.error||'desconocido'));
+    }
+  } catch(err){
+    alert('Error de conexión: '+err.message);
+  }
 }
 
 function openCargarTrackRetorno(id){
