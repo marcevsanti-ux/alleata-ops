@@ -5099,7 +5099,8 @@ function rlRenderTabla(){
         <td style="max-width:180px">${e.ultimo_evento&&e.ultimo_evento!=='Importado desde SF'?`<div style="font-size:10px;color:var(--teal);margin-top:2px">${e.ultimo_evento}</div>`:'—'}${e.foto_evidencia?`<a href="${e.foto_evidencia}" target="_blank"><img src="${e.foto_evidencia}" style="width:50px;height:38px;object-fit:cover;border-radius:5px;border:1px solid var(--border2);margin-top:4px"></a>`:''}</td>
         <td><div style="display:flex;gap:4px;flex-wrap:wrap">
           <button title="Editar" style="background:var(--surface2);border:1px solid var(--border2);color:var(--text-muted);font-size:11px;padding:4px 7px;border-radius:6px;cursor:pointer" onclick="openUpdateEvento('${e.id}','${(e.ultimo_evento||'').replace(/'/g,'&#39;')}')">✏️</button>
-          ${e.track?`<button id="rl-track-btn-${e.id}" title="Ver tracking CA" style="background:var(--surface2);border:1px solid var(--border2);color:var(--blue);font-size:11px;padding:4px 7px;border-radius:6px;cursor:pointer" onclick="consultarTracking('${e.id}','${e.track}')">🔍</button>`:''}
+          ${e.track?`<button id="rl-track-btn-${e.id}" title="Ver tracking CA" style="background:var(--surface2);border:1px solid var(--border2);color:var(--blue);font-size:11px;padding:4px 7px;border-radius:6px;cursor:pointer" onclick="consultarTracking('${e.id}','${(e.tipo||'').toLowerCase().includes('cambio de terminal')&&e.estado==='Retirar Terminal'&&e.track_devolucion?e.track_devolucion:e.track}')">🔍${(e.tipo||'').toLowerCase().includes('cambio de terminal')&&e.estado==='Retirar Terminal'?' ↩️':''}</button>`:''}
+          ${(e.tipo||'').toLowerCase().includes('cambio de terminal')&&e.estado==='Retirar Terminal'&&e.estado_ca_dev==='Entregado'?`<button title="Equipo recibido en depósito — confirmar para cerrar como Exitoso" style="background:rgba(16,185,129,.15);border:1px solid #10b981;color:#10b981;font-size:11px;padding:4px 8px;border-radius:6px;cursor:pointer;font-weight:700" onclick="confirmarRecepcionEquipo('${e.id}','${e.sf_id}','${e.ot_numero}')">✅ Confirmar recepción</button>`:''}
         </div></td>
       </tr>`;
     }
@@ -6217,6 +6218,8 @@ function normalizarSFWorkorder(r){
     fecha:              r.fecha_despacho,
     cp_dest:            cpResuelto,
     track_devolucion:   r.tracking_devolucion,
+    estado_ca_dev:      r.estado_ca_dev,
+    sf_id:              r.sf_id,
     ultimo_evento:      r.ultimo_evento_envio,
     ultimo_evento_fecha:r.ultimo_evento_envio_fecha,
     historia_ca:        r.historia_ca_envio,
@@ -7143,6 +7146,37 @@ function openCargarTrackRetorno(id){
       valor_antes:null, valor_despues:track.trim()});
     renderEnvios();
   });
+}
+
+async function confirmarRecepcionEquipo(id, sfId, otNumero){
+  if(!confirm(`¿Confirmar recepción del equipo para OT ${otNumero}?\nEsto cerrará la OT como EXITOSO en Salesforce.`)) return;
+
+  // Feedback inmediato
+  const btn = document.querySelector(`button[onclick*="confirmarRecepcionEquipo('${id}'"]`);
+  if(btn){ btn.textContent='⏳ Procesando...'; btn.disabled=true; }
+
+  try {
+    const res = await fetch('https://alleata-agent-production.up.railway.app/automations/confirm-retorno',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-automation-secret':'123456'},
+      body:JSON.stringify({ sf_id: sfId, ot_numero: otNumero })
+    });
+    const data = await res.json();
+    if(data.ok){
+      auditLog({tabla:'sf_workorders', registro_id:id, accion:'CONFIRMAR_RECEPCION_EQUIPO',
+        campo:'status', valor_antes:'Retirar Terminal', valor_despues:'Exitoso'});
+      showTrackingToast?.(`✅ OT ${otNumero} cerrada como Exitoso`, 'teal');
+      // Actualizar Supabase local
+      await sb.from('sf_workorders').update({ status:'Exitoso' }).eq('id', id);
+      renderEnvios();
+    } else {
+      alert('Error al confirmar: ' + (data.error || 'desconocido'));
+      if(btn){ btn.textContent='✅ Confirmar recepción'; btn.disabled=false; }
+    }
+  } catch(err){
+    alert('Error de conexión: ' + err.message);
+    if(btn){ btn.textContent='✅ Confirmar recepción'; btn.disabled=false; }
+  }
 }
 
 async function updateEstadoDevolucion(id,estado){
