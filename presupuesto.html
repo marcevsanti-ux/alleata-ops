@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Alleata · Presupuesto Operaciones v1.5.8</title>
+<title>Alleata · Presupuesto Operaciones v1.5.9</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -191,7 +191,7 @@
   <div class="login-box">
     <h2>💰 Presupuesto</h2>
     <p class="login-sub">Alleata · Solo Admin</p>
-    <div style="position:absolute;bottom:12px;right:16px;font-size:10px;font-family:'JetBrains Mono',monospace;color:rgba(232,237,243,.2)">v1.5.8</div>
+    <div style="position:absolute;bottom:12px;right:16px;font-size:10px;font-family:'JetBrains Mono',monospace;color:rgba(232,237,243,.2)">v1.5.9</div>
     <div class="login-field">
       <label>Email</label>
       <input type="email" id="loginEmail" placeholder="tu@email.com" onkeydown="if(event.key==='Enter')doLogin()">
@@ -207,7 +207,7 @@
 
 <div id="appContent" style="display:none">
 <h1>💰 Presupuesto Operaciones</h1>
-<p class="sub">Alleata · 2026 · Solo Admin <span style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 8px;border-radius:4px;border:1px solid var(--border2);font-size:10px;margin-left:6px">v1.5.8</span></p>
+<p class="sub">Alleata · 2026 · Solo Admin <span style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 8px;border-radius:4px;border:1px solid var(--border2);font-size:10px;margin-left:6px">v1.5.9</span></p>
 
 <div class="toolbar">
   <div class="mes-bar" id="mesBar"></div>
@@ -246,6 +246,8 @@
   <div class="modal">
     <h3 id="mTitle"></h3>
     <p id="mSub"></p>
+    <label>N° Factura (opcional)</label>
+    <input type="text" id="mNroFac" placeholder="0001-00012345" style="margin-bottom:12px;font-family:'JetBrains Mono',monospace">
     <label>Monto real ($)</label>
     <input type="number" id="mInput" step="1000">
     <div class="modal-btns">
@@ -502,6 +504,8 @@ function renderTabla(items) {
         nroFacCell = getChip(telecomData[mes].nroFac||'—', telecomData[mes].nroFac&&telecomData[mes].nroFac!=='—'?'Telecom':'');
       else if(isAmazon && amazonData[mes])
         nroFacCell = getChip('AWS '+MESES_LABEL[mes], 'ID: '+(amazonData[mes].idCuenta||'—'));
+      else if(nroFacturas[it.id+'_'+mes])
+        nroFacCell = getChip(nroFacturas[it.id+'_'+mes], '');
       rows+=`
         <tr>
           <td>
@@ -542,8 +546,9 @@ function openModal(id,proveedor,detalle) {
   document.getElementById('mTitle').textContent=proveedor;
   document.getElementById('mSub').textContent=`${MESES_LABEL[mes]} 2026 · ${detalle}`;
   document.getElementById('mInput').value=getReal(id,mes)||'';
+  document.getElementById('mNroFac').value=nroFacturas[id+'_'+mes]||'';
   document.getElementById('modalBg').classList.add('open');
-  setTimeout(()=>document.getElementById('mInput').focus(),50);
+  setTimeout(()=>document.getElementById('mNroFac').focus(),50);
 }
 function closeModal() {
   document.getElementById('modalBg').classList.remove('open');
@@ -552,7 +557,9 @@ function closeModal() {
 function guardar() {
   if(!editando) return;
   const monto=parseFloat(document.getElementById('mInput').value)||0;
+  const nro=document.getElementById('mNroFac').value.trim();
   reales[`${editando.id}_${editando.mes}`]=monto;
+  if(nro) nroFacturas[`${editando.id}_${editando.mes}`]=nro;
   closeModal();
   render();
   showToast('✅ Real guardado');
@@ -1068,6 +1075,7 @@ document.addEventListener('keydown',e=>{
 });
 
 // ── State vars (hoisted before render) ───────────────────────────────────────
+const nroFacturas = {}; // nroFacturas['epsa_jun'] = '0001-00012345'
 const amazonData      = {};
 const claroData       = {};
 const napseFacturas   = {};
