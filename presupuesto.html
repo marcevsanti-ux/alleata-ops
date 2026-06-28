@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Alleata · Presupuesto Operaciones v1.5.5</title>
+<title>Alleata · Presupuesto Operaciones v1.5.6</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -191,7 +191,7 @@
   <div class="login-box">
     <h2>💰 Presupuesto</h2>
     <p class="login-sub">Alleata · Solo Admin</p>
-    <div style="position:absolute;bottom:12px;right:16px;font-size:10px;font-family:'JetBrains Mono',monospace;color:rgba(232,237,243,.2)">v1.5.5</div>
+    <div style="position:absolute;bottom:12px;right:16px;font-size:10px;font-family:'JetBrains Mono',monospace;color:rgba(232,237,243,.2)">v1.5.6</div>
     <div class="login-field">
       <label>Email</label>
       <input type="email" id="loginEmail" placeholder="tu@email.com" onkeydown="if(event.key==='Enter')doLogin()">
@@ -207,7 +207,7 @@
 
 <div id="appContent" style="display:none">
 <h1>💰 Presupuesto Operaciones</h1>
-<p class="sub">Alleata · 2026 · Solo Admin <span style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 8px;border-radius:4px;border:1px solid var(--border2);font-size:10px;margin-left:6px">v1.5.5</span></p>
+<p class="sub">Alleata · 2026 · Solo Admin <span style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 8px;border-radius:4px;border:1px solid var(--border2);font-size:10px;margin-left:6px">v1.5.6</span></p>
 
 <div class="toolbar">
   <div class="mes-bar" id="mesBar"></div>
@@ -485,16 +485,24 @@ function renderTabla(items) {
       // Nro facturas para columna
       const logiFacs = isLogi ? logiGetFacturas(mes) : [];
       const napseFacsRow = isNapse ? (napseFacturas[mes]||[]) : [];
-      const chip = (facs, showTerm=true) => facs.length
-        ? facs.map(f=>`
-            <div style="display:inline-block;margin:2px;vertical-align:top;text-align:center">
-              <span style="font-family:'JetBrains Mono',monospace;font-size:10px;background:rgba(29,191,142,.08);color:var(--teal);padding:1px 6px;border-radius:4px;border:1px solid rgba(29,191,142,.2);display:block">${f.numero}</span>
-              ${showTerm&&f.terminales?`<span style="font-size:9px;color:var(--text-muted);margin-top:2px;display:block">${f.terminales} term.</span>`:''}
-            </div>`).join('')
-        : '<span style="color:var(--text-muted);font-size:11px">—</span>';
-      const nroFacCell = isLogi ? chip(logiFacs, true)
-        : isNapse ? chip(napseFacsRow, false)
-        : '<span style="color:var(--text-muted);font-size:11px">—</span>';
+      // Nro factura para cada proveedor con modal
+      const getChip = (num, sub) => `
+        <div style="display:inline-block;margin:2px;vertical-align:top;text-align:center">
+          <span style="font-family:'JetBrains Mono',monospace;font-size:10px;background:rgba(29,191,142,.08);color:var(--teal);padding:1px 6px;border-radius:4px;border:1px solid rgba(29,191,142,.2);display:block">${num}</span>
+          ${sub?`<span style="font-size:9px;color:var(--text-muted);margin-top:2px;display:block">${sub}</span>`:''}
+        </div>`;
+
+      let nroFacCell = '<span style="color:var(--text-muted);font-size:11px">—</span>';
+      if(isLogi && logiFacs.length)
+        nroFacCell = logiFacs.map(f=>getChip(f.numero, f.terminales?f.terminales+' term.':'')).join('');
+      else if(isNapse && napseFacsRow.length)
+        nroFacCell = napseFacsRow.map(f=>getChip(f.numero,'')).join('');
+      else if(isClaro && claroData[mes])
+        nroFacCell = getChip(claroData[mes].nroFac||'—', claroData[mes].nroFac&&claroData[mes].nroFac!=='—'?'Claro':'');
+      else if(isTelecom && telecomData[mes])
+        nroFacCell = getChip(telecomData[mes].nroFac||'—', telecomData[mes].nroFac&&telecomData[mes].nroFac!=='—'?'Telecom':'');
+      else if(isAmazon && amazonData[mes])
+        nroFacCell = getChip('AWS '+MESES_LABEL[mes], 'ID: '+(amazonData[mes].idCuenta||'—'));
       rows+=`
         <tr>
           <td>
