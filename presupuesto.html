@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Alleata · Presupuesto Operaciones v1.5.0</title>
+<title>Alleata · Presupuesto Operaciones v1.5.1</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -191,7 +191,7 @@
   <div class="login-box">
     <h2>💰 Presupuesto</h2>
     <p class="login-sub">Alleata · Solo Admin</p>
-    <div style="position:absolute;bottom:12px;right:16px;font-size:10px;font-family:'JetBrains Mono',monospace;color:rgba(232,237,243,.2)">v1.5.0</div>
+    <div style="position:absolute;bottom:12px;right:16px;font-size:10px;font-family:'JetBrains Mono',monospace;color:rgba(232,237,243,.2)">v1.5.1</div>
     <div class="login-field">
       <label>Email</label>
       <input type="email" id="loginEmail" placeholder="tu@email.com" onkeydown="if(event.key==='Enter')doLogin()">
@@ -207,7 +207,7 @@
 
 <div id="appContent" style="display:none">
 <h1>💰 Presupuesto Operaciones</h1>
-<p class="sub">Alleata · 2026 · Solo Admin <span style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 8px;border-radius:4px;border:1px solid var(--border2);font-size:10px;margin-left:6px">v1.5.0</span></p>
+<p class="sub">Alleata · 2026 · Solo Admin <span style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 8px;border-radius:4px;border:1px solid var(--border2);font-size:10px;margin-left:6px">v1.5.1</span></p>
 
 <div class="toolbar">
   <div class="mes-bar" id="mesBar"></div>
@@ -479,6 +479,7 @@ function renderTabla(items) {
         :'<span style="color:var(--text-muted);font-size:11px">—</span>';
       const isLogi=it.id==='logicalis';
       const isClaro=it.id==='claro';
+      const isNapse=it.id==='napse';
       // Nro facturas para columna
       const logiFacs = isLogi ? logiGetFacturas(mes) : [];
       const nroFacCell = isLogi
@@ -503,7 +504,7 @@ function renderTabla(items) {
           <td class="mono" style="color:${dc}">${(prev||real)?fmtDesv(desv,prev):'—'}</td>
           <td style="text-align:center">${pctBadge}</td>
           <td style="text-align:center">
-            <button class="btn-edit${(isLogi||isClaro)?' logi':''}" onclick="${isLogi?`openLogiModal('${mes}')`:isClaro?`openClaroModal('${mes}')`:`openModal('${it.id}','${it.p}','${it.d}')`}">${(isLogi||isClaro)?'📎':'✏️'}</button>
+            <button class="btn-edit${(isLogi||isClaro)?' logi':''}" onclick="${isLogi?`openLogiModal('${mes}')`:isClaro?`openClaroModal('${mes}')`:isNapse?`openNapseModal('${mes}')`:`openModal('${it.id}','${it.p}','${it.d}')`}">${(isLogi||isClaro||isNapse)?'📎':'✏️'}</button>
           </td>
         </tr>`;
     });
@@ -1306,6 +1307,189 @@ async function claraSaveDB(m){
 function claroShowMsg(id,txt,type){ const e=document.getElementById(id);if(e){e.className='up-msg '+type;e.textContent=txt;} }
 function claroShowPreview(id,rows){ const e=document.getElementById(id);if(e){e.style.display='block';e.innerHTML=rows.map(r=>`<div class="up-prow"><span class="pk">${r[0]}</span><span class="pv">${r[1]}</span></div>`).join('');} }
 
+// ── Napse state ──────────────────────────────────────────────────────────────
+const napseFacturas = {}; // napseFacturas[mes] = array de facturas
+let napseMesActual = 'jun';
+
+function openNapseModal(m){
+  napseMesActual=m;
+  document.getElementById('napseBg').classList.add('open');
+  document.getElementById('napseSub').textContent=MESES_LABEL[m]+' 2026 · Gateway de pagos';
+  napseResetForm();
+  napseRenderKPIs();
+  napseRenderFacturas();
+}
+function closeNapseModal(){
+  document.getElementById('napseBg').classList.remove('open');
+  napseSyncReal(); render();
+}
+function napseResetForm(){
+  const el=document.getElementById('napsePrevPdf'); if(el){el.style.display='none';el.innerHTML='';}
+  const msg=document.getElementById('napseMsgPdf'); if(msg){msg.className='up-msg';msg.textContent='';}
+  const inp=document.getElementById('napsePdfInp'); if(inp) inp.value='';
+  document.getElementById('napseZonePdf')?.classList.remove('loaded');
+  const fn=document.getElementById('napsePdfName'); if(fn){fn.style.display='none';fn.textContent='';}
+  const btn=document.getElementById('napseBtnConfirm'); if(btn) btn.style.display='none';
+}
+
+function napseSyncReal(){
+  MESES.forEach(m=>{
+    const facs=napseFacturas[m]||[];
+    const real=facs.reduce((s,f)=>s+f.totalUSD*f.tc,0);
+    if(real>0) reales['napse_'+m]=real;
+  });
+}
+
+function napseRenderKPIs(){
+  const m=napseMesActual;
+  const prev=DATA.find(i=>i.id==='napse').prev[m]||0;
+  const facs=napseFacturas[m]||[];
+  const real=facs.reduce((s,f)=>s+f.totalUSD*f.tc,0);
+  const desvPct=prev>0?((real-prev)/prev)*100:0;
+  const el=document.getElementById('napseKpis'); if(!el) return;
+  el.innerHTML=[
+    {label:'PREV '+MESES_LABEL[m].substring(0,3).toUpperCase()+' 26', val:fmt(prev)||'—', sub:'presupuestado', cls:''},
+    {label:'REAL '+MESES_LABEL[m].substring(0,3).toUpperCase()+' 26', val:real>0?fmt(real):'—', sub:facs.length+' factura(s)', cls:real>0?'green':''},
+    {label:'DESVÍO', val:real>0?fmtPct(desvPct):'—', sub:desvPct<=0?'por debajo':'por encima', cls:real>0?(Math.abs(desvPct)>20?'warn':'ok'):''},
+  ].map(k=>`<div class="lk"><div class="lk-label">${k.label}</div><div class="lk-val ${k.cls}">${k.val}</div><div class="lk-sub">${k.sub}</div></div>`).join('');
+}
+
+function napseRenderFacturas(){
+  const m=napseMesActual;
+  const facs=napseFacturas[m]||[];
+  const wrap=document.getElementById('napseFacWrap');
+  const sec=document.getElementById('napseFacSecLbl');
+  const badge=document.getElementById('napseFacBadge');
+  if(!wrap) return;
+  if(!facs.length){ wrap.innerHTML=''; if(sec) sec.style.display='none'; return; }
+  if(sec) sec.style.display='flex';
+  if(badge) badge.textContent=facs.length+' factura'+(facs.length!==1?'s':'');
+  wrap.innerHTML=`<div style="overflow-x:auto"><table class="fac-tbl">
+    <thead><tr>
+      <th>N° factura</th><th>Fecha</th><th>Descripción</th>
+      <th style="text-align:right">T.C.</th>
+      <th style="text-align:right">Bruto USD</th>
+      <th style="text-align:right">IVA USD</th>
+      <th style="text-align:right">Total USD</th>
+      <th style="text-align:right;color:var(--teal)">▶ REAL $</th>
+    </tr></thead>
+    <tbody>${facs.map(f=>`<tr>
+      <td style="font-family:'JetBrains Mono',monospace;font-size:11px">${f.numero}</td>
+      <td>${f.fecha}</td>
+      <td style="font-size:11px;max-width:160px">${f.desc}</td>
+      <td class="nr">${f.tc.toLocaleString('es-AR')}</td>
+      <td class="nr" style="color:var(--text-muted)">${fmtUSD(f.brutoUSD)}</td>
+      <td class="nr" style="color:var(--text-muted)">${fmtUSD(f.ivaUSD)}</td>
+      <td class="nr" style="color:var(--text-muted)">${fmtUSD(f.totalUSD)}</td>
+      <td class="nr" style="color:var(--teal);font-weight:800">$ ${Math.round(f.totalUSD*f.tc).toLocaleString('es-AR')}</td>
+    </tr>`).join('')}</tbody>
+  </table></div>`;
+}
+
+async function napseHandlePDF(input){
+  const file=input.files[0]; if(!file) return;
+  document.getElementById('napsePdfName').textContent=file.name;
+  document.getElementById('napsePdfName').style.display='block';
+  napseShowMsg('Leyendo PDF...','ok');
+  try{
+    const buf=await file.arrayBuffer();
+    const pdf=await pdfjsLib.getDocument({data:buf}).promise;
+    let text='';
+    for(let i=1;i<=pdf.numPages;i++){
+      const pg=await pdf.getPage(i);
+      const ct=await pg.getTextContent();
+      text+=ct.items.map(it=>it.str).join(' ')+'\n';
+    }
+    const fac=napseParsePDF(text);
+    if(!fac){ napseShowMsg('No se pudo leer el PDF de Napse.','err'); return; }
+
+    // Validar mes
+    const MES_MAP_N={'01':'ene','02':'feb','03':'mar','04':'abr','05':'may','06':'jun','07':'jul','08':'ago'};
+    let mesFac=null;
+    if(fac.fecha&&fac.fecha!=='—'){ const p=fac.fecha.split('/'); if(p.length>=2) mesFac=MES_MAP_N[p[1]]; }
+    const mesOk = !mesFac || mesFac===napseMesActual;
+
+    document.getElementById('napseZonePdf').classList.add('loaded');
+    napseShowPreview([
+      ['N° factura', fac.numero],
+      ['Fecha', fac.fecha],
+      ['Descripción', fac.desc],
+      ['T.C. (de factura)', fac.tc.toLocaleString('es-AR')+' $/USD'],
+      ['Bruto USD', fmtUSD(fac.brutoUSD)],
+      ['IVA USD', fmtUSD(fac.ivaUSD)],
+      ['Total USD', fmtUSD(fac.totalUSD)],
+      ['▶ REAL en $', fmt(fac.totalUSD*fac.tc)],
+    ]);
+
+    if(!mesOk){
+      napseShowMsg('⛔ Esta factura es de '+MESES_LABEL[mesFac]+' pero estás cargando '+MESES_LABEL[napseMesActual]+'.','err');
+      return;
+    }
+
+    // Duplicado
+    const facs=napseFacturas[napseMesActual]||[];
+    if(facs.find(f=>f.numero===fac.numero)){
+      napseShowMsg('⚠️ Boludo, ya cargaste la '+fac.numero,'err');
+      return;
+    }
+
+    napseShowMsg('✓ Factura leída · T.C. $'+fac.tc.toLocaleString('es-AR')+' · REAL: '+fmt(fac.totalUSD*fac.tc),'ok');
+    document.getElementById('napseBtnConfirm').style.display='block';
+    document.getElementById('napseBtnConfirm')._pendingFac=fac;
+  }catch(e){ napseShowMsg('Error: '+e.message,'err'); }
+}
+
+function napseParsePDF(text){
+  try{
+    const numero=(text.match(/Numero[:\s]*([\d\-]+)/i)||text.match(/(0002-[\d]+)/))?.[1]||'—';
+    const fecha=(text.match(/Fecha[:\s]*(\d{1,2}\/\d{2}\/\d{4})/i))?.[1]||'—';
+    const descM=text.match(/(?:40|60|100)%\s*correspondiente[^
+
+]{0,60}/i)||text.match(/HOSTING[^
+
+]{0,40}/i);
+    const desc=descM?descM[0].trim().substring(0,60):'Hosting';
+    const tcM=text.match(/tipo de cambio[^0-9]*([\d.,]+)/i)||text.match(/([\d]{3,4}[.,][\d]{4})\s*Pesos/i);
+    const tc=tcM?logiParseNum(tcM[1]):1470;
+    const brutoM=text.match(/Bruto[:\s]*U\$?S\s*([\d.,]+)/i)||text.match(/Neto[:\s]*U\$?S\s*([\d.,]+)/i)||text.match(/U\$S\s*([\d.,]+)/i);
+    const brutoUSD=brutoM?logiParseNum(brutoM[1]):0;
+    const ivaM=text.match(/IVA[:\s]*U\$?S\s*([\d.,]+)/i);
+    const ivaUSD=ivaM?logiParseNum(ivaM[1]):0;
+    const totalM=text.match(/Total[:\s]*U\$?S\s*([\d.,]+)/i);
+    const totalUSD=totalM?logiParseNum(totalM[1]):brutoUSD+ivaUSD;
+    return{numero,fecha,desc,tc,brutoUSD,ivaUSD,totalUSD};
+  }catch(e){return null;}
+}
+
+async function napseGuardar(){
+  const btn=document.getElementById('napseBtnConfirm');
+  const fac=btn._pendingFac; if(!fac) return;
+  if(!napseFacturas[napseMesActual]) napseFacturas[napseMesActual]=[];
+  napseFacturas[napseMesActual].push(fac);
+  reales['napse_'+napseMesActual]=(napseFacturas[napseMesActual]||[]).reduce((s,f)=>s+f.totalUSD*f.tc,0);
+  if(currentUser) await napseSaveDB(fac);
+  showToast('✅ Napse '+fac.numero+' guardada · '+fmt(fac.totalUSD*fac.tc));
+  napseResetForm();
+  napseRenderKPIs();
+  napseRenderFacturas();
+  render();
+}
+
+async function napseSaveDB(fac){
+  const row={
+    user_id:currentUser.id, mes:napseMesActual,
+    numero:fac.numero, fecha:fac.fecha, descripcion:fac.desc,
+    tc:fac.tc, subtotal_usd:fac.brutoUSD, iva_usd:fac.ivaUSD,
+    otros_imp:0, total_usd:fac.totalUSD, terminales:0, series:[]
+  };
+  // Reusar tabla presupuesto_facturas con proveedor en descripción
+  const {error}=await sb.from('presupuesto_facturas').upsert({...row, proveedor:'napse'},{onConflict:'numero,mes'});
+  if(error) console.error('Napse DB error:',error);
+}
+
+function napseShowMsg(txt,type){ const e=document.getElementById('napseMsgPdf');if(e){e.className='up-msg '+type;e.textContent=txt;} }
+function napseShowPreview(rows){ const e=document.getElementById('napsePrevPdf');if(e){e.style.display='block';e.innerHTML=rows.map(r=>`<div class="up-prow"><span class="pk">${r[0]}</span><span class="pv">${r[1]}</span></div>`).join('');} }
+
 // ── Supabase ─────────────────────────────────────────────────────────────────
 const SB_URL = 'https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
@@ -1404,6 +1588,22 @@ async function loadFacturasFromDB() {
       }
     });
   }
+  // Cargar facturas Napse (guardadas en presupuesto_facturas con proveedor='napse')
+  const { data: napseData, error: napseErr } = await sb.from('presupuesto_facturas')
+    .select('*').eq('proveedor','napse');
+  if(!napseErr && napseData && napseData.length){
+    napseData.forEach(row=>{
+      const m=row.mes;
+      if(!napseFacturas[m]) napseFacturas[m]=[];
+      if(!napseFacturas[m].find(f=>f.numero===row.numero)){
+        napseFacturas[m].push({
+          numero:row.numero, fecha:row.fecha, desc:row.descripcion,
+          tc:row.tc, brutoUSD:row.subtotal_usd, ivaUSD:row.iva_usd, totalUSD:row.total_usd
+        });
+      }
+    });
+    napseSyncReal();
+  }
   render();
 }
 
@@ -1494,6 +1694,43 @@ logiAgregar = async function() {
 
     <div class="logi-footer">
       <button class="btn-cancel" onclick="closeClaroModal()">Cerrar</button>
+    </div>
+  </div>
+</div>
+<!-- Modal Napse -->
+<div class="claro-bg" id="napseBg">
+  <div class="claro-modal">
+    <h3>Napse SRL</h3>
+    <p class="msub" id="napseSub" style="font-size:12px;color:var(--text-muted);margin-bottom:22px"></p>
+
+    <div class="claro-kpis" id="napseKpis"></div>
+
+    <div class="sec-lbl">Cargar factura <span></span></div>
+    <div style="max-width:400px">
+      <div class="up-title">📄 Factura Napse (PDF)</div>
+      <div class="up-zone" id="napseZonePdf"
+        ondragover="event.preventDefault();this.classList.add('drag')"
+        ondragleave="this.classList.remove('drag')"
+        ondrop="this.classList.remove('drag');napseHandlePDF({files:event.dataTransfer.files});event.preventDefault()">
+        <input type="file" id="napsePdfInp" accept=".pdf" onchange="napseHandlePDF(this)">
+        <div class="uz-icon">📑</div>
+        <div class="uz-lbl">Soltá o seleccioná el PDF</div>
+        <div class="uz-sub">Agrupa_A_QR.pdf</div>
+        <div class="uz-fn" id="napsePdfName"></div>
+      </div>
+      <div class="up-preview" id="napsePrevPdf"></div>
+      <div class="up-msg" id="napseMsgPdf"></div>
+    </div>
+
+    <button class="btn-confirm" id="napseBtnConfirm" onclick="napseGuardar()" style="display:none;margin-top:14px">
+      ✓ Confirmar y guardar REAL
+    </button>
+
+    <div class="sec-lbl" id="napseFacSecLbl" style="display:none">Facturas cargadas este mes <span></span> <span id="napseFacBadge" style="background:rgba(29,191,142,.15);color:var(--teal);padding:1px 10px;border-radius:20px;font-size:10px;font-weight:700"></span></div>
+    <div id="napseFacWrap"></div>
+
+    <div class="logi-footer">
+      <button class="btn-cancel" onclick="closeNapseModal()">Cerrar</button>
     </div>
   </div>
 </div>
