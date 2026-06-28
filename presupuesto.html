@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Alleata · Presupuesto Operaciones v1.5.4</title>
+<title>Alleata · Presupuesto Operaciones v1.5.5</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -191,7 +191,7 @@
   <div class="login-box">
     <h2>💰 Presupuesto</h2>
     <p class="login-sub">Alleata · Solo Admin</p>
-    <div style="position:absolute;bottom:12px;right:16px;font-size:10px;font-family:'JetBrains Mono',monospace;color:rgba(232,237,243,.2)">v1.5.4</div>
+    <div style="position:absolute;bottom:12px;right:16px;font-size:10px;font-family:'JetBrains Mono',monospace;color:rgba(232,237,243,.2)">v1.5.5</div>
     <div class="login-field">
       <label>Email</label>
       <input type="email" id="loginEmail" placeholder="tu@email.com" onkeydown="if(event.key==='Enter')doLogin()">
@@ -207,7 +207,7 @@
 
 <div id="appContent" style="display:none">
 <h1>💰 Presupuesto Operaciones</h1>
-<p class="sub">Alleata · 2026 · Solo Admin <span style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 8px;border-radius:4px;border:1px solid var(--border2);font-size:10px;margin-left:6px">v1.5.4</span></p>
+<p class="sub">Alleata · 2026 · Solo Admin <span style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 8px;border-radius:4px;border:1px solid var(--border2);font-size:10px;margin-left:6px">v1.5.5</span></p>
 
 <div class="toolbar">
   <div class="mes-bar" id="mesBar"></div>
@@ -481,6 +481,7 @@ function renderTabla(items) {
       const isClaro=it.id==='claro';
       const isNapse=it.id==='napse';
       const isTelecom=it.id==='telecom';
+      const isAmazon=it.id==='amazon';
       // Nro facturas para columna
       const logiFacs = isLogi ? logiGetFacturas(mes) : [];
       const napseFacsRow = isNapse ? (napseFacturas[mes]||[]) : [];
@@ -510,7 +511,7 @@ function renderTabla(items) {
           <td class="mono" style="color:${dc}">${(prev||real)?fmtDesv(desv,prev):'—'}</td>
           <td style="text-align:center">${pctBadge}</td>
           <td style="text-align:center">
-            <button class="btn-edit${(isLogi||isClaro)?' logi':''}" onclick="${isLogi?`openLogiModal('${mes}')`:isClaro?`openClaroModal('${mes}')`:isNapse?`openNapseModal('${mes}')`:isTelecom?`openTelecomModal('${mes}')`:`openModal('${it.id}','${it.p}','${it.d}')`}">${(isLogi||isClaro||isNapse||isTelecom)?'📎':'✏️'}</button>
+            <button class="btn-edit${(isLogi||isClaro)?' logi':''}" onclick="${isLogi?`openLogiModal('${mes}')`:isClaro?`openClaroModal('${mes}')`:isNapse?`openNapseModal('${mes}')`:isTelecom?`openTelecomModal('${mes}')`:isAmazon?`openAmazonModal('${mes}')`:`openModal('${it.id}','${it.p}','${it.d}')`}">${(isLogi||isClaro||isNapse||isTelecom||isAmazon)?'📎':'✏️'}</button>
           </td>
         </tr>`;
     });
@@ -1060,6 +1061,10 @@ document.addEventListener('keydown',e=>{
 });
 
 // ── State vars (hoisted before render) ───────────────────────────────────────
+const amazonData = {};
+let amazonMesActual = 'jun';
+let amazonCurrentTC = 1470;
+let amazonPendingFac = null;
 const napseFacturas = {};
 const telecomData   = {};
 let napseMesActual  = 'jun';
@@ -1704,6 +1709,196 @@ async function telecomSaveDB(m){
 function telecomShowMsg(id,txt,type){ const e=document.getElementById(id);if(e){e.className='up-msg '+type;e.textContent=txt;} }
 function telecomShowPreview(id,rows){ const e=document.getElementById(id);if(e){e.style.display='block';e.innerHTML=rows.map(r=>`<div class="up-prow"><span class="pk">${r[0]}</span><span class="pv">${r[1]}</span></div>`).join('');} }
 
+// ── Amazon state ─────────────────────────────────────────────────────────────
+// (amazonData, amazonMesActual, etc. declarados arriba)
+
+function openAmazonModal(m){
+  amazonMesActual=m;
+  document.getElementById('amazonBg').classList.add('open');
+  document.getElementById('amazonSub').textContent=MESES_LABEL[m]+' 2026 · Infraestructura cloud';
+  amazonPendingFac=null;
+  amazonResetForm();
+  amazonRenderKPIs();
+}
+function closeAmazonModal(){
+  document.getElementById('amazonBg').classList.remove('open');
+  render();
+}
+function amazonResetForm(){
+  const p=document.getElementById('amazonPrevPdf');if(p){p.style.display='none';p.innerHTML='';}
+  const msg=document.getElementById('amazonMsgPdf');if(msg){msg.className='up-msg';msg.textContent='';}
+  const inp=document.getElementById('amazonPdfInp');if(inp)inp.value='';
+  document.getElementById('amazonZonePdf')?.classList.remove('loaded');
+  const fn=document.getElementById('amazonPdfName');if(fn){fn.style.display='none';fn.textContent='';}
+  const btn=document.getElementById('amazonBtnConfirm');if(btn)btn.style.display='none';
+  const tcRow=document.getElementById('amazonTCRow');if(tcRow)tcRow.style.display='none';
+  const rp=document.getElementById('amazonRealPreview');if(rp)rp.style.display='none';
+  const det=document.getElementById('amazonDetail');if(det)det.style.display='none';
+}
+
+function amazonRenderKPIs(){
+  const m=amazonMesActual;
+  const prev=DATA.find(i=>i.id==='amazon').prev[m]||0;
+  const saved=amazonData[m];
+  const real=saved?saved.realPesos:(reales['amazon_'+m]||0);
+  const desvPct=prev>0?((real-prev)/prev)*100:0;
+  const el=document.getElementById('amazonKpis');if(!el)return;
+  el.innerHTML=[
+    {label:'PREV '+MESES_LABEL[m].substring(0,3).toUpperCase()+' 26',val:fmt(prev)||'—',sub:'presupuestado',cls:''},
+    {label:'REAL '+MESES_LABEL[m].substring(0,3).toUpperCase()+' 26',val:real>0?fmt(real):'—',sub:'Total USD × TC',cls:real>0?'green':''},
+    {label:'DESVÍO',val:real>0?fmtPct(desvPct):'—',sub:desvPct<=0?'por debajo':'por encima',cls:real>0?(Math.abs(desvPct)>20?'warn':'ok'):''},
+  ].map(k=>`<div class="lk"><div class="lk-label">${k.label}</div><div class="lk-val ${k.cls}">${k.val}</div><div class="lk-sub">${k.sub}</div></div>`).join('');
+}
+
+async function amazonHandlePDF(input){
+  const file=input.files[0];if(!file)return;
+  document.getElementById('amazonPdfName').textContent=file.name;
+  document.getElementById('amazonPdfName').style.display='block';
+  amazonShowMsg('Leyendo PDF...','ok');
+  try{
+    const buf=await file.arrayBuffer();
+    const pdf=await pdfjsLib.getDocument({data:buf}).promise;
+    let text='';
+    for(let i=1;i<=pdf.numPages;i++){
+      const pg=await pdf.getPage(i);
+      const ct=await pg.getTextContent();
+      text+=ct.items.map(it=>it.str).join(' ')+'\n';
+    }
+    const fac=amazonParsePDF(text);
+    if(!fac){amazonShowMsg('No se pudo leer el PDF de AWS.','err');return;}
+
+    // Validar mes
+    const MES_MAP_A={'01':'ene','02':'feb','03':'mar','04':'abr','05':'may','06':'jun','07':'jul','08':'ago'};
+    const mesNombres={'ene':0,'feb':1,'mar':2,'abr':3,'may':4,'jun':5,'jul':6,'ago':7};
+    let mesFac=amazonMesActual;
+    if(fac.periodo){
+      const mMatch=fac.periodo.match(/(ene|feb|mar|abr|may|jun|jul|ago|sep|oct|nov|dic)/i);
+      if(mMatch) mesFac=mMatch[1].toLowerCase();
+    }
+    const mesOk=mesFac===amazonMesActual;
+
+    amazonPendingFac=fac;
+    amazonCurrentTC=parseFloat(document.getElementById('amazonTC').value)||1470;
+    document.getElementById('amazonZonePdf').classList.add('loaded');
+
+    // Preview datos de la factura
+    const rows=[
+      ['Período', fac.periodo],
+      ['ID de cuenta', fac.idCuenta],
+      ['Total USD', fmtUSD(fac.totalUSD)],
+      ['IVA', 'USD 0,00 (AWS no aplica IVA en AR)'],
+    ];
+    if(fac.cuentas && fac.cuentas.length){
+      fac.cuentas.forEach(c=>rows.push([c.nombre, fmtUSD(c.monto)]));
+    }
+    amazonShowPreview(rows);
+
+    // Desglose por cuenta
+    if(fac.cuentas && fac.cuentas.length){
+      const dc=document.getElementById('amazonDetailRows');
+      if(dc){
+        dc.innerHTML=fac.cuentas.map(c=>`
+          <div class="claro-detail-row">
+            <span class="dk">${c.nombre}</span>
+            <span class="dv">${fmtUSD(c.monto)}</span>
+          </div>`).join('')+`
+          <div class="claro-detail-row" style="margin-top:4px">
+            <span class="dk" style="font-weight:700">TOTAL AWS</span>
+            <span class="dv hi">${fmtUSD(fac.totalUSD)}</span>
+          </div>`;
+        document.getElementById('amazonDetail').style.display='block';
+      }
+    }
+
+    // Mostrar TC manual y preview REAL
+    document.getElementById('amazonTCRow').style.display='flex';
+    amazonUpdateRealPreview();
+
+    if(!mesOk){
+      amazonShowMsg('⛔ Esta factura es de '+MESES_LABEL[mesFac]+' pero estás cargando '+MESES_LABEL[amazonMesActual]+'.','err');
+      return;
+    }
+    amazonShowMsg('✓ Factura leída · Total: '+fmtUSD(fac.totalUSD)+' · Ingresá el T.C. del día de pago','ok');
+    document.getElementById('amazonBtnConfirm').style.display='block';
+  }catch(e){amazonShowMsg('Error: '+e.message,'err');}
+}
+
+function amazonParsePDF(text){
+  try{
+    // Total general
+    const totalM=text.match(/Total general estimado[:\s]*(\d[\d.,]+)\s*USD/i)
+      ||text.match(/Total\s+(?:general|antes de impuestos)[^\d]*(\d[\d.,]+)\s*USD/i)
+      ||text.match(/(\d{4,5},\d{2})\s*USD/);
+    const totalUSD=totalM?logiParseNum(totalM[1]):0;
+
+    // Período
+    const periodoM=text.match(/(\d{1,2}\s+\w+\s*[-–]\s*\d{1,2}\s+\w+\s+\d{4})/i)
+      ||text.match(/Per[ií]odo de facturaci[oó]n[\s\S]{0,60}(\d{1,2}\s\w+\s[-–]\s\d{1,2}\s\w+\s\d{4})/i);
+    const periodo=periodoM?periodoM[1].trim():'—';
+
+    // ID de cuenta
+    const idM=text.match(/ID de cuenta[:\s]*(\d{12})/i);
+    const idCuenta=idM?idM[1]:'—';
+
+    // Desglose por cuenta (tabla al final)
+    const cuentas=[];
+    const cuentaPattern=/([A-Za-z][A-Za-z\s]+?)\s+(\d{12})\s+[A-Za-z][A-Za-z\s]*?\s+(\d[\d.,]+)\s+USD/g;
+    let m;
+    while((m=cuentaPattern.exec(text))!==null){
+      const monto=logiParseNum(m[3]);
+      if(monto>0) cuentas.push({nombre:m[1].trim(),id:m[2],monto});
+    }
+    // Fallback: buscar filas "Nombre de cuenta Importe"
+    if(!cuentas.length){
+      const rows=text.matchAll(/(Produccion|Quality|Desarrollo|Shared Services|Alleata Master)[\s\S]{0,30}?(\d+[.,]\d+)\s*USD/gi);
+      for(const r of rows){
+        const monto=logiParseNum(r[2]);
+        if(monto>0) cuentas.push({nombre:r[1],id:'—',monto});
+      }
+    }
+
+    return{totalUSD, periodo, idCuenta, cuentas};
+  }catch(e){return null;}
+}
+
+function amazonUpdateRealPreview(){
+  const fac=amazonPendingFac;if(!fac)return;
+  const real=fac.totalUSD*amazonCurrentTC;
+  const el=document.getElementById('amazonRealPreview');
+  if(el) el.style.display='block';
+  const ep=document.getElementById('amazonRealPesos');
+  if(ep) ep.textContent=fmt(real);
+  const eu=document.getElementById('amazonTotalUSD2');
+  if(eu) eu.textContent=fac.totalUSD.toFixed(2);
+  const et=document.getElementById('amazonTCDisplay');
+  if(et) et.textContent=amazonCurrentTC.toLocaleString('es-AR');
+}
+
+async function amazonGuardar(){
+  const fac=amazonPendingFac;if(!fac)return;
+  const m=amazonMesActual;
+  const real=fac.totalUSD*amazonCurrentTC;
+  amazonData[m]={totalUSD:fac.totalUSD, tc:amazonCurrentTC, realPesos:real,
+    periodo:fac.periodo, idCuenta:fac.idCuenta, cuentas:fac.cuentas};
+  reales['amazon_'+m]=real;
+  if(currentUser) await amazonSaveDB(m);
+  showToast('✅ AWS '+MESES_LABEL[m]+' guardado · '+fmt(real));
+  amazonResetForm(); amazonRenderKPIs(); closeAmazonModal();
+}
+
+async function amazonSaveDB(m){
+  const d=amazonData[m];
+  const row={user_id:currentUser.id, proveedor:'amazon', mes:m,
+    real_pesos:d.realPesos, total_factura:d.totalUSD,
+    nro_factura:d.idCuenta, fecha:'—', periodo:d.periodo,
+    detalle:{tc:d.tc, cuentas:d.cuentas}};
+  const {error}=await sb.from('presupuesto_reales').upsert(row,{onConflict:'proveedor,mes'});
+  if(error) console.error('Amazon DB error:',error);
+}
+
+function amazonShowMsg(txt,type){const e=document.getElementById('amazonMsgPdf');if(e){e.className='up-msg '+type;e.textContent=txt;}}
+function amazonShowPreview(rows){const e=document.getElementById('amazonPrevPdf');if(e){e.style.display='block';e.innerHTML=rows.map(r=>`<div class="up-prow"><span class="pk">${r[0]}</span><span class="pv">${r[1]}</span></div>`).join('');}}
+
 // ── Supabase ─────────────────────────────────────────────────────────────────
 const SB_URL = 'https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
@@ -1800,6 +1995,17 @@ async function loadFacturasFromDB() {
           detalle:         row.detalle||{}
         };
       }
+    });
+  }
+  // Cargar Amazon desde presupuesto_reales
+  const { data: amazonDbData, error: amazonDbErr } = await sb.from('presupuesto_reales')
+    .select('*').eq('proveedor','amazon');
+  if(!amazonDbErr && amazonDbData && amazonDbData.length){
+    amazonDbData.forEach(row=>{
+      amazonData[row.mes]={totalUSD:row.total_factura, tc:row.detalle?.tc||1470,
+        realPesos:row.real_pesos, periodo:row.periodo||'—',
+        idCuenta:row.nro_factura||'—', cuentas:row.detalle?.cuentas||[]};
+      reales['amazon_'+row.mes]=row.real_pesos;
     });
   }
   // Cargar Telecom desde presupuesto_reales
@@ -2007,6 +2213,57 @@ logiAgregar = async function() {
     <div id="telecomMsgConfirm" style="display:none;font-size:12px;font-weight:600;padding:8px 12px;border-radius:8px;margin-bottom:14px"></div>
     <div class="logi-footer">
       <button class="btn-cancel" onclick="closeTelecomModal()">Cerrar</button>
+    </div>
+  </div>
+</div>
+<!-- Modal Amazon -->
+<div class="claro-bg" id="amazonBg">
+  <div class="claro-modal">
+    <h3>Amazon Web Services</h3>
+    <p class="msub" id="amazonSub" style="font-size:12px;color:var(--text-muted);margin-bottom:22px"></p>
+    <div class="claro-kpis" id="amazonKpis"></div>
+
+    <div class="sec-lbl">Cargar factura <span></span></div>
+    <div style="max-width:420px">
+      <div class="up-title">📄 Factura AWS (PDF)</div>
+      <div class="up-zone" id="amazonZonePdf"
+        ondragover="event.preventDefault();this.classList.add('drag')"
+        ondragleave="this.classList.remove('drag')"
+        ondrop="this.classList.remove('drag');amazonHandlePDF({files:event.dataTransfer.files});event.preventDefault()">
+        <input type="file" id="amazonPdfInp" accept=".pdf" onchange="amazonHandlePDF(this)">
+        <div class="uz-icon">☁️</div>
+        <div class="uz-lbl">Soltá o seleccioná el PDF</div>
+        <div class="uz-sub">Fact-AWS-*.pdf</div>
+        <div class="uz-fn" id="amazonPdfName"></div>
+      </div>
+      <div class="up-preview" id="amazonPrevPdf"></div>
+      <div class="up-msg" id="amazonMsgPdf"></div>
+    </div>
+
+    <!-- T.C. manual (AWS no incluye TC en la factura) -->
+    <div class="tc-row" id="amazonTCRow" style="display:none;margin-top:12px">
+      <label>T.C. Banco Nación ($/USD)</label>
+      <input class="tc-inp" type="number" id="amazonTC" value="1470" min="1" step="1"
+        oninput="amazonCurrentTC=parseFloat(this.value)||1470;amazonUpdateRealPreview()">
+      <span style="font-size:11px;color:var(--text-muted)">AWS no incluye T.C. — ingresalo del día de pago</span>
+    </div>
+    <div id="amazonRealPreview" style="display:none;background:rgba(29,191,142,.07);border:1px solid rgba(29,191,142,.2);border-radius:10px;padding:12px 16px;margin-top:10px;font-size:13px">
+      <span style="color:var(--text-muted)">REAL en $:</span>
+      <span id="amazonRealPesos" style="font-weight:800;color:var(--teal);font-family:'JetBrains Mono',monospace;margin-left:8px"></span>
+      <span style="color:var(--text-muted);font-size:11px;margin-left:6px">(USD <span id="amazonTotalUSD2"></span> × TC <span id="amazonTCDisplay"></span>)</span>
+    </div>
+
+    <!-- Desglose por cuenta -->
+    <div class="claro-detail" id="amazonDetail">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:8px">Desglose por cuenta AWS</div>
+      <div id="amazonDetailRows"></div>
+    </div>
+
+    <button class="btn-confirm" id="amazonBtnConfirm" onclick="amazonGuardar()" style="display:none;margin-top:14px">
+      ✓ Confirmar y guardar REAL
+    </button>
+    <div class="logi-footer">
+      <button class="btn-cancel" onclick="closeAmazonModal()">Cerrar</button>
     </div>
   </div>
 </div>
