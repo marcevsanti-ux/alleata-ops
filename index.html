@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.4.8</title>
+<title>Alleata · Operaciones v4.4.9</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -407,7 +407,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.4.8 · 01 jul 2026
+      v4.4.9 · 01 jul 2026
     </div>
   </div>
 </div>
@@ -485,7 +485,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.4.8 · 01 jul 2026
+      v4.4.9 · 01 jul 2026
     </div>
   </div>
 </nav>
@@ -525,7 +525,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.4.8</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.4.9</div>
   </div>
   <div class="content">
 
@@ -4474,7 +4474,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.4.8] OK');
+console.log('[Alleata v4.4.9] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -8319,10 +8319,15 @@ async function printSelectedRotulos() {
 }
 
 function _imprimirRotuloHTML(envios) {
-  // FIX v4.4.8: la etiqueta física de la SATO es 100x150mm (confirmado — la vez
-  // pasada asumí 100x100mm por otro doc del proyecto que hablaba de un rollo
-  // distinto, estaba mal). Vuelve el @page a 100x150mm y se usa el espacio extra
-  // para QR más grandes y tipografía más cómoda.
+  // FIX v4.4.9 — TEMPORAL: probamos 100mm (v4.4.6) y 150mm (v4.4.8) de alto y en
+  // AMBOS casos el driver de Windows lo partió en 2 etiquetas. Esto indica que el
+  // driver tiene un formulario "Custom" FIJO cargado (no editable desde Chrome),
+  // probablemente el de Cabify (100x80mm, documentado en el proyecto) quedado en
+  // la misma impresora compartida. Mientras se confirma la medida real:
+  //  1) .rotulo pasa a height FIJO (no min-height) + overflow:hidden — así, aunque
+  //     la medida real no sea exactamente 80mm, en el peor caso se recorta un
+  //     poco el contenido, pero NUNCA MÁS debería mandar una segunda etiqueta.
+  //  2) Todo el layout se compactó para entrar en ~80mm de alto.
   function makeQRDataUrl(text, size) {
     return `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(text)}&color=000000&bgcolor=ffffff&margin=2`;
   }
@@ -8339,17 +8344,17 @@ function _imprimirRotuloHTML(envios) {
       qrTarget = `https://maps.google.com/?q=${addr}`;
       qrLabel = 'Ver en Maps';
     }
-    const qrGeoSrc = qrTarget ? makeQRDataUrl(qrTarget, 70) : '';
+    const qrGeoSrc = qrTarget ? makeQRDataUrl(qrTarget, 45) : '';
 
     // QR "Escanear Ruta": abre mobile.html con la OT cargada — mismo patrón que la Hoja de Ruta
     const rutaUrl   = `https://marcevsanti-ux.github.io/alleata-ops/mobile.html?ot=${e.sf_id || e.id}`;
-    const qrRutaSrc = makeQRDataUrl(rutaUrl, 105);
+    const qrRutaSrc = makeQRDataUrl(rutaUrl, 70);
 
     return `
     <div class="rotulo">
       <div class="hdr">
         <div class="hdr-logo">alleata</div>
-        <div class="hdr-info">Andrés Moretti e Hijos S.A.<br>Logística Alleata &nbsp;·&nbsp; (+54 11) 4103-4600</div>
+        <div class="hdr-info">Log. Alleata &nbsp;·&nbsp; (+54 11) 4103-4600</div>
       </div>
       <div class="tipo">${e.tipo || '—'}</div>
       <div class="ot-block">
@@ -8359,7 +8364,7 @@ function _imprimirRotuloHTML(envios) {
           ${e.track ? `<div class="track-num">Track: ${e.track}</div>` : '<div class="track-num" style="color:#aaa">Sin tracking</div>'}
         </div>
         <div class="qr-ruta">
-          <img src="${qrRutaSrc}" width="105" height="105" style="display:block;">
+          <img src="${qrRutaSrc}" width="70" height="70" style="display:block;">
           <div class="qr-ruta-lbl">Escanear Ruta</div>
         </div>
       </div>
@@ -8377,7 +8382,7 @@ function _imprimirRotuloHTML(envios) {
       <div class="divider"></div>
       <div class="bottom">
         ${qrGeoSrc ? `<div class="qr-geo">
-          <img src="${qrGeoSrc}" width="70" height="70" style="display:block;">
+          <img src="${qrGeoSrc}" width="45" height="45" style="display:block;">
           <div class="qr-geo-lbl">${qrLabel}</div>
         </div>` : ''}
         <div class="obs-wrap">
@@ -8386,8 +8391,7 @@ function _imprimirRotuloHTML(envios) {
         </div>
       </div>
       <div class="footer">
-        <div class="footer-lbl">Remitente</div>
-        <div class="footer-val">Andrés Moretti e Hijos S.A. &nbsp;·&nbsp; Av. Rivadavia 1234, CABA</div>
+        <div class="footer-val">Rte: Andrés Moretti e Hijos S.A. &nbsp;·&nbsp; Av. Rivadavia 1234, CABA</div>
       </div>
     </div>`;
   }).join('<div class="page-break"></div>');
@@ -8396,39 +8400,38 @@ function _imprimirRotuloHTML(envios) {
   w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
   <title>Rótulos Alleata — ${envios.length} OT${envios.length > 1 ? 's' : ''}</title>
   <style>
-    @page { size: 100mm 150mm portrait; margin: 0; }
+    @page { size: 100mm 80mm portrait; margin: 0; }
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body { width: 100mm; font-family: 'Arial', sans-serif; background: #fff; font-size: 10px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    .rotulo { width: 100mm; min-height: 150mm; padding: 3mm; display: flex; flex-direction: column; }
+    .rotulo { width: 100mm; height: 80mm; padding: 2mm; display: flex; flex-direction: column; overflow: hidden; }
     .page-break { page-break-after: always; break-after: page; height: 0; }
-    .hdr { display: flex; align-items: center; justify-content: space-between; border-bottom: 1.5px solid #000; padding-bottom: 1.5mm; margin-bottom: 2.5mm; }
-    .hdr-logo { font-size: 17px; font-weight: 900; letter-spacing: -1px; color: #1dbf8e !important; }
-    .hdr-info { font-size: 7px; line-height: 1.5; color: #444; text-align: right; }
-    .tipo { font-size: 8.5px; font-weight: 700; text-align: center; border: 1px solid #ccc; padding: 1.8mm; margin-bottom: 2.5mm; text-transform: uppercase; color: #555; }
-    .ot-block { display: flex; align-items: center; justify-content: space-between; gap: 2mm; border: 2.5px solid #000; padding: 2.5mm 3.5mm; margin-bottom: 2.5mm; }
-    .ot-label { font-size: 7.5px; font-weight: 700; text-transform: uppercase; color: #555; }
-    .ot-num { font-size: 24px; font-weight: 900; letter-spacing: -1px; line-height: 1.1; }
-    .track-num { font-size: 9.5px; font-weight: 700; font-family: 'Courier New', monospace; color: #333; margin-top: 1.2mm; }
+    .hdr { display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #000; padding-bottom: 0.8mm; margin-bottom: 1mm; }
+    .hdr-logo { font-size: 14px; font-weight: 900; letter-spacing: -1px; color: #1dbf8e !important; }
+    .hdr-info { font-size: 6px; line-height: 1.2; color: #444; text-align: right; }
+    .tipo { font-size: 7px; font-weight: 700; text-align: center; border: 1px solid #ccc; padding: 0.8mm; margin-bottom: 1mm; text-transform: uppercase; color: #555; }
+    .ot-block { display: flex; align-items: center; justify-content: space-between; gap: 1.2mm; border: 1.8px solid #000; padding: 1.2mm 1.8mm; margin-bottom: 1.2mm; }
+    .ot-label { font-size: 6px; font-weight: 700; text-transform: uppercase; color: #555; }
+    .ot-num { font-size: 16px; font-weight: 900; letter-spacing: -1px; line-height: 1.1; }
+    .track-num { font-size: 7px; font-weight: 700; font-family: 'Courier New', monospace; color: #333; margin-top: 0.6mm; }
     .qr-ruta { text-align: center; flex-shrink: 0; }
-    .qr-ruta-lbl { font-size: 6.5px; font-weight: 700; margin-top: 2px; text-transform: uppercase; }
-    .dest-label { font-size: 7.5px; font-weight: 700; text-transform: uppercase; color: #555; margin-bottom: 1.2mm; }
-    .dest { font-size: 13px; font-weight: 900; text-align: center; text-transform: uppercase; background: #f0f0f0 !important; padding: 2.5mm; margin-bottom: 2.5mm; line-height: 1.3; border: 1px solid #ccc; }
-    .row { display: flex; align-items: baseline; gap: 2mm; margin-bottom: 1.5mm; }
-    .row2 { display: flex; gap: 2.5mm; margin-bottom: 1.5mm; }
-    .row-half { flex: 1; display: flex; align-items: baseline; gap: 1.2mm; min-width: 0; }
+    .qr-ruta-lbl { font-size: 5px; font-weight: 700; margin-top: 1px; text-transform: uppercase; }
+    .dest-label { font-size: 6px; font-weight: 700; text-transform: uppercase; color: #555; margin-bottom: 0.6mm; }
+    .dest { font-size: 10px; font-weight: 900; text-align: center; text-transform: uppercase; background: #f0f0f0 !important; padding: 1.2mm; margin-bottom: 1.2mm; line-height: 1.2; border: 1px solid #ccc; }
+    .row { display: flex; align-items: baseline; gap: 1.2mm; margin-bottom: 0.6mm; }
+    .row2 { display: flex; gap: 1.5mm; margin-bottom: 0.6mm; }
+    .row-half { flex: 1; display: flex; align-items: baseline; gap: 0.8mm; min-width: 0; }
     .row-half .val { word-break: break-word; }
-    .lbl { font-weight: 700; font-size: 8px; min-width: 17mm; color: #555; text-transform: uppercase; flex-shrink: 0; }
-    .val { font-size: 10px; font-weight: 700; color: #000; }
-    .divider { border-top: 1px solid #ccc; margin: 2.5mm 0; }
-    .bottom { display: flex; gap: 2mm; align-items: flex-start; }
-    .qr-geo { display: flex; flex-direction: column; align-items: center; gap: 1mm; flex-shrink: 0; }
-    .qr-geo-lbl { font-size: 6.5px; font-weight: 700; text-align: center; text-transform: uppercase; max-width: 18mm; }
+    .lbl { font-weight: 700; font-size: 6.5px; min-width: 13mm; color: #555; text-transform: uppercase; flex-shrink: 0; }
+    .val { font-size: 8px; font-weight: 700; color: #000; }
+    .divider { border-top: 1px solid #ccc; margin: 0.8mm 0; }
+    .bottom { display: flex; gap: 1.2mm; align-items: flex-start; }
+    .qr-geo { display: flex; flex-direction: column; align-items: center; gap: 0.4mm; flex-shrink: 0; }
+    .qr-geo-lbl { font-size: 5px; font-weight: 700; text-align: center; text-transform: uppercase; max-width: 13mm; }
     .obs-wrap { flex: 1; min-width: 0; }
-    .obs-lbl { font-size: 8px; font-weight: 700; text-transform: uppercase; color: #555; margin-bottom: 1mm; }
-    .obs-val { font-size: 9px; border: 1px solid #ccc; padding: 1.5mm; word-break: break-word; line-height: 1.4; min-height: 14mm; }
-    .footer { margin-top: auto; border-top: 1.5px solid #000; padding-top: 1.5mm; }
-    .footer-lbl { font-size: 7px; font-weight: 700; color: #555; text-transform: uppercase; }
-    .footer-val { font-size: 7.5px; color: #333; margin-top: 0.5mm; }
+    .obs-lbl { font-size: 6.5px; font-weight: 700; text-transform: uppercase; color: #555; margin-bottom: 0.5mm; }
+    .obs-val { font-size: 7.5px; border: 1px solid #ccc; padding: 0.8mm; word-break: break-word; line-height: 1.25; min-height: 5mm; max-height: 8mm; overflow: hidden; }
+    .footer { margin-top: auto; border-top: 1px solid #000; padding-top: 0.8mm; }
+    .footer-val { font-size: 6px; color: #333; }
     .btn-print { display: block; width: 95mm; margin: 6px auto 0; padding: 9px; background: #1dbf8e; color: #fff; border: none; font-size: 13px; font-weight: 700; cursor: pointer; border-radius: 5px; font-family: Arial, sans-serif; }
     .btn-pdf { display: block; width: 95mm; margin: 6px auto 0; padding: 9px; background: #1a9fd4; color: #fff; border: none; font-size: 13px; font-weight: 700; cursor: pointer; border-radius: 5px; font-family: Arial, sans-serif; }
     @media print { .btn-print, .btn-pdf { display: none !important; } }
