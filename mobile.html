@@ -165,7 +165,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
       <div class="login-logo">
         <img id="loginLogo" src="" alt="Alleata">
         <div class="login-sub">Portal de Operaciones</div>
-        <div class="login-version">v2.10.0 · mobile</div>
+        <div class="login-version">v2.11.0 · mobile</div>
       </div>
       <div class="field"><label class="label">Email</label><input class="input" id="lEmail" type="email" placeholder="usuario@alleata.com" autocomplete="email"></div>
       <div class="field"><label class="label">Contraseña</label><input class="input" id="lPass" type="password" placeholder="••••••••" autocomplete="current-password"></div>
@@ -181,7 +181,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
   <div class="topbar">
     <img id="appLogo" src="" alt="Alleata">
     <div class="topbar-title" id="topbarTitle">Operaciones</div>
-    <div class="topbar-version">v2.10.0</div>
+    <div class="topbar-version">v2.11.0</div>
     <div class="topbar-avatar" id="topbarAvatar" onclick="openDrawer()">?</div>
   </div>
 
@@ -723,11 +723,28 @@ async function loadEnTransito(){
   const el=document.getElementById('rutaActivaList');
   const count=document.getElementById('transitoCount');
   el.innerHTML='<div class="empty"><div class="empty-icon">⏳</div><p>Cargando...</p></div>';
-  const{data:ots}=await sb.from('envios').select('*')
+  // FIX: antes leía de 'envios' (tabla legacy, desconectada del sync de SF).
+  // El flujo de aceptar/despachar OT (aceptarOT → /despachar-ot) escribe en
+  // sf_workorders, así que la lista de "en tránsito" tiene que leer de ahí.
+  const{data:otsRaw}=await sb.from('sf_workorders').select('*')
     .eq('logistica','ALLEATA')
-    .in('estado',['En Tránsito','En tránsito','Despachado'])
-    .order('ultimo_evento_fecha',{ascending:true});
-  const list=ots||[];
+    .in('status',['En Tránsito','En tránsito','Despachado'])
+    .order('fecha_despacho',{ascending:true});
+  const list=(otsRaw||[]).map(r=>({
+    id:                 r.id,
+    sf_id:              r.sf_id,
+    ot_numero:          r.workorder_number,
+    tipo:               r.record_type,
+    estado:             r.status,
+    cuenta:             r.cuenta,
+    nombre_comercio:    r.nombre_comercio,
+    direccion_completa: r.direccion_formula||r.direccion||'',
+    ciudad:             r.ciudad,
+    provincia:          r.provincia,
+    horario:            r.horario||r.horario_entrega,
+    contacto:           r.contacto_celular,
+    responsable:        r.responsable,
+  }));
   count.textContent=list.length;
   if(!list.length){
     el.innerHTML='<div class="empty"><div class="empty-icon">🚚</div><p>Sin OTs en tránsito hoy</p></div>';
@@ -1154,29 +1171,40 @@ async function confirmarCierreOT(){
     }catch(e){console.warn('Error subiendo foto:',e);}
   }
 
-  const estado=resultado==='Entregado'?'Entregado':'Demorado';
-  const evento=resultado==='Entregado'?'Entregado por logística Alleata':'Entrega fallida'+(datoEnvio?' — '+datoEnvio:'')+(notas?' — '+notas:'');
+  // Resolver sf_id: si lo tenemos en memoria (viene de mostrarOTScaneada/rutaDelDia) lo usamos,
+  // sino lo buscamos en sf_workorders (ya no en 'envios' — tabla legacy desconectada del sync).
+  if(!_otCierreActual||!_otCierreActual.sf_id){
+    const{data:otData}=await sb.from('sf_workorders').select('sf_id,workorder_number,tipo,cuenta').eq('id',id).single();
+    _otCierreActual={..._otCierreActual, sf_id:otData?.sf_id, ot_numero:otData?.workorder_number||_otCierreActual?.ot_numero, cuenta:otData?.cuenta};
+  }
 
-  const update={
-    estado,
-    resultado,
-    notas_cierre:notas||null,
-    dato_envio:datoEnvio||null,
-    foto_evidencia:fotoUrl||null,
-    fecha_cierre:new Date().toISOString().slice(0,10),
-    ultimo_evento:evento,
-    ultimo_evento_fecha:new Date().toISOString().slice(0,10)
-  };
+  const tecnico=(currentProfile?.nombre||currentUser?.email||'Operador').trim();
 
-  const{error}=await sb.from('envios').update(update).eq('id',id);
+  // FIX: antes escribía directo en 'envios'. Ahora pasa por el backend, que:
+  //  - si resultado='Entregado' → hace el MISMO writeback a Salesforce que usa
+  //    logística Correo Argentino (Status='Exitoso' + Fecha de Instalación en la Cuenta)
+  //  - si resultado='Fallido' → NO toca Salesforce, solo deja constancia en Supabase
+  let error=null;
+  try{
+    const res=await fetch(ALLY_URL+'/automations/entregar-ot',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-automation-secret':'123456'},
+      body:JSON.stringify({
+        sf_id:      _otCierreActual?.sf_id,
+        tecnico,
+        resultado,
+        notas:      notas||null,
+        dato_envio: datoEnvio||null,
+        foto_url:   fotoUrl||null
+      })
+    });
+    const data=await res.json();
+    if(!data.ok) error={message:data.error||'Error al cerrar la OT'};
+  }catch(e){ error={message:e.message}; }
+
   btn.disabled=false;btn.textContent='Confirmar';
   if(error){alert('Error: '+error.message);return;}
   closeModalCierre();
-  // Si no tenemos la OT en memoria, buscarla en Supabase
-  if(!_otCierreActual){
-    const{data:otData}=await sb.from('envios').select('ot_numero,tipo,cuenta').eq('id',id).single();
-    _otCierreActual=otData||{ot_numero:'—',tipo:'',cuenta:''};
-  }
   await notificarAlly(_otCierreActual, resultado==='Entregado'?'entregado':'fallido', fotoUrl||null, notas||null);
   _otCierreActual=null;
   await loadEnTransito();
