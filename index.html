@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.4.3</title>
+<title>Alleata · Operaciones v4.4.4</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -407,7 +407,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.4.3 · 29 jun 2026
+      v4.4.4 · 30 jun 2026
     </div>
   </div>
 </div>
@@ -485,7 +485,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.4.3 · 29 jun 2026
+      v4.4.4 · 30 jun 2026
     </div>
   </div>
 </nav>
@@ -525,7 +525,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.4.3</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.4.4</div>
   </div>
   <div class="content">
 
@@ -4474,7 +4474,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.4.3] OK');
+console.log('[Alleata v4.4.4] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -8319,12 +8319,18 @@ async function printSelectedRotulos() {
 }
 
 function _imprimirRotuloHTML(envios) {
+  // FIX v4.4.4: mismo patrón de doble-QR que printRotuloInstalacion (probado y estable):
+  // 1) QR "Escanear Ruta" arriba, en el ot-block, junto al número de OT — para escanear con Ally Mobile.
+  // 2) QR "Ubicación/Tracking" en un bloque .bottom dedicado, junto a las observaciones.
+  // Antes ambos usos compartían un solo slot dentro de ot-block, lo que dejaba el QR de geo
+  // sin una posición fija reservada — ahora cada QR tiene su propio contenedor con tamaño fijo,
+  // igual que en el rótulo de Instalaciones que nunca tuvo el problema de posicionamiento.
   function makeQRDataUrl(text, size) {
     return `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(text)}&color=000000&bgcolor=ffffff&margin=2`;
   }
 
   const rotulosHTML = envios.map(e => {
-    // QR: si tiene tracking CA → URL tracking, sino → Google Maps con la dirección
+    // QR geo/tracking: si tiene tracking CA → URL tracking, sino → Google Maps con la dirección
     let qrTarget = null;
     let qrLabel = '';
     if (e.track) {
@@ -8335,7 +8341,11 @@ function _imprimirRotuloHTML(envios) {
       qrTarget = `https://maps.google.com/?q=${addr}`;
       qrLabel = 'Ver en Maps';
     }
-    const qrSrc = qrTarget ? makeQRDataUrl(qrTarget, 80) : '';
+    const qrGeoSrc = qrTarget ? makeQRDataUrl(qrTarget, 75) : '';
+
+    // QR "Escanear Ruta": abre mobile.html con la OT cargada — mismo patrón que la Hoja de Ruta
+    const rutaUrl   = `https://marcevsanti-ux.github.io/alleata-ops/mobile.html?ot=${e.sf_id || e.id}`;
+    const qrRutaSrc = makeQRDataUrl(rutaUrl, 68);
 
     return `
     <div class="rotulo">
@@ -8350,7 +8360,10 @@ function _imprimirRotuloHTML(envios) {
           <div class="ot-num">${e.ot_numero || '—'}</div>
           ${e.track ? `<div class="track-num">Track: ${e.track}</div>` : '<div class="track-num" style="color:#aaa">Sin tracking</div>'}
         </div>
-        ${qrSrc ? `<div style="text-align:center"><img src="${qrSrc}" width="72" height="72" style="display:block;"><div style="font-size:6px;font-weight:700;margin-top:2px;text-transform:uppercase;">${qrLabel}</div></div>` : ''}
+        <div class="qr-ruta">
+          <img src="${qrRutaSrc}" width="68" height="68" style="display:block;">
+          <div class="qr-ruta-lbl">Escanear Ruta</div>
+        </div>
       </div>
       <div class="dest-label">DESTINATARIO</div>
       <div class="dest">${e.cuenta || '—'}</div>
@@ -8358,9 +8371,18 @@ function _imprimirRotuloHTML(envios) {
       <div class="row"><span class="lbl">C.P.</span><span class="val">${e.cp_dest || '—'}</span></div>
       <div class="row"><span class="lbl">Localidad</span><span class="val">${e.ciudad || '—'}</span></div>
       <div class="row"><span class="lbl">Provincia</span><span class="val">${e.provincia || '—'}</span></div>
-      <div class="divider"></div>
       <div class="row"><span class="lbl">Responsable</span><span class="val">${e.responsable || '—'}</span></div>
-      ${e.notas ? `<div class="row"><span class="lbl">Obs.</span><span class="val" style="font-size:9px">${e.notas}</span></div>` : ''}
+      <div class="divider"></div>
+      <div class="bottom">
+        ${qrGeoSrc ? `<div class="qr-geo">
+          <img src="${qrGeoSrc}" width="75" height="75" style="display:block;">
+          <div class="qr-geo-lbl">${qrLabel}</div>
+        </div>` : ''}
+        <div class="obs-wrap">
+          <div class="obs-lbl">Obs.</div>
+          <div class="obs-val">${e.notas || '—'}</div>
+        </div>
+      </div>
       <div class="footer">
         <div class="footer-lbl">Remitente</div>
         <div class="footer-val">Andrés Moretti e Hijos S.A. &nbsp;·&nbsp; Av. Rivadavia 1234, CABA</div>
@@ -8381,16 +8403,24 @@ function _imprimirRotuloHTML(envios) {
     .hdr-logo { font-size: 16px; font-weight: 900; letter-spacing: -1px; color: #1dbf8e !important; }
     .hdr-info { font-size: 6.5px; line-height: 1.5; color: #444; text-align: right; }
     .tipo { font-size: 8px; font-weight: 700; text-align: center; border: 1px solid #ccc; padding: 1.5mm; margin-bottom: 2mm; text-transform: uppercase; color: #555; }
-    .ot-block { display: flex; align-items: center; justify-content: space-between; border: 2.5px solid #000; padding: 2mm 3mm; margin-bottom: 2mm; }
+    .ot-block { display: flex; align-items: center; justify-content: space-between; gap: 2mm; border: 2.5px solid #000; padding: 2mm 3mm; margin-bottom: 2mm; }
     .ot-label { font-size: 7px; font-weight: 700; text-transform: uppercase; color: #555; }
-    .ot-num { font-size: 24px; font-weight: 900; letter-spacing: -1px; line-height: 1.1; }
+    .ot-num { font-size: 22px; font-weight: 900; letter-spacing: -1px; line-height: 1.1; }
     .track-num { font-size: 9px; font-weight: 700; font-family: 'Courier New', monospace; color: #333; margin-top: 1mm; }
+    .qr-ruta { text-align: center; flex-shrink: 0; }
+    .qr-ruta-lbl { font-size: 6px; font-weight: 700; margin-top: 2px; text-transform: uppercase; }
     .dest-label { font-size: 7px; font-weight: 700; text-transform: uppercase; color: #555; margin-bottom: 1mm; }
     .dest { font-size: 12px; font-weight: 900; text-align: center; text-transform: uppercase; background: #f0f0f0 !important; padding: 2mm; margin-bottom: 2mm; line-height: 1.3; border: 1px solid #ccc; }
     .row { display: flex; align-items: baseline; gap: 2mm; margin-bottom: 1.2mm; }
     .lbl { font-weight: 700; font-size: 8px; min-width: 22mm; color: #555; text-transform: uppercase; flex-shrink: 0; }
     .val { font-size: 10px; font-weight: 700; color: #000; }
     .divider { border-top: 1px solid #ccc; margin: 2mm 0; }
+    .bottom { display: flex; gap: 2mm; align-items: flex-start; }
+    .qr-geo { display: flex; flex-direction: column; align-items: center; gap: 1mm; flex-shrink: 0; }
+    .qr-geo-lbl { font-size: 6px; font-weight: 700; text-align: center; text-transform: uppercase; max-width: 20mm; }
+    .obs-wrap { flex: 1; min-width: 0; }
+    .obs-lbl { font-size: 8px; font-weight: 700; text-transform: uppercase; color: #555; margin-bottom: 1mm; }
+    .obs-val { font-size: 9px; border: 1px solid #ccc; padding: 1.5mm; word-break: break-word; line-height: 1.4; min-height: 12mm; }
     .footer { margin-top: auto; border-top: 1.5px solid #000; padding-top: 1.5mm; }
     .footer-lbl { font-size: 7px; font-weight: 700; color: #555; text-transform: uppercase; }
     .footer-val { font-size: 7.5px; color: #333; margin-top: 0.5mm; }
