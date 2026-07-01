@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.4.10</title>
+<title>Alleata · Operaciones v4.4.11</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -407,7 +407,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.4.10 · 01 jul 2026
+      v4.4.11 · 01 jul 2026
     </div>
   </div>
 </div>
@@ -485,7 +485,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.4.10 · 01 jul 2026
+      v4.4.11 · 01 jul 2026
     </div>
   </div>
 </nav>
@@ -525,7 +525,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.4.10</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.4.11</div>
   </div>
   <div class="content">
 
@@ -4474,7 +4474,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.4.10] OK');
+console.log('[Alleata v4.4.11] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -7985,9 +7985,36 @@ async function auditLog({tabla, registro_id, accion, campo, valor_antes, valor_d
 }
 
 async function updateEnvioEstado(id, estado){
-  // Leer estado anterior para el log
-  const {data:prev} = await sb.from('sf_workorders').select('status,workorder_number').eq('id',id).single();
-  await sb.from('sf_workorders').update({status:estado, ultimo_evento_envio_fecha:new Date().toISOString().slice(0,10)}).eq('id',id);
+  // Leer estado anterior + logistica/sf_id, necesarios para el log y el writeback a SF
+  const {data:prev} = await sb.from('sf_workorders').select('status,workorder_number,sf_id,logistica').eq('id',id).single();
+
+  // FIX: si es logística ALLEATA y se pasa a "Entregado", ahora hace lo MISMO que
+  // logística Correo Argentino en SF — mismo endpoint que ya usa la app mobile
+  // (/entregar-ot → writebackEnvioEntregado). Antes este dropdown del desktop
+  // solo tocaba Supabase y nunca avisaba a Salesforce.
+  let handledByBackend = false;
+  if (estado === 'Entregado' && (prev?.logistica || '').toUpperCase() === 'ALLEATA' && prev?.sf_id) {
+    try {
+      const tecnico = (currentProfile?.nombre || currentUser?.email || 'Operador').trim();
+      const res = await fetch('https://alleata-agent-production.up.railway.app/automations/entregar-ot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-automation-secret': '123456' },
+        body: JSON.stringify({ sf_id: prev.sf_id, tecnico, resultado: 'Entregado' })
+      });
+      const data = await res.json();
+      handledByBackend = !!data.ok;
+      if (!data.ok) console.warn('[entregar-ot] backend error:', data.error);
+    } catch (e) {
+      console.warn('[entregar-ot] fetch error:', e.message);
+    }
+  }
+
+  // Si el backend ya lo resolvió (SF + Supabase), no lo pisamos de nuevo acá.
+  // Si no aplica (no es Alleata/no es Entregado) o el backend falló, fallback normal.
+  if (!handledByBackend) {
+    await sb.from('sf_workorders').update({status:estado, ultimo_evento_envio_fecha:new Date().toISOString().slice(0,10)}).eq('id',id);
+  }
+
   auditLog({tabla:'sf_workorders', registro_id:id, accion:'CAMBIO_ESTADO', campo:'status',
     valor_antes: prev?.status||null, valor_despues: estado});
   loadBadges(); renderEnvios();
