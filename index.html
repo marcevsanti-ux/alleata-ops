@@ -454,10 +454,6 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <div class="active-bar"></div><span class="nav-icon-wrap">⏱</span> Horas
       <span class="nav-badge" id="nb-horas">—</span>
     </div>
-    <div class="nav-item" data-mod="sf" id="nav-sf" onclick="goTo('sf')" style="display:none">
-      <div class="active-bar"></div><span class="nav-icon-wrap">☁️</span> SF-Integración
-      <span class="nav-badge" id="nb-sf">—</span>
-    </div>
     <div class="nav-section" id="nav-section-config" style="display:none">Configuración</div>
     <div class="nav-item" data-mod="ajustes" id="nav-ajustes" style="display:none" onclick="goTo('ajustes')">
       <div class="active-bar"></div><span class="nav-icon-wrap">⚙️</span> Ajustes
@@ -529,286 +525,6 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
   </div>
   <div class="content">
 
-    <!-- SF-INTEGRACIÓN -->
-    <div class="module" id="mod-sf">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
-        <div>
-          <h2 style="font-size:20px;font-weight:800;color:#fff;margin:0">☁️ SF — Integración</h2>
-          <div style="font-size:12px;color:var(--text-muted);margin-top:3px">Salesforce UAT · Solo lectura</div>
-        </div>
-        <div style="font-size:11px;color:var(--text-muted)">El sync se controla desde el botón <strong style="color:var(--teal)">Full Sync</strong> en el topbar.</div>
-      </div>
-
-      <!-- Stats -->
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px">
-        <div class="card" style="padding:16px">
-          <div style="font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px">Total activas</div>
-          <div id="sf-stat-total" style="font-size:28px;font-weight:800;color:var(--teal);margin-top:4px">—</div>
-        </div>
-        <div class="card" style="padding:16px">
-          <div style="font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px">Despachado</div>
-          <div id="sf-stat-despachado" style="font-size:28px;font-weight:800;color:var(--blue);margin-top:4px">—</div>
-        </div>
-        <div class="card" style="padding:16px">
-          <div style="font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px">En Proceso</div>
-          <div id="sf-stat-proceso" style="font-size:28px;font-weight:800;color:var(--yellow);margin-top:4px">—</div>
-        </div>
-        <div class="card" style="padding:16px">
-          <div style="font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px">Retirar Terminal</div>
-          <div id="sf-stat-retiro" style="font-size:28px;font-weight:800;color:var(--purple);margin-top:4px">—</div>
-        </div>
-      </div>
-
-      <!-- Tabla OTs -->
-      <div class="card" style="padding:0;overflow:hidden">
-        <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
-          <div style="font-size:13px;font-weight:600;color:var(--text)">OTs activas — Correo Argentino</div>
-          <input class="input" id="sf-search" placeholder="Buscar OT, cuenta, tracking..." style="width:240px;padding:6px 10px;font-size:12px" oninput="sfFilterTable()">
-        </div>
-        <div style="overflow-x:auto">
-          <table style="width:100%;border-collapse:collapse;font-size:12px">
-            <thead>
-              <tr style="background:var(--navy-800)">
-                <th style="padding:10px 14px;text-align:left;color:var(--text-muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap">OT</th>
-                <th style="padding:10px 14px;text-align:left;color:var(--text-muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Tipo</th>
-                <th style="padding:10px 14px;text-align:left;color:var(--text-muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Estado SF</th>
-                <th style="padding:10px 14px;text-align:left;color:var(--text-muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Cuenta</th>
-                <th style="padding:10px 14px;text-align:left;color:var(--text-muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Tracking envío</th>
-                <th style="padding:10px 14px;text-align:left;color:var(--text-muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Estado CA</th>
-                <th style="padding:10px 14px;text-align:left;color:var(--text-muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Fecha despacho</th>
-                <th style="padding:10px 14px;text-align:left;color:var(--text-muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Responsable</th>
-              </tr>
-            </thead>
-            <tbody id="sf-tbody">
-              <tr><td colspan="8" style="padding:40px;text-align:center;color:var(--text-muted)">Cargando...</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-      <!-- Logs de sync -->
-      <div class="card" style="padding:0;overflow:hidden;margin-top:16px">
-        <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
-          <div style="font-size:13px;font-weight:600;color:var(--text)">📋 Historial de sincronizaciones</div>
-          <button class="btn btn-sm" onclick="sfCargarLogs()" style="font-size:11px;padding:4px 10px">↺ Actualizar</button>
-        </div>
-        <div style="overflow-x:auto">
-          <table style="width:100%;border-collapse:collapse;font-size:11px">
-            <thead>
-              <tr style="background:var(--navy-800)">
-                <th style="padding:8px 14px;text-align:left;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px">Fecha</th>
-                <th style="padding:8px 14px;text-align:left;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px">Tipo</th>
-                <th style="padding:8px 14px;text-align:left;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px">Origen</th>
-                <th style="padding:8px 14px;text-align:left;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px">Status</th>
-                <th style="padding:8px 14px;text-align:left;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px">Total</th>
-                <th style="padding:8px 14px;text-align:left;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px">Actualizadas</th>
-                <th style="padding:8px 14px;text-align:left;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px">Duración</th>
-                <th style="padding:8px 14px;text-align:left;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px">Detalle</th>
-              </tr>
-            </thead>
-            <tbody id="sf-logs-tbody">
-              <tr><td colspan="8" style="padding:20px;text-align:center;color:var(--text-muted)">Cargando...</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-    <!-- /SF-INTEGRACIÓN -->
-
-    <!-- HOME -->
-    <div class="module active" id="mod-home">
-
-      <!-- HEADER BIENVENIDA -->
-      <div id="ops-header" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
-        <div>
-          <h2 id="welcomeMsg" style="font-size:20px;font-weight:800;color:#fff;margin:0"></h2>
-          <div style="font-size:12px;color:var(--text-muted);margin-top:3px" id="ops-timestamp">Panel de Operaciones</div>
-        </div>
-        <div style="display:flex;align-items:center;gap:12px">
-
-          <div id="qrCanvas" style="background:#fff;border-radius:10px;padding:6px;width:68px;height:68px;display:flex;align-items:center;justify-content:center;"></div>
-        </div>
-      </div>
-
-      <!-- GRÁFICOS TOP -->
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;margin-bottom:20px" id="ops-charts-grid">
-        <div class="ops-chart-card" id="chart-instaladas" style="display:none"></div>
-        <div class="ops-chart-card" id="chart-precolecta" style="display:none"></div>
-        <div class="ops-chart-card" id="chart-entregas" style="display:none"></div>
-        <div class="ops-chart-card" id="chart-desins" style="display:none"></div>
-      </div>
-
-
-      <!-- KPIs ABAJO -->
-      <div id="ops-kpis" class="stats-row" style="flex-wrap:wrap;margin-bottom:20px;gap:10px"></div>
-
-      <!-- SLA POR TIPO -->
-      <div class="sec-title" style="margin-bottom:12px">
-        <div class="sec-dot" style="background:var(--blue)"></div>
-        <span>SLA — Antigüedad de OTs activas</span>
-      </div>
-      <div id="ops-sla-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-bottom:20px"></div>
-
-      <!-- KPIs CORREO ARGENTINO (solo admin) -->
-      <div id="ca-kpi-section" style="display:none;margin-bottom:20px">
-        <div class="sec-title" style="margin-bottom:12px">
-          <div class="sec-dot" style="background:#E30613"></div>
-          <span>Performance Correo Argentino</span>
-          <span id="ca-kpi-sla-label" style="font-size:10px;color:var(--text-muted);margin-left:8px;font-family:'JetBrains Mono',monospace">SLA target: 7 días</span>
-        </div>
-        <!-- KPI chips -->
-        <div id="ca-kpi-chips" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px"></div>
-        <!-- Tabla por provincia -->
-        <div style="background:var(--navy-800);border:1px solid var(--border);border-radius:10px;overflow:hidden">
-          <div style="padding:10px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px">
-            <span style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px">SLA por provincia</span>
-            <span style="font-size:10px;color:var(--text-muted)">— OTs entregadas con datos de tracking</span>
-          </div>
-          <div id="ca-kpi-tabla" style="overflow-x:auto">
-            <table style="width:100%;border-collapse:collapse;font-size:12px">
-              <thead>
-                <tr style="background:var(--navy-700)">
-                  <th style="padding:8px 12px;text-align:left;color:var(--text-muted);font-weight:600;font-size:10px;text-transform:uppercase;letter-spacing:.5px">Provincia</th>
-                  <th style="padding:8px 12px;text-align:center;color:var(--text-muted);font-weight:600;font-size:10px;text-transform:uppercase;letter-spacing:.5px">OTs</th>
-                  <th style="padding:8px 12px;text-align:center;color:var(--text-muted);font-weight:600;font-size:10px;text-transform:uppercase;letter-spacing:.5px">SLA prom.</th>
-                  <th style="padding:8px 12px;text-align:center;color:var(--text-muted);font-weight:600;font-size:10px;text-transform:uppercase;letter-spacing:.5px">≤7 días ✅</th>
-                  <th style="padding:8px 12px;text-align:center;color:var(--text-muted);font-weight:600;font-size:10px;text-transform:uppercase;letter-spacing:.5px">&gt;7 días ⚠️</th>
-                  <th style="padding:8px 12px;text-align:center;color:var(--text-muted);font-weight:600;font-size:10px;text-transform:uppercase;letter-spacing:.5px">Intentos prom.</th>
-                  <th style="padding:8px 12px;text-align:center;color:var(--text-muted);font-weight:600;font-size:10px;text-transform:uppercase;letter-spacing:.5px">1er intento ✅</th>
-                </tr>
-              </thead>
-              <tbody id="ca-kpi-tbody"></tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
-      <!-- Dashboard operador (solo operadores, oculto para admin) -->
-      <div id="envStatsOperador" style="display:none;margin-bottom:18px">
-        <!-- Header nombre + hora -->
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-          <div style="display:flex;align-items:center;gap:10px">
-            <div id="opAvatar" style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#1dbf8e,#1a9fd4);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:#fff;font-family:'Inter',sans-serif;flex-shrink:0">--</div>
-            <div>
-              <div id="opNombreLabel" style="font-size:14px;font-weight:700;color:var(--text)">Cargando...</div>
-              <div id="opPerfilLabel" style="font-size:10px;color:var(--text-muted);letter-spacing:.5px;text-transform:uppercase">Mi panel de OTs</div>
-            </div>
-          </div>
-          <div id="opLastUpdate" style="font-size:10px;color:var(--text-muted);font-family:'JetBrains Mono',monospace">--</div>
-        </div>
-
-        <!-- PANEL ENVÍOS (Gonza + Andres) -->
-        <div id="opPanelEnvios">
-          <!-- Fila 1: KPIs envíos -->
-          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:8px">
-            <div onclick="goTo('rollout')" style="background:var(--navy-800);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;cursor:pointer;transition:border-color .15s" onmouseover="this.style.borderColor='var(--teal)'" onmouseout="this.style.borderColor='var(--border2)'">
-              <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-bottom:6px">Activas totales</div>
-              <div id="opStatTotal" style="font-size:26px;font-weight:800;font-family:'JetBrains Mono',monospace;color:var(--text);line-height:1">0</div>
-            </div>
-            <div onclick="goTo('rollout')" style="background:var(--navy-800);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;cursor:pointer;transition:border-color .15s" onmouseover="this.style.borderColor='#f59e0b'" onmouseout="this.style.borderColor='var(--border2)'">
-              <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-bottom:6px">En tránsito</div>
-              <div id="opStatTransito" style="font-size:26px;font-weight:800;font-family:'JetBrains Mono',monospace;color:#f59e0b;line-height:1">0</div>
-            </div>
-            <div onclick="goTo('rollout')" style="background:var(--navy-800);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;cursor:pointer;transition:border-color .15s" onmouseover="this.style.borderColor='#10b981'" onmouseout="this.style.borderColor='var(--border2)'">
-              <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-bottom:6px">Entregados</div>
-              <div id="opStatEntregado" style="font-size:26px;font-weight:800;font-family:'JetBrains Mono',monospace;color:#10b981;line-height:1">0</div>
-            </div>
-            <div onclick="goTo('rollout')" style="background:var(--navy-800);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;cursor:pointer;transition:border-color .15s" onmouseover="this.style.borderColor='#ef4444'" onmouseout="this.style.borderColor='var(--border2)'">
-              <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-bottom:6px">Retirar Terminal</div>
-              <div id="opStatRetirar" style="font-size:26px;font-weight:800;font-family:'JetBrains Mono',monospace;color:#ef4444;line-height:1">0</div>
-            </div>
-          </div>
-          <!-- Fila 2: SLA + Rollout NAPSE -->
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px">
-            <div style="background:var(--navy-800);border:1px solid var(--border2);border-radius:10px;padding:12px 14px">
-              <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-bottom:8px">SLA Logística (prom.)</div>
-              <div style="display:flex;align-items:baseline;gap:6px;margin-bottom:8px">
-                <div id="opSlaCA" style="font-size:26px;font-weight:800;font-family:'JetBrains Mono',monospace;color:var(--text);line-height:1">--</div>
-                <div style="font-size:11px;color:var(--text-muted)">días</div>
-                <div id="opSlaCASemaforo" style="margin-left:auto;font-size:16px">--</div>
-              </div>
-              <div style="display:flex;gap:4px;align-items:center">
-                <div style="flex:1;height:4px;border-radius:2px;background:var(--navy-700)"><div id="opSlaCABarFill" style="height:4px;border-radius:2px;width:0%;transition:width .4s;background:#10b981"></div></div>
-                <div id="opSlaCARango" style="font-size:9px;color:var(--text-muted);font-family:'JetBrains Mono',monospace;white-space:nowrap;margin-left:6px">target: 7d</div>
-              </div>
-            </div>
-            <div style="background:var(--navy-800);border:1px solid var(--border2);border-radius:10px;padding:12px 14px">
-              <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-bottom:8px">SLA Total (prom.)</div>
-              <div style="display:flex;align-items:baseline;gap:6px;margin-bottom:8px">
-                <div id="opSlaTotal" style="font-size:26px;font-weight:800;font-family:'JetBrains Mono',monospace;color:var(--text);line-height:1">--</div>
-                <div style="font-size:11px;color:var(--text-muted)">días</div>
-                <div id="opSlaTotalSemaforo" style="margin-left:auto;font-size:16px">--</div>
-              </div>
-              <div style="display:flex;gap:4px;align-items:center">
-                <div style="flex:1;height:4px;border-radius:2px;background:var(--navy-700)"><div id="opSlaTotalBarFill" style="height:4px;border-radius:2px;width:0%;transition:width .4s;background:#10b981"></div></div>
-                <div id="opSlaTotalRango" style="font-size:9px;color:var(--text-muted);font-family:'JetBrains Mono',monospace;white-space:nowrap;margin-left:6px">target: 10d</div>
-              </div>
-            </div>
-            <div onclick="goTo('rollout')" style="background:var(--navy-800);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;cursor:pointer;transition:border-color .15s" onmouseover="this.style.borderColor='#6366f1'" onmouseout="this.style.borderColor='var(--border2)'">
-              <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-bottom:6px">Rollout NAPSE</div>
-              <div style="display:flex;align-items:baseline;gap:6px">
-                <div id="opStatRollout" style="font-size:26px;font-weight:800;font-family:'JetBrains Mono',monospace;color:#6366f1;line-height:1">0</div>
-                <div style="font-size:11px;color:var(--text-muted)">OTs activas</div>
-              </div>
-              <div style="margin-top:8px;display:flex;gap:10px;flex-wrap:wrap">
-                <span style="font-size:10px;color:var(--text-muted)">Pre-colecta: <span id="opRlPrecolecta" style="color:#6366f1;font-weight:700">0</span></span>
-                <span style="font-size:10px;color:var(--text-muted)">Despachado: <span id="opRlDespachado" style="color:#f59e0b;font-weight:700">0</span></span>
-                <span style="font-size:10px;color:var(--text-muted)">Retirar: <span id="opRlRetirar" style="color:#ef4444;font-weight:700">0</span></span>
-              </div>
-            </div>
-          </div>
-          <!-- Fila 3: Distribución SLA -->
-          <div style="background:var(--navy-800);border:1px solid var(--border2);border-radius:10px;padding:12px 16px">
-            <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-bottom:10px">OTs por estado de SLA logística</div>
-            <div id="opSlaDistribucion" style="display:flex;gap:6px;flex-wrap:wrap"><span style="font-size:11px;color:var(--text-muted)">Cargando...</span></div>
-          </div>
-        </div>
-
-        <!-- PANEL DESINSTALACIONES (Angel) -->
-        <div id="opPanelDesins" style="display:none">
-          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:8px">
-            <div onclick="goTo('desinstalaciones')" style="background:var(--navy-800);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;cursor:pointer;transition:border-color .15s" onmouseover="this.style.borderColor='var(--teal)'" onmouseout="this.style.borderColor='var(--border2)'">
-              <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-bottom:6px">Pendientes</div>
-              <div id="opDsPendientes" style="font-size:26px;font-weight:800;font-family:'JetBrains Mono',monospace;color:var(--teal);line-height:1">0</div>
-            </div>
-            <div onclick="goTo('desinstalaciones')" style="background:var(--navy-800);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;cursor:pointer;transition:border-color .15s" onmouseover="this.style.borderColor='#1a9fd4'" onmouseout="this.style.borderColor='var(--border2)'">
-              <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-bottom:6px">En proceso</div>
-              <div id="opDsEnProceso" style="font-size:26px;font-weight:800;font-family:'JetBrains Mono',monospace;color:#1a9fd4;line-height:1">0</div>
-            </div>
-            <div onclick="goTo('desinstalaciones')" style="background:var(--navy-800);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;cursor:pointer;transition:border-color .15s" onmouseover="this.style.borderColor='#10b981'" onmouseout="this.style.borderColor='var(--border2)'">
-              <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-bottom:6px">Exitosas hoy</div>
-              <div id="opDsExitosasHoy" style="font-size:26px;font-weight:800;font-family:'JetBrains Mono',monospace;color:#10b981;line-height:1">0</div>
-            </div>
-            <div onclick="goTo('desinstalaciones')" style="background:var(--navy-800);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;cursor:pointer;transition:border-color .15s" onmouseover="this.style.borderColor='#f59e0b'" onmouseout="this.style.borderColor='var(--border2)'">
-              <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-bottom:6px">Reprogramar</div>
-              <div id="opDsReprogramar" style="font-size:26px;font-weight:800;font-family:'JetBrains Mono',monospace;color:#f59e0b;line-height:1">0</div>
-            </div>
-          </div>
-          <!-- Fila 2: Hoja de ruta + total mes -->
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-            <div onclick="goTo('desinstalaciones')" style="background:var(--navy-800);border:1px solid var(--border2);border-radius:10px;padding:14px;cursor:pointer;transition:border-color .15s" onmouseover="this.style.borderColor='var(--teal)'" onmouseout="this.style.borderColor='var(--border2)'">
-              <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-bottom:8px">📋 Hoja de ruta hoy</div>
-              <div id="opDsHojaRuta" style="font-size:22px;font-weight:800;font-family:'JetBrains Mono',monospace;color:var(--text)">—</div>
-              <div id="opDsHojaRutaLabel" style="font-size:10px;color:var(--text-muted);margin-top:4px">Sin hoja asignada</div>
-            </div>
-            <div style="background:var(--navy-800);border:1px solid var(--border2);border-radius:10px;padding:14px">
-              <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-bottom:8px">📦 Total desins activas</div>
-              <div id="opDsTotal" style="font-size:22px;font-weight:800;font-family:'JetBrains Mono',monospace;color:#a78bfa">0</div>
-              <div style="font-size:10px;color:var(--text-muted);margin-top:4px">en todos los estados</div>
-            </div>
-          </div>
-        </div>
-      </div>
-      <!-- ACCESOS RÁPIDOS -->
-      <div style="border-top:1px solid var(--border);padding-top:16px">
-        <div class="sec-title" style="margin-bottom:12px">
-          <div class="sec-dot" style="background:var(--text-muted)"></div>
-          <span>Módulos</span>
-        </div>
-        <div class="dash-grid" id="dashGrid"></div>
-      </div>
-
-    </div>
-    <!-- SIMS -->
     <div class="module" id="mod-sims">
       <div class="upload-zone" id="simDropZone">
         <input type="file" id="simFileInput" multiple accept="image/*">
@@ -1172,7 +888,6 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
             <div class="mod-pill" data-mod="napse" onclick="toggleCreateMod(this)"><span class="pill-dot"></span>🔍 Napse</div>
             <div class="mod-pill active" data-mod="horas" onclick="toggleCreateMod(this)"><span class="pill-dot"></span>⏱ Horas</div>
             <div class="mod-pill" data-mod="terminales" onclick="toggleCreateMod(this)"><span class="pill-dot"></span>🖥️ Terminales</div>
-            <div class="mod-pill" data-mod="sf" onclick="toggleCreateMod(this)"><span class="pill-dot"></span>☁ SF-Integración</div>
             <div class="mod-pill" data-mod="store" onclick="toggleCreateMod(this)"><span class="pill-dot"></span>🏪 Store</div>
           </div>
         </div>
@@ -4652,8 +4367,6 @@ function showApp(){
     if(navAlly) navAlly.style.display='flex';
     const navDistri=document.getElementById('nav-distri');
     if(navDistri) navDistri.style.display='flex';
-    const navSF=document.getElementById('nav-sf');
-    if(navSF) navSF.style.display='flex';
     // SF Sync global en topbar — solo admins
     mostrarSFSyncSiAdmin();
     document.getElementById('nav-ajustes').style.display='flex';
@@ -4765,7 +4478,6 @@ function goTo(mod){
   if(mod==='distri')window.cargarDistri?.();
   if(mod==='horas')renderHoras();
   if(mod==='ajustes'){loadUsers();loadSimsDbStats();loadConfigSLA();_auditPage=0;loadAuditLog();cargarCronHorarios();}
-  if(mod==='sf')window.cargarSFIntegracion?.();
   if(mod==='retencion')window.cargarRetencion?.();
   if(mod==='terminales')window.termInit?.();
   if(mod==='store')window.storeInit?.(); // store
@@ -4809,7 +4521,6 @@ const ALL_MODS = [
   {id:'napse', label:'🔍 Napse'},
   {id:'horas',     label:'⏱ Horas'},
   {id:'terminales',label:'🖥️ Terminales'},
-  {id:'sf',        label:'☁ SF-Integración'},
   {id:'store',      label:'🏪 Store'},
 ];
 
