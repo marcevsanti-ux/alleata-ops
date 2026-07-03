@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.4.14</title>
+<title>Alleata · Operaciones v4.4.15</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -407,7 +407,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.4.14 · 02 jul 2026
+      v4.4.15 · 03 jul 2026
     </div>
   </div>
 </div>
@@ -464,6 +464,10 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     <div class="nav-item" data-mod="terminales" id="nav-terminales" onclick="goTo('terminales')">
       <div class="active-bar"></div><span class="nav-icon-wrap">🖥️</span> Terminales
     </div>
+    <div class="nav-item" data-mod="recuperadas" id="nav-recuperadas" onclick="goTo('recuperadas')" style="display:none">
+      <div class="active-bar"></div><span class="nav-icon-wrap">🔁</span> Recuperadas
+      <span class="nav-badge" id="nb-recuperadas">0</span>
+    </div>
     <div class="nav-item" data-mod="distri" id="nav-distri" onclick="goTo('distri')" style="display:none">
       <div class="active-bar"></div><span class="nav-icon-wrap">🚚</span> Distribuidores
     </div>
@@ -481,7 +485,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.4.14 · 02 jul 2026
+      v4.4.15 · 03 jul 2026
     </div>
   </div>
 </nav>
@@ -521,7 +525,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.4.14</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.4.15</div>
   </div>
   <div class="content">
 
@@ -889,6 +893,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
             <div class="mod-pill active" data-mod="horas" onclick="toggleCreateMod(this)"><span class="pill-dot"></span>⏱ Horas</div>
             <div class="mod-pill" data-mod="terminales" onclick="toggleCreateMod(this)"><span class="pill-dot"></span>🖥️ Terminales</div>
             <div class="mod-pill" data-mod="store" onclick="toggleCreateMod(this)"><span class="pill-dot"></span>🏪 Store</div>
+            <div class="mod-pill" data-mod="recuperadas" onclick="toggleCreateMod(this)"><span class="pill-dot"></span>🔁 Recuperadas</div>
           </div>
         </div>
         <div id="ajMsg"></div>
@@ -2033,9 +2038,70 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
 </div>
     <!-- Campos a grabar -->
 
+<!-- ── RECUPERADAS ── -->
+<div class="module" id="mod-recuperadas">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+    <div>
+      <h2 style="font-size:20px;font-weight:800;color:#fff;margin:0">🔁 Recuperadas</h2>
+      <div style="font-size:12px;color:var(--text-muted);margin-top:3px">Desinstalaciones recuperadas — control de terminal en depósito (Ignacio)</div>
+    </div>
+    <button class="btn btn-sm" onclick="cargarRecuperadas()">↺ Actualizar</button>
+  </div>
+
+  <!-- Stats -->
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px">
+    <div class="card" style="padding:16px;cursor:pointer" onclick="filtrarRecuperadas('pendiente_regreso')">
+      <div style="font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px">📦 Pendiente regreso</div>
+      <div id="rec-stat-pendiente" style="font-size:26px;font-weight:800;font-family:'JetBrains Mono',monospace;color:#ef4444;margin-top:4px">0</div>
+      <div style="font-size:10px;color:var(--text-muted);margin-top:2px">terminal no llegó a Barracas</div>
+    </div>
+    <div class="card" style="padding:16px;cursor:pointer" onclick="filtrarRecuperadas('en_deposito_mal_estado')">
+      <div style="font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px">🏭 En depósito, mal estado</div>
+      <div id="rec-stat-deposito" style="font-size:26px;font-weight:800;font-family:'JetBrains Mono',monospace;color:#f59e0b;margin-top:4px">0</div>
+      <div style="font-size:10px;color:var(--text-muted);margin-top:2px">está en Barracas pero no Disponible</div>
+    </div>
+    <div class="card" style="padding:16px;cursor:pointer" onclick="filtrarRecuperadas('reasignada_exito')">
+      <div style="font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px">✅ Reasignada con éxito</div>
+      <div id="rec-stat-reasignada" style="font-size:26px;font-weight:800;font-family:'JetBrains Mono',monospace;color:#22c55e;margin-top:4px">0</div>
+      <div style="font-size:10px;color:var(--text-muted);margin-top:2px">solo para confirmar, no es urgente</div>
+    </div>
+  </div>
+
+  <!-- Filtros -->
+  <div style="display:flex;gap:8px;margin-bottom:14px;align-items:center;flex-wrap:wrap">
+    <input id="rec-buscar" placeholder="Buscar OT, serial o responsable..." oninput="filtrarRecuperadasTexto()" style="flex:1;min-width:200px;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:8px 12px;color:#fff;font-size:13px">
+    <select id="rec-f-categoria" onchange="filtrarRecuperadas(this.value)" style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:8px 12px;color:#fff;font-size:13px">
+      <option value="">Todas las categorías</option>
+      <option value="pendiente_regreso">📦 Pendiente regreso</option>
+      <option value="en_deposito_mal_estado">🏭 En depósito, mal estado</option>
+      <option value="reasignada_exito">✅ Reasignada con éxito</option>
+    </select>
+  </div>
+
+  <div class="table-wrap" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden">
+    <table style="width:100%;border-collapse:collapse;font-size:12px">
+      <thead>
+        <tr style="background:var(--surface2);text-align:left">
+          <th style="padding:10px 12px">OT</th>
+          <th style="padding:10px 12px">Serial</th>
+          <th style="padding:10px 12px">Responsable</th>
+          <th style="padding:10px 12px">Ubicación</th>
+          <th style="padding:10px 12px">Estado</th>
+          <th style="padding:10px 12px">Categoría</th>
+          <th style="padding:10px 12px">Detectado</th>
+          <th style="padding:10px 12px"></th>
+        </tr>
+      </thead>
+      <tbody id="rec-tbody">
+        <tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-muted)">Cargando...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
 
 <!-- ── HTML DEL MÓDULO ── -->
 <div class="module" id="mod-instalaciones">
+
 
   <!-- Header -->
   <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">
@@ -4189,7 +4255,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.4.14] OK');
+console.log('[Alleata v4.4.15] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -4377,7 +4443,12 @@ function showApp(){
   }
   const navStore=document.getElementById('nav-store');
   if(navStore&&(isAdmin||modulos.includes('store')))navStore.style.display='flex';
-  ['sims','envios','desinstalaciones','napse','horas','store'].forEach(mod=>{
+  const navRecuperadas=document.getElementById('nav-recuperadas');
+  if(navRecuperadas&&(isAdmin||modulos.includes('recuperadas'))){
+    navRecuperadas.style.display='flex';
+    cargarBadgeRecuperadas();
+  }
+  ['sims','envios','desinstalaciones','napse','horas','store','recuperadas'].forEach(mod=>{
     const el=document.getElementById('nav-'+mod);
     if(el&&!modulos.includes(mod)&&!isAdmin){el.classList.add('locked');el.onclick=null;}
   });
@@ -4481,6 +4552,7 @@ function goTo(mod){
   if(mod==='retencion')window.cargarRetencion?.();
   if(mod==='terminales')window.termInit?.();
   if(mod==='store')window.storeInit?.(); // store
+  if(mod==='recuperadas')window.cargarRecuperadas?.();
 }
 
 function refreshCurrentModule(){
@@ -4504,6 +4576,106 @@ function updateDate(){
 }
 setInterval(updateDate,60000);updateDate();
 
+// ══════════════════════════════════════════════════════════════
+// MÓDULO RECUPERADAS — lee GET /automations/recuperadas (persistido en Supabase)
+// ══════════════════════════════════════════════════════════════
+
+let _recDatos = [];
+let _recFiltroCategoria = '';
+
+const REC_CAT_LABEL = {
+  pendiente_regreso:      { label: '📦 Pendiente regreso',      color: '#ef4444' },
+  en_deposito_mal_estado: { label: '🏭 En depósito, mal estado', color: '#f59e0b' },
+  reasignada_exito:       { label: '✅ Reasignada con éxito',    color: '#22c55e' },
+};
+
+function recEsc(s){
+  return String(s??'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+async function cargarBadgeRecuperadas(){
+  try{
+    const res = await fetch(`${SF_AGENT_URL}/automations/recuperadas`, { headers: ADMIN_HEADERS });
+    const data = await res.json();
+    if(!data.ok) return;
+    const activos = (data.items||[]).filter(i => i.categoria !== 'reasignada_exito').length;
+    const badge = document.getElementById('nb-recuperadas');
+    if(badge) badge.textContent = activos;
+  }catch(e){ console.warn('[Recuperadas] badge error:', e.message); }
+}
+
+window.cargarRecuperadas = async function(){
+  const tbody = document.getElementById('rec-tbody');
+  if(!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-muted)">Cargando...</td></tr>';
+  try{
+    const res = await fetch(`${SF_AGENT_URL}/automations/recuperadas`, { headers: ADMIN_HEADERS });
+    const data = await res.json();
+    if(!data.ok) throw new Error(data.error || 'Error desconocido');
+    _recDatos = data.items || [];
+
+    // Stats
+    const porCat = { pendiente_regreso:0, en_deposito_mal_estado:0, reasignada_exito:0 };
+    _recDatos.forEach(r => { if(porCat[r.categoria]!==undefined) porCat[r.categoria]++; });
+    document.getElementById('rec-stat-pendiente').textContent  = porCat.pendiente_regreso;
+    document.getElementById('rec-stat-deposito').textContent   = porCat.en_deposito_mal_estado;
+    document.getElementById('rec-stat-reasignada').textContent = porCat.reasignada_exito;
+
+    const badge = document.getElementById('nb-recuperadas');
+    if(badge) badge.textContent = porCat.pendiente_regreso + porCat.en_deposito_mal_estado;
+
+    recRenderTabla(_recDatos);
+  }catch(e){
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--red)">⚠ Error: ${recEsc(e.message)}</td></tr>`;
+  }
+};
+
+function filtrarRecuperadas(categoria){
+  _recFiltroCategoria = categoria || '';
+  const sel = document.getElementById('rec-f-categoria');
+  if(sel) sel.value = _recFiltroCategoria;
+  filtrarRecuperadasTexto();
+}
+
+function filtrarRecuperadasTexto(){
+  const q = (document.getElementById('rec-buscar')?.value||'').trim().toLowerCase();
+  let filtrados = _recDatos;
+  if(_recFiltroCategoria) filtrados = filtrados.filter(r => r.categoria === _recFiltroCategoria);
+  if(q){
+    filtrados = filtrados.filter(r =>
+      (r.ot_numero||'').toLowerCase().includes(q) ||
+      (r.serial||'').toLowerCase().includes(q) ||
+      (r.responsable||'').toLowerCase().includes(q)
+    );
+  }
+  recRenderTabla(filtrados);
+}
+
+function recRenderTabla(rows){
+  const tbody = document.getElementById('rec-tbody');
+  if(!tbody) return;
+  if(!rows.length){
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-muted)">Sin resultados 🎉</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map(r => {
+    const cat = REC_CAT_LABEL[r.categoria] || { label: r.categoria||'—', color: 'var(--text-muted)' };
+    const fecha = r.primera_deteccion ? new Date(r.primera_deteccion).toLocaleDateString('es-AR') : '—';
+    // Link de búsqueda global en SF (producción) por N° de OT — no persistimos el Id de SF todavía
+    const sfUrl = `https://alleata.lightning.force.com/_ui/search/ui/UnifiedSearchResults?searchType=2&str=${encodeURIComponent(r.ot_numero)}`;
+    return `<tr style="border-top:1px solid var(--border)">
+      <td style="padding:9px 12px;font-family:'JetBrains Mono',monospace;font-weight:600">${recEsc(r.ot_numero)}</td>
+      <td style="padding:9px 12px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-muted)">${recEsc(r.serial)}</td>
+      <td style="padding:9px 12px">${recEsc(r.responsable)}</td>
+      <td style="padding:9px 12px">${recEsc(r.ubicacion)}</td>
+      <td style="padding:9px 12px">${recEsc(r.estado)}</td>
+      <td style="padding:9px 12px"><span style="color:${cat.color};font-weight:600;font-size:11px">${cat.label}</span></td>
+      <td style="padding:9px 12px;font-size:11px;color:var(--text-muted)">${fecha}</td>
+      <td style="padding:9px 12px"><a href="${sfUrl}" target="_blank" style="color:var(--blue);font-size:11px;text-decoration:none">Ver en SF ↗</a></td>
+    </tr>`;
+  }).join('');
+}
+
 
 // ══════════════════════════════════════════════════════════════
 // MÓDULO AJUSTES — Gestión de usuarios
@@ -4522,6 +4694,7 @@ const ALL_MODS = [
   {id:'horas',     label:'⏱ Horas'},
   {id:'terminales',label:'🖥️ Terminales'},
   {id:'store',      label:'🏪 Store'},
+  {id:'recuperadas',label:'🔁 Recuperadas'},
 ];
 
 async function loadUsers() {
