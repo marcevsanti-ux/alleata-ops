@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.4.20</title>
+<title>Alleata · Operaciones v4.4.21</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -407,7 +407,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.4.20 · 03 jul 2026
+      v4.4.21 · 03 jul 2026
     </div>
   </div>
 </div>
@@ -485,7 +485,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.4.20 · 03 jul 2026
+      v4.4.21 · 03 jul 2026
     </div>
   </div>
 </nav>
@@ -525,7 +525,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.4.20</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.4.21</div>
   </div>
   <div class="content">
 
@@ -4260,7 +4260,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.4.20] OK');
+console.log('[Alleata v4.4.21] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -4463,20 +4463,26 @@ function showApp(){
   const envFecha=document.getElementById('envFecha');if(envFecha)envFecha.value=new Date().toISOString().slice(0,10);
 
   // ── Realtime: refrescar módulo activo cuando el sync de Railway actualiza sf_workorders ──
+  // FIX parpadeo: los eventos postgres_changes llegan uno POR FILA modificada. Un Full
+  // Sync puede tocar miles de filas en segundos -> sin debounce esto dispara cientos de
+  // re-renders (innerHTML completo de la tabla) en todos los clientes conectados al mismo
+  // tiempo, lo que se percibe como parpadeo de pantalla para todos los usuarios.
+  // Con el debounce, no importa cuántos eventos lleguen en ráfaga: solo se repinta 1 vez,
+  // 1.2s después de que la ráfaga de cambios se detiene.
   if(!window._sfRealtimeChannel){
+    let _sfRealtimeDebounceTimer = null;
+    const _sfRealtimeRefresh = () => {
+      clearTimeout(_sfRealtimeDebounceTimer);
+      _sfRealtimeDebounceTimer = setTimeout(() => {
+        const modActivo = document.querySelector('.module.active')?.id?.replace('mod-','');
+        if(modActivo === 'envios')  { renderEnvios?.(); }
+        if(modActivo === 'rollout') { initRollout?.(); }
+      }, 1200);
+    };
     window._sfRealtimeChannel = sb
       .channel('sf_workorders_cambios')
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'sf_workorders' }, () => {
-        // Solo actuar si el usuario está viendo envíos o rollout
-        const modActivo = document.querySelector('.module.active')?.id?.replace('mod-','');
-        if(modActivo === 'envios')  { renderEnvios?.(); }
-        if(modActivo === 'rollout') { initRollout?.(); }
-      })
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'sf_workorders' }, () => {
-        const modActivo = document.querySelector('.module.active')?.id?.replace('mod-','');
-        if(modActivo === 'envios')  { renderEnvios?.(); }
-        if(modActivo === 'rollout') { initRollout?.(); }
-      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'sf_workorders' }, _sfRealtimeRefresh)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'sf_workorders' }, _sfRealtimeRefresh)
       .subscribe();
   }
   if(typeof setWeek==="function") setWeek();
@@ -8961,6 +8967,18 @@ async function globalSFSync() {
   const elapsed= document.getElementById('sf-sync-elapsed');
   const summary= document.getElementById('sf-sync-summary');
   if (!btn) return;
+
+  // FIX: guard extra contra doble disparo (mismo admin en 2 pestañas, o 2 admins casi
+  // a la vez). No reemplaza un lock server-side, pero evita el caso más común: alguien
+  // reclickeando porque no vio feedback, o abriendo el portal en 2 pestañas.
+  // Ventana de 25s porque el Full Sync real tarda ~20-28s (ver STEPS más abajo).
+  if (btn.disabled) return;
+  const _lastSync = Number(localStorage.getItem('_sfFullSyncLastStart') || 0);
+  if (Date.now() - _lastSync < 25000) {
+    console.warn('[SF Sync global] Ignorado: ya se disparó un Full Sync hace menos de 25s (esta u otra pestaña).');
+    return;
+  }
+  localStorage.setItem('_sfFullSyncLastStart', String(Date.now()));
 
   // Pasos simulados con tiempos aproximados
   // FIX: Full Sync ya no dispara CA Tracker (skip_ca_tracker:true más abajo) —
