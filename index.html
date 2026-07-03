@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.4.21</title>
+<title>Alleata · Operaciones v4.4.22</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -407,7 +407,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.4.21 · 03 jul 2026
+      v4.4.22 · 03 jul 2026
     </div>
   </div>
 </div>
@@ -485,7 +485,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.4.21 · 03 jul 2026
+      v4.4.22 · 03 jul 2026
     </div>
   </div>
 </nav>
@@ -525,7 +525,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.4.21</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.4.22</div>
   </div>
   <div class="content">
 
@@ -2068,6 +2068,14 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <div style="font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px">🟢 En Barracas OK</div>
       <div id="rec-stat-ok" style="font-size:26px;font-weight:800;font-family:'JetBrains Mono',monospace;color:#22c55e;margin-top:4px">0</div>
       <div style="font-size:10px;color:var(--text-muted);margin-top:2px">Disponible — todo bien, sin acción</div>
+    </div>
+  </div>
+
+  <!-- OTs resueltas por día (detección automática — ver nota en cargarRecuperadasDiario) -->
+  <div style="margin-bottom:20px">
+    <div style="font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">📅 OTs resueltas por día</div>
+    <div id="rec-diario-cards" style="display:flex;gap:10px;overflow-x:auto;padding-bottom:4px">
+      <div style="color:var(--text-muted);font-size:12px;padding:10px">Cargando...</div>
     </div>
   </div>
 
@@ -4260,7 +4268,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.4.21] OK');
+console.log('[Alleata v4.4.22] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -4638,10 +4646,57 @@ window.cargarRecuperadas = async function(){
     if(badge) badge.textContent = porCat.pendiente_regreso + porCat.en_deposito_mal_estado;
 
     recRenderTabla(_recDatos);
+    cargarRecuperadasDiario();
   }catch(e){
     tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--red)">⚠ Error: ${recEsc(e.message)}</td></tr>`;
   }
 };
+
+// Cards "OTs resueltas por día" — GET /automations/recuperadas/diario.
+// IMPORTANTE: esto cuenta detecciones automáticas (el sistema notó que la
+// terminal ya estaba OK en Barracas), no acciones manuales de Nacho. Es la
+// mejor proxy disponible hoy de "cuánto avanzó" cada día, pero si algún día
+// se agrega un botón de "marcar revisado" manual, este número va a dejar de
+// representar 1:1 el trabajo de Nacho y habría que sumar esa otra fuente.
+const REC_DIAS_LABEL = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+async function cargarRecuperadasDiario(){
+  const cont = document.getElementById('rec-diario-cards');
+  if(!cont) return;
+  try{
+    const res = await fetch(`${SF_AGENT_URL}/automations/recuperadas/diario?dias=14`, { headers: ADMIN_HEADERS });
+    const data = await res.json();
+    if(!data.ok) throw new Error(data.error || 'Error desconocido');
+
+    const porFecha = {};
+    (data.dias||[]).forEach(d => { porFecha[d.fecha] = d.cantidad; });
+
+    // Armamos siempre los últimos 7 días de corrido (aunque algún día tenga 0),
+    // así se ve el patrón completo de la semana, no solo los días con actividad.
+    const hoyStr = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' });
+    const cards = [];
+    for(let i=6;i>=0;i--){
+      const d = new Date();
+      d.setDate(d.getDate()-i);
+      const fechaStr = d.toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' });
+      const [y,m,day] = fechaStr.split('-');
+      const cantidad = porFecha[fechaStr] || 0;
+      const esHoy = fechaStr === hoyStr;
+      const diaSemana = REC_DIAS_LABEL[new Date(fechaStr+'T12:00:00').getDay()];
+      cards.push({ fechaStr, label: `${diaSemana} ${day}/${m}`, cantidad, esHoy });
+    }
+
+    cont.innerHTML = cards.map(c => `
+      <div style="flex:0 0 auto;min-width:88px;background:var(--surface);border:1px solid ${c.esHoy?'var(--teal)':'var(--border)'};border-radius:10px;padding:10px 12px;text-align:center">
+        <div style="font-size:10px;color:${c.esHoy?'var(--teal)':'var(--text-muted)'};font-weight:700;text-transform:uppercase;letter-spacing:.4px">${c.esHoy?'Hoy':recEsc(c.label)}</div>
+        ${c.esHoy?`<div style="font-size:9px;color:var(--text-muted);margin-top:1px">${recEsc(c.label)}</div>`:''}
+        <div style="font-size:22px;font-weight:800;font-family:'JetBrains Mono',monospace;color:${c.cantidad>0?'#22c55e':'var(--text-muted)'};margin-top:4px">${c.cantidad}</div>
+      </div>
+    `).join('');
+  }catch(e){
+    cont.innerHTML = `<div style="color:var(--red);font-size:12px;padding:10px">⚠ Error: ${recEsc(e.message)}</div>`;
+    console.warn('[Recuperadas diario] error:', e.message);
+  }
+}
 
 function filtrarRecuperadas(categoria){
   _recFiltroCategoria = categoria || '';
