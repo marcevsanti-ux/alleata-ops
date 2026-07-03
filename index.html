@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.4.17</title>
+<title>Alleata · Operaciones v4.4.18</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -407,7 +407,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.4.17 · 03 jul 2026
+      v4.4.18 · 03 jul 2026
     </div>
   </div>
 </div>
@@ -485,7 +485,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.4.17 · 03 jul 2026
+      v4.4.18 · 03 jul 2026
     </div>
   </div>
 </nav>
@@ -525,7 +525,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.4.17</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.4.18</div>
   </div>
   <div class="content">
 
@@ -2056,9 +2056,9 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <div style="font-size:10px;color:var(--text-muted);margin-top:2px">terminal no llegó a Barracas</div>
     </div>
     <div class="card" style="padding:16px;cursor:pointer" onclick="filtrarRecuperadas('en_deposito_mal_estado')">
-      <div style="font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px">🏭 En depósito, mal estado</div>
+      <div style="font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px">🏭 Pendiente de Revisión</div>
       <div id="rec-stat-deposito" style="font-size:26px;font-weight:800;font-family:'JetBrains Mono',monospace;color:#f59e0b;margin-top:4px">0</div>
-      <div style="font-size:10px;color:var(--text-muted);margin-top:2px">está en Barracas pero no Disponible</div>
+      <div style="font-size:10px;color:var(--text-muted);margin-top:2px">Terminal llegó a Barracas, falta realizar revisión</div>
     </div>
     <div class="card" style="padding:16px;cursor:pointer" onclick="filtrarRecuperadas('reasignada_exito')">
       <div style="font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px">✅ Reasignada con éxito</div>
@@ -2084,11 +2084,11 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <tr style="background:var(--surface2);text-align:left">
           <th style="padding:10px 12px">OT</th>
           <th style="padding:10px 12px">Serial</th>
-          <th style="padding:10px 12px">Responsable</th>
+          <th style="padding:10px 12px">SLA</th>
           <th style="padding:10px 12px">Ubicación</th>
           <th style="padding:10px 12px">Estado</th>
           <th style="padding:10px 12px">Categoría</th>
-          <th style="padding:10px 12px">Detectado</th>
+          <th style="padding:10px 12px">Transicionado</th>
           <th style="padding:10px 12px"></th>
         </tr>
       </thead>
@@ -4255,7 +4255,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.4.17] OK');
+console.log('[Alleata v4.4.18] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -4651,6 +4651,32 @@ function filtrarRecuperadasTexto(){
   recRenderTabla(filtrados);
 }
 
+// SLA = días hábiles transcurridos entre la fecha de transición a Recuperada y hoy.
+// No cuenta el día de inicio, cuenta hasta hoy inclusive, salta sábados y domingos.
+// Ej: transicionó lunes 29/6 -> hoy viernes 3/7 = 4 días hábiles (mar,mié,jue,vie).
+function recSlaBusinessDays(fromISO){
+  if(!fromISO) return null;
+  const start = new Date(fromISO);
+  const end = new Date();
+  start.setHours(0,0,0,0);
+  end.setHours(0,0,0,0);
+  if(isNaN(start.getTime())) return null;
+  let count = 0;
+  const cur = new Date(start);
+  while(cur < end){
+    cur.setDate(cur.getDate()+1);
+    const day = cur.getDay(); // 0=domingo, 6=sábado
+    if(day!==0 && day!==6) count++;
+  }
+  return count;
+}
+function recSlaColor(dias){
+  if(dias===null) return 'var(--text-muted)';
+  if(dias<=2) return '#22c55e';
+  if(dias<=5) return '#f59e0b';
+  return '#ef4444';
+}
+
 function recRenderTabla(rows){
   const tbody = document.getElementById('rec-tbody');
   if(!tbody) return;
@@ -4660,17 +4686,20 @@ function recRenderTabla(rows){
   }
   tbody.innerHTML = rows.map(r => {
     const cat = REC_CAT_LABEL[r.categoria] || { label: r.categoria||'—', color: 'var(--text-muted)' };
-    const fecha = r.primera_deteccion ? new Date(r.primera_deteccion).toLocaleDateString('es-AR') : '—';
+    const fechaTrans = r.transicionado_at ? new Date(r.transicionado_at).toLocaleDateString('es-AR') : '—';
+    const slaDias = recSlaBusinessDays(r.transicionado_at);
+    const slaTxt = slaDias===null ? '—' : `${slaDias}d`;
+    const slaColor = recSlaColor(slaDias);
     // Link de búsqueda global en SF (producción) por N° de OT — no persistimos el Id de SF todavía
     const sfUrl = `https://alleata.lightning.force.com/_ui/search/ui/UnifiedSearchResults?searchType=2&str=${encodeURIComponent(r.ot_numero)}`;
     return `<tr style="border-top:1px solid var(--border)">
       <td style="padding:9px 12px;font-family:'JetBrains Mono',monospace;font-weight:600">${recEsc(r.ot_numero)}</td>
       <td style="padding:9px 12px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-muted)">${recEsc(r.serial)}</td>
-      <td style="padding:9px 12px">${recEsc(r.responsable)}</td>
+      <td style="padding:9px 12px;font-family:'JetBrains Mono',monospace;font-weight:700;color:${slaColor}">${slaTxt}</td>
       <td style="padding:9px 12px">${recEsc(r.ubicacion)}</td>
       <td style="padding:9px 12px">${recEsc(r.estado)}</td>
       <td style="padding:9px 12px"><span style="color:${cat.color};font-weight:600;font-size:11px">${cat.label}</span></td>
-      <td style="padding:9px 12px;font-size:11px;color:var(--text-muted)">${fecha}</td>
+      <td style="padding:9px 12px;font-size:11px;color:var(--text-muted)">${fechaTrans}</td>
       <td style="padding:9px 12px"><a href="${sfUrl}" target="_blank" style="color:var(--blue);font-size:11px;text-decoration:none">Ver en SF ↗</a></td>
     </tr>`;
   }).join('');
