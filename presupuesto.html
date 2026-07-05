@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Alleata · Presupuesto Operaciones v1.8.0</title>
+<title>Alleata · Presupuesto Operaciones v1.8.1</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -191,7 +191,7 @@
   <div class="login-box">
     <h2>💰 Presupuesto</h2>
     <p class="login-sub">Alleata · Solo Admin</p>
-    <div style="position:absolute;bottom:12px;right:16px;font-size:10px;font-family:'JetBrains Mono',monospace;color:rgba(232,237,243,.2)">v1.8.0</div>
+    <div style="position:absolute;bottom:12px;right:16px;font-size:10px;font-family:'JetBrains Mono',monospace;color:rgba(232,237,243,.2)">v1.8.1</div>
     <div class="login-field">
       <label>Email</label>
       <input type="email" id="loginEmail" placeholder="tu@email.com" onkeydown="if(event.key==='Enter')doLogin()">
@@ -207,7 +207,7 @@
 
 <div id="appContent" style="display:none">
 <h1>💰 Presupuesto Operaciones</h1>
-<p class="sub">Alleata · 2026 · Solo Admin <span style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 8px;border-radius:4px;border:1px solid var(--border2);font-size:10px;margin-left:6px">v1.8.0</span></p>
+<p class="sub">Alleata · 2026 · Solo Admin <span style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 8px;border-radius:4px;border:1px solid var(--border2);font-size:10px;margin-left:6px">v1.8.1</span></p>
 
 <div class="toolbar">
   <div class="mes-bar" id="mesBar"></div>
@@ -2057,11 +2057,12 @@ async function amazonHandlePDF(input){
     const fac=amazonParsePDF(text);
     if(!fac){amazonShowMsg('No se pudo leer el PDF de AWS.','err');return;}
 
-    // Validar mes
-    const MES_MAP_A={'01':'ene','02':'feb','03':'mar','04':'abr','05':'may','06':'jun','07':'jul','08':'ago'};
-    const mesNombres={'ene':0,'feb':1,'mar':2,'abr':3,'may':4,'jun':5,'jul':6,'ago':7};
+    // Validar mes — se imputa por la fecha de FACTURA (Invoice Date), no por el
+    // período de uso (billing period), igual que Claro/Telecom se imputan por vencimiento.
     let mesFac=amazonMesActual;
-    if(fac.periodo){
+    if(fac.mesFactura){
+      mesFac=fac.mesFactura;
+    } else if(fac.periodo){
       const mMatch=fac.periodo.match(/(ene|feb|mar|abr|may|jun|jul|ago|sep|oct|nov|dic)/i);
       if(mMatch) mesFac=mMatch[1].toLowerCase();
     }
@@ -2073,8 +2074,9 @@ async function amazonHandlePDF(input){
 
     // Preview datos de la factura
     const rows=[
-      ['Período', fac.periodo],
-      ['ID de cuenta', fac.idCuenta],
+      ['N° Factura', fac.idCuenta!=='—'?('Cta. '+fac.idCuenta):'—'],
+      ['Fecha factura', fac.fechaFactura],
+      ['Período de uso', fac.periodo],
       ['Total USD', fmtUSD(fac.totalUSD)],
       ['IVA', 'USD 0,00 (AWS no aplica IVA en AR)'],
     ];
@@ -2115,30 +2117,49 @@ async function amazonHandlePDF(input){
 
 function amazonParsePDF(text){
   try{
-    // Total general
-    const totalM=text.match(/Total general estimado[:\s]*(\d[\d.,]+)\s*USD/i)
-      ||text.match(/Total\s+(?:general|antes de impuestos)[^\d]*(\d[\d.,]+)\s*USD/i)
-      ||text.match(/(\d{4,5},\d{2})\s*USD/);
+    // Total — nuevo formato AWS en inglés, con fallback a los patrones viejos (español)
+    const totalM = text.match(/TOTAL AMOUNT DUE[\s\S]{0,80}?USD\s*([\d,]+\.\d{2})/i)
+      || text.match(/Total for this invoice\s*USD\s*([\d,]+\.\d{2})/i)
+      || text.match(/Total general estimado[:\s]*(\d[\d.,]+)\s*USD/i)
+      || text.match(/Total\s+(?:general|antes de impuestos)[^\d]*(\d[\d.,]+)\s*USD/i);
     const totalUSD=totalM?logiParseNum(totalM[1]):0;
 
-    // Período
-    const periodoM=text.match(/(\d{1,2}\s+\w+\s*[-–]\s*\d{1,2}\s+\w+\s+\d{4})/i)
+    // Fecha de factura (Invoice Date) — el mes se imputa por ACÁ, no por el período de uso,
+    // igual que Claro/Telecom se imputan por vencimiento y no por período facturado.
+    const ENG_MESES={january:'ene',february:'feb',march:'mar',april:'abr',may:'may',june:'jun',july:'jul',august:'ago',september:'sep',october:'oct',november:'nov',december:'dic'};
+    const fechaFacM=text.match(/Invoice Date:?\s*([A-Za-z]+)\s+(\d{1,2})\s*,?\s*(\d{4})/i);
+    let mesFactura=null, fechaFactura='—';
+    if(fechaFacM){
+      mesFactura=ENG_MESES[fechaFacM[1].toLowerCase()]||null;
+      fechaFactura=fechaFacM[2]+'/'+fechaFacM[1]+'/'+fechaFacM[3];
+    }
+
+    // Período de uso (billing period) — informativo, no define el mes de imputación
+    const periodoM=text.match(/billing period\s+([A-Za-z]+\s+\d{1,2}\s*-\s*[A-Za-z]+\s+\d{1,2}\s*,?\s*\d{4})/i)
+      ||text.match(/(\d{1,2}\s+\w+\s*[-–]\s*\d{1,2}\s+\w+\s+\d{4})/i)
       ||text.match(/Per[ií]odo de facturaci[oó]n[\s\S]{0,60}(\d{1,2}\s\w+\s[-–]\s\d{1,2}\s\w+\s\d{4})/i);
     const periodo=periodoM?periodoM[1].trim():'—';
 
     // ID de cuenta
-    const idM=text.match(/ID de cuenta[:\s]*(\d{12})/i);
+    const idM=text.match(/Account number:?\s*(\d{9,15})/i)||text.match(/ID de cuenta[:\s]*(\d{9,15})/i);
     const idCuenta=idM?idM[1]:'—';
 
-    // Desglose por cuenta (tabla al final)
+    // Desglose por cuenta — SÓLO dentro del bloque "Activity By Account" (página del resumen).
+    // El mismo detalle se repite página por página para cada cuenta más abajo en el PDF;
+    // si se buscara en todo el texto, cada cuenta quedaría duplicada.
     const cuentas=[];
-    const cuentaPattern=/([A-Za-z][A-Za-z\s]+?)\s+(\d{12})\s+[A-Za-z][A-Za-z\s]*?\s+(\d[\d.,]+)\s+USD/g;
-    let m;
-    while((m=cuentaPattern.exec(text))!==null){
-      const monto=logiParseNum(m[3]);
-      if(monto>0) cuentas.push({nombre:m[1].trim(),id:m[2],monto});
+    const startIdx=text.indexOf('Activity By Account');
+    const endIdx=text.indexOf('Total allocated for this invoice');
+    if(startIdx>=0){
+      const block=(endIdx>startIdx?text.slice(startIdx,endIdx):text.slice(startIdx)).replace(/^Activity By Account\s*/,'');
+      const cuentaRe=/([A-Za-z][A-Za-z\s]+?)\s*\((\d{9,15})\)\s*USD\s*([\d,]+\.\d{2})/g;
+      let mc;
+      while((mc=cuentaRe.exec(block))){
+        const monto=logiParseNum(mc[3]);
+        if(monto>=0) cuentas.push({nombre:mc[1].trim(),id:mc[2],monto});
+      }
     }
-    // Fallback: buscar filas "Nombre de cuenta Importe"
+    // Fallback: formato viejo en español con nombres fijos sin ID entre paréntesis
     if(!cuentas.length){
       const rows=text.matchAll(/(Produccion|Quality|Desarrollo|Shared Services|Alleata Master)[\s\S]{0,30}?(\d+[.,]\d+)\s*USD/gi);
       for(const r of rows){
@@ -2147,7 +2168,7 @@ function amazonParsePDF(text){
       }
     }
 
-    return{totalUSD, periodo, idCuenta, cuentas};
+    return{totalUSD, periodo, idCuenta, mesFactura, fechaFactura, cuentas};
   }catch(e){return null;}
 }
 
@@ -2169,7 +2190,7 @@ async function amazonGuardar(){
   const m=amazonMesActual;
   const real=fac.totalUSD*amazonCurrentTC;
   amazonData[m]={totalUSD:fac.totalUSD, tc:amazonCurrentTC, realPesos:real,
-    periodo:fac.periodo, idCuenta:fac.idCuenta, cuentas:fac.cuentas};
+    periodo:fac.periodo, idCuenta:fac.idCuenta, fechaFactura:fac.fechaFactura, cuentas:fac.cuentas};
   reales['amazon_'+m]=real;
   if(!currentUser){
     amazonShowMsg('⚠️ No hay sesión activa: se guardó solo en este navegador, NO en la base. Volvé a iniciar sesión.','err');
@@ -2188,7 +2209,7 @@ async function amazonSaveDB(m){
   const d=amazonData[m];
   const row={user_id:currentUser.id, item_id:'amazon', proveedor:'amazon', mes:m,
     real_pesos:d.realPesos, total_factura:d.totalUSD,
-    nro_factura:d.idCuenta, fecha:'—', periodo:d.periodo,
+    nro_factura:d.idCuenta, fecha:d.fechaFactura||'—', periodo:d.periodo,
     detalle:{tc:d.tc, cuentas:d.cuentas}};
   const {error}=await sb.from('presupuesto_reales').upsert(row,{onConflict:'proveedor,mes'});
   if(error){ console.error('Amazon DB error:',error); return false; }
@@ -2303,7 +2324,7 @@ async function loadFacturasFromDB() {
     amazonDbData.forEach(row=>{
       amazonData[row.mes]={totalUSD:row.total_factura, tc:row.detalle?.tc||1470,
         realPesos:row.real_pesos, periodo:row.periodo||'—',
-        idCuenta:row.nro_factura||'—', cuentas:row.detalle?.cuentas||[]};
+        idCuenta:row.nro_factura||'—', fechaFactura:row.fecha||'—', cuentas:row.detalle?.cuentas||[]};
       reales['amazon_'+row.mes]=row.real_pesos;
     });
   }
