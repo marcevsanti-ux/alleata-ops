@@ -483,9 +483,11 @@ function renderTabla(items) {
       const isNapse=it.id==='napse';
       const isTelecom=it.id==='telecom';
       const isAmazon=it.id==='amazon';
+      const isCA=it.id==='ca';
       // Nro facturas para columna
       const logiFacs = isLogi ? logiGetFacturas(mes) : [];
       const napseFacsRow = isNapse ? (napseFacturas[mes]||[]) : [];
+      const caFacsRow = isCA ? (caFacturas[mes]||[]) : [];
       // Nro factura para cada proveedor con modal
       const getChip = (num, sub) => `
         <div style="display:inline-block;margin:2px;vertical-align:top;text-align:center">
@@ -498,6 +500,8 @@ function renderTabla(items) {
         nroFacCell = logiFacs.map(f=>getChip(f.numero, f.terminales?f.terminales+' term.':'')).join('');
       else if(isNapse && napseFacsRow.length)
         nroFacCell = napseFacsRow.map(f=>getChip(f.numero,'')).join('');
+      else if(isCA && caFacsRow.length)
+        nroFacCell = caFacsRow.map(f=>getChip(f.numero, f.cantidadAlleata?f.cantidadAlleata+' env. Alleata':'')).join('');
       else if(isClaro && claroData[mes])
         nroFacCell = getChip(claroData[mes].nroFac||'—', claroData[mes].nroFac&&claroData[mes].nroFac!=='—'?'Claro':'');
       else if(isTelecom && telecomData[mes])
@@ -522,7 +526,7 @@ function renderTabla(items) {
           <td class="mono" style="color:${dc}">${(prev||real)?fmtDesv(desv,prev):'—'}</td>
           <td style="text-align:center">${pctBadge}</td>
           <td style="text-align:center">
-            <button class="btn-edit${(isLogi||isClaro)?' logi':''}" onclick="${isLogi?`openLogiModal('${mes}')`:isClaro?`openClaroModal('${mes}')`:isNapse?`openNapseModal('${mes}')`:isTelecom?`openTelecomModal('${mes}')`:isAmazon?`openAmazonModal('${mes}')`:`openModal('${it.id}','${it.p}','${it.d}')`}">${(isLogi||isClaro||isNapse||isTelecom||isAmazon)?'📎':'✏️'}</button>
+            <button class="btn-edit${(isLogi||isClaro)?' logi':''}" onclick="${isLogi?`openLogiModal('${mes}')`:isClaro?`openClaroModal('${mes}')`:isNapse?`openNapseModal('${mes}')`:isTelecom?`openTelecomModal('${mes}')`:isAmazon?`openAmazonModal('${mes}')`:isCA?`openCaModal('${mes}')`:`openModal('${it.id}','${it.p}','${it.d}')`}">${(isLogi||isClaro||isNapse||isTelecom||isAmazon||isCA)?'📎':'✏️'}</button>
           </td>
         </tr>`;
     });
@@ -1090,6 +1094,16 @@ let napseMesActual    = 'jun';
 let telecomMesActual  = 'jun';
 let telecomPendingXLS = null;
 let telecomPendingPDF = null;
+
+// ── Correo Argentino state ──────────────────────────────────────────────────
+// caFacturas[mes] = array de facturas CA cargadas ese mes (una factura puede
+// mezclar envíos Alleata + otros envíos de Moretti — por eso se separan por línea)
+const caFacturas = {};
+let caMesActual = 'jun';
+let caPendingFac = null;
+// Pesos (kg) de las terminales Alleata: 2kg / 4kg / 6kg según lo acordado
+const CA_PESOS_ALLEATA = ['2','4','6'];
+const CA_MES_MAP = {'01':'ene','02':'feb','03':'mar','04':'abr','05':'may','06':'jun','07':'jul','08':'ago','09':'sep','10':'oct','11':'nov','12':'dic'};
 let logiCurrentTC     = 1428;
 // (logiPendingFac declarado arriba)
 // (logiPendingRTO declarado arriba)
@@ -1548,6 +1562,228 @@ async function napseSaveDB(fac){
 
 function napseShowMsg(txt,type){ const e=document.getElementById('napseMsgPdf');if(e){e.className='up-msg '+type;e.textContent=txt;} }
 function napseShowPreview(rows){ const e=document.getElementById('napsePrevPdf');if(e){e.style.display='block';e.innerHTML=rows.map(r=>`<div class="up-prow"><span class="pk">${r[0]}</span><span class="pv">${r[1]}</span></div>`).join('');} }
+
+// ── Correo Argentino (CA) ────────────────────────────────────────────────────
+// Criterio acordado: las terminales Alleata pesan 2kg (a futuro también 4kg/6kg
+// si se despachan varias juntas). Cualquier línea "Paq.ar ... Nkg" con N en
+// CA_PESOS_ALLEATA se cuenta como envío Alleata. El resto de la factura (otros
+// pesos) corresponde a otros envíos de Moretti e Hijos, no a Alleata.
+// El "monto real" que se carga en presupuesto es SIEMPRE el total de la
+// factura tal cual sale de Correo Argentino (sin prorratear). El monto y la
+// cantidad de envíos Alleata quedan como aclaración/nota debajo, a modo de
+// control interno — no se resta ni se recalcula el total de la factura.
+
+function openCaModal(m){
+  caMesActual=m;
+  document.getElementById('caBg').classList.add('open');
+  document.getElementById('caSub').textContent=MESES_LABEL[m]+' 2026 · Servicios de mensajería';
+  caResetForm();
+  caRenderKPIs();
+  caRenderFacturas();
+}
+function closeCaModal(){
+  document.getElementById('caBg').classList.remove('open');
+  caSyncReal(); render();
+}
+function caResetForm(){
+  const el=document.getElementById('caPrevPdf'); if(el){el.style.display='none';el.innerHTML='';}
+  const msg=document.getElementById('caMsgPdf'); if(msg){msg.className='up-msg';msg.textContent='';}
+  const inp=document.getElementById('caPdfInp'); if(inp) inp.value='';
+  document.getElementById('caZonePdf')?.classList.remove('loaded');
+  const fn=document.getElementById('caPdfName'); if(fn){fn.style.display='none';fn.textContent='';}
+  const btn=document.getElementById('caBtnConfirm'); if(btn) btn.style.display='none';
+  caPendingFac=null;
+}
+
+function caSyncReal(){
+  MESES.forEach(m=>{
+    const facs=caFacturas[m]||[];
+    const real=facs.reduce((s,f)=>s+f.totalFactura,0);
+    if(real>0) reales['ca_'+m]=real;
+  });
+}
+
+function caRenderKPIs(){
+  const m=caMesActual;
+  const prev=DATA.find(i=>i.id==='ca').prev[m]||0;
+  const facs=caFacturas[m]||[];
+  const real=facs.reduce((s,f)=>s+f.totalFactura,0);
+  const montoAlleata=facs.reduce((s,f)=>s+f.totalAlleata,0);
+  const cantAlleata=facs.reduce((s,f)=>s+f.cantidadAlleata,0);
+  const desvPct=prev>0?((real-prev)/prev)*100:0;
+  const el=document.getElementById('caKpis'); if(!el) return;
+  el.innerHTML=[
+    {label:'PREV '+MESES_LABEL[m].substring(0,3).toUpperCase()+' 26', val:fmt(prev)||'—', sub:'presupuestado', cls:''},
+    {label:'REAL (Total factura)', val:real>0?fmt(real):'—', sub:facs.length+' factura(s)', cls:real>0?'green':''},
+    {label:'DESVÍO', val:real>0?fmtPct(desvPct):'—', sub:desvPct<=0?'por debajo':'por encima', cls:real>0?(Math.abs(desvPct)>20?'warn':'ok'):''},
+    {label:'Monto Alleata (nota)', val:montoAlleata>0?fmt(montoAlleata):'—', sub:cantAlleata+' envíos (2/4/6kg)', cls:''},
+  ].map(k=>`<div class="lk"><div class="lk-label">${k.label}</div><div class="lk-val ${k.cls}">${k.val}</div><div class="lk-sub">${k.sub}</div></div>`).join('');
+}
+
+function caRenderFacturas(){
+  const m=caMesActual;
+  const facs=caFacturas[m]||[];
+  const wrap=document.getElementById('caFacWrap');
+  const sec=document.getElementById('caFacSecLbl');
+  const badge=document.getElementById('caFacBadge');
+  if(!wrap) return;
+  if(!facs.length){ wrap.innerHTML=''; if(sec) sec.style.display='none'; return; }
+  if(sec) sec.style.display='flex';
+  if(badge) badge.textContent=facs.length+' factura'+(facs.length!==1?'s':'');
+  wrap.innerHTML=`<div style="overflow-x:auto"><table class="fac-tbl">
+    <thead><tr>
+      <th>N° factura</th><th>Fecha</th>
+      <th style="text-align:right">Total factura (REAL)</th>
+      <th style="text-align:right">Envíos Alleata</th>
+      <th style="text-align:right;color:var(--teal)">Monto Alleata (nota)</th>
+    </tr></thead>
+    <tbody>${facs.map(f=>`<tr>
+      <td style="font-family:'JetBrains Mono',monospace;font-size:11px">${f.numero}</td>
+      <td>${f.fecha}</td>
+      <td class="nr hi">${fmt(f.totalFactura)}</td>
+      <td class="nr" style="color:var(--text-muted)">${f.cantidadAlleata}</td>
+      <td class="nr" style="color:var(--teal);font-weight:800">${fmt(f.totalAlleata)}</td>
+    </tr>`).join('')}</tbody>
+  </table></div>
+  <div style="font-size:10px;color:var(--text-muted);margin-top:8px">
+    El "Total factura" es el REAL que se computa para el presupuesto. "Envíos Alleata" y "Monto Alleata" son una nota informativa (líneas de 2/4/6kg), no se restan del total.
+  </div>`;
+}
+
+async function caHandlePDF(input){
+  const file=input.files[0]; if(!file) return;
+  document.getElementById('caPdfName').textContent=file.name;
+  document.getElementById('caPdfName').style.display='block';
+  caShowMsg('Leyendo PDF...','ok');
+  try{
+    const buf=await file.arrayBuffer();
+    const pdf=await pdfjsLib.getDocument({data:buf}).promise;
+    // OJO: la factura CA viene repetida (varias copias idénticas del mismo
+    // comprobante en el PDF) — leer sólo la página 1 para no duplicar/triplicar
+    // cantidades e importes.
+    const pg=await pdf.getPage(1);
+    const ct=await pg.getTextContent();
+    const text=ct.items.map(it=>it.str).join(' ');
+
+    const fac=caParsePDF(text);
+    if(!fac){ caShowMsg('No se pudo leer el PDF de Correo Argentino.','err'); return; }
+
+    // Detectar mes de la factura y cambiar si difiere del seleccionado
+    if(fac.mesFac && fac.mesFac!==caMesActual){
+      caMesActual=fac.mesFac;
+      document.getElementById('caSub').textContent=MESES_LABEL[fac.mesFac]+' 2026 · Servicios de mensajería · (mes detectado del PDF)';
+    }
+
+    // Duplicado
+    const facs=caFacturas[caMesActual]||[];
+    if(facs.find(f=>f.numero===fac.numero)){
+      caShowMsg('⚠️ Ya cargaste la factura '+fac.numero+' este mes.','err');
+      return;
+    }
+
+    document.getElementById('caZonePdf').classList.add('loaded');
+    caShowPreview([
+      ['N° Factura', fac.numero],
+      ['Fecha', fac.fecha],
+      ['Mes imputado', MESES_LABEL[caMesActual]+' 2026'],
+      ['IVA', fac.ivaPct+'%'],
+      ['▶ Total factura (REAL)', fmt(fac.totalFactura)],
+      ['— Envíos Alleata (2/4/6kg)', fac.cantidadAlleata+' paquetes'],
+      ['— Monto Alleata (nota, con IVA)', fmt(fac.totalAlleata)],
+    ]);
+
+    if(!fac.cantidadAlleata){
+      caShowMsg('⚠️ No se encontraron líneas de 2/4/6kg en esta factura — revisá si corresponde a Alleata.','err');
+    } else {
+      caShowMsg('✓ Factura leída · Total REAL: '+fmt(fac.totalFactura)+' · Alleata: '+fac.cantidadAlleata+' envíos ('+fmt(fac.totalAlleata)+')','ok');
+    }
+
+    caRenderKPIs();
+    document.getElementById('caBtnConfirm').style.display='block';
+    caPendingFac=fac;
+  }catch(e){ caShowMsg('Error: '+e.message,'err'); }
+}
+
+function caParsePDF(text){
+  try{
+    const numM=text.match(/N[°º]\s*(\d{4}-\d{8})/);
+    const numero=numM?numM[1]:'—';
+
+    const fechaM=text.match(/Fecha:\s*(\d{2})\.(\d{2})\.(\d{4})/);
+    const fecha=fechaM?fechaM[1]+'/'+fechaM[2]+'/'+fechaM[3]:'—';
+    const mesFac=fechaM?CA_MES_MAP[fechaM[2]]:null;
+
+    const totalM=text.match(/Total\s+General\s*([\d.,]+)/i);
+    const totalFactura=totalM?logiParseNum(totalM[1]):0;
+
+    const ivaM=text.match(/IVA\s*(\d+)\s*%/);
+    const ivaPct=ivaM?parseFloat(ivaM[1]):21;
+
+    // Líneas de detalle: "<cant> Paq.ar <descripcion> <peso>kg <precio> <descuento> <importe> IVA<n>"
+    const lineRe=/(\d+)\s+Paq\.ar\s+(.+?)\s+(\d+(?:,\d+)?)kg\s+([\d.,]+)\s+([\d.,]+)\s+([\d.,]+)\s+IVA\d+/g;
+    let m, lineas=[];
+    while((m=lineRe.exec(text))){
+      lineas.push({
+        cant: parseInt(m[1]),
+        desc: m[2].trim(),
+        peso: m[3].replace(',','.'),
+        importe: logiParseNum(m[6])
+      });
+    }
+
+    const lineasAlleata=lineas.filter(l=>CA_PESOS_ALLEATA.includes(l.peso));
+    const cantidadAlleata=lineasAlleata.reduce((s,l)=>s+l.cant,0);
+    const subtotalAlleata=lineasAlleata.reduce((s,l)=>s+l.importe,0);
+    const ivaAlleata=subtotalAlleata*(ivaPct/100);
+    const totalAlleata=subtotalAlleata+ivaAlleata;
+
+    if(!totalFactura) return null;
+
+    return {numero, fecha, mesFac, totalFactura, ivaPct, cantidadAlleata, subtotalAlleata, ivaAlleata, totalAlleata};
+  }catch(e){ return null; }
+}
+
+function caCheckBtn(){
+  const btn=document.getElementById('caBtnConfirm');
+  if(!btn) return;
+  btn.style.display=caPendingFac?'block':'none';
+}
+
+async function caGuardar(){
+  const fac=caPendingFac; if(!fac) return;
+  if(!caFacturas[caMesActual]) caFacturas[caMesActual]=[];
+  caFacturas[caMesActual].push(fac);
+  reales['ca_'+caMesActual]=(caFacturas[caMesActual]||[]).reduce((s,f)=>s+f.totalFactura,0);
+  if(!currentUser){
+    caShowMsg('⚠️ No hay sesión activa: se guardó solo en este navegador, NO en la base.','err');
+  } else {
+    const ok=await caSaveDB(fac);
+    if(!ok){
+      caShowMsg('⛔ Error al guardar en la base de datos. Revisá la consola (F12).','err');
+      return;
+    }
+  }
+  showToast('✅ CA '+fac.numero+' guardada · REAL: '+fmt(fac.totalFactura)+' · Alleata: '+fac.cantidadAlleata+' envíos');
+  caResetForm();
+  caRenderKPIs();
+  caRenderFacturas();
+  render();
+}
+
+async function caSaveDB(fac){
+  const row={
+    user_id:currentUser.id, mes:caMesActual, proveedor:'ca',
+    numero:fac.numero, fecha:fac.fecha, descripcion:'Envíos Alleata (2/4/6kg) — nota informativa',
+    tc:fac.ivaPct, subtotal_usd:fac.subtotalAlleata, iva_usd:fac.ivaAlleata,
+    otros_imp:0, total_usd:fac.totalFactura, terminales:fac.cantidadAlleata, series:[]
+  };
+  const {error}=await sb.from('presupuesto_facturas').upsert(row,{onConflict:'numero,mes'});
+  if(error){ console.error('CA DB error:',error); return false; }
+  return true;
+}
+
+function caShowMsg(txt,type){ const e=document.getElementById('caMsgPdf');if(e){e.className='up-msg '+type;e.textContent=txt;} }
+function caShowPreview(rows){ const e=document.getElementById('caPrevPdf');if(e){e.style.display='block';e.innerHTML=rows.map(r=>`<div class="up-prow"><span class="pk">${r[0]}</span><span class="pv">${r[1]}</span></div>`).join('');} }
 
 // ── Telecom Personal state ───────────────────────────────────────────────────
 // (telecomData, telecomMesActual, telecomPendingXLS/PDF declarados arriba)
@@ -2097,6 +2333,24 @@ async function loadFacturasFromDB() {
     });
     napseSyncReal();
   }
+  // Cargar facturas Correo Argentino (guardadas en presupuesto_facturas con proveedor='ca')
+  const { data: caData, error: caErr } = await sb.from('presupuesto_facturas')
+    .select('*').eq('proveedor','ca');
+  if(!caErr && caData && caData.length){
+    caData.forEach(row=>{
+      const m=row.mes;
+      if(!caFacturas[m]) caFacturas[m]=[];
+      if(!caFacturas[m].find(f=>f.numero===row.numero)){
+        caFacturas[m].push({
+          numero:row.numero, fecha:row.fecha, mesFac:m,
+          totalFactura:row.total_usd, ivaPct:row.tc,
+          subtotalAlleata:row.subtotal_usd, ivaAlleata:row.iva_usd,
+          totalAlleata:row.subtotal_usd+row.iva_usd, cantidadAlleata:row.terminales
+        });
+      }
+    });
+    caSyncReal();
+  }
   render();
 }
 
@@ -2224,6 +2478,47 @@ logiAgregar = async function() {
 
     <div class="logi-footer">
       <button class="btn-cancel" onclick="closeNapseModal()">Cerrar</button>
+    </div>
+  </div>
+</div>
+<!-- Modal Correo Argentino -->
+<div class="claro-bg" id="caBg">
+  <div class="claro-modal">
+    <h3>Correo Argentino</h3>
+    <p class="msub" id="caSub" style="font-size:12px;color:var(--text-muted);margin-bottom:22px"></p>
+
+    <div class="claro-kpis" id="caKpis" style="grid-template-columns:repeat(4,1fr)"></div>
+
+    <div style="font-size:11px;color:var(--text-muted);background:var(--navy-900);border:1px solid var(--border2);border-radius:9px;padding:10px 14px;margin-bottom:16px">
+      💡 CA también hace envíos para Moretti (no sólo Alleata). El <b>total de la factura</b> se carga tal cual como REAL. Las líneas de <b>2kg / 4kg / 6kg</b> (peso de las terminales) se identifican aparte como envíos Alleata — es sólo una nota de control, no se resta del total.
+    </div>
+
+    <div class="sec-lbl">Cargar factura <span></span></div>
+    <div style="max-width:420px">
+      <div class="up-title">📄 Factura Correo Argentino (PDF)</div>
+      <div class="up-zone" id="caZonePdf"
+        ondragover="event.preventDefault();this.classList.add('drag')"
+        ondragleave="this.classList.remove('drag')"
+        ondrop="this.classList.remove('drag');caHandlePDF({files:event.dataTransfer.files});event.preventDefault()">
+        <input type="file" id="caPdfInp" accept=".pdf" onchange="caHandlePDF(this)">
+        <div class="uz-icon">📑</div>
+        <div class="uz-lbl">Soltá o seleccioná el PDF</div>
+        <div class="uz-sub">FACT-XXXX-JULIO_.pdf</div>
+        <div class="uz-fn" id="caPdfName"></div>
+      </div>
+      <div class="up-preview" id="caPrevPdf"></div>
+      <div class="up-msg" id="caMsgPdf"></div>
+    </div>
+
+    <button class="btn-confirm" id="caBtnConfirm" onclick="caGuardar()" style="display:none;margin-top:14px">
+      ✓ Confirmar y guardar REAL
+    </button>
+
+    <div class="sec-lbl" id="caFacSecLbl" style="display:none">Facturas cargadas este mes <span></span> <span id="caFacBadge" style="background:rgba(29,191,142,.15);color:var(--teal);padding:1px 10px;border-radius:20px;font-size:10px;font-weight:700"></span></div>
+    <div id="caFacWrap"></div>
+
+    <div class="logi-footer">
+      <button class="btn-cancel" onclick="closeCaModal()">Cerrar</button>
     </div>
   </div>
 </div>
