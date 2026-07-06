@@ -165,7 +165,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
       <div class="login-logo">
         <img id="loginLogo" src="" alt="Alleata">
         <div class="login-sub">Portal de Operaciones</div>
-        <div class="login-version">v2.12.0 · mobile</div>
+        <div class="login-version">v2.12.1 · mobile</div>
       </div>
       <div class="field"><label class="label">Email</label><input class="input" id="lEmail" type="email" placeholder="usuario@alleata.com" autocomplete="email"></div>
       <div class="field"><label class="label">Contraseña</label><input class="input" id="lPass" type="password" placeholder="••••••••" autocomplete="current-password"></div>
@@ -181,7 +181,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
   <div class="topbar">
     <img id="appLogo" src="" alt="Alleata">
     <div class="topbar-title" id="topbarTitle">Operaciones</div>
-    <div class="topbar-version">v2.12.0</div>
+    <div class="topbar-version">v2.12.1</div>
     <div class="topbar-avatar" id="topbarAvatar" onclick="openDrawer()">?</div>
   </div>
 
@@ -277,6 +277,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
       <div style="font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--text-muted);margin-bottom:10px;display:flex;align-items:center;gap:8px">
         <span>🚚 EN RUTA HOY</span>
         <span id="transitoCount" style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 7px;border-radius:8px;font-size:10px">0</span>
+        <span onclick="loadEnTransito()" style="margin-left:auto;cursor:pointer;color:var(--teal);font-size:11px;text-transform:none;letter-spacing:0;font-weight:600">🔄 Actualizar</span>
       </div>
       <div id="kmIndicador" style="display:none;background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--teal);border-radius:12px;padding:12px 14px;margin-bottom:12px"></div>
       <div id="rutaActivaList">
@@ -843,6 +844,8 @@ function registrarCierreResumen(item){
   guardarCierresLocal();
 }
 
+let _otsEnTransitoMap={}; // id → OT completa (última carga de loadEnTransito) — evita re-consultar SF al cerrar
+
 async function loadEnTransito(){
   const el=document.getElementById('rutaActivaList');
   const count=document.getElementById('transitoCount');
@@ -869,6 +872,10 @@ async function loadEnTransito(){
     contacto:           r.contacto_celular,
     responsable:        r.responsable,
   }));
+  // Guardar por id para poder resolver sf_id al cerrar la OT (Entregado/Fallido)
+  // sin depender de rutaDelDia, que solo tiene lo aceptado en la sesión actual.
+  _otsEnTransitoMap={};
+  list.forEach(e=>{ _otsEnTransitoMap[e.id]=e; });
   count.textContent=list.length;
   if(!list.length){
     el.innerHTML='<div class="empty"><div class="empty-icon">🚚</div><p>Sin OTs en tránsito hoy</p></div>';
@@ -1260,7 +1267,7 @@ function openCierreModal(id,resultado){
   document.getElementById('fotoImg').src='';
   document.getElementById('modalFotoInput').value='';
   _fotoBlob=null;_fotoBase64=null;
-  _otCierreActual=rutaDelDia.find(o=>o.id===id)||null;
+  _otCierreActual=rutaDelDia.find(o=>o.id===id)||_otsEnTransitoMap[id]||null;
   document.getElementById('modalCierre').classList.add('show');
 }
 
@@ -1377,11 +1384,24 @@ async function confirmarCierreOT(){
     }catch(e){console.warn('Error subiendo foto:',e);}
   }
 
-  // Resolver sf_id: si lo tenemos en memoria (viene de mostrarOTScaneada/rutaDelDia) lo usamos,
+  // Resolver sf_id: si lo tenemos en memoria (viene de mostrarOTScaneada/rutaDelDia/_otsEnTransitoMap) lo usamos,
   // sino lo buscamos en sf_workorders (ya no en 'envios' — tabla legacy desconectada del sync).
   if(!_otCierreActual||!_otCierreActual.sf_id){
-    const{data:otData}=await sb.from('sf_workorders').select('sf_id,workorder_number,tipo,cuenta').eq('id',id).single();
-    _otCierreActual={..._otCierreActual, sf_id:otData?.sf_id, ot_numero:otData?.workorder_number||_otCierreActual?.ot_numero, cuenta:otData?.cuenta};
+    const{data:otData,error:otErr}=await sb.from('sf_workorders')
+      .select('sf_id,workorder_number,tipo,cuenta').eq('id',id).maybeSingle();
+    if(otErr) console.warn('[confirmarCierreOT] fallback sf_id lookup error:',otErr.message);
+    _otCierreActual={
+      ..._otCierreActual,
+      sf_id:      otData?.sf_id||_otCierreActual?.sf_id,
+      ot_numero:  otData?.workorder_number||_otCierreActual?.ot_numero,
+      cuenta:     otData?.cuenta||_otCierreActual?.cuenta,
+    };
+  }
+  if(!_otCierreActual?.sf_id){
+    btn.disabled=false;btn.textContent='Confirmar';
+    alert('No pude identificar la OT en Salesforce (sf_id). Cerrá este cuadro, tocá "Actualizar" en la lista de En Ruta Hoy y volvé a intentar.');
+    console.error('[confirmarCierreOT] sf_id no resuelto para id=',id,_otCierreActual);
+    return;
   }
 
   const tecnico=(currentProfile?.nombre||currentUser?.email||'Operador').trim();
