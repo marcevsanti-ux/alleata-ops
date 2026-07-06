@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.4.24</title>
+<title>Alleata · Operaciones v4.4.25</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -407,7 +407,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.4.24 · 03 jul 2026
+      v4.4.25 · 03 jul 2026
     </div>
   </div>
 </div>
@@ -485,7 +485,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.4.24 · 03 jul 2026
+      v4.4.25 · 03 jul 2026
     </div>
   </div>
 </nav>
@@ -525,7 +525,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.4.24</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.4.25</div>
   </div>
   <div class="content">
 
@@ -2579,7 +2579,8 @@ function instBodyModal(r) {
   );
 
   // Destino
-  const dir = r.direccion_formula || r.direccion || '';
+  // FIX: priorizar Direccion_de_envio__c ('direccion' en Supabase) sobre direccion_formula
+  const dir = r.direccion || r.direccion_formula || '';
   html += sec('Destino',
     grid(
       f('Dirección', dir + (r.entre_calles ? ' / ' + r.entre_calles : '')),
@@ -2719,7 +2720,10 @@ async function printRotuloInstalacion(id) {
   else if (['lomas de zamora','lanús','lanus','avellaneda','quilmes','berazategui','florencio varela','almirante brown','ezeiza','esteban echeverría','esteban echeverria','la plata','guernica','monte grande','temperley','banfield'].some(n => ciudadZ.includes(n))) { zonaCode = 'ZS'; zonaColor = '#f59e0b'; }
   else if (['la matanza','morón','moron','hurlingham','ituzaingó','ituzaingo','merlo','moreno','tres de febrero','luján','lujan','ramos mejía','ramos mejia','san justo','haedo','castelar','palomar','ciudadela','tapiales','villa luzuriaga','aldo bonzi','gregorio laferrere'].some(n => ciudadZ.includes(n))) { zonaCode = 'ZO'; zonaColor = '#8b5cf6'; }
 
-  const dir = r.direccion_formula || r.direccion || '';
+  // FIX: el rótulo tiene que usar Direccion_de_envio__c (campo 'direccion' en Supabase,
+  // viene de Direcci_n_de_env_o__Street__s) — antes priorizaba direccion_formula,
+  // que es OTRO campo de SF (Direccion_formula__c) y mostraba una dirección distinta/duplicada.
+  const dir = r.direccion || r.direccion_formula || '';
   const direccionQR = encodeURIComponent(`${dir} ${r.ciudad || ''} ${r.provincia || ''} Argentina`);
   const mapsUrl  = `https://www.google.com/maps/search/?api=1&query=${direccionQR}`;
   const rutaUrl  = `https://marcevsanti-ux.github.io/alleata-ops/mobile.html?ot=${r.sf_id || r.id}`;
@@ -4267,7 +4271,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.4.24] OK');
+console.log('[Alleata v4.4.25] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -6238,7 +6242,10 @@ function normalizarSFWorkorder(r){
     estado_ca:          r.estado_ca_envio,
     eventos_ca:         r.eventos_ca_envio,
     notas:              r.observacion_corta || r.observacion_resumen,
-    direccion_completa: r.direccion_formula || r.direccion,
+    // FIX: priorizar Direccion_de_envio__c ('direccion' en Supabase) sobre direccion_formula
+    // (Direccion_formula__c es otro campo de SF y mostraba una dirección distinta/duplicada
+    // en el rótulo y en las vistas de detalle).
+    direccion_completa: r.direccion || r.direccion_formula,
   };
 }
 
