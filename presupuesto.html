@@ -3,7 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<<<<<<< HEAD
 <title>Alleata · Presupuesto Operaciones v1.8.1</title>
+=======
+<title>Alleata · Presupuesto Operaciones v1.8.3</title>
+>>>>>>> 2e851c95a155f7d9f35ff344fce4b2641b0b7d9f
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -191,7 +195,11 @@
   <div class="login-box">
     <h2>💰 Presupuesto</h2>
     <p class="login-sub">Alleata · Solo Admin</p>
+<<<<<<< HEAD
     <div style="position:absolute;bottom:12px;right:16px;font-size:10px;font-family:'JetBrains Mono',monospace;color:rgba(232,237,243,.2)">v1.8.1</div>
+=======
+    <div style="position:absolute;bottom:12px;right:16px;font-size:10px;font-family:'JetBrains Mono',monospace;color:rgba(232,237,243,.2)">v1.8.3</div>
+>>>>>>> 2e851c95a155f7d9f35ff344fce4b2641b0b7d9f
     <div class="login-field">
       <label>Email</label>
       <input type="email" id="loginEmail" placeholder="tu@email.com" onkeydown="if(event.key==='Enter')doLogin()">
@@ -207,7 +215,11 @@
 
 <div id="appContent" style="display:none">
 <h1>💰 Presupuesto Operaciones</h1>
+<<<<<<< HEAD
 <p class="sub">Alleata · 2026 · Solo Admin <span style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 8px;border-radius:4px;border:1px solid var(--border2);font-size:10px;margin-left:6px">v1.8.1</span></p>
+=======
+<p class="sub">Alleata · 2026 · Solo Admin <span style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 8px;border-radius:4px;border:1px solid var(--border2);font-size:10px;margin-left:6px">v1.8.3</span></p>
+>>>>>>> 2e851c95a155f7d9f35ff344fce4b2641b0b7d9f
 
 <div class="toolbar">
   <div class="mes-bar" id="mesBar"></div>
@@ -501,7 +513,11 @@ function renderTabla(items) {
       else if(isNapse && napseFacsRow.length)
         nroFacCell = napseFacsRow.map(f=>getChip(f.numero,'')).join('');
       else if(isCA && caFacsRow.length)
-        nroFacCell = caFacsRow.map(f=>getChip(f.numero, f.cantidadAlleata?f.cantidadAlleata+' env. Alleata':'')).join('');
+        nroFacCell = caFacsRow.map(f=>`
+          <div style="display:inline-block;margin:2px;vertical-align:top;text-align:center">
+            <span style="font-family:'JetBrains Mono',monospace;font-size:10px;background:rgba(29,191,142,.08);color:var(--teal);padding:1px 6px;border-radius:4px;border:1px solid rgba(29,191,142,.2);display:block">${f.numero}</span>
+            ${f.cantidadAlleata?`<span style="font-size:9px;color:var(--text-muted);margin-top:2px;display:block">${f.cantidadAlleata} env. Alleata</span><span style="font-size:9px;color:var(--teal);font-weight:700;display:block">${fmt(f.totalAlleata)}</span>`:''}
+          </div>`).join('');
       else if(isClaro && claroData[mes])
         nroFacCell = getChip(claroData[mes].nroFac||'—', claroData[mes].nroFac&&claroData[mes].nroFac!=='—'?'Claro':'');
       else if(isTelecom && telecomData[mes])
@@ -2266,6 +2282,7 @@ async function saveFacturaDB(fac, mesKey) {
   const row = {
     user_id:      currentUser.id,
     mes:          mesKey,
+    proveedor:    'logicalis',
     numero:       fac.numero,
     fecha:        fac.fecha,
     vto:          fac.vto,
@@ -2284,8 +2301,12 @@ async function saveFacturaDB(fac, mesKey) {
 }
 
 async function loadFacturasFromDB() {
-  // Cargar facturas Logicalis
-  const { data, error } = await sb.from('presupuesto_facturas').select('*').order('fecha');
+  // Cargar facturas Logicalis — IMPORTANTE: filtrar por proveedor, ya que esta
+  // misma tabla también guarda facturas de Napse y Correo Argentino (CA).
+  // Se incluye proveedor IS NULL para no perder filas viejas guardadas antes
+  // de que este campo existiera.
+  const { data, error } = await sb.from('presupuesto_facturas')
+    .select('*').or('proveedor.eq.logicalis,proveedor.is.null').order('fecha');
   if(!error && data && data.length) {
     data.forEach(row => {
       const m = row.mes;
