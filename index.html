@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.4.27</title>
+<title>Alleata · Operaciones v4.4.28</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -407,7 +407,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.4.27 · 07 jul 2026
+      v4.4.28 · 07 jul 2026
     </div>
   </div>
 </div>
@@ -485,7 +485,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.4.27 · 07 jul 2026
+      v4.4.28 · 07 jul 2026
     </div>
   </div>
 </nav>
@@ -525,7 +525,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.4.27</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.4.28</div>
   </div>
   <div class="content">
 
@@ -4271,7 +4271,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.4.27] OK');
+console.log('[Alleata v4.4.28] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -8149,10 +8149,29 @@ async function crearEnvioCabify(id) {
   const horarioTexto = e.horario_entrega || e.horario || '';
   const ventana = parseHorarioAVentanaISO(horarioTexto);
 
+  // FIX URGENTE (07/07): Cabify NUNCA debe usar direccion_formula como
+  // dirección de envío — es un campo distinto (puede venir de la dirección
+  // de la cuenta/formula, no de la OT) y mandar ahí genera envíos a
+  // direcciones incorrectas sin ningún aviso. Se exige el campo real
+  // "Dirección de envío" (e.direccion, viene de Direcci_n_de_env_o__Street__s
+  // en SF) — si no está cargado, se bloquea la creación en vez de usar un
+  // fallback silencioso.
+  if (!e.direccion) {
+    alert(
+      `⚠️ No se puede crear el envío Cabify para OT ${e.ot_numero}.\n\n` +
+      `Falta el campo "Dirección de envío" en Salesforce (Direccion_de_envio__c).\n` +
+      `NO se usa la dirección alternativa (${e.direccion_formula || 'sin datos'}) porque puede corresponder a un domicilio distinto.\n\n` +
+      `Cargá la Dirección de envío en la OT en SF y esperá el próximo sync antes de reintentar.`
+    );
+    return;
+  }
+
+  const direccionEnvioReal = [e.direccion, e.ciudad, e.provincia].filter(Boolean).join(', ');
+
   const ok = confirm(
     `¿Crear envío Cabify para OT ${e.ot_numero}?\n\n` +
     `Destinatario: ${e.cuenta}\n` +
-    `Dirección: ${e.direccion_completa||''}, ${e.ciudad||''}\n` +
+    `Dirección de envío (SF): ${direccionEnvioReal}\n` +
     `Horario: ${horarioTexto || '—'}` +
     (ventana ? `\nVentana programada en Cabify: ${ventana.delivery_from} → ${ventana.delivery_to}` : '\n⚠️ No se pudo interpretar el horario — se manda solo como texto, sin restricción real de entrega')
   );
@@ -8163,7 +8182,9 @@ async function crearEnvioCabify(id) {
   if (actionEl) actionEl.innerHTML = `<button disabled style="background:rgba(124,58,237,.1);border:1.5px dashed #7C3AED;color:#7C3AED;font-size:11px;padding:6px 10px;border-radius:7px;cursor:default;opacity:.7">⏳ Procesando...</button>`;
 
   try {
-    const addr = [e.direccion_completa, e.ciudad, e.provincia, 'Argentina'].filter(Boolean).join(', ');
+    // FIX: usar SIEMPRE e.direccion (Dirección de envío real), nunca
+    // e.direccion_completa (que puede traer direccion_formula por fallback).
+    const addr = [e.direccion, e.ciudad, e.provincia, 'Argentina'].filter(Boolean).join(', ');
     const body = {
       external_id: e.ot_numero,
       dropoff_info: {
