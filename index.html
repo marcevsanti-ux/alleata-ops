@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.4.26</title>
+<title>Alleata · Operaciones v4.4.27</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -407,7 +407,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.4.26 · 03 jul 2026
+      v4.4.27 · 07 jul 2026
     </div>
   </div>
 </div>
@@ -485,7 +485,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.4.26 · 03 jul 2026
+      v4.4.27 · 07 jul 2026
     </div>
   </div>
 </nav>
@@ -525,7 +525,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.4.26</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.4.27</div>
   </div>
   <div class="content">
 
@@ -4271,7 +4271,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.4.26] OK');
+console.log('[Alleata v4.4.27] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -8111,6 +8111,34 @@ async function preloadCabifyRides(list) {
   }
 }
 
+// ── CABIFY: parsear "10 a 15 hs" / "10 a 15" / "9 a 12hs" en ventana ISO real ──
+// FIX: antes solo mandábamos el horario como texto libre en dropoff_info.instr,
+// que Cabify puede ignorar para el scheduling real del envío — por eso el
+// chofer podía pasar fuera de la ventana pactada, generando demoras/reintentos.
+// delivery_from/delivery_to sí son parámetros reales de programación en la API
+// de Cabify (ver POST /v1/parcels), no solo texto cosmético.
+function parseHorarioAVentanaISO(horarioStr, fechaBase) {
+  if (!horarioStr) return null;
+  const m = String(horarioStr).match(/(\d{1,2})\s*(?:hs?|:00)?\s*a\s*(\d{1,2})\s*(?:hs?)?/i);
+  if (!m) return null;
+
+  const horaDesde = parseInt(m[1], 10);
+  const horaHasta = parseInt(m[2], 10);
+  if (isNaN(horaDesde) || isNaN(horaHasta) || horaDesde < 0 || horaHasta > 23 || horaDesde >= horaHasta) return null;
+
+  const base = fechaBase ? new Date(fechaBase) : new Date();
+  const yyyy = base.getFullYear();
+  const mm   = String(base.getMonth() + 1).padStart(2, '0');
+  const dd   = String(base.getDate()).padStart(2, '0');
+
+  // Buenos Aires es UTC-3 todo el año (sin horario de verano)
+  const pad = n => String(n).padStart(2, '0');
+  const delivery_from = `${yyyy}-${mm}-${dd}T${pad(horaDesde)}:00:00-03:00`;
+  const delivery_to   = `${yyyy}-${mm}-${dd}T${pad(horaHasta)}:00:00-03:00`;
+
+  return { delivery_from, delivery_to };
+}
+
 // ── CABIFY: crear envío ────────────────────────────────────────────────────────
 
 async function crearEnvioCabify(id) {
@@ -8118,11 +8146,15 @@ async function crearEnvioCabify(id) {
   if (!raw) { alert('OT no encontrada'); return; }
   const e = normalizarSFWorkorder(raw);
 
+  const horarioTexto = e.horario_entrega || e.horario || '';
+  const ventana = parseHorarioAVentanaISO(horarioTexto);
+
   const ok = confirm(
     `¿Crear envío Cabify para OT ${e.ot_numero}?\n\n` +
     `Destinatario: ${e.cuenta}\n` +
     `Dirección: ${e.direccion_completa||''}, ${e.ciudad||''}\n` +
-    `Horario: ${e.horario_entrega||e.horario||'—'}`
+    `Horario: ${horarioTexto || '—'}` +
+    (ventana ? `\nVentana programada en Cabify: ${ventana.delivery_from} → ${ventana.delivery_to}` : '\n⚠️ No se pudo interpretar el horario — se manda solo como texto, sin restricción real de entrega')
   );
   if (!ok) return;
 
@@ -8140,8 +8172,9 @@ async function crearEnvioCabify(id) {
           name:  e.cuenta || '',
           phone: e.contacto_celular || e.telefono_secundario || '',
         },
-        instr: e.horario_entrega || e.horario || '',
+        instr: horarioTexto,
       },
+      ...(ventana ? { delivery_from: ventana.delivery_from, delivery_to: ventana.delivery_to } : {}),
     };
 
     const res = await fetch(`https://alleata-agent-production.up.railway.app/cabify/parcels/create-and-ship`, {
