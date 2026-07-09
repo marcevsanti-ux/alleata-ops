@@ -165,7 +165,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
       <div class="login-logo">
         <img id="loginLogo" src="" alt="Alleata">
         <div class="login-sub">Portal de Operaciones</div>
-        <div class="login-version">v2.12.2 · mobile</div>
+        <div class="login-version">v2.13.0 · mobile</div>
       </div>
       <div class="field"><label class="label">Email</label><input class="input" id="lEmail" type="email" placeholder="usuario@alleata.com" autocomplete="email"></div>
       <div class="field"><label class="label">Contraseña</label><input class="input" id="lPass" type="password" placeholder="••••••••" autocomplete="current-password"></div>
@@ -181,7 +181,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
   <div class="topbar">
     <img id="appLogo" src="" alt="Alleata">
     <div class="topbar-title" id="topbarTitle">Operaciones</div>
-    <div class="topbar-version">v2.12.2</div>
+    <div class="topbar-version">v2.13.0</div>
     <div class="topbar-avatar" id="topbarAvatar" onclick="openDrawer()">?</div>
   </div>
 
@@ -428,6 +428,9 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
   <div class="modal">
     <div class="modal-title">🏁 Resumen de ruta</div>
     <textarea id="resumenTexto" rows="14" style="width:100%;background:var(--navy-700);border:1px solid var(--border2);color:var(--text);font-family:'JetBrains Mono',monospace;font-size:12.5px;line-height:1.5;padding:12px;border-radius:10px;outline:none;margin-bottom:12px;resize:vertical"></textarea>
+    <button class="btn" id="btnCompartirResumen" onclick="compartirResumen()" style="margin-bottom:10px">
+      📤 Compartir (WhatsApp, Mail, etc.)
+    </button>
     <div class="modal-btns">
       <button class="btn btn-cancel" onclick="cerrarResumenModal()">Cerrar</button>
       <button class="btn" style="background:var(--surface2);border:1px solid var(--border2);color:var(--text)" onclick="copiarResumen()">📋 Copiar</button>
@@ -795,16 +798,39 @@ async function copiarResumen(){
     catch(e2){ showScanFeedback('⚠️ No se pudo copiar','error'); }
   }
 }
+// ── RESUMEN DE RUTA — v2.13.0 ──────────────────────────────────────────────
+// Agregado: botón Compartir (Web Share API nativa, deja elegir destino).
+// Fix: "Enviar a Ops" apuntaba a /notificar (ruta inexistente) — ahora usa
+// /automations/send-message, mismo endpoint que el resto de la app.
+async function compartirResumen(){
+  const txt=document.getElementById('resumenTexto').value;
+  if(navigator.share){
+    try{
+      await navigator.share({text:txt,title:'Reporte Log. Alleata'});
+      // No cerramos el modal automáticamente — el usuario puede querer compartir
+      // el mismo resumen por más de un canal (WhatsApp Y Mail, por ejemplo).
+    }catch(e){
+      // AbortError = el usuario canceló el selector — no es un error real, no mostrar nada
+      if(e.name!=='AbortError') showScanFeedback('⚠️ No se pudo abrir el selector: '+e.message,'error');
+    }
+  } else {
+    // Fallback para navegadores/desktop sin soporte de Web Share API
+    await copiarResumen();
+    showScanFeedback('📋 Tu navegador no tiene selector nativo — resumen copiado, pegalo donde quieras','info');
+  }
+}
 async function enviarResumenAOps(){
   const txt=document.getElementById('resumenTexto').value;
   const btn=document.getElementById('btnEnviarResumenOps');
   btn.disabled=true;btn.textContent='⏳ Enviando...';
   try{
-    await fetch(ALLY_URL+'/notificar',{
+    const res=await fetch(ALLY_URL+'/automations/send-message',{
       method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({numero:ALLY_GROUP_TEST,mensaje:txt})
+      headers:{'Content-Type':'application/json','x-automation-secret':'123456'},
+      body:JSON.stringify({group_id:ALLY_GROUP_TEST,message:txt,context:'resumen_ruta'})
     });
+    const data=await res.json();
+    if(!res.ok||data.error) throw new Error(data.error||'Error desconocido');
     showScanFeedback('✅ Resumen enviado al grupo de Ops','ok');
     cerrarResumenModal();
   }catch(e){
