@@ -1891,11 +1891,11 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
           <option value="DISPONIBLE" selected>DISPONIBLE</option>
           <option value="ASIGNADA">ASIGNADA</option>
           <option value="ERROR TETRA">ERROR TETRA</option>
+          <option value="TERMINAL ROTA">TERMINAL ROTA</option>
           <option value="IRRUPTION">IRRUPTION</option>
           <option value="ERROR 98">ERROR 98</option>
           <option value="OPERACIÓN CANCELADA">OPERACIÓN CANCELADA</option>
           <option value="EXTRAVIADA">EXTRAVIADA</option>
-          <option value="TERMINAL ROTA">TERMINAL ROTA</option>
         </select>
       </div>
       <div style="background:var(--navy-800);border:1px solid var(--border);border-radius:8px;padding:10px 14px">
@@ -10390,17 +10390,20 @@ async function napseMatchSF(serialNumber, node, store, btn){
 
   // Campos a grabar para una serie puntual: si la terminal vino con error
   // (columna "Solución" del Excel Logicalis distinta de "Personalización"),
-  // se pisan Estado/Perfil y se arma el Lote con fecha + evidencia.
+  // se pisan Estado/Perfil, se arma el Lote con fecha + evidencia, y se carga
+  // la fecha de hoy en Fecha reparación (Ingrese_fecha2__c).
   function fieldsForSerie(serie){
     const base = getFields();
     const meta = termMeta[serie];
     if(meta && meta.esError){
       const hoy = new Date().toLocaleDateString('es-AR');
+      const hoyISO = new Date().toISOString().split('T')[0]; // SF espera YYYY-MM-DD en campos Date
       return {
         ...base,
         Estado__c: 'TERMINAL ROTA',
         Perfil__c: 'PRISMA',
-        Lote__c:   `${hoy} - ${meta.solucion}`
+        Lote__c:   `${hoy} - ${meta.solucion}`,
+        Ingrese_fecha2__c: hoyISO
       };
     }
     return base;
