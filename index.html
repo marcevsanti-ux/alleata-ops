@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.4.30</title>
+<title>Alleata · Operaciones v4.4.32</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -407,7 +407,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.4.30 · 09 jul 2026
+      v4.4.32 · 09 jul 2026
     </div>
   </div>
 </div>
@@ -485,7 +485,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.4.30 · 09 jul 2026
+      v4.4.32 · 09 jul 2026
     </div>
   </div>
 </nav>
@@ -525,7 +525,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.4.30</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.4.32</div>
   </div>
   <div class="content">
 
@@ -1891,7 +1891,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
           <option value="DISPONIBLE" selected>DISPONIBLE</option>
           <option value="ASIGNADA">ASIGNADA</option>
           <option value="ERROR TETRA">ERROR TETRA</option>
-          <option value="TERMINAL ROTA">TERMINAL ROTA</option>
+          <option value="ROTA">TERMINAL ROTA</option>
           <option value="IRRUPTION">IRRUPTION</option>
           <option value="ERROR 98">ERROR 98</option>
           <option value="OPERACIÓN CANCELADA">OPERACIÓN CANCELADA</option>
@@ -4280,7 +4280,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.4.30] OK');
+console.log('[Alleata v4.4.32] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -10400,7 +10400,7 @@ async function napseMatchSF(serialNumber, node, store, btn){
       const hoyISO = new Date().toISOString().split('T')[0]; // SF espera YYYY-MM-DD en campos Date
       return {
         ...base,
-        Estado__c: 'TERMINAL ROTA',
+        Estado__c: 'ROTA', // SF muestra la etiqueta "TERMINAL ROTA" pero el valor real del picklist es "ROTA"
         Perfil__c: 'PRISMA',
         Lote__c:   `${hoy} - ${meta.solucion}`,
         Ingrese_fecha2__c: hoyISO
@@ -10547,17 +10547,22 @@ async function napseMatchSF(serialNumber, node, store, btn){
     if(elError)    elError.textContent    = conError.length;
     if(elErrorWrap) elErrorWrap.style.display = conError.length > 0 ? '' : 'none';
 
-    function cell(actual, nuevo){
+    // SF guarda "ROTA" pero muestra la etiqueta "TERMINAL ROTA" — mapeo solo visual
+    function estadoLabel(v){ return v === 'ROTA' ? 'TERMINAL ROTA' : v; }
+
+    function cell(actual, nuevo, labelFn){
+      const f = labelFn || (v=>v);
       const actNorm = actual && actual !== '—' ? actual : null;
       const cambia  = actNorm !== nuevo;  // cambia si es diferente, incluso si actual es null/vacío
-      const actTxt = actual||'—';
+      const actTxt = actual ? f(actual) : '—';
       return `<td style="padding:5px 8px;text-align:center;color:var(--text-muted);border-left:1px solid var(--border);font-size:10px">${actTxt}</td>
-              <td style="padding:5px 8px;text-align:center;font-size:10px;font-weight:${cambia?'700':'400'};color:${cambia?'var(--teal)':'var(--text-muted)'}">${cambia?'→ '+nuevo:'—'}</td>`;
+              <td style="padding:5px 8px;text-align:center;font-size:10px;font-weight:${cambia?'700':'400'};color:${cambia?'var(--teal)':'var(--text-muted)'}">${cambia?'→ '+f(nuevo):'—'}</td>`;
     }
 
-    function newCell(val){
+    function newCell(val, labelFn){
+      const f = labelFn || (v=>v);
       return `<td style="padding:5px 8px;text-align:center;color:var(--text-muted);border-left:1px solid var(--border);font-size:10px">—</td>
-              <td style="padding:5px 8px;text-align:center;font-size:10px;font-weight:700;color:#f59e0b">${val}</td>`;
+              <td style="padding:5px 8px;text-align:center;font-size:10px;font-weight:700;color:#f59e0b">${f(val)}</td>`;
     }
 
     const tbody = document.getElementById('term-preview-tbody');
@@ -10583,7 +10588,7 @@ async function napseMatchSF(serialNumber, node, store, btn){
           <td style="padding:6px 8px;color:var(--text-muted);font-size:10px">${i+1}</td>
           <td style="padding:6px 8px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text)">${r.serie}${errTag}</td>
           ${cell(c.Ubicacion__c,         d.Ubicacion__c)}
-          ${cell(c.Estado__c,            d.Estado__c)}
+          ${cell(c.Estado__c,            d.Estado__c, estadoLabel)}
           ${cell(c.CAMBIO_DE_BATERIA__c, d.CAMBIO_DE_BATERIA__c)}
           ${cell(c.Perfil__c,            d.Perfil__c)}
           ${cell(c.Lote__c,              d.Lote__c || '—')}
@@ -10596,7 +10601,7 @@ async function napseMatchSF(serialNumber, node, store, btn){
         <td style="padding:6px 8px;font-family:'JetBrains Mono',monospace;font-size:10px;color:#f59e0b">${r.serie}${errTag}<br>
           <span style="font-size:9px;color:#f59e0b;opacity:.8">+ crear en SF</span></td>
         ${newCell(d.Ubicacion__c)}
-        ${newCell(d.Estado__c)}
+        ${newCell(d.Estado__c, estadoLabel)}
         ${newCell(d.CAMBIO_DE_BATERIA__c)}
         ${newCell(d.Perfil__c)}
         ${newCell(d.Lote__c || '—')}
