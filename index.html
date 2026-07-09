@@ -1895,6 +1895,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
           <option value="ERROR 98">ERROR 98</option>
           <option value="OPERACIÓN CANCELADA">OPERACIÓN CANCELADA</option>
           <option value="EXTRAVIADA">EXTRAVIADA</option>
+          <option value="TERMINAL ROTA">TERMINAL ROTA</option>
         </select>
       </div>
       <div style="background:var(--navy-800);border:1px solid var(--border);border-radius:8px;padding:10px 14px">
@@ -1965,6 +1966,10 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div style="font-size:16px;font-weight:900;color:var(--text-muted)" id="term-stat-skipped">0</div>
         <div style="font-size:11px;color:var(--text-muted)">ya con Perfil NAPSE</div>
       </div>
+      <div id="term-error-wrap" style="display:none;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.3);border-radius:8px;padding:8px 16px">
+        <div style="font-size:16px;font-weight:900;color:#ef4444" id="term-stat-error">0</div>
+        <div style="font-size:11px;color:#ef4444">con error Logicalis</div>
+      </div>
       <div style="background:var(--navy-800);border:1px solid var(--border);border-radius:8px;padding:8px 16px">
         <div style="font-size:14px;font-weight:900;color:var(--text)" id="term-stat-mes">—</div>
         <div style="font-size:11px;color:var(--text-muted)">período</div>
@@ -1977,6 +1982,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <span style="color:var(--teal)">🟢 a actualizar (cambia)</span>
       <span style="color:#f59e0b">🟡 a crear en SF</span>
       <span style="color:var(--text-muted);opacity:.5">⬜ omitida (ya es NAPSE)</span>
+      <span style="color:#ef4444">🔴 con error (Solución ≠ Personalización) → Estado TERMINAL ROTA / Perfil PRISMA / Lote con evidencia</span>
     </div>
 
     <!-- Tabla preview -->
@@ -1990,9 +1996,12 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
             <th style="padding:7px 8px;text-align:center;color:var(--text-muted);font-weight:600;font-size:10px;text-transform:uppercase;letter-spacing:.4px" colspan="2">Estado</th>
             <th style="padding:7px 8px;text-align:center;color:var(--text-muted);font-weight:600;font-size:10px;text-transform:uppercase;letter-spacing:.4px" colspan="2">Batería</th>
             <th style="padding:7px 8px;text-align:center;color:var(--text-muted);font-weight:600;font-size:10px;text-transform:uppercase;letter-spacing:.4px" colspan="2">Perfil</th>
+            <th style="padding:7px 8px;text-align:center;color:var(--text-muted);font-weight:600;font-size:10px;text-transform:uppercase;letter-spacing:.4px" colspan="2">Lote (evidencia)</th>
           </tr>
           <tr style="background:var(--navy-700);border-bottom:1px solid var(--border)">
             <th colspan="2"></th>
+            <th style="padding:4px 8px;text-align:center;color:var(--text-muted);font-size:9px;font-weight:500;border-left:1px solid var(--border)">Actual</th>
+            <th style="padding:4px 8px;text-align:center;color:var(--teal);font-size:9px;font-weight:500">Nuevo</th>
             <th style="padding:4px 8px;text-align:center;color:var(--text-muted);font-size:9px;font-weight:500;border-left:1px solid var(--border)">Actual</th>
             <th style="padding:4px 8px;text-align:center;color:var(--teal);font-size:9px;font-weight:500">Nuevo</th>
             <th style="padding:4px 8px;text-align:center;color:var(--text-muted);font-size:9px;font-weight:500;border-left:1px solid var(--border)">Actual</th>
@@ -10361,8 +10370,9 @@ async function napseMatchSF(serialNumber, node, store, btn){
 (function(){
   const AGENT_URL    = 'https://alleata-agent-production.up.railway.app';
   const AGENT_SECRET = '123456';
-  let termSeries  = [];   // [{serie, modelo}]
+  let termSeries  = [];   // [{serie, modelo, solucion, esError}]
   let termPreview = [];   // resultados del preview SF
+  let termMeta    = {};   // serie -> {modelo, solucion, esError}
 
   function getFields(){
     return {
@@ -10371,6 +10381,42 @@ async function napseMatchSF(serialNumber, node, store, btn){
       CAMBIO_DE_BATERIA__c: document.getElementById('term-val-bateria')?.value   || 'SÍ',
       Perfil__c:            document.getElementById('term-val-perfil')?.value    || 'NAPSE'
     };
+  }
+
+  // Quita acentos y normaliza para comparar textos de Excel de forma robusta
+  function normTxt(s){
+    return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLowerCase();
+  }
+
+  // Campos a grabar para una serie puntual: si la terminal vino con error
+  // (columna "Solución" del Excel Logicalis distinta de "Personalización"),
+  // se pisan Estado/Perfil y se arma el Lote con fecha + evidencia.
+  function fieldsForSerie(serie){
+    const base = getFields();
+    const meta = termMeta[serie];
+    if(meta && meta.esError){
+      const hoy = new Date().toLocaleDateString('es-AR');
+      return {
+        ...base,
+        Estado__c: 'TERMINAL ROTA',
+        Perfil__c: 'PRISMA',
+        Lote__c:   `${hoy} - ${meta.solucion}`
+      };
+    }
+    return base;
+  }
+
+  // "Ya está al día" = encontrada en SF y sus valores actuales ya coinciden con
+  // lo que le corresponde (normal → Perfil NAPSE; error → Estado TERMINAL ROTA
+  // + Perfil PRISMA). Evita que una terminal con error se omita solo porque
+  // alguna vez tuvo Perfil NAPSE.
+  function termYaListo(r){
+    if(!r.found) return false;
+    const c = r.current || {};
+    const d = fieldsForSerie(r.serie);
+    const meta = termMeta[r.serie];
+    if(meta && meta.esError) return c.Estado__c === d.Estado__c && c.Perfil__c === d.Perfil__c;
+    return c.Perfil__c === 'NAPSE';
   }
 
   function show(id){ const e=document.getElementById(id); if(e) e.style.display='block'; }
@@ -10388,7 +10434,7 @@ async function napseMatchSF(serialNumber, node, store, btn){
   };
 
   window.termReset = function(soft){
-    termSeries = []; termPreview = [];
+    termSeries = []; termPreview = []; termMeta = {};
     show('term-step1'); hide('term-step2'); hide('term-step3'); hide('term-step4');
     const dr = document.getElementById('term-done-row'); if(dr) dr.style.display='none';
     const btn = document.getElementById('term-btn-update'); if(btn) btn.disabled=false;
@@ -10408,17 +10454,24 @@ async function napseMatchSF(serialNumber, node, store, btn){
         for(const sName of ['Detalle Despacho','Informe Final']){
           if(!wb.SheetNames.includes(sName)) continue;
           const rows = XLSX.utils.sheet_to_json(wb.Sheets[sName], {header:1, defval:''});
-          let hIdx=-1, sIdx=-1, mIdx=-1;
+          let hIdx=-1, sIdx=-1, mIdx=-1, solIdx=-1;
           for(let i=0;i<rows.length;i++){
-            const row = rows[i].map(v=>String(v).trim().toLowerCase());
-            const si = row.findIndex(c=>c==='serie'||c==='n° de serie'||c==='numero de serie');
-            if(si>-1){ hIdx=i; sIdx=si; const mi=row.findIndex(c=>c==='modelo'||c.includes('model')); if(mi>-1) mIdx=mi; break; }
+            const row = rows[i].map(v=>normTxt(v));
+            const si = row.findIndex(c=>c==='serie'||c==='n de serie'||c==='numero de serie');
+            if(si>-1){
+              hIdx=i; sIdx=si;
+              const mi=row.findIndex(c=>c==='modelo'||c.includes('model')); if(mi>-1) mIdx=mi;
+              const soli=row.findIndex(c=>c.includes('solucion')); if(soli>-1) solIdx=soli;
+              break;
+            }
           }
           if(hIdx>-1 && sIdx>-1){
             for(let i=hIdx+1;i<rows.length;i++){
               const v=String(rows[i][sIdx]||'').trim();
               const m=mIdx>-1?String(rows[i][mIdx]||'').trim():'D7 Axium';
-              if(v.length>10) series.push({serie:v, modelo:m||'D7 Axium'});
+              const sol=solIdx>-1?String(rows[i][solIdx]||'').trim():'';
+              const esError = solIdx>-1 && sol!=='' && normTxt(sol)!=='personalizacion';
+              if(v.length>10) series.push({serie:v, modelo:m||'D7 Axium', solucion:sol, esError});
             }
             const mr=rows.find(r=>String(r[1]||'').toLowerCase().includes('mes'));
             if(mr){ const mv=String(mr[2]||'').trim(); if(mv) mes=mv; }
@@ -10429,6 +10482,8 @@ async function napseMatchSF(serialNumber, node, store, btn){
         }
         if(!series.length){ alert('No se encontraron series. Verificá que sea el reporte de Logicalis.'); return; }
         termSeries = series;
+        termMeta = {};
+        series.forEach(s=>{ termMeta[s.serie] = { modelo:s.modelo, solucion:s.solucion, esError:!!s.esError }; });
 
         // Mostrar loader y consultar SF
         hide('term-step1');
@@ -10464,12 +10519,11 @@ async function napseMatchSF(serialNumber, node, store, btn){
   }
 
   function renderPreview(mes, modelo){
-    const f = getFields();
 
-    // Filtrar las ya actualizadas (Perfil = NAPSE)
-    const yaActualizadas = termPreview.filter(r=>r.found && r.current?.Perfil__c === 'NAPSE');
-    const toUpdate       = termPreview.filter(r=>r.found && r.current?.Perfil__c !== 'NAPSE');
-    const toCreate       = termPreview.filter(r=>!r.found);
+    const yaActualizadas = termPreview.filter(termYaListo);
+    const toUpdate        = termPreview.filter(r=>r.found && !termYaListo(r));
+    const toCreate        = termPreview.filter(r=>!r.found);
+    const conError         = termPreview.filter(r=>termMeta[r.serie]?.esError);
 
     document.getElementById('term-stat-total').textContent    = termPreview.length;
     document.getElementById('term-stat-found').textContent    = toUpdate.length;
@@ -10481,10 +10535,14 @@ async function napseMatchSF(serialNumber, node, store, btn){
     const elNotFound = document.getElementById('term-lbl-notfound');
     const elSkipped  = document.getElementById('term-stat-skipped');
     const elSkipWrap = document.getElementById('term-skip-wrap');
+    const elError    = document.getElementById('term-stat-error');
+    const elErrorWrap= document.getElementById('term-error-wrap');
     if(elFound)    elFound.textContent    = 'a actualizar en SF';
     if(elNotFound) elNotFound.textContent = 'a crear en SF';
     if(elSkipped)  elSkipped.textContent  = yaActualizadas.length;
     if(elSkipWrap) elSkipWrap.style.display = yaActualizadas.length > 0 ? '' : 'none';
+    if(elError)    elError.textContent    = conError.length;
+    if(elErrorWrap) elErrorWrap.style.display = conError.length > 0 ? '' : 'none';
 
     function cell(actual, nuevo){
       const actNorm = actual && actual !== '—' ? actual : null;
@@ -10499,56 +10557,60 @@ async function napseMatchSF(serialNumber, node, store, btn){
               <td style="padding:5px 8px;text-align:center;font-size:10px;font-weight:700;color:#f59e0b">${val}</td>`;
     }
 
-    const today = new Date().toLocaleDateString('es-AR');
-
     const tbody = document.getElementById('term-preview-tbody');
     tbody.innerHTML = termPreview.map((r,i)=>{
+      const meta = termMeta[r.serie] || {};
+      const d    = fieldsForSerie(r.serie);
+      const errTag = meta.esError ? ' <span style="font-size:9px;color:#ef4444;font-weight:700">🔴 ERROR</span>' : '';
 
-      // Ya actualizada (Perfil = NAPSE) → fila atenuada, no se toca
-      if(r.found && r.current?.Perfil__c === 'NAPSE'){
+      // Ya al día → fila atenuada, no se toca
+      if(r.found && termYaListo(r)){
         return `<tr style="border-bottom:1px solid var(--border);opacity:.35">
           <td style="padding:6px 8px;color:var(--text-muted);font-size:10px">${i+1}</td>
-          <td style="padding:6px 8px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-muted)">${r.serie}<br>
-            <span style="font-size:9px;color:var(--teal);opacity:.8">✓ ya actualizada (Perfil = NAPSE)</span></td>
-          <td colspan="8" style="padding:6px 8px;text-align:center;color:var(--text-muted);font-size:10px;border-left:1px solid var(--border)">— omitida —</td>
+          <td style="padding:6px 8px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-muted)">${r.serie}${errTag}<br>
+            <span style="font-size:9px;color:var(--teal);opacity:.8">✓ ya actualizada</span></td>
+          <td colspan="10" style="padding:6px 8px;text-align:center;color:var(--text-muted);font-size:10px;border-left:1px solid var(--border)">— omitida —</td>
         </tr>`;
       }
 
       // Encontrada y necesita update
       if(r.found){
         const c = r.current || {};
-        return `<tr style="border-bottom:1px solid var(--border)">
+        return `<tr style="border-bottom:1px solid var(--border);${meta.esError?'background:rgba(239,68,68,.04)':''}">
           <td style="padding:6px 8px;color:var(--text-muted);font-size:10px">${i+1}</td>
-          <td style="padding:6px 8px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text)">${r.serie}</td>
-          ${cell(c.Ubicacion__c,         f.Ubicacion__c)}
-          ${cell(c.Estado__c,            f.Estado__c)}
-          ${cell(c.CAMBIO_DE_BATERIA__c, f.CAMBIO_DE_BATERIA__c)}
-          ${cell(c.Perfil__c,            f.Perfil__c)}
+          <td style="padding:6px 8px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text)">${r.serie}${errTag}</td>
+          ${cell(c.Ubicacion__c,         d.Ubicacion__c)}
+          ${cell(c.Estado__c,            d.Estado__c)}
+          ${cell(c.CAMBIO_DE_BATERIA__c, d.CAMBIO_DE_BATERIA__c)}
+          ${cell(c.Perfil__c,            d.Perfil__c)}
+          ${cell(c.Lote__c,              d.Lote__c || '—')}
         </tr>`;
       }
 
       // No encontrada → se va a crear
-      return `<tr style="border-bottom:1px solid var(--border);background:rgba(245,158,11,.04)">
+      return `<tr style="border-bottom:1px solid var(--border);background:${meta.esError?'rgba(239,68,68,.05)':'rgba(245,158,11,.04)'}">
         <td style="padding:6px 8px;color:var(--text-muted);font-size:10px">${i+1}</td>
-        <td style="padding:6px 8px;font-family:'JetBrains Mono',monospace;font-size:10px;color:#f59e0b">${r.serie}<br>
+        <td style="padding:6px 8px;font-family:'JetBrains Mono',monospace;font-size:10px;color:#f59e0b">${r.serie}${errTag}<br>
           <span style="font-size:9px;color:#f59e0b;opacity:.8">+ crear en SF</span></td>
-        ${newCell(f.Ubicacion__c)}
-        ${newCell(f.Estado__c)}
-        ${newCell(f.CAMBIO_DE_BATERIA__c)}
-        ${newCell(f.Perfil__c)}
+        ${newCell(d.Ubicacion__c)}
+        ${newCell(d.Estado__c)}
+        ${newCell(d.CAMBIO_DE_BATERIA__c)}
+        ${newCell(d.Perfil__c)}
+        ${newCell(d.Lote__c || '—')}
       </tr>`;
     }).join('');
   }
 
   window.termExportCSV = function(){
-    const f = getFields();
     const modeloMap = {}; termSeries.forEach(s=>{ modeloMap[s.serie]=s.modelo; });
-    const csv = 'N° de Serie,Modelo,Encontrada SF,Ubicacion actual,Estado actual,Bateria actual,Perfil actual,Ubicacion nueva,Estado nuevo,Bateria nueva,Perfil nuevo\n' +
+    const csv = 'N° de Serie,Modelo,Encontrada SF,Con error Logicalis,Solucion Logicalis,Ubicacion actual,Estado actual,Bateria actual,Perfil actual,Lote actual,Ubicacion nueva,Estado nuevo,Bateria nueva,Perfil nuevo,Lote nuevo\n' +
       termPreview.map(r=>{
-        const c = r.current||{};
-        return [r.serie, modeloMap[r.serie]||'', r.found?'SI':'NO',
-          c.Ubicacion__c||'', c.Estado__c||'', c.CAMBIO_DE_BATERIA__c||'', c.Perfil__c||'',
-          f.Ubicacion__c, f.Estado__c, f.CAMBIO_DE_BATERIA__c, f.Perfil__c
+        const c    = r.current||{};
+        const d    = fieldsForSerie(r.serie);
+        const meta = termMeta[r.serie]||{};
+        return [r.serie, modeloMap[r.serie]||'', r.found?'SI':'NO', meta.esError?'SI':'NO', (meta.solucion||'').replace(/,/g,';'),
+          c.Ubicacion__c||'', c.Estado__c||'', c.CAMBIO_DE_BATERIA__c||'', c.Perfil__c||'', c.Lote__c||'',
+          d.Ubicacion__c, d.Estado__c, d.CAMBIO_DE_BATERIA__c, d.Perfil__c, (d.Lote__c||'').replace(/,/g,';')
         ].join(',');
       }).join('\n');
     const a=document.createElement('a');
@@ -10557,13 +10619,12 @@ async function napseMatchSF(serialNumber, node, store, btn){
   };
 
   window.termUpdateSF = async function(){
-    const f         = getFields();
-    const toUpdate  = termPreview.filter(r=> r.found && r.current?.Perfil__c !== 'NAPSE');
+    const toUpdate  = termPreview.filter(r=> r.found && !termYaListo(r));
     const toCreate  = termPreview.filter(r=>!r.found);
-    const skippedYa = termPreview.filter(r=> r.found && r.current?.Perfil__c === 'NAPSE');
+    const skippedYa = termPreview.filter(r=> r.found &&  termYaListo(r));
 
     if(!toUpdate.length && !toCreate.length){
-      alert('No hay terminales para procesar — todas ya tienen Perfil = NAPSE.');
+      alert('No hay terminales para procesar — todas ya están al día.');
       return;
     }
     hide('term-step3'); show('term-step4');
@@ -10582,17 +10643,21 @@ async function napseMatchSF(serialNumber, node, store, btn){
       d.innerHTML=msg; log.appendChild(d); log.scrollTop=log.scrollHeight;
     }
 
-    if(skippedYa.length) addLog(`[info] ${skippedYa.length} omitidas — Perfil ya es NAPSE.`);
+    const errorCount = termPreview.filter(r=>termMeta[r.serie]?.esError).length;
+    if(skippedYa.length) addLog(`[info] ${skippedYa.length} omitidas — ya están al día.`);
     if(toUpdate.length)  addLog(`[info] ${toUpdate.length} a actualizar en SF.`);
     if(toCreate.length)  addLog(`[info] ${toCreate.length} a crear en SF.`,'warn');
+    if(errorCount)        addLog(`[info] ${errorCount} con error Logicalis → Estado TERMINAL ROTA / Perfil PRISMA / Lote con evidencia.`,'warn');
 
-    // PATCH: terminales encontradas (excluyendo las ya con NAPSE)
+    // PATCH: terminales encontradas (excluyendo las ya al día). Cada serie manda
+    // sus propios campos porque las que vinieron con error de Logicalis llevan
+    // Estado/Perfil/Lote distintos al resto del lote.
     if(toUpdate.length){
       try{
         const res=await fetch(`${AGENT_URL}/terminales/update-sf`,{
           method:'POST',
           headers:{'Content-Type':'application/json','x-automation-secret':AGENT_SECRET},
-          body:JSON.stringify({ series:toUpdate.map(r=>r.serie), fields:f })
+          body:JSON.stringify({ records: toUpdate.map(r=>({ serie:r.serie, fields:fieldsForSerie(r.serie) })) })
         });
         const data=await res.json();
         if(!res.ok) throw new Error(data.error||`HTTP ${res.status}`);
@@ -10617,7 +10682,7 @@ async function napseMatchSF(serialNumber, node, store, btn){
         const today = new Date().toISOString().split('T')[0];
         const newRecords = toCreate.map(r=>({
           serie: r.serie,
-          fields: { ...f, Tipo_de_producto__c:'TERMINAL', Nombre_Producto__c:'AXIUM D7', RPN_sw_Version__c:'2.1.1', RPN_end_Date__c:today }
+          fields: { ...fieldsForSerie(r.serie), Tipo_de_producto__c:'TERMINAL', Nombre_Producto__c:'AXIUM D7', RPN_sw_Version__c:'2.1.1', RPN_end_Date__c:today }
         }));
         const res=await fetch(`${AGENT_URL}/terminales/create-sf`,{
           method:'POST',
