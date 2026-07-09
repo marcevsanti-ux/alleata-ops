@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>OCR Tester · Claude Vision</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --navy-900:#0d1b2a;--navy-800:#112236;--navy-700:#162d45;--navy-600:#1d3a55;
+  --teal:#1dbf8e;--teal-dark:#17a07a;--blue:#1a9fd4;
+  --grad:linear-gradient(135deg,#1dbf8e,#1a9fd4);
+  --green:#10b981;--red:#ef4444;--yellow:#f59e0b;
+  --border:rgba(255,255,255,.08);--border2:rgba(255,255,255,.14);
+  --text:#e8f0f7;--text-mid:#a0bdd0;--text-muted:#6b8eaa;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+body{background:var(--navy-900);color:var(--text);font-family:'Inter',sans-serif;min-height:100vh;max-width:520px;margin:0 auto;padding-bottom:40px;}
+header{padding:20px 18px 14px;border-bottom:1px solid var(--border);}
+header h1{font-size:16px;font-weight:800;}
+header p{font-size:12px;color:var(--text-muted);margin-top:4px;line-height:1.5;}
+.badge-generic{display:inline-block;font-size:9px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--teal);background:rgba(29,191,142,.1);border:1px solid rgba(29,191,142,.25);padding:2px 8px;border-radius:20px;margin-top:8px;}
+.badge-warn{display:inline-block;font-size:9px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--yellow);background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.25);padding:2px 8px;border-radius:20px;margin-top:8px;margin-left:6px;}
+
+main{padding:16px 18px;}
+.card{background:var(--navy-800);border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:14px;}
+.card-title{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--text-mid);margin-bottom:10px;}
+
+label.label{font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:6px;}
+input[type=password],input[type=text],select{width:100%;background:var(--navy-700);border:1px solid var(--border2);color:var(--text);font-family:'JetBrains Mono',monospace;font-size:13px;padding:11px 12px;border-radius:10px;outline:none;}
+input:focus,select:focus{border-color:var(--teal);}
+.key-row{display:flex;gap:8px;}
+.key-row input{flex:1;}
+.btn-toggle{background:var(--navy-700);border:1px solid var(--border2);color:var(--text-muted);border-radius:10px;padding:0 12px;cursor:pointer;font-size:12px;}
+.hint{font-size:11px;color:var(--text-muted);margin-top:6px;line-height:1.5;}
+.field{margin-bottom:12px;}
+.field:last-child{margin-bottom:0;}
+
+.mode-tabs{display:flex;gap:8px;margin-bottom:14px;}
+.mode-tab{flex:1;text-align:center;padding:9px;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;background:var(--navy-700);border:1px solid var(--border2);color:var(--text-muted);}
+.mode-tab.active{background:rgba(29,191,142,.12);border-color:var(--teal);color:var(--teal);}
+
+.cam-wrap{position:relative;background:#000;border-radius:12px;overflow:hidden;aspect-ratio:4/3;display:none;}
+.cam-wrap.show{display:block;}
+video{width:100%;height:100%;object-fit:cover;display:block;}
+canvas{display:none;}
+.cam-frame{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;}
+.cam-frame div{width:78%;height:34%;border:2px solid var(--teal);border-radius:10px;box-shadow:0 0 0 9999px rgba(0,0,0,.45);}
+.cam-tap{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:rgba(0,0,0,.75);cursor:pointer;}
+.cam-tap span.ic{font-size:34px;}
+.cam-tap span.txt{font-size:13px;font-weight:700;color:#fff;}
+.cam-controls{display:flex;gap:8px;margin-top:10px;}
+
+.upload-wrap{display:none;}
+.upload-wrap.show{display:block;}
+.upload-drop{border:1.5px dashed var(--border2);border-radius:12px;padding:30px 16px;text-align:center;cursor:pointer;color:var(--text-muted);font-size:13px;}
+.upload-drop:active{background:var(--navy-700);}
+.preview-img{width:100%;border-radius:12px;margin-top:10px;display:none;max-height:320px;object-fit:contain;background:#000;}
+
+.btn{background:var(--grad);color:#fff;border:none;padding:13px;font-size:14px;font-weight:700;border-radius:10px;width:100%;cursor:pointer;font-family:'Inter',sans-serif;}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+
+.status{font-size:12px;color:var(--text-muted);text-align:center;padding:8px 0;min-height:18px;}
+.status.err{color:var(--red);}
+.status.ok{color:var(--green);}
+
+.result-block{margin-top:14px;}
+.result-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--text-muted);margin-bottom:8px;}
+.candidates{display:flex;flex-direction:column;gap:6px;margin-bottom:14px;}
+.candidate{display:flex;align-items:center;justify-content:between;gap:10px;background:var(--navy-700);border:1px solid var(--border2);border-radius:10px;padding:10px 12px;font-family:'JetBrains Mono',monospace;font-size:14px;color:var(--teal);cursor:pointer;}
+.candidate:active{background:var(--navy-600);}
+.candidate .tag{font-family:'Inter',sans-serif;font-size:9px;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-left:auto;}
+.raw-text{background:var(--navy-700);border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-mid);white-space:pre-wrap;word-break:break-all;max-height:220px;overflow:auto;}
+.copy-note{font-size:10px;color:var(--teal);text-align:center;margin-top:4px;height:14px;}
+.meta-row{display:flex;justify-content:space-between;font-size:10px;color:var(--text-muted);font-family:'JetBrains Mono',monospace;margin-top:8px;}
+
+footer{padding:20px 18px;text-align:center;font-size:10px;color:var(--navy-500);font-family:'JetBrains Mono',monospace;}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🔎 OCR Tester — Claude Vision</h1>
+  <p>Mismo tester que el de Google Vision, pegando contra la API de Claude (Anthropic). Comparalos con las mismas fotos. La key nunca se guarda — vive solo en esta pestaña.</p>
+  <span class="badge-generic">Reutilizable — cualquier proyecto Moretti</span>
+  <span class="badge-warn">Requiere header browser-access</span>
+</header>
+
+<main>
+
+  <div class="card">
+    <div class="card-title">1 · Configuración</div>
+    <div class="field">
+      <label class="label">API Key de Anthropic</label>
+      <div class="key-row">
+        <input type="password" id="apiKey" placeholder="sk-ant-...">
+        <button class="btn-toggle" onclick="toggleKeyVisibility()" id="btnToggleKey">Ver</button>
+      </div>
+    </div>
+    <div class="field">
+      <label class="label">Modelo</label>
+      <select id="modelSelect">
+        <option value="claude-haiku-4-5-20251001">Claude Haiku 4.5 — rápido y barato</option>
+        <option value="claude-sonnet-5" selected>Claude Sonnet 5 — más preciso</option>
+      </select>
+    </div>
+    <div class="hint">Se manda con el header <code>anthropic-dangerous-direct-browser-access</code> para poder llamarla desde el navegador. No se persiste en ningún lado al cerrar la pestaña.</div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">2 · Capturar o subir imagen</div>
+    <div class="mode-tabs">
+      <div class="mode-tab active" id="tabCam" onclick="switchMode('cam')">📷 Cámara en vivo</div>
+      <div class="mode-tab" id="tabUpload" onclick="switchMode('upload')">🖼️ Subir foto</div>
+    </div>
+
+    <div class="cam-wrap" id="camWrap">
+      <video id="video" autoplay playsinline muted></video>
+      <canvas id="canvas"></canvas>
+      <div class="cam-frame"><div></div></div>
+      <div class="cam-tap" id="camTap" onclick="startCamera()">
+        <span class="ic">📷</span>
+        <span class="txt">Tocá para activar la cámara</span>
+      </div>
+    </div>
+    <div class="cam-controls" id="camControls" style="display:none">
+      <button class="btn" onclick="capturarYLeer()">📸 Capturar y leer</button>
+    </div>
+
+    <div class="upload-wrap" id="uploadWrap">
+      <div class="upload-drop" onclick="document.getElementById('fileInput').click()">
+        Tocar para elegir una foto de la galería
+      </div>
+      <input type="file" id="fileInput" accept="image/*" style="display:none" onchange="onFileSelected(event)">
+      <img id="previewImg" class="preview-img">
+      <button class="btn" id="btnLeerUpload" style="margin-top:10px;display:none" onclick="leerImagenActual()">🔎 Leer con Claude</button>
+    </div>
+
+    <div class="status" id="status"></div>
+  </div>
+
+  <div class="card result-block" id="resultCard" style="display:none">
+    <div class="result-title">Números candidatos detectados</div>
+    <div class="candidates" id="candidatesList"></div>
+
+    <div class="result-title">Respuesta cruda de Claude</div>
+    <div class="raw-text" id="rawText"></div>
+    <div class="meta-row" id="metaRow"></div>
+    <div class="copy-note" id="copyNote"></div>
+  </div>
+
+</main>
+
+<footer>claude-ocr-tester · standalone, sin dependencias de proyecto</footer>
+
+<script>
+let stream=null, currentImageBase64=null, currentImageMediaType='image/jpeg';
+
+function toggleKeyVisibility(){
+  const inp=document.getElementById('apiKey');
+  const btn=document.getElementById('btnToggleKey');
+  if(inp.type==='password'){ inp.type='text'; btn.textContent='Ocultar'; }
+  else { inp.type='password'; btn.textContent='Ver'; }
+}
+
+function switchMode(mode){
+  document.getElementById('tabCam').classList.toggle('active', mode==='cam');
+  document.getElementById('tabUpload').classList.toggle('active', mode==='upload');
+  document.getElementById('camWrap').classList.toggle('show', mode==='cam');
+  document.getElementById('camControls').style.display = mode==='cam' ? 'flex' : 'none';
+  document.getElementById('uploadWrap').classList.toggle('show', mode==='upload');
+  if(mode!=='cam') stopCamera();
+}
+
+async function startCamera(){
+  try{
+    stream = await navigator.mediaDevices.getUserMedia({
+      video:{ facingMode:{ideal:'environment'}, width:{ideal:1920}, height:{ideal:1080} }
+    });
+    document.getElementById('video').srcObject = stream;
+    document.getElementById('camTap').style.display='none';
+  }catch(e){
+    setStatus('No se pudo activar la cámara: '+e.message, 'err');
+  }
+}
+function stopCamera(){
+  if(stream){ stream.getTracks().forEach(t=>t.stop()); stream=null; }
+  document.getElementById('camTap').style.display='flex';
+}
+
+function onFileSelected(ev){
+  const file=ev.target.files[0];
+  if(!file) return;
+  currentImageMediaType = file.type || 'image/jpeg';
+  const reader=new FileReader();
+  reader.onload=()=>{
+    currentImageBase64 = reader.result.split(',')[1];
+    const img=document.getElementById('previewImg');
+    img.src=reader.result;
+    img.style.display='block';
+    document.getElementById('btnLeerUpload').style.display='block';
+  };
+  reader.readAsDataURL(file);
+}
+
+function capturarYLeer(){
+  const video=document.getElementById('video');
+  const canvas=document.getElementById('canvas');
+  canvas.width=video.videoWidth;
+  canvas.height=video.videoHeight;
+  canvas.getContext('2d').drawImage(video,0,0);
+  currentImageMediaType='image/jpeg';
+  currentImageBase64 = canvas.toDataURL('image/jpeg',0.92).split(',')[1];
+  leerImagenActual();
+}
+
+function setStatus(txt,cls){
+  const el=document.getElementById('status');
+  el.textContent=txt;
+  el.className='status'+(cls?' '+cls:'');
+}
+
+const PROMPT_OCR = `Esta es una foto de un chip SIM físico. El número de serie impreso arranca siempre con el prefijo 8954 y puede estar partido en 2, 3 o 4 líneas en la etiqueta del chip.
+
+Transcribí EXACTAMENTE los números impresos que ves, línea por línea, tal cual aparecen (no los combines, no corrijas, no completes dígitos que no puedas ver con certeza — si un dígito no se lee bien, poné [?] en su lugar).
+
+Después de la transcripción línea por línea, en una línea aparte que empiece con "NUMERO_COMPLETO:", escribí el número de serie completo uniendo todas las líneas relevantes (sin espacios, sin guiones).
+
+No agregues explicación, ni texto adicional, ni markdown.`;
+
+async function leerImagenActual(){
+  const apiKey=document.getElementById('apiKey').value.trim();
+  const model=document.getElementById('modelSelect').value;
+  if(!apiKey){ setStatus('Pegá tu API Key de Anthropic primero','err'); return; }
+  if(!currentImageBase64){ setStatus('No hay imagen para leer','err'); return; }
+
+  setStatus('🔍 Consultando Claude ('+model+')...', '');
+  document.getElementById('resultCard').style.display='none';
+  const t0 = performance.now();
+
+  try{
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method:'POST',
+      headers:{
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: model,
+        max_tokens: 500,
+        messages: [{
+          role: 'user',
+          content: [
+            { type:'image', source:{ type:'base64', media_type: currentImageMediaType, data: currentImageBase64 } },
+            { type:'text', text: PROMPT_OCR }
+          ]
+        }]
+      })
+    });
+    const data = await resp.json();
+    const ms = Math.round(performance.now()-t0);
+
+    if(data.error){
+      setStatus('Error de Claude: '+data.error.message,'err');
+      return;
+    }
+
+    const textoCrudo = (data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('\n');
+
+    if(!textoCrudo){
+      setStatus('Claude no devolvió texto','err');
+      return;
+    }
+
+    setStatus('✅ Lectura completa','ok');
+    mostrarResultado(textoCrudo, { ms, model, tokensIn: data.usage?.input_tokens, tokensOut: data.usage?.output_tokens });
+
+  }catch(e){
+    setStatus('Error de red: '+e.message+' — si es CORS, revisá que el header dangerous-direct-browser-access esté yendo','err');
+  }
+}
+
+// Extrae el NUMERO_COMPLETO si Claude lo devolvió con el formato pedido,
+// más cualquier otra secuencia numérica larga como candidato secundario.
+function extraerCandidatos(texto){
+  const candidatos=[];
+  const vistos=new Set();
+
+  const matchCompleto = texto.match(/NUMERO_COMPLETO:\s*([0-9]+)/i);
+  if(matchCompleto){
+    candidatos.push({ valor: matchCompleto[1], prioridad:'respuesta directa de Claude' });
+    vistos.add(matchCompleto[1]);
+  }
+
+  const limpio = texto.replace(/[^0-9\n ]/g,' ');
+  const secuencias = limpio.split(/[\s\n]+/).filter(s=>s.length>=6);
+  secuencias.forEach(s=>{
+    if(vistos.has(s)) return;
+    vistos.add(s);
+    candidatos.push({ valor:s, prioridad: s.startsWith('8954') ? 'prefijo conocido' : 'genérico' });
+  });
+
+  return candidatos;
+}
+
+function mostrarResultado(textoCrudo, meta){
+  const candidatos = extraerCandidatos(textoCrudo);
+  const list=document.getElementById('candidatesList');
+  if(candidatos.length===0){
+    list.innerHTML='<div style="color:var(--text-muted);font-size:12px">No se encontraron secuencias numéricas</div>';
+  } else {
+    list.innerHTML = candidatos.map(c=>`
+      <div class="candidate" onclick="copiarCandidato('${c.valor}')">
+        ${c.valor}
+        <span class="tag">${c.prioridad}</span>
+      </div>
+    `).join('');
+  }
+  document.getElementById('rawText').textContent = textoCrudo;
+  document.getElementById('metaRow').textContent =
+    `${meta.model} · ${meta.ms}ms · in:${meta.tokensIn ?? '—'} out:${meta.tokensOut ?? '—'} tokens`;
+  document.getElementById('resultCard').style.display='block';
+}
+
+async function copiarCandidato(valor){
+  try{
+    await navigator.clipboard.writeText(valor);
+    const note=document.getElementById('copyNote');
+    note.textContent='📋 Copiado: '+valor;
+    setTimeout(()=>note.textContent='',2000);
+  }catch(e){}
+}
+</script>
+
+</body>
+</html>
