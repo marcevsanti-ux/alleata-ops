@@ -426,9 +426,9 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <div class="active-bar"></div><span class="nav-icon-wrap">⊞</span> Dashboard
     </div>
     <div class="nav-section">Módulos</div>
-    <div class="nav-item" data-mod="sims" id="nav-sims" style="opacity:0.4;pointer-events:none;cursor:default;">
+    <div class="nav-item" data-mod="sims" id="nav-sims" onclick="goTo('sims')">
       <div class="active-bar"></div><span class="nav-icon-wrap">📡</span> SIMs
-      <span class="nav-badge">6878</span>
+      <span class="nav-badge">—</span>
     </div>
     <div class="nav-item" data-mod="envios" id="nav-envios" onclick="goTo('envios')">
       <div class="active-bar"></div><span class="nav-icon-wrap">🚚</span> Envíos
@@ -788,25 +788,21 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         </div>
       </div>
 
-      <!-- Actualizar base SIMs (solo admin) -->
+      <!-- Base de datos SIMs (solo admin) — fuente única: Salesforce -->
       <div class="card" style="margin-bottom:16px">
         <div class="card-title">📡 Base de datos SIMs</div>
         <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px;line-height:1.6;">
-          Subí el Excel de CLARO con el listado actualizado de SIMs. El sistema hará un <strong style="color:var(--text)">upsert</strong> por número de serie — actualizará los existentes y agregará los nuevos sin borrar registros que no vengan en el archivo.
+          La base de SIMs se sincroniza automáticamente desde <strong style="color:var(--text)">Salesforce (Product2)</strong> todos los días a las 06:10 ART. No hay carga manual de Excel — toda actualización de estado, ubicación o cuenta se hace en SF y se refleja acá solo.
         </div>
-        <div id="simsDbStats" style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap"></div>
+        <div id="simsDbStats" style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap">
+          <div class="stat-box s-teal" style="min-width:110px"><div class="stat-num" id="ss-admin-total">—</div><div class="stat-label">Total en base</div></div>
+          <div class="stat-box s-green" style="min-width:110px"><div class="stat-num" id="ss-admin-ok">—</div><div class="stat-label">Asignadas/Disp.</div></div>
+          <div class="stat-box s-red" style="min-width:110px"><div class="stat-num" id="ss-admin-baja">—</div><div class="stat-label">Otros estados</div></div>
+        </div>
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-          <label style="background:var(--grad);color:#fff;border:none;padding:9px 18px;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;cursor:pointer;border-radius:8px;display:inline-flex;align-items:center;gap:8px;">
-            📂 Seleccionar Excel SIMs
-            <input type="file" id="simsFileInput" accept=".xlsx,.xls" style="display:none" onchange="importSIMs(event)">
-          </label>
-          <div id="simsImportMsg" style="font-size:12px;color:var(--text-muted)"></div>
+          <button class="btn btn-sm" id="simsSyncBtn" onclick="syncSimsFromSF()">↻ Sincronizar ahora desde SF</button>
+          <div id="simsSyncMsg" style="font-size:12px;color:var(--text-muted)"></div>
         </div>
-        <div id="simsImportProgress" style="display:none;margin-top:10px">
-          <div class="progress-text" id="simsProgressText">Procesando...</div>
-          <div class="progress-track" style="margin-top:6px"><div class="progress-fill" id="simsProgressFill"></div></div>
-        </div>
-        <div id="simsImportResult" style="margin-top:10px"></div>
       </div>
       <!-- Configuración SLA -->
       <div class="card" style="margin-bottom:16px">
@@ -4392,6 +4388,9 @@ async function loadSimStats() {
     if (document.getElementById('ss-total')) document.getElementById('ss-total').textContent = total || 0;
     if (document.getElementById('ss-ok')) document.getElementById('ss-ok').textContent = ok;
     if (document.getElementById('ss-baja')) document.getElementById('ss-baja').textContent = baja;
+    if (document.getElementById('ss-admin-total')) document.getElementById('ss-admin-total').textContent = total || 0;
+    if (document.getElementById('ss-admin-ok')) document.getElementById('ss-admin-ok').textContent = ok;
+    if (document.getElementById('ss-admin-baja')) document.getElementById('ss-admin-baja').textContent = baja;
     const nb = document.querySelector('#nav-sims .nav-badge');
     if (nb && total) nb.textContent = total.toLocaleString();
     const dstat = document.querySelector('[data-mod="sims"] .dash-card-stat');
@@ -4400,6 +4399,34 @@ async function loadSimStats() {
 }
 // alias para compatibilidad
 function loadSimsDbStats() { return loadSimStats(); }
+
+// Sync manual SIMs desde Salesforce (Product2) — mismo endpoint que corre el cron diario 06:10
+async function syncSimsFromSF() {
+  const btn = document.getElementById('simsSyncBtn');
+  const msg = document.getElementById('simsSyncMsg');
+  if (!btn) return;
+  btn.disabled = true;
+  btn.textContent = '↻ Sincronizando...';
+  if (msg) { msg.style.color = 'var(--text-muted)'; msg.textContent = 'Consultando Salesforce (Product2)...'; }
+  try {
+    const res = await fetch(`${SF_AGENT_URL}/automations/run/sf_sims_sync`, {
+      method: 'POST',
+      headers: { 'x-automation-secret': SF_SYNC_SECRET, 'Content-Type': 'application/json' }
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Error en la sincronización');
+    if (msg) {
+      msg.style.color = 'var(--teal)';
+      msg.textContent = `✅ ${data.upserted ?? data.total ?? '—'} SIMs sincronizadas` + (data.eliminados ? `, ${data.eliminados} huérfanas eliminadas` : '');
+    }
+    await loadSimStats();
+  } catch (err) {
+    if (msg) { msg.style.color = 'var(--red)'; msg.textContent = '❌ ' + err.message; }
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '↻ Sincronizar ahora desde SF';
+  }
+}
 // ========== FIN SIMS Supabase ==========  
 let currentUser=null,currentProfile=null;
 
@@ -4479,7 +4506,7 @@ function showApp(){
   });
   buildDashCards(modulos,isAdmin);
   loadConfigSLA(); // cargar config SLA al inicio
-  updateDate();loadBadges();
+  updateDate();loadBadges();loadSimStats();
   const envFecha=document.getElementById('envFecha');if(envFecha)envFecha.value=new Date().toISOString().slice(0,10);
 
   // ── Realtime: refrescar módulo activo cuando el sync de Railway actualiza sf_workorders ──
@@ -4574,6 +4601,7 @@ function goTo(mod){
   if(mod==='home'){setTimeout(()=>{if(window._drawQR)window._drawQR();},200);loadOpsPanel(currentProfile?.rol==='admin');}
   if(mod==='rollout')initRollout();
   if(mod==='desinstalaciones'){if(window.cargarDesinstalaciones&&!(window.DesinModule?.cargado))window.cargarDesinstalaciones();}
+  if(mod==='sims')loadSimStats();
   if(mod==='napse')window.napseInitApp?.();
   if(mod==='instalaciones'){window.scrollTo(0,0);initInstalaciones();}
   if(mod==='ally')window.allyInit?.();
