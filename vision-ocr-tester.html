@@ -47,6 +47,8 @@ canvas{display:none;}
 .cam-tap span.ic{font-size:34px;}
 .cam-tap span.txt{font-size:13px;font-weight:700;color:#fff;}
 .cam-controls{display:flex;gap:8px;margin-top:10px;}
+.zoom-row{display:flex;align-items:center;gap:10px;padding:8px 4px;}
+.zoom-row input[type=range]{flex:1;accent-color:var(--teal);cursor:pointer;height:4px;}
 
 .upload-wrap{display:none;}
 .upload-wrap.show{display:block;}
@@ -110,6 +112,11 @@ footer{padding:20px 18px;text-align:center;font-size:10px;color:var(--navy-500);
         <span class="txt">Tocá para activar la cámara</span>
       </div>
     </div>
+    <div class="zoom-row" id="zoomRow" style="display:none">
+      <span style="font-size:13px">🔍</span>
+      <input type="range" id="zoomSlider" min="1" max="4" step="0.1" value="1" oninput="aplicarZoom(parseFloat(this.value))">
+      <span id="zoomLabel" style="font-size:11px;color:var(--text-muted);min-width:28px;text-align:right;font-family:'JetBrains Mono',monospace">1×</span>
+    </div>
     <div class="cam-controls" id="camControls" style="display:none">
       <button class="btn" onclick="capturarYLeer()">📸 Capturar y leer</button>
     </div>
@@ -140,7 +147,7 @@ footer{padding:20px 18px;text-align:center;font-size:10px;color:var(--navy-500);
 <footer>vision-ocr-tester · standalone, sin dependencias de proyecto</footer>
 
 <script>
-let stream=null, currentImageBase64=null;
+let stream=null, currentImageBase64=null, _zoom=1;
 
 function toggleKeyVisibility(){
   const inp=document.getElementById('apiKey');
@@ -165,6 +172,8 @@ async function startCamera(){
     });
     document.getElementById('video').srcObject = stream;
     document.getElementById('camTap').style.display='none';
+    document.getElementById('zoomRow').style.display='flex';
+    aplicarZoom(1);
   }catch(e){
     setStatus('No se pudo activar la cámara: '+e.message, 'err');
   }
@@ -172,7 +181,45 @@ async function startCamera(){
 function stopCamera(){
   if(stream){ stream.getTracks().forEach(t=>t.stop()); stream=null; }
   document.getElementById('camTap').style.display='flex';
+  document.getElementById('zoomRow').style.display='none';
 }
+
+function aplicarZoom(val){
+  _zoom = val;
+  document.getElementById('zoomLabel').textContent = val.toFixed(1)+'×';
+  const video = document.getElementById('video');
+  video.style.transform = `scale(${val})`;
+  video.style.transformOrigin = 'center center';
+  // Zoom nativo de cámara si el dispositivo lo soporta (Android Chrome) — mejora la
+  // nitidez real en vez de solo agrandar por CSS. Si no está disponible, no rompe nada.
+  if(stream){
+    const track = stream.getVideoTracks()[0];
+    const caps = track.getCapabilities?.();
+    if(caps?.zoom){
+      const zoomVal = caps.zoom.min + (caps.zoom.max-caps.zoom.min) * ((val-1)/3);
+      track.applyConstraints({advanced:[{zoom:zoomVal}]}).catch(()=>{});
+    }
+  }
+}
+
+// Pinch-to-zoom táctil
+(function initPinchZoom(){
+  let pinchDist=null, pinchZoomStart=1;
+  function dist(t){ const dx=t[0].clientX-t[1].clientX, dy=t[0].clientY-t[1].clientY; return Math.sqrt(dx*dx+dy*dy); }
+  document.addEventListener('touchstart', e=>{
+    if(!document.getElementById('camWrap').contains(e.target)) return;
+    if(e.touches.length===2){ pinchDist=dist(e.touches); pinchZoomStart=_zoom; }
+  },{passive:true});
+  document.addEventListener('touchmove', e=>{
+    if(e.touches.length!==2 || !pinchDist) return;
+    if(!document.getElementById('camWrap').contains(e.target)) return;
+    const ratio = dist(e.touches)/pinchDist;
+    const newZoom = Math.min(4, Math.max(1, pinchZoomStart*ratio));
+    document.getElementById('zoomSlider').value = newZoom;
+    aplicarZoom(newZoom);
+  },{passive:true});
+  document.addEventListener('touchend', e=>{ if(e.touches.length<2) pinchDist=null; },{passive:true});
+})();
 
 function onFileSelected(ev){
   const file=ev.target.files[0];
@@ -191,9 +238,14 @@ function onFileSelected(ev){
 function capturarYLeer(){
   const video=document.getElementById('video');
   const canvas=document.getElementById('canvas');
-  canvas.width=video.videoWidth;
-  canvas.height=video.videoHeight;
-  canvas.getContext('2d').drawImage(video,0,0);
+  const z = Math.max(1, _zoom||1);
+  const sw = Math.floor(video.videoWidth/z);
+  const sh = Math.floor(video.videoHeight/z);
+  const sx = Math.floor((video.videoWidth-sw)/2);
+  const sy = Math.floor((video.videoHeight-sh)/2);
+  canvas.width = sw;
+  canvas.height = sh;
+  canvas.getContext('2d').drawImage(video, sx, sy, sw, sh, 0, 0, sw, sh);
   currentImageBase64 = canvas.toDataURL('image/jpeg',0.92).split(',')[1];
   leerImagenActual();
 }
