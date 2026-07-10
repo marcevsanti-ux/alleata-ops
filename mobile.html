@@ -330,6 +330,14 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
       <div id="simScanStatus" style="padding:10px 14px;text-align:center;font-size:12px;color:var(--text-muted);border-top:1px solid var(--border);background:var(--surface)">
         Apuntá la cámara al chip SIM
       </div>
+      <!-- TEMPORAL — panel de diagnóstico (no bloqueante, a diferencia del alert() viejo
+           que congelaba la cámara en iOS). Sacar cuando quede confirmado que anda bien. -->
+      <div id="simDebugPanel" style="display:none;padding:10px 14px;background:rgba(245,158,11,.08);border-top:1px solid rgba(245,158,11,.3);font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--yellow);white-space:pre-wrap;word-break:break-all"></div>
+      <div style="padding:8px 14px;text-align:center;border-top:1px solid var(--border)">
+        <button onclick="reiniciarSimCamera()" style="background:none;border:1px solid var(--border2);color:var(--text-muted);font-size:11px;padding:6px 14px;border-radius:8px;cursor:pointer;font-family:'Inter',sans-serif">
+          🔄 Reiniciar cámara
+        </button>
+      </div>
       <!-- Número interpretado -->
       <div id="simDetectedWrap" style="display:none;padding:8px 14px;background:var(--surface2);border-top:1px solid var(--border)">
         <div style="font-size:10px;color:var(--text-muted);font-weight:600;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px">Número interpretado</div>
@@ -1670,8 +1678,8 @@ async function capturarSimFrame(){
       captureBtn.style.opacity='1';
       captureBtn.textContent='📷 Capturar';
       _simScanning=false;
-      // TEMPORAL — diagnóstico en vivo, sacar cuando resolvamos el problema real
-      alert('DIAGNÓSTICO — Vision no devolvió texto reconocible.\n\nTexto crudo recibido:\n'+(res||'(vacío)'));
+      // TEMPORAL — diagnóstico no bloqueante (ver panel debajo de la cámara)
+      mostrarDebugPanel('Vision no devolvió texto reconocible.\n\nTexto crudo recibido:\n'+(res||'(vacío)'));
       return;
     }
 
@@ -1710,9 +1718,30 @@ async function capturarSimFrame(){
     captureBtn.style.opacity='1';
     captureBtn.textContent='📷 Capturar';
     // TEMPORAL — diagnóstico en vivo, sacar cuando resolvamos el problema real
-    alert('DIAGNÓSTICO — Error real capturado:\n\n'+err.message+'\n\n'+(err.stack||''));
+    // TEMPORAL — diagnóstico no bloqueante (ver panel debajo de la cámara)
+    mostrarDebugPanel('Error real capturado:\n\n'+err.message+'\n\n'+(err.stack||''));
   }
   _simScanning=false;
+}
+
+// Panel de diagnóstico no-bloqueante — reemplaza los alert() que se usaron
+// para debuggear, porque alert() puede congelar el preview de cámara en iOS
+// Safari mientras el diálogo está abierto.
+function mostrarDebugPanel(texto){
+  const panel=document.getElementById('simDebugPanel');
+  if(!panel)return;
+  panel.textContent='⚠️ DIAGNÓSTICO — '+texto;
+  panel.style.display='block';
+}
+
+// Reinicio manual de la cámara — por si queda trabada después de un error
+// (safety net, además del fix de sacar los alert() bloqueantes).
+function reiniciarSimCamera(){
+  detenerSimCamera();
+  const panel=document.getElementById('simDebugPanel');
+  if(panel){panel.style.display='none';panel.textContent='';}
+  document.getElementById('simScanStatus').textContent='Apuntá la cámara al chip SIM';
+  setTimeout(()=>iniciarSimCamera(),300);
 }
 
 function detenerSimCamera(){
