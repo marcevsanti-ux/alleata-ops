@@ -1879,35 +1879,40 @@ async function callVision(b64,mime){
 
 function parseVisionSIM(text){
   // Vision devuelve texto plano línea por línea (no JSON como Gemini).
-  // Misma lógica validada en el tester: limpiar cada línea de caracteres no
-  // numéricos ANTES de cortar, para no perder dígitos por espacios raros de OCR.
+  // Limpiar cada línea de caracteres no numéricos ANTES de cortar, para no
+  // perder dígitos por espacios raros de OCR.
+  //
+  // FIX (chips de 4 líneas cortas, ej: "89543"/"10226"/"10232"/"1847"):
+  // el filtro anterior exigía >=6 dígitos por línea, pensado para el formato
+  // de 2 líneas largas (~10 dígitos c/u). Con 4 líneas cortas (4-5 dígitos)
+  // descartaba TODO y no armaba nada. Bajado a >=3 y unificado en un solo
+  // camino que junta todas las líneas que pasen el filtro, sin importar cuántas
+  // sean — cubre el formato de 2 líneas Y el de 3-4 líneas por igual.
   const lineasLimpias = text.split('\n')
     .map(l=>l.replace(/[^0-9]/g,''))
-    .filter(l=>l.length>=6);
+    .filter(l=>l.length>=3);
 
   let prefijo=null, sufijo=null, serie=null;
 
-  if(lineasLimpias.length>=2){
-    // Chip de 2+ líneas: primera línea = prefijo (si arranca 8954), resto = sufijo
-    prefijo = lineasLimpias[0].startsWith('8954') ? lineasLimpias[0] : null;
-    sufijo  = lineasLimpias[1] || null;
+  if(lineasLimpias.length>0){
     const combinada = lineasLimpias.join('');
-    if(combinada.length>=18) serie = combinada;
-  } else if(lineasLimpias.length===1){
-    const unica = lineasLimpias[0];
-    if(unica.length>=18) serie = unica;
-    else if(unica.startsWith('8954')) prefijo = unica;
-    else sufijo = unica;
+    // ICCID completo son 19-20 dígitos — margen amplio por si Vision se come
+    // o agrega algún dígito de más
+    if(combinada.length>=18 && combinada.length<=21) serie = combinada;
+    prefijo = lineasLimpias[0].startsWith('8954') ? lineasLimpias[0]
+            : (combinada.startsWith('8954') ? combinada.slice(0,10) : null);
+    sufijo = lineasLimpias.length>1 ? lineasLimpias.slice(1).join('') : null;
   }
 
   // Línea telefónica: 10 dígitos empezando con 11 (AMBA), en cualquier parte del texto
   const lineaMatch = text.replace(/[^0-9\n ]/g,' ').match(/\b11\d{8}\b/);
   const linea = lineaMatch ? lineaMatch[0] : null;
 
-  // Fallback si no se armó nada por líneas (ej: Vision devolvió todo en una sola
-  // línea pegada, o con separadores raros) — mismo regex de respaldo que antes
+  // Fallback si no se armó nada por líneas (ej: Vision devolvió todo pegado
+  // sin saltos de línea, o con separadores raros) — mismo regex de respaldo
   if(!serie && !prefijo && !sufijo){
-    const serieMatch=text.match(/8954\d{9,}/);
+    const soloDigitos = text.replace(/\n/g,'');
+    const serieMatch=soloDigitos.match(/8954\d{9,}/);
     const sufijoMatch=text.match(/\b\d{9,10}\b/g);
     return{
       serie:serieMatch?serieMatch[0]:null,
