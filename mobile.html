@@ -1625,17 +1625,29 @@ async function capturarSimFrame(){
     // Usar un canvas temporal limpio para la captura
     const canvas=document.createElement('canvas');
     const z=Math.max(1,_simZoom||1);
-    const sw=Math.floor(video.videoWidth/z);
-    const sh=Math.floor(video.videoHeight/z);
-    const sx=Math.floor((video.videoWidth-sw)/2);
-    const sy=Math.floor((video.videoHeight-sh)/2);
-    // Escalar a 800x800 max para no sobrecargar
-    const outSize=Math.min(800,Math.max(sw,sh));
+    // FIX: recorte cuadrado desde el origen (antes recortaba un rectángulo
+    // sw×sh no-cuadrado y lo aplastaba en un canvas cuadrado — eso distorsionaba
+    // la imagen y probablemente le complicaba la lectura a Vision).
+    const cropSize=Math.floor(Math.min(video.videoWidth,video.videoHeight)/z);
+    const sx=Math.floor((video.videoWidth-cropSize)/2);
+    const sy=Math.floor((video.videoHeight-cropSize)/2);
+    const outSize=Math.min(800,cropSize);
     canvas.width=outSize;
     canvas.height=outSize;
     const ctx=canvas.getContext('2d');
-    ctx.drawImage(video,sx,sy,sw,sh,0,0,outSize,outSize);
+    ctx.drawImage(video,sx,sy,cropSize,cropSize,0,0,outSize,outSize);
     const b64=canvas.toDataURL('image/jpeg',0.92).split(',')[1];
+
+    // TEMPORAL — diagnóstico visual: mostrar exactamente la imagen que se manda
+    let dbgImg=document.getElementById('simDebugCapture');
+    if(!dbgImg){
+      dbgImg=document.createElement('img');
+      dbgImg.id='simDebugCapture';
+      dbgImg.style.cssText='width:100%;border:2px solid var(--yellow);border-radius:10px;margin-top:10px;display:block';
+      document.getElementById('simResults').prepend(dbgImg);
+    }
+    dbgImg.src=canvas.toDataURL('image/jpeg',0.92);
+    console.log('DEBUG captura — video:',video.videoWidth+'x'+video.videoHeight,'zoom:',z,'cropSize:',cropSize,'outSize:',outSize,'b64 length:',b64.length);
 
     const res=await callVision(b64,'image/jpeg');
     console.log('VISION RAW:', res);
