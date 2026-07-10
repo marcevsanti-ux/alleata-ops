@@ -42,7 +42,7 @@ input:focus{border-color:var(--teal);}
 video{width:100%;height:100%;object-fit:cover;display:block;}
 canvas{display:none;}
 .cam-frame{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;}
-.cam-frame div{width:78%;height:34%;border:2px solid var(--teal);border-radius:10px;box-shadow:0 0 0 9999px rgba(0,0,0,.45);}
+.cam-frame div{width:85%;height:44%;border:2px solid var(--teal);border-radius:10px;box-shadow:0 0 0 9999px rgba(0,0,0,.45);}
 .cam-tap{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:rgba(0,0,0,.75);cursor:pointer;}
 .cam-tap span.ic{font-size:34px;}
 .cam-tap span.txt{font-size:13px;font-weight:700;color:#fff;}
@@ -173,7 +173,12 @@ async function startCamera(){
     document.getElementById('video').srcObject = stream;
     document.getElementById('camTap').style.display='none';
     document.getElementById('zoomRow').style.display='flex';
-    aplicarZoom(1);
+    // Arranca con zoom de entrada (no 1x) — el texto del chip es chico y así
+    // el operador ya lo ve grande desde que activa la cámara, sin tener que
+    // acordarse de mover el slider cada vez.
+    const zoomInicial = 2;
+    document.getElementById('zoomSlider').value = zoomInicial;
+    aplicarZoom(zoomInicial);
   }catch(e){
     setStatus('No se pudo activar la cámara: '+e.message, 'err');
   }
@@ -306,23 +311,39 @@ async function leerImagenActual(){
 // Prioriza las que empiezan con el prefijo conocido de chips CLARO (8954),
 // pero muestra cualquier secuencia larga de dígitos como candidato secundario.
 function extraerCandidatos(texto){
-  const limpio = texto.replace(/[^0-9\n ]/g,' ');
-  const secuencias = limpio.split(/[\s\n]+/).filter(s=>s.length>=6);
   const vistos = new Set();
   const candidatos=[];
+
+  // 1. Candidato por línea completa (saca espacios internos de CADA línea) —
+  //    esto evita perder dígitos cuando Vision mete un espacio raro a mitad
+  //    de un renglón (ej: "055847852 0" → "0558478520").
+  const lineasLimpias = texto.split('\n')
+    .map(l=>l.replace(/[^0-9]/g,''))
+    .filter(l=>l.length>=6);
+  lineasLimpias.forEach(l=>{
+    if(vistos.has(l)) return;
+    vistos.add(l);
+    candidatos.push({ valor:l, prioridad: l.startsWith('8954') ? 'prefijo conocido' : 'línea completa' });
+  });
+
+  // 2. Candidato de líneas combinadas (chips partidos en 3-4 renglones cortos)
+  if(lineasLimpias.length>1){
+    const pegado = lineasLimpias.join('');
+    if(pegado.length>=10 && !vistos.has(pegado)){
+      candidatos.unshift({ valor: pegado, prioridad:'líneas combinadas' });
+      vistos.add(pegado);
+    }
+  }
+
+  // 3. Fallback: split naive por espacios/saltos, por si el texto no vino en líneas prolijas
+  const limpio = texto.replace(/[^0-9\n ]/g,' ');
+  const secuencias = limpio.split(/[\s\n]+/).filter(s=>s.length>=6);
   secuencias.forEach(s=>{
     if(vistos.has(s)) return;
     vistos.add(s);
     candidatos.push({ valor:s, prioridad: s.startsWith('8954') ? 'prefijo conocido' : 'genérico' });
   });
-  // también intenta pegar líneas consecutivas de dígitos cortas (chips que imprimen partido en 3-4 líneas)
-  const lineas = texto.split('\n').map(l=>l.replace(/[^0-9]/g,'')).filter(Boolean);
-  if(lineas.length>1){
-    const pegado = lineas.join('');
-    if(pegado.length>=10 && !vistos.has(pegado)){
-      candidatos.unshift({ valor: pegado, prioridad:'líneas combinadas' });
-    }
-  }
+
   return candidatos;
 }
 
