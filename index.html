@@ -530,7 +530,8 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
   <div class="content">
 
     <div class="module" id="mod-sims">
-      <div class="upload-zone" id="simDropZone">
+      <!-- Carga de fotos deshabilitada por ahora — dejar solo búsqueda manual -->
+      <div class="upload-zone" id="simDropZone" style="display:none">
         <input type="file" id="simFileInput" multiple accept="image/*">
         <div style="font-size:30px;margin-bottom:8px">📷</div>
         <h3>Subir fotos de chips SIM</h3>
@@ -4335,7 +4336,25 @@ async function simSmartLookup(query) {
   return await simLookupBySufijo(query);
 }
 
-function renderSimCard(sim) {
+// Búsqueda EN VIVO contra Salesforce (Product2), vía Railway — no depende
+// del sync nocturno (06:10). Se usa como segundo paso, después de mostrar
+// el resultado instantáneo de Supabase, para confirmar/corregir con la
+// fuente de verdad. De paso el backend refresca el caché de esa fila.
+async function simLookupLiveSF(query) {
+  try {
+    const res = await fetch(`${SF_AGENT_URL}/automations/sims/lookup?q=${encodeURIComponent(query)}`, {
+      headers: { 'x-automation-secret': SF_SYNC_SECRET }
+    });
+    const data = await res.json();
+    if (!res.ok || !data.ok) return null;
+    return data.sim;
+  } catch (e) {
+    console.warn('simLookupLiveSF error', e);
+    return null;
+  }
+}
+
+function renderSimCard(sim, sourceLabel) {
   const estadoClass = {
     'ASIGNADA': 'c-ok', 'DISPONIBLE': 'c-ok',
     'EXTRAVIADA': 'c-baja', 'ENVIO FALLIDO': 'c-baja', 'TERMINAL DEVUELTA': 'c-baja'
@@ -4352,6 +4371,7 @@ function renderSimCard(sim) {
     <div class="sim-row"><span class="sim-key">Línea</span><span class="sim-val">${sim.linea || '—'}</span></div>
     <div class="sim-row"><span class="sim-key">Ubicación</span><span class="sim-val">${sim.ubicacion || '—'}</span></div>
     <div class="sim-row"><span class="sim-key">Cuenta</span><span class="sim-val" style="font-size:10px;word-break:break-word">${sim.cuenta || '—'}</span></div>
+    ${sourceLabel ? `<div style="font-size:9px;color:var(--text-muted);margin-top:8px;text-align:right">${sourceLabel}</div>` : ''}
   </div>`;
 }
 
@@ -4360,12 +4380,26 @@ async function simSearchManual() {
   const out = document.getElementById('simManualResult');
   if (!q) { out.innerHTML = ''; return; }
   out.innerHTML = '<div style="color:var(--text-muted);font-size:12px;padding:10px 0">Buscando...</div>';
-  const sim = await simSmartLookup(q);
-  if (!sim) {
-    out.innerHTML = '<div class="alert alert-err" style="margin-top:10px">No se encontró ninguna SIM con ese dato.</div>';
-    return;
+
+  // 1) Resultado instantáneo desde caché (Supabase) — puede estar hasta 1 día desactualizado
+  const cached = await simSmartLookup(q);
+  if (cached) {
+    out.innerHTML = '<div class="sim-grid" style="margin-top:12px">' + renderSimCard(cached, '⏱ Caché · confirmando con Salesforce...') + '</div>';
+  } else {
+    out.innerHTML = '<div style="color:var(--text-muted);font-size:12px;padding:10px 0">No está en caché, consultando Salesforce en vivo...</div>';
   }
-  out.innerHTML = '<div class="sim-grid" style="margin-top:12px">' + renderSimCard(sim) + '</div>';
+
+  // 2) Confirmar/corregir en vivo contra Salesforce (fuente de verdad).
+  // De paso el backend refresca esa fila en Supabase, así el caché se
+  // autocura con cada búsqueda real.
+  const live = await simLookupLiveSF(q);
+  if (live) {
+    out.innerHTML = '<div class="sim-grid" style="margin-top:12px">' + renderSimCard(live, '● Confirmado en vivo con Salesforce') + '</div>';
+  } else if (!cached) {
+    out.innerHTML = '<div class="alert alert-err" style="margin-top:10px">No se encontró ninguna SIM con ese dato (ni en caché ni en Salesforce).</div>';
+  } else {
+    out.innerHTML = '<div class="sim-grid" style="margin-top:12px">' + renderSimCard(cached, '⚠️ No se pudo confirmar con SF — mostrando caché, puede estar desactualizado') + '</div>';
+  }
 }
 
 async function processOcrResult(ocrText, thumbEl) {
