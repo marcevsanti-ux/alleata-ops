@@ -154,8 +154,8 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;min-h
 .dash-card[data-mod="sims"]::after{background:linear-gradient(90deg,var(--teal),var(--blue));}
 .dash-card[data-mod="envios"]::after{background:linear-gradient(90deg,var(--blue),#6366f1);}
 .dash-card[data-mod="devoluciones"]::after{background:linear-gradient(90deg,var(--orange),var(--yellow));}
-.dash-card[data-mod="horas"]::after{background:linear-gradient(90deg,var(--purple),var(--blue));}
 .dash-card[data-mod="ajustes"]::after{background:linear-gradient(90deg,var(--navy-400),var(--navy-300));}
+.dash-card[data-mod="presupuesto"]::after{background:linear-gradient(90deg,var(--purple),var(--blue));}
 .dash-card[data-mod="terminales"]::after{background:linear-gradient(90deg,#f59e0b,#ef4444);}
 .dash-card[data-mod="terminales"] .dash-card-stat{color:#f59e0b;}
 .dash-card.locked{opacity:.3;cursor:not-allowed;}
@@ -166,8 +166,8 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;min-h
 .dash-card[data-mod="sims"] .dash-card-stat{color:var(--teal);}
 .dash-card[data-mod="envios"] .dash-card-stat{color:var(--blue);}
 .dash-card[data-mod="devoluciones"] .dash-card-stat{color:var(--orange);}
-.dash-card[data-mod="horas"] .dash-card-stat{color:var(--purple);}
 .dash-card[data-mod="ajustes"] .dash-card-stat{color:var(--text-muted);}
+.dash-card[data-mod="presupuesto"] .dash-card-stat{color:var(--purple);}
 
 /* CARDS */
 .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;}
@@ -236,14 +236,6 @@ tr:hover td{background:var(--surface2);}
 .sim-row{display:flex;gap:8px;margin-bottom:3px;}
 .sim-key{font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);min-width:64px;font-weight:700;}
 .sim-val{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text);}
-
-/* HORAS TEAM */
-.team-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:10px;}
-.team-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center;}
-.team-avatar{width:44px;height:44px;border-radius:50%;background:var(--grad);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:#fff;margin:0 auto 8px;}
-.team-name{font-size:13px;font-weight:600;color:var(--text);}
-.team-hours{font-family:'JetBrains Mono',monospace;font-size:22px;font-weight:700;color:var(--purple);margin-top:4px;}
-.team-today{font-size:10px;color:var(--text-muted);}
 
 /* AJUSTES - USER CARDS */
 .user-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px 20px;transition:border-color .2s;}
@@ -450,9 +442,8 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <div class="active-bar"></div><span class="nav-icon-wrap">🏪</span> Store
     </div>
 
-    <div class="nav-item" data-mod="horas" id="nav-horas" style="opacity:0.4;pointer-events:none;cursor:default;">
-      <div class="active-bar"></div><span class="nav-icon-wrap">⏱</span> Horas
-      <span class="nav-badge" id="nb-horas">—</span>
+    <div class="nav-item" data-mod="presupuesto" id="nav-presupuesto" style="display:none" onclick="goTo('presupuesto')">
+      <div class="active-bar"></div><span class="nav-icon-wrap">💰</span> Presupuesto
     </div>
     <div class="nav-section" id="nav-section-config" style="display:none">Configuración</div>
     <div class="nav-item" data-mod="ajustes" id="nav-ajustes" style="display:none" onclick="goTo('ajustes')">
@@ -738,20 +729,13 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       </div></div>
     </div>
 
-    <!-- HORAS -->
-    <div class="module" id="mod-horas">
-      <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:flex-end">
-        <div class="field" style="margin:0"><label class="label">Semana</label><input class="input" id="horasWeek" type="week" style="width:190px" /></div>
-        <button class="btn btn-sm" onclick="renderHoras()">Ver semana</button>
-        <button class="btn-ghost btn-sm" onclick="openAddHoras()">+ Cargar horas</button>
-      </div>
-      <div class="team-grid" id="teamGrid"></div>
-      <div class="sec-title" style="margin-top:14px"><div class="sec-dot" style="background:var(--purple)"></div>Detalle de registros</div>
-      <div class="card"><div class="table-wrap">
-        <table><thead><tr><th>Fecha</th><th>Persona</th><th>Horas</th><th>Tarea</th><th></th></tr></thead>
-        <tbody id="horasTable"></tbody></table>
-        <div class="empty" id="horasEmpty"><div class="empty-icon">🕐</div><p>No hay horas cargadas</p></div>
-      </div></div>
+    <!-- PRESUPUESTO (solo admin) — embebido vía iframe: es una app standalone con su propio
+         login/Supabase/estado, mezclarla inline en este mismo <script> gigante generaría
+         colisiones de nombres (sb, currentUser, etc.) con el resto del portal. -->
+    <div class="module" id="mod-presupuesto">
+      <iframe id="presupuestoFrame" src="about:blank" data-src="presupuesto.html"
+        style="width:100%;height:100%;min-height:calc(100vh - 100px);border:none;border-radius:12px;background:var(--navy-900)">
+      </iframe>
     </div>
 
     <!-- AJUSTES -->
@@ -887,7 +871,6 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
             <div class="mod-pill active" data-mod="envios" onclick="toggleCreateMod(this)"><span class="pill-dot"></span>🚚 Envíos</div>
             <div class="mod-pill" data-mod="desinstalaciones" onclick="toggleCreateMod(this)"><span class="pill-dot"></span>📦 Desinstalaciones</div>
             <div class="mod-pill" data-mod="napse" onclick="toggleCreateMod(this)"><span class="pill-dot"></span>🔍 Napse</div>
-            <div class="mod-pill active" data-mod="horas" onclick="toggleCreateMod(this)"><span class="pill-dot"></span>⏱ Horas</div>
             <div class="mod-pill" data-mod="terminales" onclick="toggleCreateMod(this)"><span class="pill-dot"></span>🖥️ Terminales</div>
             <div class="mod-pill" data-mod="store" onclick="toggleCreateMod(this)"><span class="pill-dot"></span>🏪 Store</div>
             <div class="mod-pill" data-mod="recuperadas" onclick="toggleCreateMod(this)"><span class="pill-dot"></span>🔁 Recuperadas</div>
@@ -911,7 +894,6 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
             <option value="">Todas las tablas</option>
             <option value="envios">envios</option>
             <option value="profiles">profiles</option>
-              <option value="horas">horas</option>
           </select>
           <select id="auditAccion" style="background:var(--surface2);border:1px solid var(--border2);color:var(--text);font-size:12px;padding:6px 10px;border-radius:8px;outline:none" onchange="loadAuditLog()">
             <option value="">Todas las acciones</option>
@@ -1320,23 +1302,6 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
   </div>
 </div>
 
-<!-- MODAL HORAS -->
-<div class="modal-overlay" id="modalHoras">
-  <div class="modal">
-    <button class="modal-close" onclick="closeModal('modalHoras')">✕</button>
-    <div class="modal-title">⏱ Cargar horas trabajadas</div>
-    <div class="field"><label class="label">Persona</label><input class="input" id="hPersona" placeholder="Tu nombre" /></div>
-    <div class="row">
-      <div class="field"><label class="label">Fecha</label><input class="input" id="hFecha" type="date" /></div>
-      <div class="field"><label class="label">Horas</label><input class="input" id="hHoras" type="number" min="0.5" max="24" step="0.5" placeholder="8" /></div>
-    </div>
-    <div class="field"><label class="label">Tarea realizada</label><input class="input" id="hTarea" placeholder="Descripción de la tarea..." /></div>
-    <div style="display:flex;gap:10px;margin-top:6px">
-      <button class="btn btn-sm" onclick="saveHoras()">Guardar</button>
-      <button class="btn-ghost btn-sm" onclick="closeModal('modalHoras')">Cancelar</button>
-    </div>
-  </div>
-</div>
 
 <!-- ══ MÓDULO NAPSE ════════════════════════════════════════════════════════════════ -->
 <div class="module" id="mod-napse">
@@ -3026,7 +2991,7 @@ function toggleSidebar(){
   const sbW=sb.classList.contains('collapsed')?60:224;
   main.style.marginLeft=sbW+'px';
   // Actualizar módulos outside si hay uno activo
-  const outsideMods=new Set(['ally','retencion','distri','terminales','instalaciones','recuperadas']);
+  const outsideMods=new Set(['ally','retencion','distri','terminales','instalaciones','recuperadas','presupuesto']);
   const activeOutside=document.querySelector('.module.active');
   if(activeOutside){
     const mod=activeOutside.id.replace('mod-','');
@@ -4481,7 +4446,7 @@ async function loadProfile(user){
   const{data:profile}=await sb.from('profiles').select('*').eq('id',user.id).single();
   if(!profile){
     const{count}=await sb.from('profiles').select('*',{count:'exact',head:true});
-    const newP={id:user.id,email:user.email,nombre:user.email.split('@')[0],rol:count===0?'admin':'operador',modulos:['sims','envios','desinstalaciones','horas']};
+    const newP={id:user.id,email:user.email,nombre:user.email.split('@')[0],rol:count===0?'admin':'operador',modulos:['sims','envios','desinstalaciones']};
     await sb.from('profiles').insert(newP);
     currentProfile=newP;
   }else{currentProfile=profile;}
@@ -4509,7 +4474,7 @@ function showApp(){
   const nombre=currentProfile.nombre||currentProfile.email;
   const isAdmin=currentProfile.rol==='admin';
   const isLogistica=currentProfile.rol==='logistica';
-  const modulos=currentProfile.modulos||['sims','envios','desinstalaciones','horas'];
+  const modulos=currentProfile.modulos||['sims','envios','desinstalaciones'];
   document.getElementById('sideUserName').textContent=nombre;
   const rolLabel={'admin':'Administrador','logistica':'Logística','operador':'Operador'}[currentProfile.rol]||'Operador';
   document.getElementById('sideUserRole').textContent=rolLabel;
@@ -4523,6 +4488,8 @@ function showApp(){
     mostrarSFSyncSiAdmin();
     document.getElementById('nav-ajustes').style.display='flex';
     document.getElementById('nav-section-config').style.display='block';
+    const navPresupuesto=document.getElementById('nav-presupuesto');
+    if(navPresupuesto) navPresupuesto.style.display='flex';
   } else {
     // Operadores con envios: mostrar sync info en topbar
     mostrarSFSyncSiAdmin();
@@ -4534,7 +4501,7 @@ function showApp(){
     navRecuperadas.style.display='flex';
     cargarBadgeRecuperadas();
   }
-  ['sims','envios','desinstalaciones','napse','horas','store','recuperadas'].forEach(mod=>{
+  ['sims','envios','desinstalaciones','napse','store','recuperadas'].forEach(mod=>{
     const el=document.getElementById('nav-'+mod);
     if(el&&!modulos.includes(mod)&&!isAdmin){el.classList.add('locked');el.onclick=null;}
   });
@@ -4576,11 +4543,11 @@ function buildDashCards(modulos,isAdmin){
     {mod:'rollout',icon:'🔄',title:'Rollout',desc:'Cambio tecnológico',stat:'cargando...'},
     {mod:'desinstalaciones',icon:'📦',title:'Desinstalaciones',desc:'Logística inversa',stat:'cargando...'},
     {mod:'napse',icon:'🔍',title:'NAPSE',desc:'Analizador de Logs VTOL',stat:''},
-    {mod:'horas',icon:'⏱',title:'Horas',desc:'Registro diario',stat:'cargando...'},
     {mod:'terminales',icon:'🖥️',title:'Terminales',desc:'Reporte Logicalis → Salesforce',stat:'Logicalis'},
     {mod:'store',icon:'🏪',title:'Store',desc:'Terminales disponibles Barracas',stat:'cargando...'},
   ];
   if(isAdmin)all.push({mod:'ajustes',icon:'⚙️',title:'Ajustes',desc:'Usuarios y permisos',stat:'gestión'});
+  if(isAdmin)all.push({mod:'presupuesto',icon:'💰',title:'Presupuesto',desc:'Presupuesto de Operaciones',stat:'gestión'});
   const grid=document.getElementById('dashGrid');
   if(!grid)return;
   // Para operadores: filtrar solo módulos habilitados (no mostrar bloqueados)
@@ -4596,13 +4563,13 @@ function buildDashCards(modulos,isAdmin){
   loadOpsPanel(isAdmin);
 }
 
-const MOD_INFO={home:'Dashboard',sims:'Verificador SIMs',envios:'Envíos',rollout:'Rollout',desinstalaciones:'Desinstalaciones',napse:'NAPSE — Logs VTOL',instalaciones:'Instalaciones SF',horas:'Control de Horas',retencion:'Retención de Cuentas',ajustes:'Ajustes',ally:'Configuración Ally',distri:'Distribuidores',terminales:'Terminales — Logicalis',store:'Store — Terminales disponibles'};
+const MOD_INFO={home:'Dashboard',sims:'Verificador SIMs',envios:'Envíos',rollout:'Rollout',desinstalaciones:'Desinstalaciones',napse:'NAPSE — Logs VTOL',instalaciones:'Instalaciones SF',retencion:'Retención de Cuentas',ajustes:'Ajustes',ally:'Configuración Ally',distri:'Distribuidores',terminales:'Terminales — Logicalis',store:'Store — Terminales disponibles',presupuesto:'Presupuesto de Operaciones'};
 
 function goTo(mod){
   const el=document.getElementById('nav-'+mod);
   if(el&&el.classList.contains('locked'))return;
   // Módulos que viven FUERA del .content div
-  const outsideMods=new Set(['ally','retencion','distri','terminales','instalaciones','recuperadas']);
+  const outsideMods=new Set(['ally','retencion','distri','terminales','instalaciones','recuperadas','presupuesto']);
   // Ocultar .content PRIMERO para evitar el bloque negro
   const contentEl=document.querySelector('.content');
   if(contentEl) contentEl.style.display=outsideMods.has(mod)?'none':'';
@@ -4640,8 +4607,11 @@ function goTo(mod){
   if(mod==='instalaciones'){window.scrollTo(0,0);initInstalaciones();}
   if(mod==='ally')window.allyInit?.();
   if(mod==='distri')window.cargarDistri?.();
-  if(mod==='horas')renderHoras();
   if(mod==='ajustes'){loadUsers();loadSimsDbStats();loadConfigSLA();_auditPage=0;loadAuditLog();cargarCronHorarios();}
+  if(mod==='presupuesto'){
+    const f=document.getElementById('presupuestoFrame');
+    if(f&&f.getAttribute('src')==='about:blank')f.src=f.dataset.src;
+  }
   if(mod==='retencion')window.cargarRetencion?.();
   if(mod==='terminales')window.termInit?.();
   if(mod==='store')window.storeInit?.(); // store
@@ -4657,8 +4627,11 @@ function refreshCurrentModule(){
   setTimeout(()=>{if(btn){btn.textContent='↺';btn.style.color='var(--text-muted)';}},600);
   if(mod==='envios'){renderEnvios();loadBadges();}
   else if(mod==='desinstalaciones'){if(window.cargarDesinstalaciones)window.cargarDesinstalaciones();}
-  else if(mod==='horas'){renderHoras();loadBadges();}
   else if(mod==='sims'){loadSimsDbStats();}
+  else if(mod==='presupuesto'){
+    const f=document.getElementById('presupuestoFrame');
+    if(f&&f.getAttribute('src')!=='about:blank')f.src=f.src; // fuerza reload del iframe
+  }
   else if(mod==='ajustes'){loadUsers();loadSimsDbStats();}
   else{loadBadges();}
 }
@@ -4864,7 +4837,6 @@ const ALL_MODS = [
   {id:'envios',    label:'🚚 Envíos'},
   {id:'desinstalaciones', label:'📦 Desinstalaciones'},
   {id:'napse', label:'🔍 Napse'},
-  {id:'horas',     label:'⏱ Horas'},
   {id:'terminales',label:'🖥️ Terminales'},
   {id:'store',      label:'🏪 Store'},
   {id:'recuperadas',label:'🔁 Recuperadas'},
@@ -5285,12 +5257,6 @@ async function loadBadges(){
   });
   if(document.getElementById('dc-envios'))document.getElementById('dc-envios').textContent=envCount+' activos';
   if(document.getElementById('dc-desinstalaciones'))document.getElementById('dc-desinstalaciones').textContent=desCount+' activas';
-  // Horas hoy
-  const today=new Date().toISOString().slice(0,10);
-  const {data:hrs}=await sb.from('horas').select('horas,fecha').eq('user_id',uid);
-  const todayHs=(hrs||[]).filter(h=>h.fecha===today).reduce((a,b)=>a+Number(b.horas),0)||0;
-  const nbHoras=document.getElementById('nb-horas');if(nbHoras)nbHoras.textContent=todayHs+'h';
-  if(document.getElementById('dc-horas'))document.getElementById('dc-horas').textContent=todayHs+' hs hoy';
 }
 
 async function loadOpsPanel(isAdmin){
