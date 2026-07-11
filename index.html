@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.4.36</title>
+<title>Alleata · Operaciones v4.4.37</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -399,7 +399,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.4.36 · 10 jul 2026
+      v4.4.37 · 10 jul 2026
     </div>
   </div>
 </div>
@@ -476,7 +476,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.4.36 · 10 jul 2026
+      v4.4.37 · 10 jul 2026
     </div>
   </div>
 </nav>
@@ -516,9 +516,22 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.4.36</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.4.37</div>
   </div>
   <div class="content">
+
+    <!-- DASHBOARD / HOME -->
+    <div class="module active" id="mod-home">
+      <div style="margin-bottom:18px">
+        <div id="welcomeMsg" style="font-size:18px;font-weight:800;color:var(--text)">Hola 👋</div>
+        <div id="ops-timestamp" style="font-size:11px;color:var(--text-muted);margin-top:2px"></div>
+      </div>
+
+      <!-- Vista CEO: KPIs de Gestión NAPSE, en vivo, directo acá — sin sección aparte -->
+      <div id="ceoDashKpis"></div>
+
+      <div class="dash-grid" id="dashGrid" style="margin-top:6px"></div>
+    </div>
 
     <div class="module" id="mod-sims">
       <!-- Carga de fotos deshabilitada por ahora — dejar solo búsqueda manual -->
@@ -4247,7 +4260,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.4.36] OK');
+console.log('[Alleata v4.4.37] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -5277,6 +5290,79 @@ async function loadBadges(){
   if(document.getElementById('dc-desinstalaciones'))document.getElementById('dc-desinstalaciones').textContent=desCount+' activas';
 }
 
+// ── Vista CEO: KPIs de Gestión NAPSE directo en el Dashboard (fetch en vivo a Railway) ──
+async function loadCeoDashKpis(){
+  const box=document.getElementById('ceoDashKpis');
+  if(!box)return;
+  box.innerHTML='<div style="color:var(--text-muted);font-size:12px;padding:10px 0">Cargando KPIs…</div>';
+  try{
+    const resp=await fetch('https://alleata-agent-production.up.railway.app/automations/napse/snapshots?limit=1',{
+      headers:{'x-automation-secret':'123456'}
+    });
+    if(!resp.ok) throw new Error('HTTP '+resp.status);
+    const json=await resp.json();
+    if(!json.ok || !(json.snapshots&&json.snapshots.length)) throw new Error(json.error||'Sin datos');
+    const s=json.snapshots[0];
+    const fmt$=n=>n?'$'+Math.round(n).toLocaleString('es-AR'):'$0';
+
+    const card=(label,value,color,sub)=>`
+      <div style="background:var(--navy-800);border:1px solid var(--border);border-top:3px solid ${color};border-radius:12px;padding:16px">
+        <div style="font-size:10px;font-weight:800;letter-spacing:.06em;color:${color};text-transform:uppercase">${label}</div>
+        <div style="font-size:26px;font-weight:900;color:var(--text);margin-top:6px;font-family:'JetBrains Mono',monospace">${value}</div>
+        ${sub?`<div style="font-size:11px;color:var(--text-muted);margin-top:4px">${sub}</div>`:''}
+      </div>`;
+
+    const estados=[
+      {key:'configurar_terminal',label:'Configurar Terminal',color:'#e67e22'},
+      {key:'en_proceso',label:'En Proceso',color:'#1a9fd4'},
+      {key:'pre_colecta',label:'Pre-Colecta',color:'#f5a623'},
+      {key:'despachado',label:'Despachado',color:'#3a7bd5'},
+      {key:'retirar_terminal',label:'Retirar Terminal',color:'#9b59b6'},
+      {key:'exitoso',label:'Exitoso',color:'#27ae60'},
+    ];
+    const total=estados.reduce((a,e)=>a+(s[e.key]||0),0);
+    const estadosHTML=estados.map(e=>{
+      const val=s[e.key]||0;
+      const pct=total?Math.round(val/total*100):0;
+      return card(e.label,val,e.color,pct+'% del total');
+    }).join('');
+
+    const totalOTsHTML=`
+      <div style="background:linear-gradient(135deg,rgba(29,191,142,.12),rgba(26,159,212,.12));border:1px solid rgba(29,191,142,.3);border-radius:12px;padding:16px;grid-column:1/-1">
+        <div style="font-size:10px;font-weight:800;letter-spacing:.06em;color:var(--teal);text-transform:uppercase">Total OTs Activas</div>
+        <div style="font-size:30px;font-weight:900;color:var(--text);font-family:'JetBrains Mono',monospace">${total}</div>
+      </div>`;
+
+    // Logística — costo de envíos
+    const logProvs=[
+      {label:'Correo Argentino',ots:s.correo_argentino_ots||0,costo:s.correo_argentino_costo||0,color:'#e74c3c'},
+      {label:'EPSA',ots:s.epsa_ots||0,costo:s.epsa_costo||0,color:'#f39c12'},
+      {label:'Alleata',ots:s.alleata_ots||0,costo:s.alleata_costo||0,color:'#1dbf8e'},
+      {label:'Cabify',ots:s.cabify_ots||0,costo:s.cabify_costo||0,color:'#9b59b6'},
+    ].filter(e=>e.ots>0||e.costo>0);
+    const provsTotales=logProvs.filter(e=>e.label!=='Alleata');
+    const totOts=provsTotales.reduce((a,e)=>a+e.ots,0);
+    const totCosto=provsTotales.reduce((a,e)=>a+e.costo,0);
+    const logHTML=logProvs.map(e=>{
+      const prom=e.ots?Math.round(e.costo/e.ots):0;
+      return card(e.label,fmt$(e.costo),e.color,e.ots+' envíos · Prom. '+fmt$(prom));
+    }).join('') + card('Total Envíos',fmt$(totCosto),'#1dbf8e',totOts+' envíos (sin Alleata)');
+
+    box.innerHTML = `
+      <div style="font-size:12px;font-weight:800;letter-spacing:.05em;color:var(--text-muted);text-transform:uppercase;margin:4px 0 10px">📋 Gestión NAPSE${s.fecha?' — '+s.fecha:''}${s.turno?' · Turno '+s.turno:''}</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-bottom:8px">
+        ${estadosHTML}${totalOTsHTML}
+      </div>
+      <div style="font-size:12px;font-weight:800;letter-spacing:.05em;color:var(--text-muted);text-transform:uppercase;margin:18px 0 10px">🚚 Logística — Costo de Envíos</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px;margin-bottom:20px">
+        ${logHTML}
+      </div>`;
+  }catch(err){
+    console.error('[CEO Dashboard]',err);
+    box.innerHTML='<div style="color:var(--text-muted);font-size:12px;padding:10px 0">No se pudieron cargar los KPIs de NAPSE ahora mismo.</div>';
+  }
+}
+
 async function loadOpsPanel(isAdmin){
   const nombre=currentProfile?.nombre||'';
   const primerNombre=nombre.split(' ')[0];
@@ -5291,7 +5377,8 @@ async function loadOpsPanel(isAdmin){
   // Vista CEO: dashboard aún sin definir — por ahora solo saludo + shortcuts
   // (los shortcuts de Napse/Presupuesto ya los arma buildDashCards). Nada de
   // KPIs operativos todavía: se van a definir con Marcelo más adelante.
-  if(currentProfile?.rol==='ceo') return;
+  // Vista CEO: KPIs de Gestión NAPSE en vivo, directo en el dashboard (sin sección aparte)
+  if(currentProfile?.rol==='ceo'){ loadCeoDashKpis(); return; }
 
   // Dashboard personal para operadores
   const opCard=document.getElementById('envStatsOperador');
