@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.4.39</title>
+<title>Alleata · Operaciones v4.4.40</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -399,7 +399,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.4.39 · 11 jul 2026
+      v4.4.40 · 11 jul 2026
     </div>
   </div>
 </div>
@@ -476,7 +476,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.4.39 · 11 jul 2026
+      v4.4.40 · 11 jul 2026
     </div>
   </div>
 </nav>
@@ -516,7 +516,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.4.39</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.4.40</div>
   </div>
   <div class="content">
 
@@ -4260,7 +4260,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.4.39] OK');
+console.log('[Alleata v4.4.40] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -5296,13 +5296,18 @@ async function loadCeoDashKpis(){
   if(!box)return;
   box.innerHTML='<div style="color:var(--text-muted);font-size:12px;padding:10px 0">Cargando KPIs…</div>';
   try{
-    const resp=await fetch('https://alleata-agent-production.up.railway.app/automations/napse/snapshots?limit=1',{
-      headers:{'x-automation-secret':'123456'}
-    });
+    const [resp,respMeses]=await Promise.all([
+      fetch('https://alleata-agent-production.up.railway.app/automations/napse/snapshots?limit=1',{
+        headers:{'x-automation-secret':'123456'}
+      }),
+      fetch('https://alleata-agent-production.up.railway.app/automations/napse/detalle-mensual')
+    ]);
     if(!resp.ok) throw new Error('HTTP '+resp.status);
     const json=await resp.json();
     if(!json.ok || !(json.snapshots&&json.snapshots.length)) throw new Error(json.error||'Sin datos');
     const s=json.snapshots[0];
+    let meses=[];
+    try{ const jm=await respMeses.json(); if(jm.ok) meses=jm.meses||[]; }catch(e){ /* si falla, seguimos sin desglose */ }
     const fmt$=n=>n?'$'+Math.round(n).toLocaleString('es-AR'):'$0';
 
     const card=(label,value,color,sub)=>`
@@ -5321,11 +5326,21 @@ async function loadCeoDashKpis(){
         ${s.turno?`<div style="font-size:11px;color:var(--text-muted);margin-top:4px">Turno ${s.turno}</div>`:''}
       </div>`;
 
+    const mesesHTML = meses.length ? `
+        <div style="display:flex;gap:12px;margin-top:10px;padding-top:10px;border-top:1px solid rgba(29,191,142,.2);flex-wrap:wrap">
+          ${meses.map(m=>`
+            <div>
+              <div style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em">${m.mes_nombre}</div>
+              <div style="font-size:16px;font-weight:800;color:var(--text);font-family:'JetBrains Mono',monospace">${m.total}</div>
+            </div>`).join('')}
+        </div>` : '';
+
     const totalOTsHTML=`
       <div style="background:linear-gradient(135deg,rgba(29,191,142,.12),rgba(26,159,212,.12));border:1px solid rgba(29,191,142,.3);border-radius:12px;padding:16px">
         <div style="font-size:10px;font-weight:800;letter-spacing:.06em;color:var(--teal);text-transform:uppercase">Total OTs Activas</div>
         <div style="font-size:30px;font-weight:900;color:var(--text);font-family:'JetBrains Mono',monospace">${total}</div>
         <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Acumulado desde 01/06/2026</div>
+        ${mesesHTML}
       </div>`;
 
     // Logística — costo de envíos
