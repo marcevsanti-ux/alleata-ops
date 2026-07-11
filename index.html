@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.4.37</title>
+<title>Alleata · Operaciones v4.4.38</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -399,7 +399,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.4.37 · 10 jul 2026
+      v4.4.38 · 10 jul 2026
     </div>
   </div>
 </div>
@@ -476,7 +476,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.4.37 · 10 jul 2026
+      v4.4.38 · 10 jul 2026
     </div>
   </div>
 </nav>
@@ -516,7 +516,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.4.37</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.4.38</div>
   </div>
   <div class="content">
 
@@ -4260,7 +4260,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.4.37] OK');
+console.log('[Alleata v4.4.38] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -4577,7 +4577,7 @@ function buildDashCards(modulos,isAdmin,isCeo){
   if(!grid)return;
   // Vista CEO: solo cards de Napse + Presupuesto (nada operativo)
   // Para operadores: filtrar solo módulos habilitados (no mostrar bloqueados)
-  const visibles = isCeo ? all.filter(c=>c.mod==='napse'||c.mod==='presupuesto')
+  const visibles = isCeo ? []
                   : isAdmin ? all : all.filter(c=>modulos.includes(c.mod));
   grid.innerHTML=visibles.map(c=>{
     return`<div class="dash-card" data-mod="${c.mod}" onclick="goTo('${c.mod}')">
@@ -5312,23 +5312,17 @@ async function loadCeoDashKpis(){
         ${sub?`<div style="font-size:11px;color:var(--text-muted);margin-top:4px">${sub}</div>`:''}
       </div>`;
 
-    const estados=[
-      {key:'configurar_terminal',label:'Configurar Terminal',color:'#e67e22'},
-      {key:'en_proceso',label:'En Proceso',color:'#1a9fd4'},
-      {key:'pre_colecta',label:'Pre-Colecta',color:'#f5a623'},
-      {key:'despachado',label:'Despachado',color:'#3a7bd5'},
-      {key:'retirar_terminal',label:'Retirar Terminal',color:'#9b59b6'},
-      {key:'exitoso',label:'Exitoso',color:'#27ae60'},
-    ];
-    const total=estados.reduce((a,e)=>a+(s[e.key]||0),0);
-    const estadosHTML=estados.map(e=>{
-      const val=s[e.key]||0;
-      const pct=total?Math.round(val/total*100):0;
-      return card(e.label,val,e.color,pct+'% del total');
-    }).join('');
+    const total=(s.configurar_terminal||0)+(s.en_proceso||0)+(s.pre_colecta||0)+(s.despachado||0)+(s.retirar_terminal||0)+(s.exitoso||0);
+
+    const fechaSnapshotHTML=`
+      <div style="background:var(--navy-800);border:1px solid var(--border);border-radius:12px;padding:16px">
+        <div style="font-size:10px;font-weight:800;letter-spacing:.06em;color:var(--text-muted);text-transform:uppercase">Último Snapshot</div>
+        <div style="font-size:20px;font-weight:900;color:var(--text);margin-top:6px;font-family:'JetBrains Mono',monospace">${s.fecha||'—'}</div>
+        ${s.turno?`<div style="font-size:11px;color:var(--text-muted);margin-top:4px">Turno ${s.turno}</div>`:''}
+      </div>`;
 
     const totalOTsHTML=`
-      <div style="background:linear-gradient(135deg,rgba(29,191,142,.12),rgba(26,159,212,.12));border:1px solid rgba(29,191,142,.3);border-radius:12px;padding:16px;grid-column:1/-1">
+      <div style="background:linear-gradient(135deg,rgba(29,191,142,.12),rgba(26,159,212,.12));border:1px solid rgba(29,191,142,.3);border-radius:12px;padding:16px">
         <div style="font-size:10px;font-weight:800;letter-spacing:.06em;color:var(--teal);text-transform:uppercase">Total OTs Activas</div>
         <div style="font-size:30px;font-weight:900;color:var(--text);font-family:'JetBrains Mono',monospace">${total}</div>
       </div>`;
@@ -5348,14 +5342,30 @@ async function loadCeoDashKpis(){
       return card(e.label,fmt$(e.costo),e.color,e.ots+' envíos · Prom. '+fmt$(prom));
     }).join('') + card('Total Envíos',fmt$(totCosto),'#1dbf8e',totOts+' envíos (sin Alleata)');
 
+    // Tipo de OT
+    const inst=s.instalacion_equipo||0, camb=s.cambio_terminal||0, totTipo=(inst+camb)||1;
+    const tipoRow=(label,val,color)=>{
+      const w=Math.round(val/totTipo*100);
+      return `<div style="margin-bottom:10px">
+        <div style="font-size:12px;color:var(--text);margin-bottom:5px">${label}</div>
+        <div style="background:var(--navy-700);border-radius:8px;overflow:hidden;height:26px;position:relative">
+          <div style="background:${color};width:${w}%;height:100%;display:flex;align-items:center;padding-left:10px;font-size:12px;font-weight:700;color:var(--navy-900)">${val}</div>
+        </div>
+      </div>`;
+    };
+    const tipoHTML = tipoRow('Instalación Equipo + Simcard',inst,'#1dbf8e') + tipoRow('Cambio de Terminal',camb,'#1a9fd4');
+
     box.innerHTML = `
-      <div style="font-size:12px;font-weight:800;letter-spacing:.05em;color:var(--text-muted);text-transform:uppercase;margin:4px 0 10px">📋 Gestión NAPSE${s.fecha?' — '+s.fecha:''}${s.turno?' · Turno '+s.turno:''}</div>
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-bottom:8px">
-        ${estadosHTML}${totalOTsHTML}
+        ${fechaSnapshotHTML}${totalOTsHTML}
       </div>
       <div style="font-size:12px;font-weight:800;letter-spacing:.05em;color:var(--text-muted);text-transform:uppercase;margin:18px 0 10px">🚚 Logística — Costo de Envíos</div>
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px;margin-bottom:20px">
         ${logHTML}
+      </div>
+      <div style="font-size:12px;font-weight:800;letter-spacing:.05em;color:var(--text-muted);text-transform:uppercase;margin:18px 0 10px">📦 Tipo de OT</div>
+      <div style="background:var(--navy-800);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:20px">
+        ${tipoHTML}
       </div>`;
   }catch(err){
     console.error('[CEO Dashboard]',err);
