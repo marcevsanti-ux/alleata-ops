@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.4.41</title>
+<title>Alleata · Operaciones v4.4.42</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -399,7 +399,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.4.41 · 11 jul 2026
+      v4.4.42 · 11 jul 2026
     </div>
   </div>
 </div>
@@ -476,7 +476,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.4.41 · 11 jul 2026
+      v4.4.42 · 11 jul 2026
     </div>
   </div>
 </nav>
@@ -516,7 +516,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.4.41</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.4.42</div>
   </div>
   <div class="content">
 
@@ -4260,7 +4260,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.4.41] OK');
+console.log('[Alleata v4.4.42] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -5291,6 +5291,30 @@ async function loadBadges(){
 }
 
 // ── Vista CEO: KPIs de Gestión NAPSE directo en el Dashboard (fetch en vivo a Railway) ──
+function proximaCorridaNapse(){
+  try{
+    const horas=[10,14,17];
+    const now=new Date(new Date().toLocaleString('en-US',{timeZone:'America/Argentina/Buenos_Aires'}));
+    const dias=['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+    let d=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+    for(let i=0;i<8;i++){
+      const dow=d.getDay();
+      if(dow>=1&&dow<=5){
+        for(const h of horas){
+          const slot=new Date(d.getFullYear(),d.getMonth(),d.getDate(),h,0,0);
+          if(slot>now){
+            const esHoy=slot.toDateString()===now.toDateString();
+            const label=esHoy?'hoy':dias[slot.getDay()];
+            return `${label} ${String(h).padStart(2,'0')}:00`;
+          }
+        }
+      }
+      d.setDate(d.getDate()+1);
+    }
+  }catch(e){}
+  return null;
+}
+
 async function loadCeoDashKpis(){
   const box=document.getElementById('ceoDashKpis');
   if(!box)return;
@@ -5310,6 +5334,22 @@ async function loadCeoDashKpis(){
     try{ const jm=await respMeses.json(); if(jm.ok) meses=jm.meses||[]; }catch(e){ /* si falla, seguimos sin desglose */ }
     const fmt$=n=>n?'$'+Math.round(n).toLocaleString('es-AR'):'$0';
 
+    // ── Desinstalaciones: misma query que usa el módulo Desinstalaciones (v_ordenes_con_sla) ──
+    const dsCount=async(estado,ilike)=>{
+      let q=sb.from('v_ordenes_con_sla').select('*',{count:'exact',head:true}).eq('tipo','desinstalacion');
+      q = estado ? (ilike ? q.ilike('estado',estado) : q.eq('estado',estado)) : q;
+      const {count,error}=await q;
+      if(error) throw error;
+      return count||0;
+    };
+    const [dsTotal,dsPendientes,dsEnProceso,dsNoResponde,dsExtraviadas]=await Promise.all([
+      dsCount(),
+      dsCount('Pendiente'),
+      dsCount('En Proceso'),
+      dsCount('no responde',true),
+      dsCount('Extraviada'),
+    ]);
+
     const card=(label,value,color,sub)=>`
       <div style="background:var(--navy-800);border:1px solid var(--border);border-top:3px solid ${color};border-radius:12px;padding:16px;text-align:center">
         <div style="font-size:10px;font-weight:800;letter-spacing:.06em;color:${color};text-transform:uppercase">${label}</div>
@@ -5319,11 +5359,11 @@ async function loadCeoDashKpis(){
 
     const total=(s.configurar_terminal||0)+(s.en_proceso||0)+(s.pre_colecta||0)+(s.despachado||0)+(s.retirar_terminal||0)+(s.exitoso||0);
 
-    const fechaSnapshotHTML=`
-      <div style="background:var(--navy-800);border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center">
-        <div style="font-size:10px;font-weight:800;letter-spacing:.06em;color:var(--text-muted);text-transform:uppercase">Último Snapshot</div>
-        <div style="font-size:20px;font-weight:900;color:var(--text);margin-top:6px;font-family:'JetBrains Mono',monospace">${s.fecha||'—'}</div>
-        ${s.turno?`<div style="font-size:11px;color:var(--text-muted);margin-top:4px">Turno ${s.turno}</div>`:''}
+    const proxima=proximaCorridaNapse();
+    const subHeaderHTML=`
+      <div style="font-size:11px;color:var(--text-muted);margin-bottom:12px">
+        Último snapshot: <b style="color:var(--text)">${s.fecha||'—'}</b>${s.turno?` · Turno ${s.turno}`:''}
+        ${proxima?` &nbsp;·&nbsp; Próxima corrida: <b style="color:var(--text)">${proxima}</b>`:''}
       </div>`;
 
     const mesesHTML = meses.length ? `
@@ -5336,7 +5376,7 @@ async function loadCeoDashKpis(){
         </div>` : '';
 
     const totalOTsHTML=`
-      <div style="background:linear-gradient(135deg,rgba(29,191,142,.12),rgba(26,159,212,.12));border:1px solid rgba(29,191,142,.3);border-radius:12px;padding:16px;text-align:center">
+      <div style="background:linear-gradient(135deg,rgba(29,191,142,.12),rgba(26,159,212,.12));border:1px solid rgba(29,191,142,.3);border-radius:12px;padding:16px;text-align:center;height:100%;box-sizing:border-box;display:flex;flex-direction:column;justify-content:center">
         <div style="font-size:10px;font-weight:800;letter-spacing:.06em;color:var(--teal);text-transform:uppercase">Total OTs Activas</div>
         <div style="font-size:30px;font-weight:900;color:var(--text);font-family:'JetBrains Mono',monospace">${total}</div>
         <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Acumulado desde 01/06/2026</div>
@@ -5370,22 +5410,43 @@ async function loadCeoDashKpis(){
       </div>`;
     };
     const tipoDeOtHTML=`
-      <div style="background:var(--navy-800);border:1px solid var(--border);border-radius:12px;padding:16px;flex:2;min-width:260px">
+      <div style="background:var(--navy-800);border:1px solid var(--border);border-radius:12px;padding:16px;flex:2;min-width:260px;height:100%;box-sizing:border-box;display:flex;flex-direction:column;justify-content:center">
         <div style="font-size:10px;font-weight:800;letter-spacing:.06em;color:var(--text-muted);text-transform:uppercase;text-align:center;margin-bottom:12px">📦 Tipo de OT</div>
         ${tipoRow('Instalación Equipo + Simcard',inst,'#1dbf8e')}${tipoRow('Cambio de Terminal',camb,'#1a9fd4')}
       </div>`;
 
+    // Desinstalaciones
+    const dsMiniCard=(label,val,color)=>`
+      <div style="background:var(--navy-800);border:1px solid var(--border);border-left:3px solid ${color};border-radius:10px;padding:14px;text-align:center">
+        <div style="font-size:22px;font-weight:900;color:${color};font-family:'JetBrains Mono',monospace">${val}</div>
+        <div style="font-size:10px;font-weight:700;letter-spacing:.04em;color:var(--text-muted);text-transform:uppercase;margin-top:2px">${label}</div>
+      </div>`;
+    const desinstalacionesHTML=`
+      <div style="font-size:12px;font-weight:800;letter-spacing:.05em;color:var(--text-muted);text-transform:uppercase;margin:18px 0 10px">📦 Desinstalaciones</div>
+      <div style="background:var(--navy-800);border-left:3px solid var(--teal);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:12px">
+        <div style="font-size:10px;font-weight:800;letter-spacing:.06em;color:var(--text-muted);text-transform:uppercase">Desinstalaciones Pendientes</div>
+        <div style="font-size:34px;font-weight:900;color:var(--teal);font-family:'JetBrains Mono',monospace;margin-top:2px">${dsTotal}</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:2px">OTs activas</div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:20px">
+        ${dsMiniCard('Pendientes',dsPendientes,'#f59e0b')}
+        ${dsMiniCard('En Proceso',dsEnProceso,'#3b82f6')}
+        ${dsMiniCard('No Responde',dsNoResponde,'#f97316')}
+        ${dsMiniCard('Extraviadas',dsExtraviadas,'#ef4444')}
+      </div>`;
+
     box.innerHTML = `
-      <div style="font-size:13px;font-weight:900;letter-spacing:.06em;color:var(--text);text-transform:uppercase;margin:4px 0 14px;padding-bottom:8px;border-bottom:1px solid var(--border)">📋 Gestión NAPSE — Información</div>
-      <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:8px">
-        <div style="flex:1;min-width:150px">${fechaSnapshotHTML}</div>
+      <div style="font-size:13px;font-weight:900;letter-spacing:.06em;color:var(--text);text-transform:uppercase;margin:4px 0 6px;padding-bottom:8px;border-bottom:1px solid var(--border)">📋 Gestión NAPSE — Información</div>
+      ${subHeaderHTML}
+      <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:8px;align-items:stretch">
         <div style="flex:1;min-width:150px">${totalOTsHTML}</div>
         ${tipoDeOtHTML}
       </div>
       <div style="font-size:12px;font-weight:800;letter-spacing:.05em;color:var(--text-muted);text-transform:uppercase;margin:18px 0 10px">🚚 Logística — Costo de Envíos</div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px;margin-bottom:20px">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-bottom:20px">
         ${logHTML}
-      </div>`;
+      </div>
+      ${desinstalacionesHTML}`;
   }catch(err){
     console.error('[CEO Dashboard]',err);
     box.innerHTML='<div style="color:var(--text-muted);font-size:12px;padding:10px 0">No se pudieron cargar los KPIs de NAPSE ahora mismo.</div>';
