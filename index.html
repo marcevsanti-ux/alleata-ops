@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.4.34</title>
+<title>Alleata · Operaciones v4.4.36</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -399,7 +399,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.4.34 · 10 jul 2026
+      v4.4.36 · 10 jul 2026
     </div>
   </div>
 </div>
@@ -476,7 +476,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.4.34 · 10 jul 2026
+      v4.4.36 · 10 jul 2026
     </div>
   </div>
 </nav>
@@ -516,7 +516,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.4.34</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.4.36</div>
   </div>
   <div class="content">
 
@@ -865,6 +865,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
               <option value="operador">Operador</option>
               <option value="logistica">Logística</option>
               <option value="admin">Administrador</option>
+              <option value="ceo">CEO (solo dashboard, lectura)</option>
             </select>
           </div>
         </div>
@@ -4246,7 +4247,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.4.34] OK');
+console.log('[Alleata v4.4.36] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -4478,9 +4479,10 @@ function showApp(){
   const nombre=currentProfile.nombre||currentProfile.email;
   const isAdmin=currentProfile.rol==='admin';
   const isLogistica=currentProfile.rol==='logistica';
+  const isCeo=currentProfile.rol==='ceo';
   const modulos=currentProfile.modulos||['sims','envios','desinstalaciones'];
   document.getElementById('sideUserName').textContent=nombre;
-  const rolLabel={'admin':'Administrador','logistica':'Logística','operador':'Operador'}[currentProfile.rol]||'Operador';
+  const rolLabel={'admin':'Administrador','logistica':'Logística','operador':'Operador','ceo':'CEO'}[currentProfile.rol]||'Operador';
   document.getElementById('sideUserRole').textContent=rolLabel;
   setTimeout(()=>{ if(window._drawQR) window._drawQR(); },400);
   if(isAdmin){
@@ -4492,24 +4494,30 @@ function showApp(){
     mostrarSFSyncSiAdmin();
     document.getElementById('nav-ajustes').style.display='flex';
     document.getElementById('nav-section-config').style.display='block';
-    const navPresupuesto=document.getElementById('nav-presupuesto');
-    if(navPresupuesto) navPresupuesto.style.display='flex';
   } else {
     // Operadores con envios: mostrar sync info en topbar
     mostrarSFSyncSiAdmin();
   }
+  const navPresupuesto=document.getElementById('nav-presupuesto');
+  if(navPresupuesto&&(isAdmin||isCeo)) navPresupuesto.style.display='flex';
+  // ── Vista CEO: SOLO Dashboard + Napse + Presupuesto, nada más en el nav ──
+  if(isCeo){
+    ['nav-sims','nav-envios','nav-rollout','nav-desinstalaciones','nav-store','nav-recuperadas',
+     'nav-ally','nav-distri','nav-ajustes','nav-retencion','nav-terminales','nav-section-config']
+      .forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display='none'; });
+  }
   const navStore=document.getElementById('nav-store');
-  if(navStore&&(isAdmin||modulos.includes('store')))navStore.style.display='flex';
+  if(navStore&&!isCeo&&(isAdmin||modulos.includes('store')))navStore.style.display='flex';
   const navRecuperadas=document.getElementById('nav-recuperadas');
-  if(navRecuperadas&&(isAdmin||modulos.includes('recuperadas'))){
+  if(navRecuperadas&&!isCeo&&(isAdmin||modulos.includes('recuperadas'))){
     navRecuperadas.style.display='flex';
     cargarBadgeRecuperadas();
   }
   ['sims','envios','desinstalaciones','napse','store','recuperadas'].forEach(mod=>{
     const el=document.getElementById('nav-'+mod);
-    if(el&&!modulos.includes(mod)&&!isAdmin){el.classList.add('locked');el.onclick=null;}
+    if(el&&!modulos.includes(mod)&&!isAdmin&&!isCeo){el.classList.add('locked');el.onclick=null;}
   });
-  buildDashCards(modulos,isAdmin);
+  buildDashCards(modulos,isAdmin,isCeo);
   loadConfigSLA(); // cargar config SLA al inicio
   updateDate();loadBadges();loadSimStats();
   const envFecha=document.getElementById('envFecha');if(envFecha)envFecha.value=new Date().toISOString().slice(0,10);
@@ -4540,7 +4548,7 @@ function showApp(){
   if(typeof setWeek==="function") setWeek();
 }
 
-function buildDashCards(modulos,isAdmin){
+function buildDashCards(modulos,isAdmin,isCeo){
   const all=[
     {mod:'sims',icon:'📡',title:'SIMs',desc:'Verificá chips contra base CLARO',stat:'6.878 SIMs'},
     {mod:'envios',icon:'🚚',title:'Envíos',desc:'Logística directa',stat:'cargando...'},
@@ -4551,11 +4559,13 @@ function buildDashCards(modulos,isAdmin){
     {mod:'store',icon:'🏪',title:'Store',desc:'Terminales disponibles Barracas',stat:'cargando...'},
   ];
   if(isAdmin)all.push({mod:'ajustes',icon:'⚙️',title:'Ajustes',desc:'Usuarios y permisos',stat:'gestión'});
-  if(isAdmin)all.push({mod:'presupuesto',icon:'💰',title:'Presupuesto',desc:'Presupuesto de Operaciones',stat:'gestión'});
+  if(isAdmin||isCeo)all.push({mod:'presupuesto',icon:'💰',title:'Presupuesto',desc:'Presupuesto de Operaciones',stat:'gestión'});
   const grid=document.getElementById('dashGrid');
   if(!grid)return;
+  // Vista CEO: solo cards de Napse + Presupuesto (nada operativo)
   // Para operadores: filtrar solo módulos habilitados (no mostrar bloqueados)
-  const visibles = isAdmin ? all : all.filter(c=>modulos.includes(c.mod));
+  const visibles = isCeo ? all.filter(c=>c.mod==='napse'||c.mod==='presupuesto')
+                  : isAdmin ? all : all.filter(c=>modulos.includes(c.mod));
   grid.innerHTML=visibles.map(c=>{
     return`<div class="dash-card" data-mod="${c.mod}" onclick="goTo('${c.mod}')">
       <div class="dash-card-icon">${c.icon}</div>
@@ -4614,7 +4624,10 @@ function goTo(mod){
   if(mod==='ajustes'){loadUsers();loadSimsDbStats();loadConfigSLA();_auditPage=0;loadAuditLog();cargarCronHorarios();}
   if(mod==='presupuesto'){
     const f=document.getElementById('presupuestoFrame');
-    if(f&&f.getAttribute('src')==='about:blank')f.src=f.dataset.src;
+    if(f&&f.getAttribute('src')==='about:blank'){
+      const ro=currentProfile?.rol==='ceo'?'?readonly=1':'';
+      f.src=f.dataset.src+ro;
+    }
   }
   if(mod==='retencion')window.cargarRetencion?.();
   if(mod==='terminales')window.termInit?.();
@@ -4874,7 +4887,7 @@ function renderUsersGrid(users) {
       const info = ALL_MODS.find(x => x.id === m);
       return `<span style="background:var(--navy-700);border:1px solid var(--border2);border-radius:20px;padding:2px 10px;font-size:11px;color:var(--text-muted)">${info ? info.label : m}</span>`;
     }).join('');
-    const rolColor = u.rol === 'admin' ? 'var(--teal)' : u.rol === 'logistica' ? '#f59e0b' : 'var(--blue)';
+    const rolColor = u.rol === 'admin' ? 'var(--teal)' : u.rol === 'logistica' ? '#f59e0b' : u.rol === 'ceo' ? 'var(--purple)' : 'var(--blue)';
     return `
       <div class="card" style="padding:16px;display:flex;flex-direction:column;gap:10px">
         <div style="display:flex;justify-content:space-between;align-items:flex-start">
@@ -4963,6 +4976,7 @@ function editUser(u) {
             <option value="operador">Operador</option>
             <option value="logistica">Logística</option>
             <option value="admin">Administrador</option>
+            <option value="ceo">CEO (solo dashboard, lectura)</option>
           </select>
         </div>
         <div style="margin-bottom:18px">
@@ -5273,6 +5287,11 @@ async function loadOpsPanel(isAdmin){
   if(ts) ts.textContent='Como '+new Date().toLocaleString('es-AR',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
   const wm=document.getElementById('welcomeMsg');
   if(wm) wm.textContent= isAdmin ? '👥 Panel del Equipo' : 'Hola, '+nombre+' 👋';
+
+  // Vista CEO: dashboard aún sin definir — por ahora solo saludo + shortcuts
+  // (los shortcuts de Napse/Presupuesto ya los arma buildDashCards). Nada de
+  // KPIs operativos todavía: se van a definir con Marcelo más adelante.
+  if(currentProfile?.rol==='ceo') return;
 
   // Dashboard personal para operadores
   const opCard=document.getElementById('envStatsOperador');
@@ -10209,6 +10228,10 @@ document.addEventListener('click', function(e){
 // ── NAPSE initApp (se llama cuando se entra al módulo desde goTo) ──────────
 async function napseInitApp(){
   napseSetupDropZone();
+  // Vista CEO: solo lectura — sin carga de logs
+  const isCeoView = currentProfile?.rol==='ceo';
+  const tabUpload = document.getElementById('napse-tab-upload');
+  if(tabUpload) tabUpload.style.display = isCeoView ? 'none' : '';
   // Reset filtros al entrar al módulo
   ['f-node','f-store','f-iso','f-fecha','f-monto'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
   const fEst=document.getElementById('f-estado'); if(fEst) fEst.value='';
@@ -10217,8 +10240,8 @@ async function napseInitApp(){
   try {
     const {count} = await sb.from('napse_transactions').select('*', {count:'exact', head:true});
     if(count > 0){ napseSetView('historial'); await napseRefreshHistorial(); }
-    else { napseSetView('upload'); }
-  } catch(e){ napseSetView('upload'); }
+    else { napseSetView(isCeoView ? 'buscar' : 'upload'); }
+  } catch(e){ napseSetView(isCeoView ? 'buscar' : 'upload'); }
 }
 
 // ── NAPSE setView ─────────────────────────────────────────────────────────
