@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Alleata · Presupuesto Operaciones v1.9.0</title>
+<title>Alleata · Presupuesto Operaciones v1.9.1</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -197,7 +197,7 @@
   <div class="login-box">
     <h2>💰 Presupuesto</h2>
     <p class="login-sub">Alleata · Acceso restringido</p>
-    <div style="position:absolute;bottom:12px;right:16px;font-size:10px;font-family:'JetBrains Mono',monospace;color:rgba(232,237,243,.2)">v1.9.0</div>
+    <div style="position:absolute;bottom:12px;right:16px;font-size:10px;font-family:'JetBrains Mono',monospace;color:rgba(232,237,243,.2)">v1.9.1</div>
     <div class="login-field">
       <label>Email</label>
       <input type="email" id="loginEmail" placeholder="tu@email.com" onkeydown="if(event.key==='Enter')doLogin()">
@@ -213,7 +213,7 @@
 
 <div id="appContent" style="display:none">
 <h1>💰 Presupuesto Operaciones</h1>
-<p class="sub">Alleata · 2026 <span style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 8px;border-radius:4px;border:1px solid var(--border2);font-size:10px;margin-left:6px">v1.9.0</span></p>
+<p class="sub">Alleata · 2026 <span style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 8px;border-radius:4px;border:1px solid var(--border2);font-size:10px;margin-left:6px">v1.9.1</span></p>
 
 <div class="toolbar">
   <div class="mes-bar" id="mesBar"></div>
@@ -1838,6 +1838,11 @@ function cabifyResetForm(){
   const fn=document.getElementById('cabifyPdfName'); if(fn){fn.style.display='none';fn.textContent='';}
   const btn=document.getElementById('cabifyBtnConfirm'); if(btn) btn.style.display='none';
   cabifyPendingFac=null;
+  // Reporte de consumo (.xls)
+  const xlsInp=document.getElementById('cabifyXlsInp'); if(xlsInp) xlsInp.value='';
+  const xlsFn=document.getElementById('cabifyXlsName'); if(xlsFn){xlsFn.style.display='none';xlsFn.textContent='';}
+  const xlsMsg=document.getElementById('cabifyMsgXls'); if(xlsMsg){xlsMsg.className='up-msg';xlsMsg.textContent='';}
+  cabifyPendingReporte=null;
 }
 
 function cabifySyncReal(){
@@ -1881,6 +1886,7 @@ function cabifyRenderFacturas(){
       <th style="text-align:right">Subtotal</th>
       <th style="text-align:right">Impuestos</th>
       <th style="text-align:right;color:var(--teal)">Total</th>
+      <th style="text-align:right">Envíos</th>
     </tr></thead>
     <tbody>${facs.map(f=>`<tr>
       <td style="font-size:11px">${f.empresa}</td>
@@ -1889,8 +1895,42 @@ function cabifyRenderFacturas(){
       <td class="nr" style="color:var(--text-muted)">${fmt(f.subtotal)}</td>
       <td class="nr" style="color:var(--text-muted)">${fmt(f.impuestos)}</td>
       <td class="nr hi" style="color:var(--teal);font-weight:800">${fmt(f.totalFactura)}</td>
+      <td class="nr" style="font-size:10px;color:var(--text-muted)">${(f.enviosAlleata||f.enviosVarios)?`${f.enviosAlleata||0} Alleata / ${f.enviosVarios||0} varios`:'—'}</td>
     </tr>`).join('')}</tbody>
   </table></div>`;
+}
+
+let cabifyPendingReporte = null; // {enviosAlleata, enviosVarios} — del reporte .xls, opcional
+
+// Reporte de consumo Cabify (.xls) — cuenta filas: las que NO tienen
+// "Tipo de vehículo" cargado son envíos de paquetería (Alleata); las que sí
+// lo tienen son viajes de personas (varios).
+async function cabifyHandleXLS(input){
+  const file=input.files[0]; if(!file) return;
+  document.getElementById('cabifyXlsName').textContent=file.name;
+  document.getElementById('cabifyXlsName').style.display='block';
+  const msgEl=document.getElementById('cabifyMsgXls');
+  const showXlsMsg=(txt,type)=>{ if(msgEl){msgEl.className='up-msg '+type;msgEl.textContent=txt;} };
+  showXlsMsg('Leyendo reporte...','ok');
+  try{
+    const buf=await file.arrayBuffer();
+    const wb=XLSX.read(buf,{type:'array'});
+    const sheet=wb.Sheets[wb.SheetNames[0]];
+    const rows=XLSX.utils.sheet_to_json(sheet,{defval:''});
+    if(!rows.length){ showXlsMsg('El archivo no tiene filas de datos.','err'); return; }
+    let enviosAlleata=0, enviosVarios=0;
+    rows.forEach(r=>{
+      const tipoVeh=(r['Tipo de vehículo']||'').toString().trim();
+      if(tipoVeh) enviosVarios++; else enviosAlleata++;
+    });
+    cabifyPendingReporte={enviosAlleata, enviosVarios};
+    // Si ya hay una factura PDF pendiente de guardar, le sumamos el conteo directo
+    if(cabifyPendingFac){
+      cabifyPendingFac.enviosAlleata=enviosAlleata;
+      cabifyPendingFac.enviosVarios=enviosVarios;
+    }
+    showXlsMsg(`✓ Reporte leído · ${enviosAlleata} envíos Alleata / ${enviosVarios} envíos varios (de ${rows.length} filas)`,'ok');
+  }catch(e){ showXlsMsg('Error leyendo el reporte: '+e.message,'err'); }
 }
 
 async function cabifyHandlePDF(input){
@@ -1939,6 +1979,11 @@ async function cabifyHandlePDF(input){
     cabifyShowMsg('✓ '+fac.empresa+' · '+fac.numero+' leída · Total: '+fmt(fac.totalFactura),'ok');
     cabifyRenderKPIs();
     document.getElementById('cabifyBtnConfirm').style.display='block';
+    // Si ya se había leído el reporte de consumo antes del PDF, lo sumamos acá
+    if(cabifyPendingReporte){
+      fac.enviosAlleata=cabifyPendingReporte.enviosAlleata;
+      fac.enviosVarios=cabifyPendingReporte.enviosVarios;
+    }
     cabifyPendingFac=fac;
   }catch(e){ cabifyShowMsg('Error: '+e.message,'err'); }
 }
@@ -2009,7 +2054,9 @@ async function cabifySaveDB(fac){
     numero:fac.numero, fecha:fac.fecha,
     descripcion:fac.empresa+' · CAE '+fac.cae+' · Vto '+fac.vto,
     tc:0, subtotal_usd:fac.subtotal, iva_usd:fac.impuestos,
-    otros_imp:0, total_usd:fac.totalFactura, terminales:0, series:[]
+    otros_imp:0, total_usd:fac.totalFactura,
+    terminales:fac.enviosAlleata||0,
+    series:fac.enviosVarios?[{enviosVarios:fac.enviosVarios}]:[]
   };
   const {error}=await sb.from('presupuesto_facturas').upsert(row,{onConflict:'numero,mes'});
   if(error){ console.error('Cabify DB error:',error); return false; }
@@ -2634,7 +2681,9 @@ async function loadFacturasFromDB() {
           empresa:descParts[0]||'Cabify/CALOG',
           subtotal:row.subtotal_usd, impuestos:row.iva_usd, totalFactura:row.total_usd,
           vto:(descParts[2]||'').replace('Vto ','')||'—',
-          cae:(descParts[1]||'').replace('CAE ','')||'—'
+          cae:(descParts[1]||'').replace('CAE ','')||'—',
+          enviosAlleata:row.terminales||0,
+          enviosVarios:(row.series&&row.series[0]&&row.series[0].enviosVarios)||0
         });
       }
     });
@@ -2861,6 +2910,21 @@ logiAgregar = async function() {
       </div>
       <div class="up-preview" id="cabifyPrevPdf"></div>
       <div class="up-msg" id="cabifyMsgPdf"></div>
+    </div>
+
+    <div style="max-width:420px;margin-top:14px">
+      <div class="up-title">📊 Reporte de consumo (.xls) — opcional, para el conteo de envíos</div>
+      <div class="up-zone" id="cabifyZoneXls"
+        ondragover="event.preventDefault();this.classList.add('drag')"
+        ondragleave="this.classList.remove('drag')"
+        ondrop="this.classList.remove('drag');cabifyHandleXLS({files:event.dataTransfer.files});event.preventDefault()">
+        <input type="file" id="cabifyXlsInp" accept=".xls,.xlsx" onchange="cabifyHandleXLS(this)">
+        <div class="uz-icon">📊</div>
+        <div class="uz-lbl">Soltá o seleccioná el reporte de consumo</div>
+        <div class="uz-sub">RESUMEN_CABIFY_-_MES-XXXXX.xls (exportado desde el panel de Cabify)</div>
+        <div class="uz-fn" id="cabifyXlsName"></div>
+      </div>
+      <div class="up-msg" id="cabifyMsgXls"></div>
     </div>
 
     <button class="btn-confirm" id="cabifyBtnConfirm" onclick="cabifyGuardar()" style="display:none;margin-top:14px">
