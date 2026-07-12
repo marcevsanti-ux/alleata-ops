@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.4.42</title>
+<title>Alleata · Operaciones v4.4.43</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -399,7 +399,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.4.42 · 11 jul 2026
+      v4.4.43 · 11 jul 2026
     </div>
   </div>
 </div>
@@ -476,7 +476,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.4.42 · 11 jul 2026
+      v4.4.43 · 11 jul 2026
     </div>
   </div>
 </nav>
@@ -516,7 +516,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.4.42</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.4.43</div>
   </div>
   <div class="content">
 
@@ -4260,7 +4260,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.4.42] OK');
+console.log('[Alleata v4.4.43] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -5291,6 +5291,19 @@ async function loadBadges(){
 }
 
 // ── Vista CEO: KPIs de Gestión NAPSE directo en el Dashboard (fetch en vivo a Railway) ──
+function proximaCorridaSyncSF(){
+  try{
+    const now=new Date(new Date().toLocaleString('en-US',{timeZone:'America/Argentina/Buenos_Aires'}));
+    const dow=now.getDay();
+    const intervalo=(dow===0||dow===6)?30:10;
+    let mins=Math.ceil((now.getMinutes()+1)/intervalo)*intervalo;
+    const target=new Date(now);
+    if(mins>=60){ target.setHours(target.getHours()+1); mins-=60; }
+    target.setMinutes(mins,0,0);
+    return `${String(target.getHours()).padStart(2,'0')}:${String(target.getMinutes()).padStart(2,'0')}`;
+  }catch(e){ return null; }
+}
+
 function proximaCorridaNapse(){
   try{
     const horas=[10,14,17];
@@ -5417,18 +5430,20 @@ async function loadCeoDashKpis(){
 
     // Desinstalaciones
     const dsMiniCard=(label,val,color)=>`
-      <div style="background:var(--navy-800);border:1px solid var(--border);border-left:3px solid ${color};border-radius:10px;padding:14px;text-align:center">
+      <div style="background:var(--navy-800);border:1px solid var(--border);border-left:3px solid ${color};border-radius:10px;padding:14px;text-align:center;flex:1;min-width:110px;height:100%;box-sizing:border-box;display:flex;flex-direction:column;justify-content:center">
         <div style="font-size:22px;font-weight:900;color:${color};font-family:'JetBrains Mono',monospace">${val}</div>
         <div style="font-size:10px;font-weight:700;letter-spacing:.04em;color:var(--text-muted);text-transform:uppercase;margin-top:2px">${label}</div>
       </div>`;
+    const dsProxima=proximaCorridaSyncSF();
     const desinstalacionesHTML=`
-      <div style="font-size:12px;font-weight:800;letter-spacing:.05em;color:var(--text-muted);text-transform:uppercase;margin:18px 0 10px">📦 Desinstalaciones</div>
-      <div style="background:var(--navy-800);border-left:3px solid var(--teal);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:12px">
-        <div style="font-size:10px;font-weight:800;letter-spacing:.06em;color:var(--text-muted);text-transform:uppercase">Desinstalaciones Pendientes</div>
-        <div style="font-size:34px;font-weight:900;color:var(--teal);font-family:'JetBrains Mono',monospace;margin-top:2px">${dsTotal}</div>
-        <div style="font-size:11px;color:var(--text-muted);margin-top:2px">OTs activas</div>
-      </div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:20px">
+      <div style="font-size:12px;font-weight:800;letter-spacing:.05em;color:var(--text-muted);text-transform:uppercase;margin:18px 0 4px">📦 Desinstalaciones</div>
+      ${dsProxima?`<div style="font-size:11px;color:var(--text-muted);margin-bottom:10px">Se actualiza cada 10 min (fin de semana cada 30) · Próximo sync: <b style="color:var(--text)">${dsProxima}</b></div>`:''}
+      <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:20px;align-items:stretch">
+        <div style="background:var(--navy-800);border-left:3px solid var(--teal);border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center;flex:1.4;min-width:180px;height:100%;box-sizing:border-box;display:flex;flex-direction:column;justify-content:center">
+          <div style="font-size:10px;font-weight:800;letter-spacing:.06em;color:var(--text-muted);text-transform:uppercase">Desinstalaciones Pendientes</div>
+          <div style="font-size:34px;font-weight:900;color:var(--teal);font-family:'JetBrains Mono',monospace;margin-top:2px">${dsTotal}</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:2px">OTs activas</div>
+        </div>
         ${dsMiniCard('Pendientes',dsPendientes,'#f59e0b')}
         ${dsMiniCard('En Proceso',dsEnProceso,'#3b82f6')}
         ${dsMiniCard('No Responde',dsNoResponde,'#f97316')}
