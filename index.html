@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.4.45</title>
+<title>Alleata · Operaciones v4.4.46</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -399,7 +399,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.4.45 · 11 jul 2026
+      v4.4.46 · 12 jul 2026
     </div>
   </div>
 </div>
@@ -476,7 +476,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.4.45 · 11 jul 2026
+      v4.4.46 · 12 jul 2026
     </div>
   </div>
 </nav>
@@ -516,7 +516,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.4.45</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.4.46</div>
   </div>
   <div class="content">
 
@@ -4262,7 +4262,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.4.45] OK');
+console.log('[Alleata v4.4.46] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -4513,7 +4513,16 @@ function showApp(){
     // Operadores con envios: mostrar sync info en topbar
     mostrarSFSyncSiAdmin();
   }
-  const navPresupuesto=document.getElementById('nav-presupuesto');
+  // Vista CEO: sidebar colapsado por defecto — tiene poco contenido (solo
+  // Dashboard + Presupuesto), conviene ganar ancho para las cards del dashboard.
+  if(isCeo){
+    const sbEl=document.getElementById('mainSidebar');
+    const mainEl=document.querySelector('.main');
+    if(sbEl&&!sbEl.classList.contains('collapsed')){
+      sbEl.classList.add('collapsed');
+      if(mainEl) mainEl.style.marginLeft='60px';
+    }
+  }
   if(navPresupuesto&&(isAdmin||isCeo)) navPresupuesto.style.display='flex';
   // ── Vista CEO: SOLO Dashboard + Napse + Presupuesto, nada más en el nav ──
   if(isCeo){
@@ -5352,7 +5361,7 @@ function renderCeoPresupuestoKpis(p){
   const dColor=(real,prev)=>{ const d=real-prev; return d>0?'#f87171':d<0?'var(--teal)':'#fff'; };
 
   const statCard=(label,value,color,sub,isTotal)=>`
-    <div style="background:var(--navy-800);border:1px solid var(--border);border-top:3px solid ${color};border-radius:12px;padding:16px;text-align:center;flex:${isTotal?'1.3':'1'};min-width:${isTotal?'170px':'130px'};height:100%;box-sizing:border-box;display:flex;flex-direction:column;justify-content:center">
+    <div style="background:var(--navy-800);border:1px solid var(--border);border-top:3px solid ${color};border-radius:12px;padding:16px;text-align:center;flex:${isTotal?'0 0 210px':'1 1 130px'};height:100%;box-sizing:border-box;display:flex;flex-direction:column;justify-content:center">
       <div style="font-size:10px;font-weight:800;letter-spacing:.06em;color:#fff;text-transform:uppercase">${label}</div>
       <div style="font-size:${isTotal?'34px':'22px'};font-weight:900;color:${color};margin-top:6px;font-family:'JetBrains Mono',monospace;line-height:1.1">${value}</div>
       ${sub?`<div style="font-size:11px;color:var(--text-muted);margin-top:4px">${sub}</div>`:''}
@@ -5365,10 +5374,10 @@ function renderCeoPresupuestoKpis(p){
   const totColor=dColor(p.totReal,p.totPrev);
 
   const html=`
-    <div style="display:flex;align-items:center;gap:10px;margin:22px 0 12px">
-      <div style="width:4px;height:20px;background:#f5a623;border-radius:2px"></div>
-      <span style="font-size:14px">💰</span>
-      <span style="font-size:13px;font-weight:900;letter-spacing:.06em;color:#fff;text-transform:uppercase">Presupuesto — ${p.mesLabel||''}</span>
+    <div style="display:flex;align-items:center;justify-content:center;gap:12px;margin:26px 0 14px">
+      <div style="width:5px;height:26px;background:#f5a623;border-radius:3px"></div>
+      <span style="font-size:19px">💰</span>
+      <span style="font-size:17px;font-weight:900;letter-spacing:.05em;color:#fff;text-transform:uppercase">Presupuesto — ${p.mesLabel||''}</span>
     </div>
     <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:20px;align-items:stretch">
       ${statCard('Total '+(p.mesLabel||''), fmt$(p.totPrev), totColor, 'Real: '+fmt$(p.totReal), true)}
@@ -5415,7 +5424,7 @@ async function loadCeoDashKpis(){
     // ── Sistema unificado de cards: título blanco arriba siempre, número abajo.
     // Color = solo acento (borde + número). isTotal = fuente grande (34px), sino chica (22px).
     const statCard=(label,value,color,sub,isTotal)=>`
-      <div style="background:var(--navy-800);border:1px solid var(--border);border-top:3px solid ${color};border-radius:12px;padding:16px;text-align:center;flex:${isTotal?'1.3':'1'};min-width:${isTotal?'170px':'130px'};height:100%;box-sizing:border-box;display:flex;flex-direction:column;justify-content:center">
+      <div style="background:var(--navy-800);border:1px solid var(--border);border-top:3px solid ${color};border-radius:12px;padding:16px;text-align:center;flex:${isTotal?'0 0 210px':'1 1 130px'};height:100%;box-sizing:border-box;display:flex;flex-direction:column;justify-content:center">
         <div style="font-size:10px;font-weight:800;letter-spacing:.06em;color:#fff;text-transform:uppercase">${label}</div>
         <div style="font-size:${isTotal?'34px':'22px'};font-weight:900;color:${color};margin-top:6px;font-family:'JetBrains Mono',monospace;line-height:1.1">${value}</div>
         ${sub?`<div style="font-size:11px;color:var(--text-muted);margin-top:4px">${sub}</div>`:''}
@@ -5423,10 +5432,10 @@ async function loadCeoDashKpis(){
 
     // Título de sección con más peso visual: barra de color + ícono + texto blanco
     const sectionTitle=(icon,label,color)=>`
-      <div style="display:flex;align-items:center;gap:10px;margin:22px 0 12px">
-        <div style="width:4px;height:20px;background:${color};border-radius:2px"></div>
-        <span style="font-size:14px">${icon}</span>
-        <span style="font-size:13px;font-weight:900;letter-spacing:.06em;color:#fff;text-transform:uppercase">${label}</span>
+      <div style="display:flex;align-items:center;justify-content:center;gap:12px;margin:26px 0 14px">
+        <div style="width:5px;height:26px;background:${color};border-radius:3px"></div>
+        <span style="font-size:19px">${icon}</span>
+        <span style="font-size:17px;font-weight:900;letter-spacing:.05em;color:#fff;text-transform:uppercase">${label}</span>
       </div>`;
 
     const total=(s.configurar_terminal||0)+(s.en_proceso||0)+(s.pre_colecta||0)+(s.despachado||0)+(s.retirar_terminal||0)+(s.exitoso||0);
@@ -5459,10 +5468,10 @@ async function loadCeoDashKpis(){
     const provsTotales=logProvs.filter(e=>e.label!=='Alleata');
     const totOts=provsTotales.reduce((a,e)=>a+e.ots,0);
     const totCosto=provsTotales.reduce((a,e)=>a+e.costo,0);
-    const logHTML=logProvs.map(e=>{
+    const logHTML=statCard('Total Envíos',fmt$(totCosto),'#1dbf8e',totOts+' envíos (sin Alleata)',true) + logProvs.map(e=>{
       const prom=e.ots?Math.round(e.costo/e.ots):0;
       return statCard(e.label,fmt$(e.costo),e.color,e.ots+' envíos · Prom. '+fmt$(prom),false);
-    }).join('') + statCard('Total Envíos',fmt$(totCosto),'#1dbf8e',totOts+' envíos (sin Alleata)',false);
+    }).join('');
 
     // Tipo de OT
     const inst=s.instalacion_equipo||0, camb=s.cambio_terminal||0, totTipo=(inst+camb)||1;
@@ -5497,7 +5506,7 @@ async function loadCeoDashKpis(){
       ${sectionTitle('📋','Gestión NAPSE — Información','var(--teal)')}
       ${subHeaderHTML}
       <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:8px;align-items:stretch">
-        <div style="flex:1.3;min-width:170px">${totalOTsHTML}</div>
+        <div style="flex:0 0 210px">${totalOTsHTML}</div>
         ${mesesHTML}
         ${tipoDeOtHTML}
       </div>
