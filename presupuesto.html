@@ -10,6 +10,12 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <style>
+  /* ── Modo solo lectura (?readonly=1) — oculta toda acción de guardado/carga ── */
+  body.readonly-mode .btn-save,
+  body.readonly-mode .btn-confirm,
+  body.readonly-mode input[type="file"] { display:none !important; }
+  body.readonly-mode .tc-inp { pointer-events:none; opacity:.5; }
+  .readonly-banner{background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.35);color:#f59e0b;padding:9px 16px;border-radius:8px;font-size:12px;font-weight:700;margin-bottom:18px;text-align:center;letter-spacing:.3px}
   :root {
     --navy-900:#0d1b2a; --navy-800:#112236; --navy-700:#162d45;
     --teal:#1dbf8e; --blue:#1a9fd4;
@@ -190,7 +196,7 @@
 <div id="loginScreen">
   <div class="login-box">
     <h2>💰 Presupuesto</h2>
-    <p class="login-sub">Alleata · Solo Admin</p>
+    <p class="login-sub">Alleata · Acceso restringido</p>
     <div style="position:absolute;bottom:12px;right:16px;font-size:10px;font-family:'JetBrains Mono',monospace;color:rgba(232,237,243,.2)">v1.9.0</div>
     <div class="login-field">
       <label>Email</label>
@@ -207,7 +213,7 @@
 
 <div id="appContent" style="display:none">
 <h1>💰 Presupuesto Operaciones</h1>
-<p class="sub">Alleata · 2026 · Solo Admin <span style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 8px;border-radius:4px;border:1px solid var(--border2);font-size:10px;margin-left:6px">v1.9.0</span></p>
+<p class="sub">Alleata · 2026 <span style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 8px;border-radius:4px;border:1px solid var(--border2);font-size:10px;margin-left:6px">v1.9.0</span></p>
 
 <div class="toolbar">
   <div class="mes-bar" id="mesBar"></div>
@@ -2447,6 +2453,7 @@ const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 const { createClient } = supabase;
 const sb = createClient(SB_URL, SB_KEY);
 let currentUser = null;
+const READONLY = new URLSearchParams(location.search).get('readonly') === '1';
 
 async function doLogin() {
   const email = document.getElementById('loginEmail').value.trim();
@@ -2468,6 +2475,13 @@ async function doLogin() {
 function onLogin(user) {
   document.getElementById('loginScreen').style.display='none';
   document.getElementById('appContent').style.display='block';
+  if (READONLY) {
+    document.body.classList.add('readonly-mode');
+    const banner = document.createElement('div');
+    banner.className = 'readonly-banner';
+    banner.textContent = '👁 Vista de solo lectura';
+    document.getElementById('appContent').prepend(banner);
+  }
   // Mostrar usuario en header
   const h1 = document.querySelector('h1');
   const userBar = document.createElement('div');
@@ -2620,6 +2634,29 @@ async function loadFacturasFromDB() {
     cabifySyncReal();
   }
   render();
+  postResumenAlPortal();
+}
+
+// ── Envía al portal (index.html) el resumen de presupuesto para el Dashboard CEO ──
+// Solo números — nunca datos de sesión/login ni el resto de la UI.
+function postResumenAlPortal(){
+  try{
+    const rubros=['LOGISTICA','TECNOLOGIA','INSUMOS','SISTEMAS'];
+    const detalle=[];
+    let totPrev=0, totReal=0;
+    rubros.forEach(rub=>{
+      const rs=RUBRO_STYLE[rub];
+      const its=DATA.filter(i=>i.r===rub);
+      const prev=its.reduce((s,i)=>s+(i.prev[mes]||0),0);
+      const real=its.reduce((s,i)=>s+getReal(i.id,mes),0);
+      totPrev+=prev; totReal+=real;
+      detalle.push({ label: rs.label, color: rs.color, prev, real });
+    });
+    window.parent.postMessage({
+      type: 'alleata-presupuesto-resumen',
+      payload: { mes, mesLabel: MESES_LABEL[mes], totPrev, totReal, rubros: detalle }
+    }, '*');
+  }catch(e){ /* si falla, el dashboard simplemente no muestra esta sección */ }
 }
 
 // Hook: al agregar factura, también guardar en DB
