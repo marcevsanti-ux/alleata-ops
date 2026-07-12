@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Napse Watchdog — Monitoreo de Cierres</title>
+  <style>
+    :root {
+      --navy: #0f172a;
+      --navy-700: #1e293b;
+      --navy-800: #1e2d4a;
+      --teal: #1dbf8e;
+      --text: #f1f5f9;
+      --text-muted: #94a3b8;
+      --border: #334155;
+      --red: #ef4444;
+      --yellow: #f59e0b;
+      --green: #10b981;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--navy);
+      color: var(--text);
+      line-height: 1.6;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 30px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    h1 {
+      font-size: 24px;
+      font-weight: 700;
+    }
+
+    .header-right {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+
+    button {
+      background: var(--teal);
+      color: var(--navy);
+      border: none;
+      padding: 9px 18px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 13px;
+      transition: opacity 0.15s;
+    }
+
+    button:hover {
+      opacity: 0.85;
+    }
+
+    button:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .status-box {
+      background: var(--navy-800);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 20px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 20px;
+    }
+
+    .stat {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .stat-label {
+      font-size: 11px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      font-weight: 700;
+      margin-bottom: 6px;
+      letter-spacing: 0.5px;
+    }
+
+    .stat-value {
+      font-size: 28px;
+      font-weight: 900;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .stat-value.ok {
+      color: var(--green);
+    }
+
+    .stat-value.pendiente {
+      color: var(--yellow);
+    }
+
+    .stat-value.error {
+      color: var(--red);
+    }
+
+    .table-wrap {
+      background: var(--navy-800);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    thead {
+      background: var(--navy-700);
+    }
+
+    th {
+      padding: 12px 16px;
+      text-align: left;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid rgba(255,255,255, 0.05);
+      font-size: 13px;
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    .estado-badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-weight: 600;
+      font-size: 11px;
+      text-transform: uppercase;
+    }
+
+    .estado-badge.ok {
+      background: rgba(16, 185, 129, 0.1);
+      color: var(--green);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    .estado-badge.pendiente {
+      background: rgba(245, 158, 11, 0.1);
+      color: var(--yellow);
+      border: 1px solid rgba(245, 158, 11, 0.3);
+    }
+
+    .estado-badge.error {
+      background: rgba(239, 68, 68, 0.1);
+      color: var(--red);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+    }
+
+    .empty {
+      padding: 40px;
+      text-align: center;
+      color: var(--text-muted);
+    }
+
+    .loading {
+      display: inline-block;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    .pager {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      padding: 12px 0;
+      border-top: 1px solid var(--border);
+      font-size: 12px;
+    }
+
+    .pager button {
+      padding: 6px 12px;
+      background: var(--navy-700);
+      color: var(--text);
+    }
+
+    .pager button.active {
+      background: var(--teal);
+      color: var(--navy);
+    }
+
+    .alert-msg {
+      padding: 12px 16px;
+      border-radius: 8px;
+      margin-bottom: 12px;
+      font-size: 13px;
+    }
+
+    .alert-msg.success {
+      background: rgba(16, 185, 129, 0.1);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      color: var(--green);
+    }
+
+    .alert-msg.error {
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      color: var(--red);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div>
+        <h1>🚨 Napse Watchdog</h1>
+        <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">Monitoreo automático de cierres · 23:40 diarios (ART)</p>
+      </div>
+      <div class="header-right">
+        <button id="btn-refresh" onclick="cargarAlertas()">🔄 Actualizar</button>
+        <button id="btn-run" onclick="ejecutarManual()">▶️ Ejecutar ahora</button>
+      </div>
+    </header>
+
+    <div id="alert-container"></div>
+
+    <div class="status-box">
+      <div class="stat">
+        <div class="stat-label">Último estado</div>
+        <div class="stat-value" id="stat-estado">—</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Última corrida</div>
+        <div style="font-size: 13px; color: var(--text-muted);" id="stat-timestamp">—</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Problemas detectados</div>
+        <div class="stat-value" id="stat-problemas">—</div>
+      </div>
+    </div>
+
+    <h2 style="margin-bottom: 12px; font-size: 16px;">Histórico de alertas</h2>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Fecha corrida</th>
+            <th>Estado</th>
+            <th>Problemas</th>
+            <th>Timestamp</th>
+          </tr>
+        </thead>
+        <tbody id="tbody-alertas">
+          <tr><td colspan="4" class="empty">Cargando...</td></tr>
+        </tbody>
+      </table>
+      <div class="pager" id="pager"></div>
+    </div>
+  </div>
+
+  <script>
+    const RAILWAY_BASE = 'https://alleata-agent-production.up.railway.app';
+    let currentPage = 1;
+    const pageSize = 20;
+
+    async function obtenerToken() {
+      const token = localStorage.getItem('supabase_token');
+      if (!token) {
+        mostrarAlerta('Debes estar autenticado. Volvé al portal.', 'error');
+        throw new Error('No token');
+      }
+      return token;
+    }
+
+    async function cargarAlertas(page = 1) {
+      try {
+        const token = await obtenerToken();
+        currentPage = page;
+        const offset = (page - 1) * pageSize;
+
+        const res = await fetch(
+          `${RAILWAY_BASE}/napse/alertas?limit=${pageSize}&offset=${offset}`,
+          { headers: { 'Authorization': `Bearer ${token}` } }
+        );
+
+        if (!res.ok) {
+          if (res.status === 401) {
+            mostrarAlerta('Sesión expirada. Volvé al portal.', 'error');
+            return;
+          }
+          throw new Error(`HTTP ${res.status}`);
+        }
+
+        const data = await res.json();
+        renderizarAlertas(data.alertas, data.total);
+        actualizarStatus(data.alertas[0]);
+
+      } catch (err) {
+        console.error('Error cargando alertas:', err);
+        mostrarAlerta('Error al cargar alertas: ' + err.message, 'error');
+      }
+    }
+
+    async function cargarStatus() {
+      try {
+        const token = await obtenerToken();
+        const res = await fetch(`${RAILWAY_BASE}/napse/status`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+        const data = await res.json();
+        actualizarStatusUI(data.ultimo_estado, data.ultimo_timestamp, data.num_problemas);
+      } catch (err) {
+        console.error('Error cargando status:', err);
+      }
+    }
+
+    function renderizarAlertas(alertas, total) {
+      const tbody = document.getElementById('tbody-alertas');
+
+      if (!alertas.length) {
+        tbody.innerHTML = '<tr><td colspan="4" class="empty">Sin alertas registradas</td></tr>';
+        document.getElementById('pager').innerHTML = '';
+        return;
+      }
+
+      tbody.innerHTML = alertas.map(alerta => `
+        <tr>
+          <td>${alerta.fecha_corrida}</td>
+          <td><span class="estado-badge ${alerta.estado}">${alerta.estado.toUpperCase()}</span></td>
+          <td>${alerta.num_problemas}</td>
+          <td style="font-size: 12px; color: var(--text-muted);">${new Date(alerta.timestamp).toLocaleString('es-AR')}</td>
+        </tr>
+      `).join('');
+
+      renderizarPaginacion(total);
+    }
+
+    function renderizarPaginacion(total) {
+      const totalPages = Math.ceil(total / pageSize);
+      const pager = document.getElementById('pager');
+
+      if (totalPages <= 1) {
+        pager.innerHTML = '';
+        return;
+      }
+
+      let html = '';
+      for (let i = 1; i <= Math.min(totalPages, 5); i++) {
+        html += `
+          <button class="${i === currentPage ? 'active' : ''}" onclick="cargarAlertas(${i})">
+            ${i}
+          </button>
+        `;
+      }
+
+      if (totalPages > 5) {
+        html += `<span style="align-self: center;">... ${totalPages}</span>`;
+      }
+
+      pager.innerHTML = html;
+    }
+
+    function actualizarStatusUI(estado, timestamp, numProblemas) {
+      const estadoEl = document.getElementById('stat-estado');
+      estadoEl.textContent = estado.toUpperCase();
+      estadoEl.className = `stat-value ${estado}`;
+
+      document.getElementById('stat-timestamp').textContent = timestamp ? new Date(timestamp).toLocaleString('es-AR') : '—';
+
+      const problemasEl = document.getElementById('stat-problemas');
+      problemasEl.textContent = numProblemas || 0;
+      problemasEl.className = `stat-value ${numProblemas > 0 ? 'pendiente' : 'ok'}`;
+    }
+
+    function actualizarStatus(primerAlerta) {
+      if (primerAlerta) {
+        actualizarStatusUI(primerAlerta.estado, primerAlerta.timestamp, primerAlerta.num_problemas);
+      }
+    }
+
+    async function ejecutarManual() {
+      const btn = document.getElementById('btn-run');
+      btn.disabled = true;
+      btn.textContent = '⟳ Ejecutando...';
+
+      try {
+        const token = await obtenerToken();
+        const res = await fetch(`${RAILWAY_BASE}/napse/run-manual`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+        const data = await res.json();
+        mostrarAlerta(`✅ Ejecutado: ${data.resultado.estado} (${data.resultado.numProblemas} problemas)`, 'success');
+
+        setTimeout(() => {
+          cargarAlertas(1);
+          cargarStatus();
+        }, 1000);
+
+      } catch (err) {
+        console.error('Error ejecutando:', err);
+        mostrarAlerta('Error al ejecutar: ' + err.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '▶️ Ejecutar ahora';
+      }
+    }
+
+    function mostrarAlerta(msg, tipo) {
+      const container = document.getElementById('alert-container');
+      const el = document.createElement('div');
+      el.className = `alert-msg ${tipo}`;
+      el.textContent = msg;
+      container.appendChild(el);
+
+      setTimeout(() => el.remove(), 5000);
+    }
+
+    // Cargar al iniciar
+    window.addEventListener('load', () => {
+      cargarAlertas();
+      cargarStatus();
+      // Refrescar cada 2 minutos
+      setInterval(() => cargarStatus(), 120000);
+    });
+  </script>
+</body>
+</html>
