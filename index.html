@@ -7314,7 +7314,7 @@ async function renderEnviosTable(list){
       <td>
         <div style="display:flex;gap:5px;flex-wrap:wrap">
           ${(e.logistica||'').toUpperCase()==='CORREO ARGENTINO'
-            ? '' // CA: no tiene rótulo Alleata
+            ? `<span id="ca-rotulo-${e.id}">${renderCARotuloBtn(e)}</span>`
             : (e.logistica||'').toUpperCase()==='CABIFY'
               ? `<span id="cabify-print-${e.id}">${renderCabifyPrintBtn(e)}</span>`
             : (e.estado==='Entregado'||e.estado==='Entregado por logística Alleata')
@@ -8257,6 +8257,77 @@ function renderCabifyPrintBtn(e) {
   if (!ride) return '';
   return `<button title="Reimprimir rótulo Cabify" onclick="reimprimirRotuloCabify('${e.ot_numero||e.id}')"
     style="background:rgba(139,92,246,.15);border:1px solid rgba(139,92,246,.4);color:#8b5cf6;font-size:11px;padding:4px 7px;border-radius:6px;cursor:pointer">🖨️</button>`;
+}
+
+// ── CORREO ARGENTINO: rótulo subido a mano (la API de CA no permite generarlo) ──
+
+function renderCARotuloBtn(e) {
+  const id = e.id;
+  if (e.rotulo_ca_path) {
+    return `<button title="Imprimir rótulo CA (subido manual)" onclick="reimprimirRotuloCA('${id}')"
+      style="background:rgba(139,92,246,.15);border:1px solid rgba(139,92,246,.4);color:#8b5cf6;font-size:11px;padding:4px 7px;border-radius:6px;cursor:pointer">🖨️</button>
+      <label title="Reemplazar rótulo" style="background:var(--surface2);border:1px solid var(--border2);color:var(--text-muted);font-size:11px;padding:4px 7px;border-radius:6px;cursor:pointer;display:inline-block">📎
+        <input type="file" accept="application/pdf" style="display:none" onchange="subirRotuloCA('${id}',this)">
+      </label>`;
+  }
+  return `<label title="Subir rótulo CA (PDF)" style="background:rgba(245,158,11,.15);border:1px dashed #f59e0b;color:#f59e0b;font-size:11px;padding:4px 7px;border-radius:6px;cursor:pointer;display:inline-block">📎 Subir
+    <input type="file" accept="application/pdf" style="display:none" onchange="subirRotuloCA('${id}',this)">
+  </label>`;
+}
+
+async function subirRotuloCA(id, input) {
+  const file = input.files[0];
+  if (!file) return;
+  if (file.type !== 'application/pdf') { alert('Solo se aceptan archivos PDF.'); return; }
+
+  const cellEl = document.getElementById(`ca-rotulo-${id}`);
+  if (cellEl) cellEl.innerHTML = `<span style="font-size:11px;color:var(--text-muted)">⏳ Subiendo...</span>`;
+
+  try {
+    const { data: raw } = await sb.from('sf_workorders').select('workorder_number').eq('id', id).single();
+    const otNumero = raw?.workorder_number || id;
+    const storagePath = `${otNumero}.pdf`;
+
+    const { error: uploadErr } = await sb.storage
+      .from('ca-rotulos')
+      .upload(storagePath, file, { contentType: 'application/pdf', upsert: true });
+    if (uploadErr) throw uploadErr;
+
+    const { error: updateErr } = await sb.from('sf_workorders')
+      .update({ rotulo_ca_path: storagePath })
+      .eq('id', id);
+    if (updateErr) throw updateErr;
+
+    showToast('✅ Rótulo CA subido — OT ' + otNumero);
+
+    if (cellEl) {
+      const { data: rawR } = await sb.from('sf_workorders').select('*').eq('id', id).single();
+      const e = normalizarSFWorkorder(rawR);
+      cellEl.innerHTML = renderCARotuloBtn(e);
+    }
+  } catch (err) {
+    alert('No se pudo subir el rótulo: ' + err.message);
+    if (cellEl) cellEl.innerHTML = `<label title="Subir rótulo CA (PDF)" style="background:rgba(245,158,11,.15);border:1px dashed #f59e0b;color:#f59e0b;font-size:11px;padding:4px 7px;border-radius:6px;cursor:pointer;display:inline-block">📎 Subir
+      <input type="file" accept="application/pdf" style="display:none" onchange="subirRotuloCA('${id}',this)">
+    </label>`;
+  }
+}
+
+async function reimprimirRotuloCA(id) {
+  try {
+    const { data: raw } = await sb.from('sf_workorders').select('rotulo_ca_path').eq('id', id).single();
+    if (!raw?.rotulo_ca_path) { alert('No hay rótulo subido para esta OT.'); return; }
+
+    // URL firmada — el bucket es privado, no público
+    const { data, error } = await sb.storage
+      .from('ca-rotulos')
+      .createSignedUrl(raw.rotulo_ca_path, 300); // 5 min, suficiente para abrir/imprimir
+    if (error) throw error;
+
+    window.open(data.signedUrl, '_blank');
+  } catch (err) {
+    alert('No se pudo abrir el rótulo: ' + err.message);
+  }
 }
 
 async function loadCabifyRide(ot_numero, rowId) {
