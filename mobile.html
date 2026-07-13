@@ -725,6 +725,25 @@ const WASENDER_KEY='';
 
 // ── ALLY AGENT — notificaciones internas a grupos ──
 const ALLY_URL='https://alleata-agent-production.up.railway.app';
+
+// Helper único para llamadas de ESCRITURA al agent (Railway) que necesiten
+// quedar identificadas en producto_auditoria. Adjunta siempre el token de
+// sesión de Supabase (authMiddleware.js → requireAuth() lo lee de acá para
+// resolver actor_id/actor_nombre) + el secret de servicio como respaldo.
+// Mismo patrón que index.html (portal desktop) — usar esto en vez de
+// fetch() a mano para endpoints nuevos que escriban/modifiquen algo.
+async function railwayFetch(path, options = {}) {
+  const { data: { session } } = await sb.auth.getSession();
+  return fetch(ALLY_URL + path, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ' + (session ? session.access_token : ''),
+      'x-automation-secret': '123456',
+      ...(options.headers || {}),
+    },
+  });
+}
 const ALLY_GROUP_TEST='120363424299090366@g.us';
 
 // Mapa responsable → grupo WhatsApp
@@ -1157,9 +1176,8 @@ async function aceptarOT(){
       const tecnicoNombre = (currentProfile?.nombre||currentUser?.email||'Operador').trim();
       console.log('[despachar-ot] sf_id='+sfId+' tecnico='+tecnicoNombre);
       if(!sfId) throw new Error('OT sin SF ID — no se puede despachar');
-      const res=await fetch(ALLY_URL+'/automations/despachar-ot',{
+      const res=await railwayFetch('/automations/despachar-ot',{
         method:'POST',
-        headers:{'Content-Type':'application/json','x-automation-secret':'123456'},
         body:JSON.stringify({ sf_id:sfId, tecnico:tecnicoNombre })
       });
       const data=await res.json();
@@ -1492,9 +1510,8 @@ async function confirmarCierreOT(){
   //  - si resultado='Fallido' → NO toca Salesforce, solo deja constancia en Supabase
   let error=null;
   try{
-    const res=await fetch(ALLY_URL+'/automations/entregar-ot',{
+    const res=await railwayFetch('/automations/entregar-ot',{
       method:'POST',
-      headers:{'Content-Type':'application/json','x-automation-secret':'123456'},
       body:JSON.stringify({
         sf_id:      _otCierreActual?.sf_id,
         tecnico,
@@ -2088,9 +2105,8 @@ async function confirmarActualizarSim(){
   btn.disabled=true;btn.textContent='⏳ Guardando...';
   msg.textContent='';
   try{
-    const res=await fetch(ALLY_URL+'/automations/actualizar-sim',{
+    const res=await railwayFetch('/automations/actualizar-sim',{
       method:'POST',
-      headers:{'Content-Type':'application/json','x-automation-secret':'123456'},
       body:JSON.stringify({sf_id,serie,estado,ubicacion})
     });
     const data=await res.json();
