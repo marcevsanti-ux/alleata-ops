@@ -3867,6 +3867,27 @@ El envío no registra avances recientes. Requiere seguimiento.`,
 const ALLY_DESINST_SECRET = '123456';
 const ALLY_RAILWAY_BASE   = 'https://alleata-agent-production.up.railway.app';
 
+// Helper único para llamadas de ESCRITURA al agent (Railway) que necesiten
+// quedar identificadas en producto_auditoria. Adjunta siempre el token de
+// sesión de Supabase (authMiddleware.js → requireAuth() lo lee de acá para
+// resolver actor_id/actor_nombre) + el secret de servicio como respaldo.
+//
+// Usar esto en vez de fetch() a mano para cualquier endpoint nuevo que
+// escriba/modifique algo — así no depende de que alguien se acuerde de
+// agregar el header cada vez.
+async function railwayFetch(path, options = {}) {
+  const { data: { session } } = await sb.auth.getSession();
+  return fetch(ALLY_RAILWAY_BASE + path, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ' + (session ? session.access_token : ''),
+      'x-automation-secret': '123456',
+      ...(options.headers || {}),
+    },
+  });
+}
+
 // ── Enviar mensaje al grupo Desinstalaciones vía Railway ──────────────────
 async function allyDesinst_enviarMensaje(mensaje, contexto = '') {
   try {
@@ -8373,12 +8394,8 @@ async function crearEnvioCabify(id) {
       ...(ventana ? { delivery_from: ventana.delivery_from, delivery_to: ventana.delivery_to } : {}),
     };
 
-    const res = await fetch(`https://alleata-agent-production.up.railway.app/cabify/parcels/create-and-ship`, {
+    const res = await railwayFetch('/cabify/parcels/create-and-ship', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-automation-secret': '123456',
-      },
       body: JSON.stringify(body),
     });
 
@@ -11360,18 +11377,8 @@ async function cargaConfirmar() {
   var btn = document.getElementById('carga-confirmar-btn');
   btn.disabled = true; btn.textContent = 'Guardando...';
   try {
-    // El backend identifica al usuario por el JWT de sesión de Supabase
-    // (authMiddleware.js → requireAuth() + actorFromReq()), no por campos
-    // sueltos en el body. Sin este header cae al fallback "service (sin
-    // identidad de usuario)" en la auditoría.
-    var { data: { session } } = await sb.auth.getSession();
-    var res  = await fetch(ALLY_RAILWAY_BASE + '/store/asignar-terminal', {
+    var res = await railwayFetch('/store/asignar-terminal', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + (session ? session.access_token : ''),
-        'x-automation-secret': '123456',
-      },
       body: JSON.stringify({ terminal_id: _cargaTerminalId, banco: _cargaBancoSel })
     });
     var data = await res.json();
