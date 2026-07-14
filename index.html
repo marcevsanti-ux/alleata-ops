@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.4.38</title>
+<title>Alleata · Operaciones v4.4.55</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -154,8 +154,8 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;min-h
 .dash-card[data-mod="sims"]::after{background:linear-gradient(90deg,var(--teal),var(--blue));}
 .dash-card[data-mod="envios"]::after{background:linear-gradient(90deg,var(--blue),#6366f1);}
 .dash-card[data-mod="devoluciones"]::after{background:linear-gradient(90deg,var(--orange),var(--yellow));}
-.dash-card[data-mod="horas"]::after{background:linear-gradient(90deg,var(--purple),var(--blue));}
 .dash-card[data-mod="ajustes"]::after{background:linear-gradient(90deg,var(--navy-400),var(--navy-300));}
+.dash-card[data-mod="presupuesto"]::after{background:linear-gradient(90deg,var(--purple),var(--blue));}
 .dash-card[data-mod="terminales"]::after{background:linear-gradient(90deg,#f59e0b,#ef4444);}
 .dash-card[data-mod="terminales"] .dash-card-stat{color:#f59e0b;}
 .dash-card.locked{opacity:.3;cursor:not-allowed;}
@@ -166,8 +166,8 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;min-h
 .dash-card[data-mod="sims"] .dash-card-stat{color:var(--teal);}
 .dash-card[data-mod="envios"] .dash-card-stat{color:var(--blue);}
 .dash-card[data-mod="devoluciones"] .dash-card-stat{color:var(--orange);}
-.dash-card[data-mod="horas"] .dash-card-stat{color:var(--purple);}
 .dash-card[data-mod="ajustes"] .dash-card-stat{color:var(--text-muted);}
+.dash-card[data-mod="presupuesto"] .dash-card-stat{color:var(--purple);}
 
 /* CARDS */
 .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;}
@@ -236,14 +236,6 @@ tr:hover td{background:var(--surface2);}
 .sim-row{display:flex;gap:8px;margin-bottom:3px;}
 .sim-key{font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);min-width:64px;font-weight:700;}
 .sim-val{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text);}
-
-/* HORAS TEAM */
-.team-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:10px;}
-.team-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center;}
-.team-avatar{width:44px;height:44px;border-radius:50%;background:var(--grad);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:#fff;margin:0 auto 8px;}
-.team-name{font-size:13px;font-weight:600;color:var(--text);}
-.team-hours{font-family:'JetBrains Mono',monospace;font-size:22px;font-weight:700;color:var(--purple);margin-top:4px;}
-.team-today{font-size:10px;color:var(--text-muted);}
 
 /* AJUSTES - USER CARDS */
 .user-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px 20px;transition:border-color .2s;}
@@ -407,7 +399,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.4.38 · 14 jul 2026
+      v4.4.55 · 14 jul 2026
     </div>
   </div>
 </div>
@@ -450,9 +442,8 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <div class="active-bar"></div><span class="nav-icon-wrap">🏦</span> Bancos
     </div>
 
-    <div class="nav-item" data-mod="horas" id="nav-horas" style="opacity:0.4;pointer-events:none;cursor:default;">
-      <div class="active-bar"></div><span class="nav-icon-wrap">⏱</span> Horas
-      <span class="nav-badge" id="nb-horas">—</span>
+    <div class="nav-item" data-mod="presupuesto" id="nav-presupuesto" style="display:none" onclick="goTo('presupuesto')">
+      <div class="active-bar"></div><span class="nav-icon-wrap">💰</span> Presupuesto
     </div>
     <div class="nav-section" id="nav-section-config" style="display:none">Configuración</div>
     <div class="nav-item" data-mod="ajustes" id="nav-ajustes" style="display:none" onclick="goTo('ajustes')">
@@ -488,7 +479,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.4.38 · 14 jul 2026
+      v4.4.55 · 14 jul 2026
     </div>
   </div>
 </nav>
@@ -528,9 +519,24 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.4.38</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.4.55</div>
   </div>
   <div class="content">
+
+    <!-- DASHBOARD / HOME -->
+    <div class="module active" id="mod-home">
+      <div style="margin-bottom:18px">
+        <div id="welcomeMsg" style="font-size:18px;font-weight:800;color:var(--text)">Hola 👋</div>
+        <div id="ops-timestamp" style="font-size:11px;color:var(--text-muted);margin-top:2px"></div>
+      </div>
+
+      <!-- Vista CEO: KPIs de Gestión NAPSE, en vivo, directo acá — sin sección aparte -->
+      <div id="ceoDashKpis"></div>
+      <div id="ceoPresupuestoKpis"></div>
+      <iframe id="presupuestoBridgeFrame" style="display:none" src="about:blank"></iframe>
+
+      <div class="dash-grid" id="dashGrid" style="margin-top:6px"></div>
+    </div>
 
     <div class="module" id="mod-sims">
       <!-- Carga de fotos deshabilitada por ahora — dejar solo búsqueda manual -->
@@ -741,20 +747,17 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       </div></div>
     </div>
 
-    <!-- HORAS -->
-    <div class="module" id="mod-horas">
-      <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:flex-end">
-        <div class="field" style="margin:0"><label class="label">Semana</label><input class="input" id="horasWeek" type="week" style="width:190px" /></div>
-        <button class="btn btn-sm" onclick="renderHoras()">Ver semana</button>
-        <button class="btn-ghost btn-sm" onclick="openAddHoras()">+ Cargar horas</button>
-      </div>
-      <div class="team-grid" id="teamGrid"></div>
-      <div class="sec-title" style="margin-top:14px"><div class="sec-dot" style="background:var(--purple)"></div>Detalle de registros</div>
-      <div class="card"><div class="table-wrap">
-        <table><thead><tr><th>Fecha</th><th>Persona</th><th>Horas</th><th>Tarea</th><th></th></tr></thead>
-        <tbody id="horasTable"></tbody></table>
-        <div class="empty" id="horasEmpty"><div class="empty-icon">🕐</div><p>No hay horas cargadas</p></div>
-      </div></div>
+    <!-- PRESUPUESTO (solo admin) — embebido vía iframe: es una app standalone con su propio
+         login/Supabase/estado, mezclarla inline en este mismo <script> gigante generaría
+         colisiones de nombres (sb, currentUser, etc.) con el resto del portal.
+         NOTA: presupuesto.html tiene su propio login (Supabase separado) — es normal que
+         pida iniciar sesión de nuevo la primera vez que se abre.
+         Módulo normal (NO outsideMod): evita depender de position:fixed + % height, que
+         es frágil con iframes. Altura fija en vh, la página scrollea normal si hace falta. -->
+    <div class="module" id="mod-presupuesto">
+      <iframe id="presupuestoFrame" src="about:blank" data-src="presupuesto.html"
+        style="display:block;width:100%;height:82vh;border:1px solid var(--border2);border-radius:12px;background:var(--navy-900)">
+      </iframe>
     </div>
 
     <!-- AUDITORÍA -->
@@ -924,6 +927,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
               <option value="operador">Operador</option>
               <option value="logistica">Logística</option>
               <option value="admin">Administrador</option>
+              <option value="ceo">CEO (solo dashboard, lectura)</option>
             </select>
           </div>
         </div>
@@ -934,7 +938,6 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
             <div class="mod-pill active" data-mod="envios" onclick="toggleCreateMod(this)"><span class="pill-dot"></span>🚚 Envíos</div>
             <div class="mod-pill" data-mod="desinstalaciones" onclick="toggleCreateMod(this)"><span class="pill-dot"></span>📦 Desinstalaciones</div>
             <div class="mod-pill" data-mod="napse" onclick="toggleCreateMod(this)"><span class="pill-dot"></span>🔍 Napse</div>
-            <div class="mod-pill active" data-mod="horas" onclick="toggleCreateMod(this)"><span class="pill-dot"></span>⏱ Horas</div>
             <div class="mod-pill" data-mod="terminales" onclick="toggleCreateMod(this)"><span class="pill-dot"></span>🖥️ Terminales</div>
             <div class="mod-pill" data-mod="store" onclick="toggleCreateMod(this)"><span class="pill-dot"></span>🏦 Bancos</div>
             <div class="mod-pill" data-mod="recuperadas" onclick="toggleCreateMod(this)"><span class="pill-dot"></span>🔁 Recuperadas</div>
@@ -958,7 +961,6 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
             <option value="">Todas las tablas</option>
             <option value="envios">envios</option>
             <option value="profiles">profiles</option>
-              <option value="horas">horas</option>
           </select>
           <select id="auditAccion" style="background:var(--surface2);border:1px solid var(--border2);color:var(--text);font-size:12px;padding:6px 10px;border-radius:8px;outline:none" onchange="loadAuditLog()">
             <option value="">Todas las acciones</option>
@@ -1367,23 +1369,6 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
   </div>
 </div>
 
-<!-- MODAL HORAS -->
-<div class="modal-overlay" id="modalHoras">
-  <div class="modal">
-    <button class="modal-close" onclick="closeModal('modalHoras')">✕</button>
-    <div class="modal-title">⏱ Cargar horas trabajadas</div>
-    <div class="field"><label class="label">Persona</label><input class="input" id="hPersona" placeholder="Tu nombre" /></div>
-    <div class="row">
-      <div class="field"><label class="label">Fecha</label><input class="input" id="hFecha" type="date" /></div>
-      <div class="field"><label class="label">Horas</label><input class="input" id="hHoras" type="number" min="0.5" max="24" step="0.5" placeholder="8" /></div>
-    </div>
-    <div class="field"><label class="label">Tarea realizada</label><input class="input" id="hTarea" placeholder="Descripción de la tarea..." /></div>
-    <div style="display:flex;gap:10px;margin-top:6px">
-      <button class="btn btn-sm" onclick="saveHoras()">Guardar</button>
-      <button class="btn-ghost btn-sm" onclick="closeModal('modalHoras')">Cancelar</button>
-    </div>
-  </div>
-</div>
 
 <!-- ══ MÓDULO NAPSE ════════════════════════════════════════════════════════════════ -->
 <div class="module" id="mod-napse">
@@ -4345,7 +4330,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.4.38] OK');
+console.log('[Alleata v4.4.55] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -4530,7 +4515,6 @@ async function syncSimsFromSF() {
   }
 }
 // ========== FIN SIMS Supabase ==========  
-
 // ========== AUDITORÍA ==========
 async function auditoriaBuscar() {
   const tbody = document.getElementById('auditoriaTbody');
@@ -4605,7 +4589,7 @@ async function loadProfile(user){
   const{data:profile}=await sb.from('profiles').select('*').eq('id',user.id).single();
   if(!profile){
     const{count}=await sb.from('profiles').select('*',{count:'exact',head:true});
-    const newP={id:user.id,email:user.email,nombre:user.email.split('@')[0],rol:count===0?'admin':'operador',modulos:['sims','envios','desinstalaciones','horas']};
+    const newP={id:user.id,email:user.email,nombre:user.email.split('@')[0],rol:count===0?'admin':'operador',modulos:['sims','envios','desinstalaciones']};
     await sb.from('profiles').insert(newP);
     currentProfile=newP;
   }else{currentProfile=profile;}
@@ -4633,9 +4617,10 @@ function showApp(){
   const nombre=currentProfile.nombre||currentProfile.email;
   const isAdmin=currentProfile.rol==='admin';
   const isLogistica=currentProfile.rol==='logistica';
-  const modulos=currentProfile.modulos||['sims','envios','desinstalaciones','horas'];
+  const isCeo=currentProfile.rol==='ceo';
+  const modulos=currentProfile.modulos||['sims','envios','desinstalaciones'];
   document.getElementById('sideUserName').textContent=nombre;
-  const rolLabel={'admin':'Administrador','logistica':'Logística','operador':'Operador'}[currentProfile.rol]||'Operador';
+  const rolLabel={'admin':'Administrador','logistica':'Logística','operador':'Operador','ceo':'CEO'}[currentProfile.rol]||'Operador';
   document.getElementById('sideUserRole').textContent=rolLabel;
   setTimeout(()=>{ if(window._drawQR) window._drawQR(); },400);
   if(isAdmin){
@@ -4652,18 +4637,36 @@ function showApp(){
     // Operadores con envios: mostrar sync info en topbar
     mostrarSFSyncSiAdmin();
   }
+  const navPresupuesto=document.getElementById('nav-presupuesto');
+  // Vista CEO: sidebar colapsado por defecto — tiene poco contenido (solo
+  // Dashboard + Presupuesto), conviene ganar ancho para las cards del dashboard.
+  if(isCeo){
+    const sbEl=document.getElementById('mainSidebar');
+    const mainEl=document.querySelector('.main');
+    if(sbEl&&!sbEl.classList.contains('collapsed')){
+      sbEl.classList.add('collapsed');
+      if(mainEl) mainEl.style.marginLeft='60px';
+    }
+  }
+  if(navPresupuesto&&(isAdmin||isCeo)) navPresupuesto.style.display='flex';
+  // ── Vista CEO: SOLO Dashboard + Napse + Presupuesto, nada más en el nav ──
+  if(isCeo){
+    ['nav-sims','nav-envios','nav-rollout','nav-desinstalaciones','nav-store','nav-recuperadas',
+     'nav-ally','nav-distri','nav-ajustes','nav-retencion','nav-terminales','nav-section-config','nav-napse']
+      .forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display='none'; });
+  }
   const navStore=document.getElementById('nav-store');
-  if(navStore&&(isAdmin||modulos.includes('store')))navStore.style.display='flex';
+  if(navStore&&!isCeo&&(isAdmin||modulos.includes('store')))navStore.style.display='flex';
   const navRecuperadas=document.getElementById('nav-recuperadas');
-  if(navRecuperadas&&(isAdmin||modulos.includes('recuperadas'))){
+  if(navRecuperadas&&!isCeo&&(isAdmin||modulos.includes('recuperadas'))){
     navRecuperadas.style.display='flex';
     cargarBadgeRecuperadas();
   }
-  ['sims','envios','desinstalaciones','napse','horas','store','recuperadas'].forEach(mod=>{
+  ['sims','envios','desinstalaciones','napse','store','recuperadas'].forEach(mod=>{
     const el=document.getElementById('nav-'+mod);
-    if(el&&!modulos.includes(mod)&&!isAdmin){el.classList.add('locked');el.onclick=null;}
+    if(el&&!modulos.includes(mod)&&!isAdmin&&!isCeo){el.classList.add('locked');el.onclick=null;}
   });
-  buildDashCards(modulos,isAdmin);
+  buildDashCards(modulos,isAdmin,isCeo);
   loadConfigSLA(); // cargar config SLA al inicio
   updateDate();loadBadges();loadSimStats();
   const envFecha=document.getElementById('envFecha');if(envFecha)envFecha.value=new Date().toISOString().slice(0,10);
@@ -4694,22 +4697,24 @@ function showApp(){
   if(typeof setWeek==="function") setWeek();
 }
 
-function buildDashCards(modulos,isAdmin){
+function buildDashCards(modulos,isAdmin,isCeo){
   const all=[
     {mod:'sims',icon:'📡',title:'SIMs',desc:'Verificá chips contra base CLARO',stat:'6.878 SIMs'},
     {mod:'envios',icon:'🚚',title:'Envíos',desc:'Logística directa',stat:'cargando...'},
     {mod:'rollout',icon:'🔄',title:'Rollout',desc:'Cambio tecnológico',stat:'cargando...'},
     {mod:'desinstalaciones',icon:'📦',title:'Desinstalaciones',desc:'Logística inversa',stat:'cargando...'},
     {mod:'napse',icon:'🔍',title:'NAPSE',desc:'Analizador de Logs VTOL',stat:''},
-    {mod:'horas',icon:'⏱',title:'Horas',desc:'Registro diario',stat:'cargando...'},
     {mod:'terminales',icon:'🖥️',title:'Terminales',desc:'Reporte Logicalis → Salesforce',stat:'Logicalis'},
     {mod:'store',icon:'🏦',title:'Bancos',desc:'Terminales disponibles Barracas',stat:'cargando...'},
   ];
   if(isAdmin)all.push({mod:'ajustes',icon:'⚙️',title:'Ajustes',desc:'Usuarios y permisos',stat:'gestión'});
+  if(isAdmin||isCeo)all.push({mod:'presupuesto',icon:'💰',title:'Presupuesto',desc:'Presupuesto de Operaciones',stat:'gestión'});
   const grid=document.getElementById('dashGrid');
   if(!grid)return;
+  // Vista CEO: solo cards de Napse + Presupuesto (nada operativo)
   // Para operadores: filtrar solo módulos habilitados (no mostrar bloqueados)
-  const visibles = isAdmin ? all : all.filter(c=>modulos.includes(c.mod));
+  const visibles = isCeo ? []
+                  : isAdmin ? all : all.filter(c=>modulos.includes(c.mod));
   grid.innerHTML=visibles.map(c=>{
     return`<div class="dash-card" data-mod="${c.mod}" onclick="goTo('${c.mod}')">
       <div class="dash-card-icon">${c.icon}</div>
@@ -4721,7 +4726,7 @@ function buildDashCards(modulos,isAdmin){
   loadOpsPanel(isAdmin);
 }
 
-const MOD_INFO={home:'Dashboard',sims:'Verificador SIMs',envios:'Envíos',rollout:'Rollout',desinstalaciones:'Desinstalaciones',napse:'NAPSE — Logs VTOL',instalaciones:'Instalaciones SF',horas:'Control de Horas',retencion:'Retención de Cuentas',ajustes:'Ajustes',ally:'Configuración Ally',distri:'Distribuidores',terminales:'Terminales — Logicalis',store:'Bancos — Terminales disponibles'};
+const MOD_INFO={home:'Dashboard',sims:'Verificador SIMs',envios:'Envíos',rollout:'Rollout',desinstalaciones:'Desinstalaciones',napse:'NAPSE — Logs VTOL',instalaciones:'Instalaciones SF',retencion:'Retención de Cuentas',ajustes:'Ajustes',ally:'Configuración Ally',distri:'Distribuidores',terminales:'Terminales — Logicalis',store:'Bancos — Terminales disponibles',presupuesto:'Presupuesto de Operaciones'};
 
 function goTo(mod){
   const el=document.getElementById('nav-'+mod);
@@ -4765,8 +4770,14 @@ function goTo(mod){
   if(mod==='instalaciones'){window.scrollTo(0,0);initInstalaciones();}
   if(mod==='ally')window.allyInit?.();
   if(mod==='distri')window.cargarDistri?.();
-  if(mod==='horas')renderHoras();
   if(mod==='ajustes'){loadUsers();loadSimsDbStats();loadConfigSLA();_auditPage=0;loadAuditLog();cargarCronHorarios();}
+  if(mod==='presupuesto'){
+    const f=document.getElementById('presupuestoFrame');
+    if(f&&f.getAttribute('src')==='about:blank'){
+      const ro=currentProfile?.rol==='ceo'?'?readonly=1':'';
+      f.src=f.dataset.src+ro;
+    }
+  }
   if(mod==='retencion')window.cargarRetencion?.();
   if(mod==='terminales')window.termInit?.();
   if(mod==='store')window.storeInit?.(); // store
@@ -4782,8 +4793,11 @@ function refreshCurrentModule(){
   setTimeout(()=>{if(btn){btn.textContent='↺';btn.style.color='var(--text-muted)';}},600);
   if(mod==='envios'){renderEnvios();loadBadges();}
   else if(mod==='desinstalaciones'){if(window.cargarDesinstalaciones)window.cargarDesinstalaciones();}
-  else if(mod==='horas'){renderHoras();loadBadges();}
   else if(mod==='sims'){loadSimsDbStats();}
+  else if(mod==='presupuesto'){
+    const f=document.getElementById('presupuestoFrame');
+    if(f&&f.getAttribute('src')!=='about:blank')f.src=f.src; // fuerza reload del iframe
+  }
   else if(mod==='ajustes'){loadUsers();loadSimsDbStats();}
   else{loadBadges();}
 }
@@ -4989,7 +5003,6 @@ const ALL_MODS = [
   {id:'envios',    label:'🚚 Envíos'},
   {id:'desinstalaciones', label:'📦 Desinstalaciones'},
   {id:'napse', label:'🔍 Napse'},
-  {id:'horas',     label:'⏱ Horas'},
   {id:'terminales',label:'🖥️ Terminales'},
   {id:'store',      label:'🏦 Bancos'},
   {id:'recuperadas',label:'🔁 Recuperadas'},
@@ -5023,7 +5036,7 @@ function renderUsersGrid(users) {
       const info = ALL_MODS.find(x => x.id === m);
       return `<span style="background:var(--navy-700);border:1px solid var(--border2);border-radius:20px;padding:2px 10px;font-size:11px;color:var(--text-muted)">${info ? info.label : m}</span>`;
     }).join('');
-    const rolColor = u.rol === 'admin' ? 'var(--teal)' : u.rol === 'logistica' ? '#f59e0b' : 'var(--blue)';
+    const rolColor = u.rol === 'admin' ? 'var(--teal)' : u.rol === 'logistica' ? '#f59e0b' : u.rol === 'ceo' ? 'var(--purple)' : 'var(--blue)';
     return `
       <div class="card" style="padding:16px;display:flex;flex-direction:column;gap:10px">
         <div style="display:flex;justify-content:space-between;align-items:flex-start">
@@ -5112,6 +5125,7 @@ function editUser(u) {
             <option value="operador">Operador</option>
             <option value="logistica">Logística</option>
             <option value="admin">Administrador</option>
+            <option value="ceo">CEO (solo dashboard, lectura)</option>
           </select>
         </div>
         <div style="margin-bottom:18px">
@@ -5213,12 +5227,11 @@ async function deleteUser(id, nombre) {
 let _rlData=[];
 let _rlEstadoFiltro='';
 
-// Criterio Rollout (redefinido 14/07): "Cambio de Terminal" + Perfil NAPSE
-// ya NO alcanza para ser Rollout — eso es un "Cambio por Napse" común y
-// pertenece a Envíos. Rollout real es cuando ADEMÁS:
-//  - el checkbox Rollout__c está tildado en SF, y
-//  - la logística es ALLEATA (hoy los rollout los hacen a mano Marcelo/Ignacio,
-//    mano a mano, nunca por CA/Cabify).
+// Criterio Rollout real (para el badge visual, no para filtrar la lista):
+// Cambio de Terminal + Perfil NAPSE + checkbox Rollout tildado en SF +
+// logística ALLEATA. Sin el checkbox (o con otra logística) es un "Cambio
+// por Napse" común — se sigue mostrando en este mismo módulo, solo cambia
+// el badge.
 function esRollout(e){
   const tipo=(e.tipo||e.record_type||'').toLowerCase();
   const perfil=(e.perfil||'').trim().toUpperCase();
@@ -5227,11 +5240,7 @@ function esRollout(e){
 }
 
 async function initRollout(){
-  // Lee de sf_workorders: Cambio de Terminal + Perfil NAPSE — todos los
-  // estados activos. Se muestran TODAS acá (Rollout real + Cambio por
-  // Napse), la diferenciación es solo visual (badge por fila) — sirve
-  // para llevar control comercial de gastos de logística sin separar el
-  // flujo operativo en dos módulos distintos.
+  // Lee de sf_workorders: Cambio de Terminal + Perfil NAPSE — todos los estados activos
   const ESTADOS_CERRADOS_RL = ['Exitoso','Cancelado','Cancelado por Error','Fallido','Fallido-Dirección Inválida'];
   const{data,error}=await sb.from('sf_workorders').select('*')
     .eq('record_type','Cambio de Terminal')
@@ -5333,10 +5342,6 @@ function rlRenderTabla(){
   tbody.innerHTML=list.map(e=>{
     const tieneRetorno=esOTConRetorno(e.tipo);
     const esCA=(e.logistica||'').toUpperCase()==='CORREO ARGENTINO';
-    // Badge visual: Rollout real (checkbox tildado + logística Alleata) vs
-    // Cambio por Napse común (mismo tipo/perfil, sin cumplir los otros 2
-    // requisitos) — la diferenciación es solo de control comercial, ambos
-    // viven en este mismo módulo/flujo operativo.
     const rlBadge = esRollout(e)
       ? `<span title="Rollout real: checkbox tildado en SF + logística Alleata" style="font-size:9px;font-weight:700;color:#8b5cf6;background:rgba(139,92,246,.15);border:1px solid rgba(139,92,246,.35);padding:1px 6px;border-radius:10px;display:inline-block;margin-top:3px">🔄 ROLLOUT</span>`
       : `<span title="Cambio de Terminal + NAPSE sin checkbox Rollout (o logística distinta a Alleata)" style="font-size:9px;font-weight:700;color:var(--text-muted);background:var(--surface2);border:1px solid var(--border2);padding:1px 6px;border-radius:10px;display:inline-block;margin-top:3px">📋 CAMBIO NAPSE</span>`;
@@ -5434,13 +5439,241 @@ async function loadBadges(){
   });
   if(document.getElementById('dc-envios'))document.getElementById('dc-envios').textContent=envCount+' activos';
   if(document.getElementById('dc-desinstalaciones'))document.getElementById('dc-desinstalaciones').textContent=desCount+' activas';
-  // Horas hoy
-  const today=new Date().toISOString().slice(0,10);
-  const {data:hrs}=await sb.from('horas').select('horas,fecha').eq('user_id',uid);
-  const todayHs=(hrs||[]).filter(h=>h.fecha===today).reduce((a,b)=>a+Number(b.horas),0)||0;
-  const nbHoras=document.getElementById('nb-horas');if(nbHoras)nbHoras.textContent=todayHs+'h';
-  if(document.getElementById('dc-horas'))document.getElementById('dc-horas').textContent=todayHs+' hs hoy';
 }
+
+// ── Vista CEO: KPIs de Gestión NAPSE directo en el Dashboard (fetch en vivo a Railway) ──
+function proximaCorridaSyncSF(){
+  try{
+    const now=new Date(new Date().toLocaleString('en-US',{timeZone:'America/Argentina/Buenos_Aires'}));
+    const dow=now.getDay();
+    const intervalo=(dow===0||dow===6)?30:10;
+    let mins=Math.ceil((now.getMinutes()+1)/intervalo)*intervalo;
+    const target=new Date(now);
+    if(mins>=60){ target.setHours(target.getHours()+1); mins-=60; }
+    target.setMinutes(mins,0,0);
+    return `${String(target.getHours()).padStart(2,'0')}:${String(target.getMinutes()).padStart(2,'0')}`;
+  }catch(e){ return null; }
+}
+
+function proximaCorridaNapse(){
+  try{
+    const horas=[10,14,17];
+    const now=new Date(new Date().toLocaleString('en-US',{timeZone:'America/Argentina/Buenos_Aires'}));
+    const dias=['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+    let d=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+    for(let i=0;i<8;i++){
+      const dow=d.getDay();
+      if(dow>=1&&dow<=5){
+        for(const h of horas){
+          const slot=new Date(d.getFullYear(),d.getMonth(),d.getDate(),h,0,0);
+          if(slot>now){
+            const esHoy=slot.toDateString()===now.toDateString();
+            const label=esHoy?'hoy':dias[slot.getDay()];
+            return `${label} ${String(h).padStart(2,'0')}:00`;
+          }
+        }
+      }
+      d.setDate(d.getDate()+1);
+    }
+  }catch(e){}
+  return null;
+}
+
+let _presupuestoBridgeListo=false;
+function loadCeoPresupuestoBridge(){
+  const frame=document.getElementById('presupuestoBridgeFrame');
+  if(frame && frame.getAttribute('src')==='about:blank'){
+    frame.src='presupuesto.html?readonly=1';
+  }
+  if(_presupuestoBridgeListo) return;
+  _presupuestoBridgeListo=true;
+  window.addEventListener('message', (event)=>{
+    if(!event.data || event.data.type!=='alleata-presupuesto-resumen') return;
+    renderCeoPresupuestoKpis(event.data.payload);
+  });
+}
+
+function renderCeoPresupuestoKpis(p){
+  const box=document.getElementById('ceoPresupuestoKpis');
+  if(!box || !p) return;
+
+  const fmt$=n=>(!n&&n!==0)?'—':'$'+Math.round(n).toLocaleString('es-AR');
+  const dColor=(real,prev)=>{ const d=real-prev; return d>0?'#f87171':d<0?'var(--teal)':'#fff'; };
+
+  const statCard=(label,value,color,sub,isTotal)=>`
+    <div style="background:var(--navy-800);border:1px solid var(--border);border-top:3px solid ${color};border-radius:12px;padding:16px;text-align:center;flex:1;min-width:0;height:${isTotal?'132px':'100%'};box-sizing:border-box;display:flex;flex-direction:column;justify-content:center">
+      <div style="font-size:10px;font-weight:800;letter-spacing:.06em;color:#fff;text-transform:uppercase">${label}</div>
+      <div style="font-size:${isTotal?'34px':'22px'};font-weight:900;color:${color};margin-top:6px;font-family:'JetBrains Mono',monospace;line-height:1.1">${value}</div>
+      ${sub?`<div style="font-size:11px;color:var(--text-muted);margin-top:4px">${sub}</div>`:''}
+    </div>`;
+
+  const rubrosHTML=(p.rubros||[]).map(r=>
+    statCard(r.label.replace(/^\S+\s/,''), fmt$(r.real), dColor(r.real,r.prev), 'Presup. '+fmt$(r.prev), false)
+  ).join('');
+
+  const totColor=dColor(p.totReal,p.totPrev);
+
+  const MESES_CEO=[{k:'jun',l:'JUN'},{k:'jul',l:'JUL'},{k:'ago',l:'AGO'}];
+  const mesBtnsHTML=MESES_CEO.map(m=>`
+    <button onclick="cambiarMesPresupuesto('${m.k}')" style="background:${m.k===p.mes?'var(--teal)':'var(--navy-800)'};color:${m.k===p.mes?'var(--navy-900)':'var(--text-muted)'};border:1px solid var(--border);border-radius:8px;padding:5px 14px;font-size:11px;font-weight:800;cursor:pointer;letter-spacing:.04em">${m.l}</button>
+  `).join('');
+
+  const html=`
+    <div style="display:flex;align-items:center;justify-content:center;gap:12px;margin:30px 0 16px;padding:10px 20px;background:rgba(0,0,0,.28);border-radius:10px;border:1px solid #f5a62355">
+      <div style="width:5px;height:32px;background:#f5a623;border-radius:3px"></div>
+      <span style="font-size:26px">💰</span>
+      <span style="font-size:24px;font-weight:900;letter-spacing:.05em;color:#fff;text-transform:uppercase">Presupuesto — ${p.mesLabel||''}</span>
+    </div>
+    <div style="display:flex;justify-content:center;gap:6px;margin-bottom:14px">${mesBtnsHTML}</div>
+    <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:20px;align-items:stretch">
+      ${statCard('Total '+(p.mesLabel||''), fmt$(p.totPrev), totColor, 'Real: '+fmt$(p.totReal), true)}
+      ${rubrosHTML}
+    </div>`;
+  box.innerHTML=html;
+}
+
+function cambiarMesPresupuesto(m){
+  const frame=document.getElementById('presupuestoBridgeFrame');
+  if(frame && frame.contentWindow) frame.contentWindow.postMessage({type:'alleata-set-mes', mes:m}, '*');
+}
+
+async function loadCeoDashKpis(){
+  const box=document.getElementById('ceoDashKpis');
+  if(!box)return;
+  box.innerHTML='<div style="color:var(--text-muted);font-size:12px;padding:10px 0">Cargando KPIs…</div>';
+  try{
+    const [resp,respMeses]=await Promise.all([
+      fetch('https://alleata-agent-production.up.railway.app/automations/napse/snapshots?limit=1',{
+        headers:{'x-automation-secret':'123456'}
+      }),
+      fetch('https://alleata-agent-production.up.railway.app/automations/napse/detalle-mensual')
+    ]);
+    if(!resp.ok) throw new Error('HTTP '+resp.status);
+    const json=await resp.json();
+    if(!json.ok || !(json.snapshots&&json.snapshots.length)) throw new Error(json.error||'Sin datos');
+    const s=json.snapshots[0];
+    let meses=[];
+    try{ const jm=await respMeses.json(); if(jm.ok) meses=jm.meses||[]; }catch(e){ /* si falla, seguimos sin desglose */ }
+    const fmt$=n=>n?'$'+Math.round(n).toLocaleString('es-AR'):'$0';
+
+    // ── Desinstalaciones: misma query que usa el módulo Desinstalaciones (v_ordenes_con_sla) ──
+    const dsCount=async(estado,ilike)=>{
+      let q=sb.from('v_ordenes_con_sla').select('*',{count:'exact',head:true}).eq('tipo','desinstalacion');
+      q = estado ? (ilike ? q.ilike('estado',estado) : q.eq('estado',estado)) : q;
+      const {count,error}=await q;
+      if(error) throw error;
+      return count||0;
+    };
+    const [dsTotal,dsPendientes,dsEnProceso,dsNoResponde,dsExtraviadas]=await Promise.all([
+      dsCount(),
+      dsCount('Pendiente'),
+      dsCount('En Proceso'),
+      dsCount('no responde',true),
+      dsCount('Extraviada'),
+    ]);
+
+    // ── Sistema unificado de cards: título blanco arriba siempre, número abajo.
+    // Color = solo acento (borde + número). isTotal = fuente grande (34px), sino chica (22px).
+    const statCard=(label,value,color,sub,isTotal)=>`
+      <div style="background:var(--navy-800);border:1px solid var(--border);border-top:3px solid ${color};border-radius:12px;padding:16px;text-align:center;flex:1;min-width:0;height:${isTotal?'132px':'100%'};box-sizing:border-box;display:flex;flex-direction:column;justify-content:center">
+        <div style="font-size:10px;font-weight:800;letter-spacing:.06em;color:#fff;text-transform:uppercase">${label}</div>
+        <div style="font-size:${isTotal?'34px':'22px'};font-weight:900;color:${color};margin-top:6px;font-family:'JetBrains Mono',monospace;line-height:1.1">${value}</div>
+        ${sub?`<div style="font-size:11px;color:var(--text-muted);margin-top:4px">${sub}</div>`:''}
+      </div>`;
+
+    // Título de sección con más peso visual: barra de color + ícono + texto blanco
+    const sectionTitle=(icon,label,color,size)=>`
+      <div style="display:flex;align-items:center;justify-content:center;gap:12px;margin:${size?'30px 0 16px':'26px 0 14px'};padding:${size?'10px 20px':'0'};background:${size?'rgba(0,0,0,.28)':'transparent'};border-radius:${size?'10px':'0'};border:${size?'1px solid '+color+'55':'none'}">
+        <div style="width:5px;height:${size?size+8:26}px;background:${color};border-radius:3px"></div>
+        <span style="font-size:${size?size+2:19}px">${icon}</span>
+        <span style="font-size:${size||17}px;font-weight:900;letter-spacing:.05em;color:#fff;text-transform:uppercase">${label}</span>
+      </div>`;
+
+    const total=(s.configurar_terminal||0)+(s.en_proceso||0)+(s.pre_colecta||0)+(s.despachado||0)+(s.retirar_terminal||0)+(s.exitoso||0);
+
+    const proxima=proximaCorridaNapse();
+    const subHeaderHTML=`
+      <div style="font-size:11px;color:var(--text-muted);margin-bottom:12px">
+        Último snapshot: <b style="color:#fff">${s.fecha||'—'}</b>${s.turno?` · Turno ${s.turno}`:''}
+        ${proxima?` &nbsp;·&nbsp; Próxima corrida: <b style="color:#fff">${proxima}</b>`:''}
+      </div>`;
+
+    const mesesHTML = meses.map(m=>
+      statCard(m.mes_nombre, m.total, 'var(--teal)', '', false)
+    ).join('');
+
+    const totalOTsHTML=`
+      <div style="background:var(--navy-800);border:1px solid var(--border);border-top:3px solid var(--teal);border-radius:12px;padding:16px;text-align:center;min-width:0;height:132px;box-sizing:border-box;display:flex;flex-direction:column;justify-content:center">
+        <div style="font-size:10px;font-weight:800;letter-spacing:.06em;color:#fff;text-transform:uppercase">Total OTs Activas</div>
+        <div style="font-size:34px;font-weight:900;color:var(--teal);font-family:'JetBrains Mono',monospace">${total}</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Acumulado desde 01/06/2026</div>
+      </div>`;
+
+    // Logística — costo de envíos
+    const logProvs=[
+      {label:'Correo Argentino',ots:s.correo_argentino_ots||0,costo:s.correo_argentino_costo||0,color:'#e74c3c'},
+      {label:'EPSA',ots:s.epsa_ots||0,costo:s.epsa_costo||0,color:'#f39c12'},
+      {label:'Alleata',ots:s.alleata_ots||0,costo:s.alleata_costo||0,color:'#1dbf8e'},
+      {label:'Cabify',ots:s.cabify_ots||0,costo:s.cabify_costo||0,color:'#9b59b6'},
+    ].filter(e=>e.ots>0||e.costo>0);
+    const provsTotales=logProvs.filter(e=>e.label!=='Alleata');
+    const totOts=provsTotales.reduce((a,e)=>a+e.ots,0);
+    const totCosto=provsTotales.reduce((a,e)=>a+e.costo,0);
+    const logHTML=statCard('Total Envíos',fmt$(totCosto),'#1dbf8e',totOts+' envíos (sin Alleata)',true) + logProvs.map(e=>{
+      const prom=e.ots?Math.round(e.costo/e.ots):0;
+      return statCard(e.label,fmt$(e.costo),e.color,e.ots+' envíos · Prom. '+fmt$(prom),false);
+    }).join('');
+
+    // Tipo de OT
+    const inst=s.instalacion_equipo||0, camb=s.cambio_terminal||0, totTipo=(inst+camb)||1;
+    const tipoRow=(label,val,color)=>{
+      const w=Math.round(val/totTipo*100);
+      return `<div style="margin-bottom:10px">
+        <div style="font-size:12px;color:#fff;margin-bottom:5px">${label}</div>
+        <div style="background:var(--navy-700);border-radius:8px;overflow:hidden;height:26px;position:relative">
+          <div style="background:${color};width:${w}%;height:100%;display:flex;align-items:center;padding-left:10px;font-size:12px;font-weight:700;color:var(--navy-900)">${val}</div>
+        </div>
+      </div>`;
+    };
+    const tipoDeOtHTML=`
+      <div style="background:var(--navy-800);border:1px solid var(--border);border-radius:12px;padding:16px;flex:1;min-width:0;height:100%;box-sizing:border-box;display:flex;flex-direction:column;justify-content:center">
+        <div style="font-size:10px;font-weight:800;letter-spacing:.06em;color:#fff;text-transform:uppercase;text-align:center;margin-bottom:12px">📦 Tipo de OT</div>
+        ${tipoRow('Instalación Equipo + Simcard',inst,'#1dbf8e')}${tipoRow('Cambio de Terminal',camb,'#1a9fd4')}
+      </div>`;
+
+    // Desinstalaciones
+    const dsProxima=proximaCorridaSyncSF();
+    const dsSubHeaderHTML=dsProxima?`<div style="font-size:11px;color:var(--text-muted);margin-bottom:12px">Se actualiza cada 10 min (fin de semana cada 30) · Próximo sync: <b style="color:#fff">${dsProxima}</b></div>`:'';
+    const desinstalacionesRowHTML=`
+      <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:20px;align-items:stretch">
+        ${statCard('Desinstalaciones Pendientes',dsTotal,'var(--teal)','OTs activas',true)}
+        ${statCard('Pendientes',dsPendientes,'#f59e0b','',false)}
+        ${statCard('En Proceso',dsEnProceso,'#3b82f6','',false)}
+        ${statCard('No Responde',dsNoResponde,'#f97316','',false)}
+        ${statCard('Extraviadas',dsExtraviadas,'#ef4444','',false)}
+      </div>`;
+
+    box.innerHTML = `
+      ${sectionTitle('📋','Gestión NAPSE — Información','var(--teal)',24)}
+      ${subHeaderHTML}
+      <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:8px;align-items:stretch">
+        <div style="flex:1;min-width:0">${totalOTsHTML}</div>
+        ${mesesHTML}
+        ${tipoDeOtHTML}
+      </div>
+      ${sectionTitle('🚚','Gestión NAPSE — Costo Logística','#3a7bd5')}
+      <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:20px;align-items:stretch">
+        ${logHTML}
+      </div>
+      ${sectionTitle('📦','Desinstalaciones','#e67e22',24)}
+      ${dsSubHeaderHTML}
+      ${desinstalacionesRowHTML}`;
+  }catch(err){
+    console.error('[CEO Dashboard]',err);
+    box.innerHTML='<div style="color:var(--text-muted);font-size:12px;padding:10px 0">No se pudieron cargar los KPIs de NAPSE ahora mismo.</div>';
+  }
+}
+
 
 async function loadOpsPanel(isAdmin){
   const nombre=currentProfile?.nombre||'';
@@ -5452,6 +5685,12 @@ async function loadOpsPanel(isAdmin){
   if(ts) ts.textContent='Como '+new Date().toLocaleString('es-AR',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
   const wm=document.getElementById('welcomeMsg');
   if(wm) wm.textContent= isAdmin ? '👥 Panel del Equipo' : 'Hola, '+nombre+' 👋';
+
+  // Vista CEO: dashboard aún sin definir — por ahora solo saludo + shortcuts
+  // (los shortcuts de Napse/Presupuesto ya los arma buildDashCards). Nada de
+  // KPIs operativos todavía: se van a definir con Marcelo más adelante.
+  // Vista CEO: KPIs de Gestión NAPSE en vivo, directo en el dashboard (sin sección aparte)
+  if(currentProfile?.rol==='ceo'){ loadCeoDashKpis(); loadCeoPresupuestoBridge(); return; }
 
   // Dashboard personal para operadores
   const opCard=document.getElementById('envStatsOperador');
@@ -6104,8 +6343,7 @@ async function _loadStatsEnvios(nombre, set){
 
   _opSlaDistribucion(conSlaCA);
 
-  // Rollout NAPSE (incluye Rollout real + Cambio por Napse — mismo criterio
-  // que el módulo Rollout, la diferenciación es un badge, no un filtro acá)
+  // Rollout NAPSE
   const{data:rawRl}=await sb.from('sf_workorders')
     .select('status')
     .eq('record_type','Cambio de Terminal')
@@ -6516,9 +6754,7 @@ async function renderEnvios(){
     list=list.filter(e=>!['ALLEATA','CORREO ARGENTINO','CABIFY','EPSA'].includes((e.logistica||'').toUpperCase().trim()));
   }
 
-  // Excluir Cambio de Terminal NAPSE (pertenecen a Rollout, no a Envíos —
-  // TODAS, sea Rollout real o Cambio por Napse: la diferenciación es un
-  // badge dentro del módulo Rollout, no una separación de módulos)
+  // Excluir Cambio de Terminal NAPSE (pertenecen a Rollout, no a Envíos)
   list = list.filter(e => !(
     (e.record_type||e.tipo||'').trim() === 'Cambio de Terminal' &&
     (e.perfil||'').trim().toUpperCase() === 'NAPSE'
@@ -8325,10 +8561,10 @@ async function subirRotuloCA(id, input) {
       .eq('id', id)
       .select();
     if (updateErr) throw updateErr;
-    // FIX: .update() sin .select() no avisa si RLS bloquea la escritura o el
-    // id no matchea ninguna fila — devuelve "éxito" sin haber tocado nada.
-    // Con .select() detectamos ese caso (0 filas afectadas) y lo mostramos
-    // como error real en vez de un falso "subido" que después revierte solo.
+    // .update() sin .select() no avisa si RLS bloquea la escritura o el id
+    // no matchea ninguna fila — devuelve "éxito" sin haber tocado nada. Con
+    // .select() detectamos ese caso (0 filas afectadas) y lo mostramos como
+    // error real en vez de un falso "subido" que después revierte solo.
     if (!updateData || updateData.length === 0) {
       throw new Error('El archivo se subió a Storage, pero no se pudo guardar la referencia en la OT (0 filas afectadas — revisar permisos UPDATE / RLS en sf_workorders).');
     }
@@ -8353,10 +8589,9 @@ async function reimprimirRotuloCA(id) {
     const { data: raw } = await sb.from('sf_workorders').select('rotulo_ca_path').eq('id', id).single();
     if (!raw?.rotulo_ca_path) { alert('No hay rótulo subido para esta OT.'); return; }
 
-    // URL firmada — el bucket es privado, no público
     const { data, error } = await sb.storage
       .from('ca-rotulos')
-      .createSignedUrl(raw.rotulo_ca_path, 300); // 5 min, suficiente para abrir/imprimir
+      .createSignedUrl(raw.rotulo_ca_path, 300);
     if (error) throw error;
 
     window.open(data.signedUrl, '_blank');
@@ -10466,6 +10701,10 @@ document.addEventListener('click', function(e){
 // ── NAPSE initApp (se llama cuando se entra al módulo desde goTo) ──────────
 async function napseInitApp(){
   napseSetupDropZone();
+  // Vista CEO: solo lectura — sin carga de logs
+  const isCeoView = currentProfile?.rol==='ceo';
+  const tabUpload = document.getElementById('napse-tab-upload');
+  if(tabUpload) tabUpload.style.display = isCeoView ? 'none' : '';
   // Reset filtros al entrar al módulo
   ['f-node','f-store','f-iso','f-fecha','f-monto'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
   const fEst=document.getElementById('f-estado'); if(fEst) fEst.value='';
@@ -10474,8 +10713,8 @@ async function napseInitApp(){
   try {
     const {count} = await sb.from('napse_transactions').select('*', {count:'exact', head:true});
     if(count > 0){ napseSetView('historial'); await napseRefreshHistorial(); }
-    else { napseSetView('upload'); }
-  } catch(e){ napseSetView('upload'); }
+    else { napseSetView(isCeoView ? 'buscar' : 'upload'); }
+  } catch(e){ napseSetView(isCeoView ? 'buscar' : 'upload'); }
 }
 
 // ── NAPSE setView ─────────────────────────────────────────────────────────
@@ -11483,6 +11722,10 @@ async function cargaConfirmar() {
   var btn = document.getElementById('carga-confirmar-btn');
   btn.disabled = true; btn.textContent = 'Guardando...';
   try {
+    // El backend identifica al usuario por el JWT de sesión de Supabase
+    // (authMiddleware.js → requireAuth() + actorFromReq()), no por campos
+    // sueltos en el body. Sin este header cae al fallback "service (sin
+    // identidad de usuario)" en la auditoría.
     var res = await railwayFetch('/store/asignar-terminal', {
       method: 'POST',
       body: JSON.stringify({ terminal_id: _cargaTerminalId, banco: _cargaBancoSel })
