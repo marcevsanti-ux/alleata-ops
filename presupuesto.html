@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Alleata · Presupuesto Operaciones v1.9.4</title>
+<title>Alleata · Presupuesto Operaciones v1.9.5</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -197,7 +197,7 @@
   <div class="login-box">
     <h2>💰 Presupuesto</h2>
     <p class="login-sub">Alleata · Acceso restringido</p>
-    <div style="position:absolute;bottom:12px;right:16px;font-size:10px;font-family:'JetBrains Mono',monospace;color:rgba(232,237,243,.2)">v1.9.4</div>
+    <div style="position:absolute;bottom:12px;right:16px;font-size:10px;font-family:'JetBrains Mono',monospace;color:rgba(232,237,243,.2)">v1.9.5</div>
     <div class="login-field">
       <label>Email</label>
       <input type="email" id="loginEmail" placeholder="tu@email.com" onkeydown="if(event.key==='Enter')doLogin()">
@@ -213,7 +213,7 @@
 
 <div id="appContent" style="display:none">
 <h1>💰 Presupuesto Operaciones</h1>
-<p class="sub">Alleata · 2026 <span style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 8px;border-radius:4px;border:1px solid var(--border2);font-size:10px;margin-left:6px">v1.9.4</span></p>
+<p class="sub">Alleata · 2026 <span style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 8px;border-radius:4px;border:1px solid var(--border2);font-size:10px;margin-left:6px">v1.9.5</span></p>
 
 <div class="toolbar">
   <div class="mes-bar" id="mesBar"></div>
@@ -268,6 +268,19 @@
   <div class="logi-modal">
     <h3>Logicalis Argentina SA</h3>
     <p class="msub" id="logiSub"></p>
+
+    <!-- Buscador de terminal por serie — busca en TODOS los meses cargados,
+         no solo el mes que tengas abierto ahora -->
+    <div style="background:var(--navy-900);border:1px solid var(--border2);border-radius:10px;padding:12px;margin-bottom:18px">
+      <div style="font-size:11px;font-weight:700;color:var(--text-muted);margin-bottom:8px">🔍 Buscar en qué RTO/factura entregaron una terminal</div>
+      <div style="display:flex;gap:8px">
+        <input type="text" id="logiSerieBuscar" placeholder="Serie de la terminal (ej: 210187314201201419229614)"
+          style="flex:1;background:var(--navy-700);border:1px solid var(--border2);color:var(--text);font-family:'JetBrains Mono',monospace;font-size:12px;padding:9px 12px;border-radius:8px;outline:none"
+          onkeydown="if(event.key==='Enter')logiBuscarPorSerie()">
+        <button class="btn-confirm" style="padding:9px 16px;margin:0;white-space:nowrap" onclick="logiBuscarPorSerie()">Buscar</button>
+      </div>
+      <div id="logiSerieResultado" style="margin-top:10px"></div>
+    </div>
 
     <div class="logi-kpis" id="logiKpis"></div>
 
@@ -386,6 +399,43 @@ let logiMesActual  = 'jun';
 
 function logiGetFacturas(m) {
   return logiFacturas[m] || [];
+}
+
+// Busca en qué factura/RTO de Logicalis viene una terminal puntual, en
+// TODOS los meses cargados en memoria (logiFacturas ya trae todo desde
+// loadFacturasFromDB() al iniciar, no hace falta ir mes por mes).
+function logiBuscarPorSerie() {
+  const input = document.getElementById('logiSerieBuscar');
+  const out = document.getElementById('logiSerieResultado');
+  const serie = (input.value || '').trim();
+
+  if (!serie) { out.innerHTML = ''; return; }
+
+  const encontradas = [];
+  for (const mes of Object.keys(logiFacturas)) {
+    for (const f of (logiFacturas[mes] || [])) {
+      if ((f.series || []).some(s => String(s).trim() === serie)) {
+        encontradas.push({ mes, ...f });
+      }
+    }
+  }
+
+  if (!encontradas.length) {
+    out.innerHTML = `<div style="font-size:12px;color:var(--red);padding:6px 0">❌ No aparece en ninguna factura/RTO cargada. O no la subimos todavía, o la serie no coincide exacto (revisá que no tenga espacios de más).</div>`;
+    return;
+  }
+
+  out.innerHTML = encontradas.map(f => `
+    <div style="background:rgba(29,191,142,.08);border:1px solid rgba(29,191,142,.25);border-radius:8px;padding:10px 12px;margin-top:6px">
+      <div style="font-size:12px;font-weight:700;color:var(--teal)">✓ Encontrada — ${MESES_LABEL ? MESES_LABEL[f.mes] : f.mes} 2026</div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:4px">
+        Factura: <span style="color:var(--text);font-family:'JetBrains Mono',monospace">${f.numero || '—'}</span>
+        · Fecha: ${f.fecha || '—'}
+        · Terminales en esa factura: ${f.terminales ?? (f.series ? f.series.length : '—')}
+        · Total: ${f.totalUSD ? 'USD ' + Number(f.totalUSD).toLocaleString('en-US', { minimumFractionDigits: 2 }) : '—'}
+      </div>
+    </div>
+  `).join('');
 }
 function logiRealPesos(m) {
   return logiGetFacturas(m).reduce((s,f) => s + f.totalUSD * logiCurrentTC, 0);
