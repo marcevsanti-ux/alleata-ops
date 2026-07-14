@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.4.36</title>
+<title>Alleata · Operaciones v4.4.38</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -407,7 +407,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.4.36 · 14 jul 2026
+      v4.4.38 · 14 jul 2026
     </div>
   </div>
 </div>
@@ -488,7 +488,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.4.36 · 14 jul 2026
+      v4.4.38 · 14 jul 2026
     </div>
   </div>
 </nav>
@@ -528,7 +528,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.4.36</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.4.38</div>
   </div>
   <div class="content">
 
@@ -4345,7 +4345,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.4.36] OK');
+console.log('[Alleata v4.4.38] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const SUPABASE_SERVICE_KEY='sb_secret_HmF0Yq_hMHsi65lLOlq_QQ_wdeqmdVq';
@@ -5227,19 +5227,26 @@ function esRollout(e){
 }
 
 async function initRollout(){
-  // Lee de sf_workorders: Cambio de Terminal + Perfil NAPSE + checkbox Rollout
-  // tildado + logística ALLEATA — todos los estados activos.
-  // (Antes solo pedía tipo+perfil, lo que traía también los "Cambio por Napse"
-  // que no son rollout real — redefinido 14/07.)
+  // Lee de sf_workorders: Cambio de Terminal + Perfil NAPSE — todos los
+  // estados activos. Se muestran TODAS acá (Rollout real + Cambio por
+  // Napse), la diferenciación es solo visual (badge por fila) — sirve
+  // para llevar control comercial de gastos de logística sin separar el
+  // flujo operativo en dos módulos distintos.
   const ESTADOS_CERRADOS_RL = ['Exitoso','Cancelado','Cancelado por Error','Fallido','Fallido-Dirección Inválida'];
   const{data,error}=await sb.from('sf_workorders').select('*')
     .eq('record_type','Cambio de Terminal')
     .eq('perfil','NAPSE')
-    .eq('rollout',true)
-    .ilike('logistica','ALLEATA')
     .not('status','in','("Exitoso","Cancelado","Cancelado por Error","Fallido","Fallido-Dirección Inválida")')
     .order('sf_last_modified',{ascending:false});
-  if(error){console.error('Rollout load error:',error);return;}
+  if(error){
+    console.error('Rollout load error:',error);
+    const tbody=document.getElementById('rl-tbody');
+    if(tbody) tbody.innerHTML=`<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--red)">
+      ⚠️ Error cargando Rollout: ${error.message||'ver consola (F12)'}<br>
+      <span style="font-size:11px;color:var(--text-muted)">Si dice algo de la columna "rollout", falta correr el SQL que agrega esa columna en Supabase.</span>
+    </td></tr>`;
+    return;
+  }
   // Normalizar columnas para compatibilidad con el render existente
   _rlData=(data||[]).map(r=>({...r,
     ot_numero: r.workorder_number,
@@ -5326,9 +5333,16 @@ function rlRenderTabla(){
   tbody.innerHTML=list.map(e=>{
     const tieneRetorno=esOTConRetorno(e.tipo);
     const esCA=(e.logistica||'').toUpperCase()==='CORREO ARGENTINO';
+    // Badge visual: Rollout real (checkbox tildado + logística Alleata) vs
+    // Cambio por Napse común (mismo tipo/perfil, sin cumplir los otros 2
+    // requisitos) — la diferenciación es solo de control comercial, ambos
+    // viven en este mismo módulo/flujo operativo.
+    const rlBadge = esRollout(e)
+      ? `<span title="Rollout real: checkbox tildado en SF + logística Alleata" style="font-size:9px;font-weight:700;color:#8b5cf6;background:rgba(139,92,246,.15);border:1px solid rgba(139,92,246,.35);padding:1px 6px;border-radius:10px;display:inline-block;margin-top:3px">🔄 ROLLOUT</span>`
+      : `<span title="Cambio de Terminal + NAPSE sin checkbox Rollout (o logística distinta a Alleata)" style="font-size:9px;font-weight:700;color:var(--text-muted);background:var(--surface2);border:1px solid var(--border2);padding:1px 6px;border-radius:10px;display:inline-block;margin-top:3px">📋 CAMBIO NAPSE</span>`;
     if(esCA){
       return`<tr>
-        <td><div style="font-weight:700;font-size:12px;color:var(--teal)">${e.ot_numero||'—'}</div><div style="font-size:10px;color:var(--text-muted)">${e.tipo||''}</div><div style="font-size:10px;color:var(--text-muted)">${e.cuenta||''}</div></td>
+        <td><div style="font-weight:700;font-size:12px;color:var(--teal)">${e.ot_numero||'—'}</div><div style="font-size:10px;color:var(--text-muted)">${e.tipo||''}</div><div style="font-size:10px;color:var(--text-muted)">${e.cuenta||''}</div>${rlBadge}</td>
         <td style="font-size:13px;font-weight:600">${e.responsable||'—'}</td>
         <td><div style="font-size:12px">${e.ciudad||'—'}</div><div style="font-size:10px;color:var(--text-muted)">${e.provincia||''}</div></td>
         <td><div class="mono" style="font-size:10px;word-break:break-all">${e.track||'—'}</div>${e.track?`<a href="https://www.correoargentino.com.ar/formularios/e-commerce?id=${e.track}" target="_blank" style="font-size:10px;color:var(--blue);text-decoration:none;">🔗 Correo Arg.</a>`:''}
@@ -5348,7 +5362,7 @@ function rlRenderTabla(){
     return`<tr>
       <td><div style="font-size:12px;font-weight:700;color:var(--teal)">${e.ot_numero||'—'}</div>
           <div style="font-size:11px;color:var(--text-muted)">${e.tipo||''}</div>
-          <div style="font-size:11px;color:var(--text-secondary)">${e.cuenta||''}</div></td>
+          <div style="font-size:11px;color:var(--text-secondary)">${e.cuenta||''}</div>${rlBadge}</td>
       <td style="font-size:12px">${e.responsable||'—'}</td>
       <td><div style="font-size:12px">${e.ciudad||'—'}</div>
           <div style="font-size:11px;color:var(--text-muted)">${e.provincia||''}</div></td>
@@ -6090,13 +6104,12 @@ async function _loadStatsEnvios(nombre, set){
 
   _opSlaDistribucion(conSlaCA);
 
-  // Rollout NAPSE (redefinido 14/07: requiere checkbox Rollout + logística Alleata)
+  // Rollout NAPSE (incluye Rollout real + Cambio por Napse — mismo criterio
+  // que el módulo Rollout, la diferenciación es un badge, no un filtro acá)
   const{data:rawRl}=await sb.from('sf_workorders')
     .select('status')
     .eq('record_type','Cambio de Terminal')
     .eq('perfil','NAPSE')
-    .eq('rollout',true)
-    .ilike('logistica','ALLEATA')
     .not('status','in','("Exitoso","Cancelado","Cancelado por Error","Fallido","Fallido-Dirección Inválida")')
     .ilike('responsable',`%${nombre}%`);
   const rl=rawRl||[];
@@ -6503,11 +6516,13 @@ async function renderEnvios(){
     list=list.filter(e=>!['ALLEATA','CORREO ARGENTINO','CABIFY','EPSA'].includes((e.logistica||'').toUpperCase().trim()));
   }
 
-  // Excluir solo ROLLOUT real (Cambio de Terminal + NAPSE + checkbox Rollout
-  // tildado + logística Alleata). Un "Cambio de Terminal NAPSE" sin el
-  // checkbox, o con otra logística, es un "Cambio por Napse" normal y
-  // pertenece a Envíos, no a Rollout.
-  list = list.filter(e => !esRollout(e));
+  // Excluir Cambio de Terminal NAPSE (pertenecen a Rollout, no a Envíos —
+  // TODAS, sea Rollout real o Cambio por Napse: la diferenciación es un
+  // badge dentro del módulo Rollout, no una separación de módulos)
+  list = list.filter(e => !(
+    (e.record_type||e.tipo||'').trim() === 'Cambio de Terminal' &&
+    (e.perfil||'').trim().toUpperCase() === 'NAPSE'
+  ));
 
   // Filtro búsqueda local (OT, tracking, cuenta, responsable)
   const buscar=(document.getElementById('envBuscar')?.value||'').trim().toLowerCase();
