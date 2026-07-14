@@ -2115,11 +2115,25 @@ async function simLookup(serie,linea,sufijo,prefijo){
   if(serie){
     const{data}=await sb.from('sims').select('*').eq('serie',serie).limit(1);
     if(data?.length)return{found:true,...data[0]};
+    // Algunos chips imprimen un dígito de control (checksum) pegado al final
+    // de la serie, que el OCR a veces suma y a veces no. Si la serie tal
+    // cual no matcheó, probamos sin el último dígito antes de rendirnos.
+    if(serie.length>=19){
+      const serieSinControl=serie.slice(0,-1);
+      const{data:dataSC}=await sb.from('sims').select('*').eq('serie',serieSinControl).limit(1);
+      if(dataSC?.length)return{found:true,...dataSC[0]};
+    }
   }
   if(prefijo&&sufijo){
     const combinada=(prefijo+sufijo).replace(/\s/g,'');
     const{data}=await sb.from('sims').select('*').eq('serie',combinada).limit(1);
     if(data?.length)return{found:true,...data[0]};
+    // Mismo fallback: probar sin el último dígito de control
+    if(combinada.length>=19){
+      const combinadaSinControl=combinada.slice(0,-1);
+      const{data:dataSC}=await sb.from('sims').select('*').eq('serie',combinadaSinControl).limit(1);
+      if(dataSC?.length)return{found:true,...dataSC[0]};
+    }
   }
   if(sufijo){
     const{data}=await sb.from('sims').select('*').ilike('serie','%'+sufijo.replace(/\s/g,'')).limit(1);
