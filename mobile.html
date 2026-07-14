@@ -411,6 +411,20 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
     <label class="label" style="margin-bottom:6px;display:block">Observaciones</label>
     <textarea id="modalCierre-notas" rows="3" placeholder="Opcional: descripción de lo ocurrido..." style="margin-bottom:12px"></textarea>
 
+    <!-- SIM NUEVA — solo para Rollout real (obligatorio antes de poder confirmar) -->
+    <div id="rolloutSimWrap" style="display:none;margin-bottom:14px">
+      <label class="label" style="margin-bottom:6px;display:block">
+        📶 SIM nueva (Rollout) <span style="color:var(--red)">*requerido</span>
+      </label>
+      <div id="rolloutSimResult" style="font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--teal);margin-bottom:8px"></div>
+      <label style="display:flex;align-items:center;gap:8px;background:var(--surface2);border:1px dashed var(--border2);border-radius:10px;padding:12px;cursor:pointer" id="rolloutSimLabel">
+        <span style="font-size:20px">📷</span>
+        <span style="font-size:13px;color:var(--text-muted)" id="rolloutSimLabelText">Tocar para leer el chip nuevo</span>
+        <input type="file" id="rolloutSimInput" accept="image/*" capture="environment" style="display:none" onchange="procesarFotoSimRollout(event)">
+      </label>
+      <div id="rolloutSimStatus" style="font-size:11px;color:var(--text-muted);margin-top:6px"></div>
+    </div>
+
     <label class="label" style="margin-bottom:6px;display:block">
       Foto de evidencia <span id="fotoRequeridaLabel" style="color:var(--red);display:none">*requerida</span>
     </label>
@@ -1351,6 +1365,17 @@ function showScanFeedback(msg,type){
 // ── CIERRE DE OT ──
 let _fotoBlob=null;
 let _fotoBase64=null;
+let _rolloutSimSerie=null;
+
+// Mismo criterio que el portal desktop (redefinido 14/07): Cambio de
+// Terminal + Perfil NAPSE + checkbox Rollout tildado + logística ALLEATA.
+function esRolloutOT(ot){
+  if(!ot) return false;
+  const tipo=(ot.record_type||ot.tipo||'').toLowerCase();
+  const perfil=(ot.perfil||'').trim().toUpperCase();
+  const logistica=(ot.logistica||'').trim().toUpperCase();
+  return tipo.includes('cambio') && perfil==='NAPSE' && ot.rollout===true && logistica==='ALLEATA';
+}
 
 function openCierreModal(id,resultado){
   document.getElementById('modalCierre-id').value=id;
@@ -1366,6 +1391,18 @@ function openCierreModal(id,resultado){
   document.getElementById('modalFotoInput').value='';
   _fotoBlob=null;_fotoBase64=null;
   _otCierreActual=rutaDelDia.find(o=>o.id===id)||_otsEnTransitoMap[id]||null;
+
+  // Rollout: mostrar el paso obligatorio de leer el chip nuevo, solo
+  // cuando se está confirmando la entrega (no aplica a "Fallido").
+  _rolloutSimSerie=null;
+  const rolloutWrap=document.getElementById('rolloutSimWrap');
+  const mostrarRollout=esRolloutOT(_otCierreActual)&&resultado==='Entregado';
+  rolloutWrap.style.display=mostrarRollout?'block':'none';
+  document.getElementById('rolloutSimResult').textContent='';
+  document.getElementById('rolloutSimStatus').textContent='';
+  document.getElementById('rolloutSimLabelText').textContent='Tocar para leer el chip nuevo';
+  document.getElementById('rolloutSimInput').value='';
+
   document.getElementById('modalCierre').classList.add('show');
 }
 
@@ -1412,6 +1449,13 @@ async function confirmarCierreOT(){
   if(datoEnvio==='Mal indicada la dirección'&&!_fotoBlob){
     document.getElementById('fotoRequeridaLabel').style.display='inline';
     document.getElementById('fotoRequeridaLabel').textContent='*foto requerida para esta opción';
+    return;
+  }
+
+  // Rollout: no se puede confirmar la entrega sin leer el chip nuevo
+  if(esRolloutOT(_otCierreActual)&&resultado==='Entregado'&&!_rolloutSimSerie){
+    document.getElementById('rolloutSimStatus').textContent='⚠️ Falta leer el chip nuevo — es obligatorio para Rollout';
+    document.getElementById('rolloutSimStatus').style.color='var(--red)';
     return;
   }
 
@@ -1525,9 +1569,30 @@ async function confirmarCierreOT(){
     if(!data.ok) error={message:data.error||'Error al cerrar la OT'};
   }catch(e){ error={message:e.message}; }
 
+  // Rollout: la OT ya cerró bien en SF — ahora actualizamos la SIM leída
+  // (Cuenta_busqueda__c/Ubicacion__c/Estado__c) y el N_Simcard__c de la OT.
+  let rolloutSimError=null;
+  if(!error&&esRolloutOT(_otCierreActual)&&resultado==='Entregado'&&_rolloutSimSerie){
+    try{
+      const resSim=await railwayFetch('/automations/rollout-actualizar-sim',{
+        method:'POST',
+        body:JSON.stringify({
+          sf_id:      _otCierreActual?.sf_id,
+          serie:      _rolloutSimSerie,
+          account_id: _otCierreActual?.account_id,
+        })
+      });
+      const dataSim=await resSim.json();
+      if(!dataSim.ok) rolloutSimError=dataSim.error||'Error al actualizar la SIM';
+    }catch(e){ rolloutSimError=e.message; }
+  }
+
   btn.disabled=false;btn.textContent='Confirmar';
   if(error){alert('Error: '+error.message);return;}
   closeModalCierre();
+  if(rolloutSimError){
+    alert('⚠️ La OT se cerró bien, pero falló la actualización de la SIM en Salesforce: '+rolloutSimError+'\n\nAvisá para que lo corrijan a mano.');
+  }
   registrarCierreResumen({
     tipo:      'envio',
     ot_numero: _otCierreActual?.ot_numero||'',
@@ -1664,6 +1729,42 @@ async function procesarFotoSIM(e){
     saveHistorial(serie||sufijo||'unknown',result);
     if(result.found&&navigator.vibrate)navigator.vibrate([100,50,100]);
     status.textContent=result.found?'✅ SIM encontrada':'❌ SIM no registrada';
+  }catch(err){
+    status.textContent='❌ Error: '+err.message;
+  }
+}
+
+// Lectura de chip para el paso obligatorio de Rollout (dentro del modal de
+// cierre) — reusa el mismo motor de OCR (callVision + parseVisionSIM) que
+// ya usa el Verificador SIMs, pero acá solo detecta la serie y la deja
+// lista para mandar al backend al confirmar el cierre; no hace lookup en
+// la base ni permite editar estado/ubicación (eso lo hace el backend).
+async function procesarFotoSimRollout(e){
+  const file=e.target.files[0];
+  if(!file)return;
+  e.target.value='';
+  const status=document.getElementById('rolloutSimStatus');
+  const result=document.getElementById('rolloutSimResult');
+  _rolloutSimSerie=null;
+  status.textContent='🧠 Analizando foto con IA...';
+  result.textContent='';
+  try{
+    const b64=await fileToB64(file);
+    const res=await callVision(b64,file.type);
+    const{serie,sufijo,prefijo}=parseVisionSIM(res);
+    if(serie){
+      _rolloutSimSerie=serie;
+      result.textContent='✅ '+serie;
+      status.textContent='Chip leído correctamente';
+      document.getElementById('rolloutSimLabelText').textContent='Volver a leer';
+      if(navigator.vibrate)navigator.vibrate([100,50,100]);
+    }else if(sufijo||prefijo){
+      status.textContent='⚠️ Solo se detectó parte del número — probá de nuevo, más cerca';
+      result.textContent='';
+    }else{
+      status.textContent='❌ No se pudo leer el chip — probá de nuevo';
+      result.textContent='';
+    }
   }catch(err){
     status.textContent='❌ Error: '+err.message;
   }
