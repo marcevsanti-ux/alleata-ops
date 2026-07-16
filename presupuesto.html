@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Alleata · Presupuesto Operaciones v1.9.9</title>
+<title>Alleata · Presupuesto Operaciones v1.9.10</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -197,7 +197,7 @@
   <div class="login-box">
     <h2>💰 Presupuesto</h2>
     <p class="login-sub">Alleata · Acceso restringido</p>
-    <div style="position:absolute;bottom:12px;right:16px;font-size:10px;font-family:'JetBrains Mono',monospace;color:rgba(232,237,243,.2)">v1.9.9</div>
+    <div style="position:absolute;bottom:12px;right:16px;font-size:10px;font-family:'JetBrains Mono',monospace;color:rgba(232,237,243,.2)">v1.9.10</div>
     <div class="login-field">
       <label>Email</label>
       <input type="email" id="loginEmail" placeholder="tu@email.com" onkeydown="if(event.key==='Enter')doLogin()">
@@ -213,7 +213,7 @@
 
 <div id="appContent" style="display:none">
 <h1>💰 Presupuesto Operaciones</h1>
-<p class="sub">Alleata · 2026 <span style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 8px;border-radius:4px;border:1px solid var(--border2);font-size:10px;margin-left:6px">v1.9.9</span></p>
+<p class="sub">Alleata · 2026 <span style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 8px;border-radius:4px;border:1px solid var(--border2);font-size:10px;margin-left:6px">v1.9.10</span></p>
 
 <div class="toolbar">
   <div class="mes-bar" id="mesBar"></div>
@@ -486,7 +486,7 @@ function render() {
   const filtro = document.getElementById('filtroRubro').value;
   const items  = DATA.filter(i=>!filtro||i.r===filtro);
   renderCards();
-  renderTabla(items);
+  renderTabla(items, filtro);
 }
 
 function renderCards() {
@@ -523,10 +523,10 @@ function renderCards() {
   document.getElementById('cards').innerHTML=html;
 }
 
-function renderTabla(items) {
+function renderTabla(items, filtro) {
   const tbody=document.getElementById('tbody');
   const tfoot=document.getElementById('tfoot');
-  let rows='', totPrev=0, totReal=0;
+  let rows='', totPrev=0, totReal=0, totalEnvios=0;
   ['LOGISTICA','TECNOLOGIA','INSUMOS','SISTEMAS'].forEach(rub=>{
     const its=items.filter(i=>i.r===rub);
     if(!its.length) return;
@@ -555,6 +555,10 @@ function renderTabla(items) {
       const caFacsRow = isCA ? (caFacturas[mes]||[]) : [];
       const cabifyFacsRow = isCabify ? (cabifyFacturas[mes]||[]) : [];
       const epsaFacsRow = isEpsa ? (epsaFacturas[mes]||[]) : [];
+      // Envíos del mes (solo paquetería, no viajes de personas de Cabify "varios")
+      if(isEpsa) totalEnvios += epsaFacsRow.reduce((s,f)=>s+(f.cantidadTotal||0),0);
+      if(isCA) totalEnvios += caFacsRow.reduce((s,f)=>s+(f.cantidadAlleata||0),0);
+      if(isCabify) totalEnvios += cabifyFacsRow.reduce((s,f)=>s+(f.enviosAlleata||0),0);
       // Nro factura para cada proveedor con modal
       const getChip = (num, sub) => `
         <div style="display:inline-block;margin:2px;vertical-align:top;text-align:center">
@@ -618,9 +622,13 @@ function renderTabla(items) {
   tbody.innerHTML=rows||`<tr><td colspan="8" class="empty">Sin ítems</td></tr>`;
   const totDesv=totReal-totPrev;
   const dc=dColor(totDesv);
+  const envioInfo = (filtro==='LOGISTICA' && totalEnvios>0)
+    ? `<div style="font-size:11px;color:var(--text-muted)">${totalEnvios} envíos</div><div style="font-size:10px;color:var(--teal);font-weight:700">prom. ${fmt(totReal/totalEnvios)}</div>`
+    : '';
   tfoot.innerHTML=`
     <tr>
-      <td colspan="3" style="font-size:12px;text-transform:uppercase;letter-spacing:.5px">Total ${MESES_LABEL[mes]}</td>
+      <td colspan="2" style="font-size:12px;text-transform:uppercase;letter-spacing:.5px">Total ${MESES_LABEL[mes]}</td>
+      <td>${envioInfo}</td>
       <td class="mono">${fmt(totPrev)}</td>
       <td class="mono" style="color:${dc}">${fmt(totReal)||'—'}</td>
       <td class="mono" style="color:${dc}">${fmtDesv(totDesv,totPrev)}</td>
