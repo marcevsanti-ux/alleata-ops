@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Alleata · Presupuesto Operaciones v1.10.1</title>
+<title>Alleata · Presupuesto Operaciones v1.11.0</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -199,7 +199,7 @@
   <div class="login-box">
     <h2>💰 Presupuesto</h2>
     <p class="login-sub">Alleata · Acceso restringido</p>
-    <div style="position:absolute;bottom:12px;right:16px;font-size:10px;font-family:'JetBrains Mono',monospace;color:rgba(232,237,243,.2)">v1.10.1</div>
+    <div style="position:absolute;bottom:12px;right:16px;font-size:10px;font-family:'JetBrains Mono',monospace;color:rgba(232,237,243,.2)">v1.11.0</div>
     <div class="login-field">
       <label>Email</label>
       <input type="email" id="loginEmail" placeholder="tu@email.com" onkeydown="if(event.key==='Enter')doLogin()">
@@ -215,7 +215,7 @@
 
 <div id="appContent" style="display:none">
 <h1>💰 Presupuesto Operaciones</h1>
-<p class="sub">Alleata · 2026 <span style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 8px;border-radius:4px;border:1px solid var(--border2);font-size:10px;margin-left:6px">v1.10.1</span></p>
+<p class="sub">Alleata · 2026 <span style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 8px;border-radius:4px;border:1px solid var(--border2);font-size:10px;margin-left:6px">v1.11.0</span></p>
 
 <div class="toolbar">
   <div class="mes-bar" id="mesBar"></div>
@@ -1269,8 +1269,10 @@ const EPSA_SERVICIO_MAP = {
 // Alleata; el total se calcula prorrateando IVA + percepciones del ticket
 // completo sobre la suma de los ítems tildados (se asume mismo IVA para
 // todos los ítems del ticket, como es habitual en insumos de limpieza).
-const GEMINI_KEY = 'AIzaSyD3CRpdbO7cxzGt5yWZ7A_OIzQcm0jkCa4';
-const GEMINI_MODEL = 'gemini-2.0-flash';
+// El OCR de tickets pasa por el mismo backend Railway que ya usa mobile.html
+// para leer los chips SIM (endpoint /automations/vision-ocr, Google Cloud
+// Vision del lado del servidor) — el navegador nunca ve ninguna key de Google.
+const ALLY_URL = 'https://alleata-agent-production.up.railway.app';
 const cotoFacturas = {};
 let cotoMesActual = 'jun';
 let cotoPendingTicket = null; // ticket recién leído, aún sin confirmar
@@ -2669,36 +2671,101 @@ function fileToBase64(file){
   });
 }
 
-async function cotoParseImagenConGemini(base64, mimeType){
-  const prompt=`Sos un asistente que lee tickets/facturas de compra de supermercado (Argentina) a partir de una foto y devuelve SOLO un JSON válido, sin texto adicional, sin backticks ni explicación. Estructura exacta:
-{"comprobante":"...", "fecha":"DD/MM/AAAA", "proveedor":"...", "items":[{"desc":"...","cantidad":0,"precioUnit":0,"importe":0}], "subtotal":0, "iva":0, "percepciones":0, "total":0}
-Reglas:
-- "items": una fila por cada línea de producto o servicio comprado (ignorá las líneas de subtotal, IVA, percepciones y medio de pago).
-- "importe" es el monto de esa línea de producto SIN impuestos, tal como figura en el ticket (antes del IVA global).
-- "percepciones": sumá TODAS las percepciones que veas (IIBB, IBCF, IBNQ, o cualquier otra) en un solo número total.
-- "subtotal" es el subtotal neto sin IVA de todo el ticket ("SUBTOT. SIN DESCUENTOS" o similar).
-- "total" es el total final pagado.
-- Todos los números van con punto decimal, sin separador de miles, sin símbolo $.
-- Si no podés leer con certeza algún campo, poné 0 (números) o "" (texto), pero nunca inventes datos.`;
-  const body={
-    contents:[{parts:[{text:prompt},{inline_data:{mime_type:mimeType,data:base64}}]}],
-    generationConfig:{temperature:0, responseMimeType:'application/json'}
-  };
-  const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_KEY}`,{
-    method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)
+// Mismo endpoint que usa mobile.html para leer chips SIM: la key de Google
+// Vision vive en Railway (server-side), acá solo se manda la imagen y se
+// recibe texto plano.
+async function cotoCallVisionOCR(base64, mime){
+  const resp=await fetch(ALLY_URL+'/automations/vision-ocr',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','x-automation-secret':'123456'},
+    body:JSON.stringify({image_base64:base64, mime_type:mime})
   });
-  if(!res.ok){
+  if(!resp.ok){
     let detail='';
-    try{
-      const errJson=await res.json();
-      detail=errJson?.error?.message || errJson?.error?.status || '';
-    }catch(_){/* la respuesta no era JSON */}
-    throw new Error('Gemini '+res.status+(detail?' — '+detail:' (sin detalle)'));
+    try{ const j=await resp.json(); detail=j?.error||''; }catch(_){/* no era JSON */}
+    throw new Error('Vision-OCR '+resp.status+(detail?' — '+detail:''));
   }
-  const data=await res.json();
-  const text=data?.candidates?.[0]?.content?.parts?.[0]?.text;
-  if(!text) throw new Error('Gemini no devolvió contenido (¿ticket poco legible?)');
-  return JSON.parse(text);
+  const data=await resp.json();
+  if(!data.ok) throw new Error(data.error||'Error de Vision');
+  return data.text||'';
+}
+
+// Parser determinístico de texto de ticket COTO (Google Vision devuelve texto
+// plano línea por línea, no JSON estructurado como daba Gemini — así que acá
+// reconstruimos los ítems con expresiones regulares en vez de pedirle a una IA
+// que "entienda" el ticket). Ancla cada ítem en la línea "CANT x PRECIO (IVA%)"
+// y busca la descripción y el importe en las líneas siguientes.
+// Busca la primera línea que matchea testFn y devuelve el monto asociado:
+// si el monto está al final de esa misma línea lo toma de ahí, si no,
+// sigue en las líneas siguientes hasta encontrar una que sea 100% numérica
+// (esto último es lo típico cuando el OCR separa etiqueta y valor en líneas
+// distintas, como pasa con "IVA 21% BASE ..." → el monto real de IVA queda
+// en la línea de abajo, no en la de la etiqueta).
+function cotoBuscarMonto(rawLines, testFn, evitarSiContiene){
+  for(let i=0;i<rawLines.length;i++){
+    if(!testFn(rawLines[i])) continue;
+    if(!evitarSiContiene || !evitarSiContiene.test(rawLines[i])){
+      const inline=rawLines[i].match(/(\d[\d.,]*[.,]\d{2})\s*$/);
+      if(inline) return logiParseNum(inline[1]);
+    }
+    for(let j=i+1;j<Math.min(i+3,rawLines.length);j++){
+      if(/^[\d.,\s]+$/.test(rawLines[j])) return logiParseNum(rawLines[j]);
+      if(rawLines[j].length) break; // texto que no es el monto, no seguir buscando
+    }
+  }
+  return 0;
+}
+
+function cotoParseTicketText(text){
+  const rawLines=text.split(/\r?\n/).map(l=>l.trim()).filter(l=>l.length);
+  const joined=rawLines.join('\n');
+
+  const compM=joined.match(/\b(\d{4}-\d{6,8})\b/);
+  const comprobante=compM?compM[1]:'—';
+
+  const fechaM=joined.match(/\b(\d{2}\/\d{2}\/\d{4})\b/);
+  const fecha=fechaM?fechaM[1]:'—';
+
+  // Ítems: anclados en la línea "CANT x PRECIO"
+  const anchorRe=/(\d+[.,]\d{3})\s*x\s*([\d.,]+)/i;
+  const items=[];
+  for(let i=0;i<rawLines.length;i++){
+    const m=rawLines[i].match(anchorRe);
+    if(!m) continue;
+    const cantidad=Number(m[1].replace(',','.'))||1;
+    const precioUnit=logiParseNum(m[2]);
+    let desc='', importe=0;
+    for(let j=i+1;j<Math.min(i+6,rawLines.length);j++){
+      const l=rawLines[j];
+      if(anchorRe.test(l)) break; // llegó el próximo ítem sin encontrar importe
+      if(/^(SUBTOT|TOTAL|IVA|PERCEP|IMPUESTOS)/i.test(l)) break;
+      if(/^\d{5,}(\s+\d{5,})*$/.test(l)) continue; // línea de códigos de barra
+      if(/^[\d.,\s]+$/.test(l)){ importe=logiParseNum(l); break; } // línea 100% numérica = el importe
+      if(!desc && /[A-ZÁÉÍÓÚÑ]{3,}/.test(l)) desc=l;
+    }
+    if(!importe) importe=Math.round(cantidad*precioUnit*100)/100;
+    items.push({desc:desc||'Ítem sin descripción', cantidad, precioUnit, importe});
+  }
+
+  const subtotal = cotoBuscarMonto(rawLines, l=>/^SUBTOT/i.test(l) || /TOTAL\s*NETO\s*SIN\s*IVA/i.test(l))
+    || Math.round(items.reduce((s,it)=>s+it.importe,0)*100)/100;
+
+  // El IVA nunca está en la misma línea si esa línea dice "BASE" (ese número
+  // es el subtotal base, no el monto de IVA) — en ese caso se busca en la
+  // línea siguiente.
+  const iva = cotoBuscarMonto(rawLines, l=>/^IVA\s*[\d.,]+\s*%/i.test(l), /BASE/i);
+
+  let percepciones=0;
+  const percBlockM=joined.match(/PERCEPCIONES:?([\s\S]*?)\bTOTAL\b/i);
+  if(percBlockM){
+    const nums=[...percBlockM[1].matchAll(/(\d[\d.,]*[.,]\d{2})/g)].map(x=>logiParseNum(x[1]));
+    percepciones=Math.round(nums.reduce((s,n)=>s+n,0)*100)/100;
+  }
+
+  const total = cotoBuscarMonto(rawLines, l=>/^TOTAL\b/i.test(l) && !/NETO/i.test(l))
+    || Math.round((subtotal+iva+percepciones)*100)/100;
+
+  return {comprobante, fecha, proveedor:'COTO', items, subtotal, iva, percepciones, total};
 }
 
 async function cotoHandleImg(input){
@@ -2706,10 +2773,11 @@ async function cotoHandleImg(input){
   document.getElementById('cotoImgName').textContent=file.name;
   document.getElementById('cotoImgName').style.display='block';
   document.getElementById('cotoZoneImg').classList.add('loaded');
-  cotoShowMsg('🤖 Leyendo el ticket con IA...','ok');
+  cotoShowMsg('🤖 Leyendo el ticket (OCR)...','ok');
   try{
     const base64=await fileToBase64(file);
-    const parsed=await cotoParseImagenConGemini(base64, file.type||'image/jpeg');
+    const rawText=await cotoCallVisionOCR(base64, file.type||'image/jpeg');
+    const parsed=cotoParseTicketText(rawText);
     const items=(parsed.items||[]).map((it,idx)=>({
       id:'it'+idx+'_'+Date.now(),
       desc:(it.desc||'Ítem').toString(),
@@ -2718,7 +2786,6 @@ async function cotoHandleImg(input){
       importe:Number(it.importe)||0,
       seleccionado:true
     }));
-    if(!items.length){ cotoShowMsg('⚠️ No se detectaron ítems. Podés agregarlos a mano abajo.','err'); }
     cotoPendingTicket={
       comprobante:parsed.comprobante||'—',
       fecha:parsed.fecha||'—',
@@ -2727,13 +2794,15 @@ async function cotoHandleImg(input){
       subtotal:Number(parsed.subtotal)||0,
       iva:Number(parsed.iva)||0,
       percepciones:Number(parsed.percepciones)||0,
-      total:Number(parsed.total)||0
+      total:Number(parsed.total)||0,
+      rawText
     };
-    if(items.length) cotoShowMsg('✓ Ticket leído · '+items.length+' ítems detectados · tildá los que correspondan','ok');
+    if(items.length) cotoShowMsg('✓ Ticket leído · '+items.length+' ítem(s) detectados · revisá y tildá los que correspondan','ok');
+    else cotoShowMsg('⚠️ No se detectaron ítems automáticamente. Revisá el texto leído (abajo) y agregalos a mano.','err');
     cotoRenderPending();
   }catch(e){
     cotoShowMsg('Error leyendo el ticket: '+e.message+' — podés cargar los ítems a mano.','err');
-    cotoPendingTicket={comprobante:'—',fecha:'—',proveedorTicket:'COTO',items:[],subtotal:0,iva:0,percepciones:0,total:0};
+    cotoPendingTicket={comprobante:'—',fecha:'—',proveedorTicket:'COTO',items:[],subtotal:0,iva:0,percepciones:0,total:0,rawText:''};
     cotoRenderPending();
   }
 }
@@ -2801,6 +2870,7 @@ function cotoRenderPending(){
       Ticket <b style="color:var(--text)">${t.comprobante}</b> · ${t.fecha} · ${t.proveedorTicket}
       &nbsp;·&nbsp; Total ticket completo: <b>${fmt(t.total)}</b>
     </div>
+    ${t.rawText?`<details style="margin-bottom:10px"><summary style="cursor:pointer;font-size:10px;color:var(--text-muted)">Ver texto crudo leído por OCR (por si algún ítem quedó mal)</summary><pre style="white-space:pre-wrap;font-size:10px;color:var(--text-muted);background:var(--navy-900);border:1px solid var(--border2);padding:8px;border-radius:6px;margin-top:6px;max-height:220px;overflow:auto">${t.rawText.replace(/</g,'&lt;')}</pre></details>`:''}
     <table class="fac-tbl">
       <thead><tr><th></th><th>Ítem</th><th style="text-align:right">Cant.</th><th style="text-align:right">Importe (sin imp.)</th><th></th></tr></thead>
       <tbody>${filas}</tbody>
@@ -3895,7 +3965,7 @@ logiAgregar = async function() {
     <div class="claro-kpis" id="cotoKpis" style="grid-template-columns:repeat(4,1fr)"></div>
 
     <div style="font-size:11px;color:var(--text-muted);background:var(--navy-900);border:1px solid var(--border2);border-radius:9px;padding:10px 14px;margin-bottom:16px">
-      💡 Subí la foto del ticket — una IA lo lee y te arma la lista de ítems. Tildá los que correspondan a Alleata (podés destildar los que no, editar importes o agregar ítems a mano) y el sistema calcula el gasto real prorrateando el IVA y las percepciones del ticket solo sobre lo tildado.
+      💡 Subí la foto del ticket — se lee con OCR (mismo motor que usa la app para los chips SIM) y se arma la lista de ítems automáticamente. El parseo es más rígido que una IA conversacional, así que revisá el resultado: podés editar descripciones/importes, tildar solo lo que corresponda a Alleata o agregar ítems a mano si algo no se detectó bien. El sistema calcula el gasto real prorrateando el IVA y las percepciones del ticket solo sobre lo tildado.
     </div>
 
     <div class="up-title">📷 Foto del ticket</div>
