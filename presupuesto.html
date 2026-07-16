@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Alleata · Presupuesto Operaciones v1.9.10</title>
+<title>Alleata · Presupuesto Operaciones v1.10.0</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -15,6 +15,8 @@
   body.readonly-mode .btn-confirm,
   body.readonly-mode input[type="file"] { display:none !important; }
   body.readonly-mode .tc-inp { pointer-events:none; opacity:.5; }
+  body.readonly-mode .up-zone { pointer-events:none; opacity:.45; }
+  body.readonly-mode .btn-del-fac { display:none !important; }
   .readonly-banner{background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.35);color:#f59e0b;padding:9px 16px;border-radius:8px;font-size:12px;font-weight:700;margin-bottom:18px;text-align:center;letter-spacing:.3px}
   :root {
     --navy-900:#0d1b2a; --navy-800:#112236; --navy-700:#162d45;
@@ -197,7 +199,7 @@
   <div class="login-box">
     <h2>💰 Presupuesto</h2>
     <p class="login-sub">Alleata · Acceso restringido</p>
-    <div style="position:absolute;bottom:12px;right:16px;font-size:10px;font-family:'JetBrains Mono',monospace;color:rgba(232,237,243,.2)">v1.9.10</div>
+    <div style="position:absolute;bottom:12px;right:16px;font-size:10px;font-family:'JetBrains Mono',monospace;color:rgba(232,237,243,.2)">v1.10.0</div>
     <div class="login-field">
       <label>Email</label>
       <input type="email" id="loginEmail" placeholder="tu@email.com" onkeydown="if(event.key==='Enter')doLogin()">
@@ -213,7 +215,7 @@
 
 <div id="appContent" style="display:none">
 <h1>💰 Presupuesto Operaciones</h1>
-<p class="sub">Alleata · 2026 <span style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 8px;border-radius:4px;border:1px solid var(--border2);font-size:10px;margin-left:6px">v1.9.10</span></p>
+<p class="sub">Alleata · 2026 <span style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 8px;border-radius:4px;border:1px solid var(--border2);font-size:10px;margin-left:6px">v1.10.0</span></p>
 
 <div class="toolbar">
   <div class="mes-bar" id="mesBar"></div>
@@ -375,6 +377,7 @@ const DATA = [
   {id:'telecom',   r:'TECNOLOGIA', p:'Telecom Personal',            d:'Servicios telefonía',        prev:{ene:2500000,feb:2500000,mar:0,abr:0,may:0,jun:5600000,jul:5800000,ago:6000000}, real:{ene:2402982,feb:4950095,mar:0,abr:0,may:0,jun:0,jul:0,ago:0}},
   {id:'bolsas',    r:'INSUMOS',    p:'Casco Flavia (Bolsas Rojas)', d:'Bolsas pluribol',            prev:{ene:0,feb:0,mar:0,abr:0,may:0,jun:200000,jul:0,ago:200000},                    real:{ene:0,feb:0,mar:0,abr:0,may:0,jun:0,jul:0,ago:0}},
   {id:'limpieza',  r:'INSUMOS',    p:'CLP SRL (Casa Thames)',       d:'Insumos de limpieza',        prev:{ene:0,feb:0,mar:0,abr:0,may:0,jun:50000,jul:0,ago:50000},                      real:{ene:0,feb:0,mar:0,abr:0,may:0,jun:0,jul:0,ago:0}},
+  {id:'coto',      r:'INSUMOS',    p:'COTO CICSA',                  d:'Insumos varios (limpieza / control de plagas)', prev:{ene:0,feb:0,mar:0,abr:0,may:0,jun:0,jul:0,ago:0}, real:{ene:0,feb:0,mar:0,abr:0,may:0,jun:0,jul:0,ago:0}},
   {id:'botmaker',  r:'SISTEMAS',   p:'Botmaker',                    d:'Chatbot',                    prev:{ene:0,feb:300000,mar:0,abr:0,may:0,jun:213000,jul:355000,ago:355000},            real:{ene:217569,feb:214560,mar:0,abr:0,may:0,jun:0,jul:0,ago:0}},
   {id:'phoneiq',   r:'SISTEMAS',   p:'Phone IQ',                    d:'Central telefónica virtual', prev:{ene:0,feb:1254000,mar:0,abr:0,may:0,jun:940000,jul:940000,ago:940000},           real:{ene:0,feb:0,mar:0,abr:0,may:0,jun:0,jul:0,ago:0}},
   {id:'ifx',       r:'SISTEMAS',   p:'IFX Networks',                d:'Licencia Office 365',        prev:{ene:0,feb:0,mar:0,abr:0,may:0,jun:250000,jul:250000,ago:250000},                real:{ene:229311,feb:218051,mar:0,abr:0,may:0,jun:212841,jul:0,ago:0}},
@@ -549,12 +552,14 @@ function renderTabla(items, filtro) {
       const isCA=it.id==='ca';
       const isCabify=it.id==='cabify';
       const isEpsa=it.id==='epsa';
+      const isCoto=it.id==='coto';
       // Nro facturas para columna
       const logiFacs = isLogi ? logiGetFacturas(mes) : [];
       const napseFacsRow = isNapse ? (napseFacturas[mes]||[]) : [];
       const caFacsRow = isCA ? (caFacturas[mes]||[]) : [];
       const cabifyFacsRow = isCabify ? (cabifyFacturas[mes]||[]) : [];
       const epsaFacsRow = isEpsa ? (epsaFacturas[mes]||[]) : [];
+      const cotoFacsRow = isCoto ? (cotoFacturas[mes]||[]) : [];
       // Envíos del mes (solo paquetería, no viajes de personas de Cabify "varios")
       if(isEpsa) totalEnvios += epsaFacsRow.reduce((s,f)=>s+(f.cantidadTotal||0),0);
       if(isCA) totalEnvios += caFacsRow.reduce((s,f)=>s+(f.cantidadAlleata||0),0);
@@ -590,6 +595,12 @@ function renderTabla(items, filtro) {
             <span style="font-family:'JetBrains Mono',monospace;font-size:10px;background:rgba(29,191,142,.08);color:var(--teal);padding:1px 6px;border-radius:4px;border:1px solid rgba(29,191,142,.2);display:block">${f.numero}</span>
             ${f.cantidadTotal?`<span style="font-size:9px;color:var(--text-muted);margin-top:2px;display:block">${f.cantidadTotal} envíos</span>`:''}
           </div>`).join('');
+      else if(isCoto && cotoFacsRow.length)
+        nroFacCell = cotoFacsRow.map(f=>`
+          <div style="display:inline-block;margin:2px;vertical-align:top;text-align:center">
+            <span style="font-family:'JetBrains Mono',monospace;font-size:10px;background:rgba(29,191,142,.08);color:var(--teal);padding:1px 6px;border-radius:4px;border:1px solid rgba(29,191,142,.2);display:block">${f.numero}</span>
+            <span style="font-size:9px;color:var(--text-muted);margin-top:2px;display:block">${f.cantidadItems}/${f.cantidadTotalTicket} ítems</span>
+          </div>`).join('');
       else if(isClaro && claroData[mes])
         nroFacCell = getChip(claroData[mes].nroFac||'—', claroData[mes].nroFac&&claroData[mes].nroFac!=='—'?'Claro':'');
       else if(isTelecom && telecomData[mes])
@@ -614,7 +625,7 @@ function renderTabla(items, filtro) {
           <td class="mono" style="color:${dc}">${(prev||real)?fmtDesv(desv,prev):'—'}</td>
           <td style="text-align:center">${pctBadge}</td>
           <td style="text-align:center">
-            <button class="btn-edit${(isLogi||isClaro)?' logi':''}" onclick="${isLogi?`openLogiModal('${mes}')`:isClaro?`openClaroModal('${mes}')`:isNapse?`openNapseModal('${mes}')`:isTelecom?`openTelecomModal('${mes}')`:isAmazon?`openAmazonModal('${mes}')`:isCA?`openCaModal('${mes}')`:isCabify?`openCabifyModal('${mes}')`:isEpsa?`openEpsaModal('${mes}')`:`openModal('${it.id}','${it.p}','${it.d}')`}">${(isLogi||isClaro||isNapse||isTelecom||isAmazon||isCA||isCabify||isEpsa)?'📎':'✏️'}</button>
+            <button class="btn-edit${(isLogi||isClaro)?' logi':''}" onclick="${isLogi?`openLogiModal('${mes}')`:isClaro?`openClaroModal('${mes}')`:isNapse?`openNapseModal('${mes}')`:isTelecom?`openTelecomModal('${mes}')`:isAmazon?`openAmazonModal('${mes}')`:isCA?`openCaModal('${mes}')`:isCabify?`openCabifyModal('${mes}')`:isEpsa?`openEpsaModal('${mes}')`:isCoto?`openCotoModal('${mes}')`:`openModal('${it.id}','${it.p}','${it.d}')`}">${(isLogi||isClaro||isNapse||isTelecom||isAmazon||isCA||isCabify||isEpsa||isCoto)?'📎':'✏️'}</button>
           </td>
         </tr>`;
     });
@@ -651,6 +662,7 @@ function closeModal() {
   editando=null;
 }
 function guardar() {
+  if(isReadonlyBlocked()) return;
   if(!editando) return;
   const monto=parseFloat(document.getElementById('mInput').value)||0;
   const nro=document.getElementById('mNroFac').value.trim();
@@ -1251,6 +1263,18 @@ const EPSA_SERVICIO_MAP = {
   'RECOLECCION A FACTURAR':  {concepto:'Colectas de envíos (Barracas)',    corto:'Colectas Barracas'},
 };
 
+// ── COTO / Insumos (tickets de supermercado) ─────────────────────────────────
+// El ticket se lee con Gemini Vision (mismo modelo/clave que ya usa la app de
+// SIMs para OCR). Se extraen los ítems y el usuario tilda cuáles son gasto de
+// Alleata; el total se calcula prorrateando IVA + percepciones del ticket
+// completo sobre la suma de los ítems tildados (se asume mismo IVA para
+// todos los ítems del ticket, como es habitual en insumos de limpieza).
+const GEMINI_KEY = 'AIzaSyD3CRpdbO7cxzGt5yWZ7A_OIzQcm0jkCa4';
+const GEMINI_MODEL = 'gemini-2.0-flash';
+const cotoFacturas = {};
+let cotoMesActual = 'jun';
+let cotoPendingTicket = null; // ticket recién leído, aún sin confirmar
+
 let logiCurrentTC     = 1428;
 // (logiPendingFac declarado arriba)
 // (logiPendingRTO declarado arriba)
@@ -1478,6 +1502,7 @@ function claroCheckBtn(){
 }
 
 async function claroGuardar(){
+  if(isReadonlyBlocked()) return;
   if(!claroPendingXLS) return;
   // Usar mes del PDF si está disponible, sino el seleccionado
   const m = claroPendingPDF?.mesFac || claroMesActual;
@@ -1673,6 +1698,7 @@ function napseParsePDF(text){
 }
 
 async function napseGuardar(){
+  if(isReadonlyBlocked()) return;
   const btn=document.getElementById('napseBtnConfirm');
   const fac=btn._pendingFac; if(!fac) return;
   if(!napseFacturas[napseMesActual]) napseFacturas[napseMesActual]=[];
@@ -1897,6 +1923,7 @@ function caCheckBtn(){
 }
 
 async function caGuardar(){
+  if(isReadonlyBlocked()) return;
   const fac=caPendingFac; if(!fac) return;
   if(!caFacturas[caMesActual]) caFacturas[caMesActual]=[];
   caFacturas[caMesActual].push(fac);
@@ -2161,6 +2188,7 @@ function cabifyParsePDF(text){
 }
 
 async function cabifyGuardar(){
+  if(isReadonlyBlocked()) return;
   const fac=cabifyPendingFac; if(!fac) return;
   if(!cabifyFacturas[cabifyMesActual]) cabifyFacturas[cabifyMesActual]=[];
   cabifyFacturas[cabifyMesActual].push(fac);
@@ -2292,7 +2320,7 @@ function epsaRenderFacturas(){
             <div style="font-size:9px;color:var(--text-muted)">Subtotal ${fmt(f.subtotal)} · IVA ${fmt(f.iva)} · Perc. ${fmt(f.otrosImp)}</div>
             <div style="font-family:'JetBrains Mono',monospace;font-weight:800;color:var(--teal)">${fmt(f.totalFactura)}</div>
           </div>
-          <button onclick="epsaEliminarFactura('${f.numero}')" title="Eliminar factura" style="background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.25);color:#f87171;border-radius:6px;padding:5px 9px;cursor:pointer;font-size:12px">🗑️</button>
+          <button onclick="epsaEliminarFactura('${f.numero}')" title="Eliminar factura" class="btn-del-fac" style="background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.25);color:#f87171;border-radius:6px;padding:5px 9px;cursor:pointer;font-size:12px">🗑️</button>
         </div>
       </div>
       ${desgloseRows}
@@ -2490,6 +2518,7 @@ function epsaParsePDF(text){
 }
 
 async function epsaEliminarFactura(numero){
+  if(isReadonlyBlocked()) return;
   const m=epsaMesActual;
   const facs=epsaFacturas[m]||[];
   const fac=facs.find(f=>f.numero===numero);
@@ -2509,6 +2538,7 @@ async function epsaEliminarFactura(numero){
 }
 
 async function epsaGuardar(){
+  if(isReadonlyBlocked()) return;
   const fac=epsaPendingFac; if(!fac) return;
   if(!epsaFacturas[epsaMesActual]) epsaFacturas[epsaMesActual]=[];
   epsaFacturas[epsaMesActual].push(fac);
@@ -2547,6 +2577,324 @@ async function epsaSaveDB(fac){
 
 function epsaShowMsg(txt,type){ const e=document.getElementById('epsaMsgPdf');if(e){e.className='up-msg '+type;e.textContent=txt;} }
 function epsaShowPreview(rows){ const e=document.getElementById('epsaPrevPdf');if(e){e.style.display='block';e.innerHTML=rows.map(r=>`<div class="up-prow"><span class="pk">${r[0]}</span><span class="pv">${r[1]}</span></div>`).join('');} }
+
+// ── COTO / Insumos ────────────────────────────────────────────────────────
+function openCotoModal(m){
+  cotoMesActual=m;
+  document.getElementById('cotoBg').classList.add('open');
+  document.getElementById('cotoSub').textContent=MESES_LABEL[m]+' 2026 · Insumos (tickets de supermercado)';
+  cotoResetForm();
+  cotoRenderKPIs();
+  cotoRenderFacturas();
+}
+function closeCotoModal(){
+  document.getElementById('cotoBg').classList.remove('open');
+  cotoSyncReal(); render();
+}
+function cotoResetForm(){
+  const inp=document.getElementById('cotoImgInp'); if(inp) inp.value='';
+  document.getElementById('cotoZoneImg')?.classList.remove('loaded');
+  const fn=document.getElementById('cotoImgName'); if(fn){fn.style.display='none';fn.textContent='';}
+  const msg=document.getElementById('cotoMsgImg'); if(msg){msg.className='up-msg';msg.textContent='';}
+  const prev=document.getElementById('cotoPendingWrap'); if(prev){prev.style.display='none';prev.innerHTML='';}
+  cotoPendingTicket=null;
+}
+function cotoSyncReal(){
+  MESES.forEach(m=>{
+    const facs=cotoFacturas[m]||[];
+    const real=facs.reduce((s,f)=>s+f.total,0);
+    if(real>0) reales['coto_'+m]=real;
+  });
+}
+function cotoRenderKPIs(){
+  const m=cotoMesActual;
+  const prev=DATA.find(i=>i.id==='coto').prev[m]||0;
+  const facs=cotoFacturas[m]||[];
+  const real=facs.reduce((s,f)=>s+f.total,0);
+  const items=facs.reduce((s,f)=>s+(f.cantidadItems||0),0);
+  const desvPct=prev>0?((real-prev)/prev)*100:0;
+  const el=document.getElementById('cotoKpis'); if(!el) return;
+  el.innerHTML=[
+    {label:'PREV '+MESES_LABEL[m].substring(0,3).toUpperCase()+' 26', val:fmt(prev)||'—', sub:'presupuestado', cls:''},
+    {label:'REAL (tildado, c/imp.)', val:real>0?fmt(real):'—', sub:facs.length+' ticket(s)', cls:real>0?'green':''},
+    {label:'DESVÍO', val:real>0?fmtPct(desvPct):'—', sub:desvPct<=0?'por debajo':'por encima', cls:real>0?(Math.abs(desvPct)>20?'warn':'ok'):''},
+    {label:'Ítems tildados', val:items||'—', sub:items?'promedio '+fmt(real/items):'sin tickets cargados', cls:''},
+  ].map(k=>`<div class="lk"><div class="lk-label">${k.label}</div><div class="lk-val ${k.cls}">${k.val}</div><div class="lk-sub">${k.sub}</div></div>`).join('');
+}
+
+function cotoRenderFacturas(){
+  const m=cotoMesActual;
+  const facs=cotoFacturas[m]||[];
+  const wrap=document.getElementById('cotoFacWrap');
+  const sec=document.getElementById('cotoFacSecLbl');
+  const badge=document.getElementById('cotoFacBadge');
+  if(!wrap) return;
+  if(!facs.length){ wrap.innerHTML=''; if(sec) sec.style.display='none'; return; }
+  if(sec) sec.style.display='flex';
+  if(badge) badge.textContent=facs.length+' ticket'+(facs.length!==1?'s':'');
+  wrap.innerHTML=facs.map(f=>{
+    const itemsRows=(f.items||[]).map(it=>`<tr style="opacity:${it.seleccionado?1:.4}">
+        <td style="font-size:11px">${it.seleccionado?'✅':'⬜'} ${it.desc}</td>
+        <td class="nr">${it.cantidad}</td>
+        <td class="nr">${fmt(it.importe)}</td>
+      </tr>`).join('');
+    return `<div style="background:var(--navy-900);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px">
+        <div>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700">${f.numero}</span>
+          <span style="font-size:11px;color:var(--text-muted);margin-left:8px">${f.fecha} · ${f.cantidadItems}/${f.cantidadTotalTicket} ítems tildados</span>
+        </div>
+        <div style="text-align:right;display:flex;align-items:center;gap:10px">
+          <div>
+            <div style="font-size:9px;color:var(--text-muted)">Ticket completo: ${fmt(f.totalTicketCompleto)}</div>
+            <div style="font-family:'JetBrains Mono',monospace;font-weight:800;color:var(--teal)">${fmt(f.total)}</div>
+          </div>
+          <button onclick="cotoEliminarFactura('${f.numero}')" title="Eliminar ticket" class="btn-del-fac" style="background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.25);color:#f87171;border-radius:6px;padding:5px 9px;cursor:pointer;font-size:12px">🗑️</button>
+        </div>
+      </div>
+      <table class="fac-tbl" style="margin-top:8px">
+        <thead><tr><th>Ítem</th><th style="text-align:right">Cant.</th><th style="text-align:right">Importe (sin imp.)</th></tr></thead>
+        <tbody>${itemsRows}</tbody>
+      </table>
+    </div>`;
+  }).join('');
+}
+
+function fileToBase64(file){
+  return new Promise((res,rej)=>{
+    const r=new FileReader();
+    r.onload=()=>res(r.result.split(',')[1]);
+    r.onerror=()=>rej(new Error('No se pudo leer el archivo'));
+    r.readAsDataURL(file);
+  });
+}
+
+async function cotoParseImagenConGemini(base64, mimeType){
+  const prompt=`Sos un asistente que lee tickets/facturas de compra de supermercado (Argentina) a partir de una foto y devuelve SOLO un JSON válido, sin texto adicional, sin backticks ni explicación. Estructura exacta:
+{"comprobante":"...", "fecha":"DD/MM/AAAA", "proveedor":"...", "items":[{"desc":"...","cantidad":0,"precioUnit":0,"importe":0}], "subtotal":0, "iva":0, "percepciones":0, "total":0}
+Reglas:
+- "items": una fila por cada línea de producto o servicio comprado (ignorá las líneas de subtotal, IVA, percepciones y medio de pago).
+- "importe" es el monto de esa línea de producto SIN impuestos, tal como figura en el ticket (antes del IVA global).
+- "percepciones": sumá TODAS las percepciones que veas (IIBB, IBCF, IBNQ, o cualquier otra) en un solo número total.
+- "subtotal" es el subtotal neto sin IVA de todo el ticket ("SUBTOT. SIN DESCUENTOS" o similar).
+- "total" es el total final pagado.
+- Todos los números van con punto decimal, sin separador de miles, sin símbolo $.
+- Si no podés leer con certeza algún campo, poné 0 (números) o "" (texto), pero nunca inventes datos.`;
+  const body={
+    contents:[{parts:[{text:prompt},{inline_data:{mime_type:mimeType,data:base64}}]}],
+    generationConfig:{temperature:0, responseMimeType:'application/json'}
+  };
+  const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_KEY}`,{
+    method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)
+  });
+  if(!res.ok) throw new Error('Gemini respondió '+res.status);
+  const data=await res.json();
+  const text=data?.candidates?.[0]?.content?.parts?.[0]?.text;
+  if(!text) throw new Error('Gemini no devolvió contenido (¿ticket poco legible?)');
+  return JSON.parse(text);
+}
+
+async function cotoHandleImg(input){
+  const file=input.files[0]; if(!file) return;
+  document.getElementById('cotoImgName').textContent=file.name;
+  document.getElementById('cotoImgName').style.display='block';
+  document.getElementById('cotoZoneImg').classList.add('loaded');
+  cotoShowMsg('🤖 Leyendo el ticket con IA...','ok');
+  try{
+    const base64=await fileToBase64(file);
+    const parsed=await cotoParseImagenConGemini(base64, file.type||'image/jpeg');
+    const items=(parsed.items||[]).map((it,idx)=>({
+      id:'it'+idx+'_'+Date.now(),
+      desc:(it.desc||'Ítem').toString(),
+      cantidad:Number(it.cantidad)||1,
+      precioUnit:Number(it.precioUnit)||0,
+      importe:Number(it.importe)||0,
+      seleccionado:true
+    }));
+    if(!items.length){ cotoShowMsg('⚠️ No se detectaron ítems. Podés agregarlos a mano abajo.','err'); }
+    cotoPendingTicket={
+      comprobante:parsed.comprobante||'—',
+      fecha:parsed.fecha||'—',
+      proveedorTicket:parsed.proveedor||'COTO',
+      items,
+      subtotal:Number(parsed.subtotal)||0,
+      iva:Number(parsed.iva)||0,
+      percepciones:Number(parsed.percepciones)||0,
+      total:Number(parsed.total)||0
+    };
+    if(items.length) cotoShowMsg('✓ Ticket leído · '+items.length+' ítems detectados · tildá los que correspondan','ok');
+    cotoRenderPending();
+  }catch(e){
+    cotoShowMsg('Error leyendo el ticket: '+e.message+' — podés cargar los ítems a mano.','err');
+    cotoPendingTicket={comprobante:'—',fecha:'—',proveedorTicket:'COTO',items:[],subtotal:0,iva:0,percepciones:0,total:0};
+    cotoRenderPending();
+  }
+}
+
+function cotoAgregarItemManual(){
+  if(!cotoPendingTicket) return;
+  cotoPendingTicket.items.push({id:'it_manual_'+Date.now(),desc:'',cantidad:1,precioUnit:0,importe:0,seleccionado:true});
+  cotoRenderPending();
+}
+function cotoQuitarItem(id){
+  if(!cotoPendingTicket) return;
+  cotoPendingTicket.items=cotoPendingTicket.items.filter(i=>i.id!==id);
+  cotoRenderPending();
+}
+function cotoToggleItem(id, el){
+  if(!cotoPendingTicket) return;
+  const it=cotoPendingTicket.items.find(i=>i.id===id);
+  if(!it) return;
+  it.seleccionado=!it.seleccionado;
+  if(el){ const tr=el.closest('tr'); if(tr) tr.style.opacity=it.seleccionado?1:.45; }
+  cotoRecalcSummary();
+}
+function cotoEditItem(id, campo, valor){
+  if(!cotoPendingTicket) return;
+  const it=cotoPendingTicket.items.find(i=>i.id===id);
+  if(!it) return;
+  if(campo==='desc'){ it.desc=valor; return; } // no afecta el cálculo, no hace falta recalcular
+  it.importe=Number(valor)||0;
+  cotoRecalcSummary();
+}
+function cotoRecalcSummary(){
+  const t=cotoPendingTicket; if(!t) return;
+  const factor=t.subtotal>0 ? (t.total/t.subtotal) : 1;
+  const seleccionados=t.items.filter(i=>i.seleccionado);
+  const sumaSel=seleccionados.reduce((s,i)=>s+(Number(i.importe)||0),0);
+  const totalConImp=Math.round(sumaSel*factor*100)/100;
+  const left=document.querySelector('#cotoSummaryBar .coto-sum-left');
+  const right=document.querySelector('#cotoSummaryBar .coto-sum-right');
+  if(left) left.textContent=seleccionados.length+'/'+t.items.length+' ítems tildados · impuestos prorrateados (factor '+factor.toFixed(3)+')';
+  if(right) right.textContent=fmt(totalConImp);
+}
+
+function cotoRenderPending(){
+  const t=cotoPendingTicket;
+  const wrap=document.getElementById('cotoPendingWrap');
+  if(!wrap) return;
+  if(!t){ wrap.style.display='none'; wrap.innerHTML=''; return; }
+  wrap.style.display='block';
+  const factor = t.subtotal>0 ? (t.total/t.subtotal) : 1;
+  const seleccionados=t.items.filter(i=>i.seleccionado);
+  const sumaSel=seleccionados.reduce((s,i)=>s+(Number(i.importe)||0),0);
+  const totalConImp=Math.round(sumaSel*factor*100)/100;
+  const filas=t.items.map(it=>`
+    <tr style="opacity:${it.seleccionado?1:.45}">
+      <td style="text-align:center">
+        <input type="checkbox" ${it.seleccionado?'checked':''} onchange="cotoToggleItem('${it.id}', this)" style="width:16px;height:16px;cursor:pointer">
+      </td>
+      <td><input type="text" value="${it.desc.replace(/"/g,'&quot;')}" oninput="cotoEditItem('${it.id}','desc',this.value)" style="width:100%;background:transparent;border:none;border-bottom:1px dashed var(--border2);color:var(--text);font-size:12px;padding:2px"></td>
+      <td class="nr">${it.cantidad}</td>
+      <td class="nr"><input type="number" step="0.01" value="${it.importe}" oninput="cotoEditItem('${it.id}','importe',this.value)" style="width:90px;background:transparent;border:none;border-bottom:1px dashed var(--border2);color:var(--text);font-size:12px;text-align:right;padding:2px"></td>
+      <td style="text-align:center"><button onclick="cotoQuitarItem('${it.id}')" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:12px">✕</button></td>
+    </tr>`).join('');
+  wrap.innerHTML=`
+    <div style="font-size:11px;color:var(--text-muted);margin:10px 0 6px">
+      Ticket <b style="color:var(--text)">${t.comprobante}</b> · ${t.fecha} · ${t.proveedorTicket}
+      &nbsp;·&nbsp; Total ticket completo: <b>${fmt(t.total)}</b>
+    </div>
+    <table class="fac-tbl">
+      <thead><tr><th></th><th>Ítem</th><th style="text-align:right">Cant.</th><th style="text-align:right">Importe (sin imp.)</th><th></th></tr></thead>
+      <tbody>${filas}</tbody>
+    </table>
+    <button onclick="cotoAgregarItemManual()" style="margin-top:8px;background:none;border:1px dashed var(--border2);color:var(--text-muted);border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px">+ Agregar ítem manual</button>
+    <div id="cotoSummaryBar" style="margin-top:12px;background:var(--navy-900);border:1px solid rgba(29,191,142,.25);border-radius:9px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center">
+      <div class="coto-sum-left" style="font-size:11px;color:var(--text-muted)">${seleccionados.length}/${t.items.length} ítems tildados · impuestos prorrateados (factor ${factor.toFixed(3)})</div>
+      <div class="coto-sum-right" style="font-family:'JetBrains Mono',monospace;font-weight:800;color:var(--teal);font-size:16px">${fmt(totalConImp)}</div>
+    </div>
+    <button class="btn-confirm" onclick="cotoGuardar()" style="margin-top:12px">✓ Confirmar y guardar REAL</button>
+  `;
+}
+
+async function cotoGuardar(){
+  if(isReadonlyBlocked()) return;
+  const t=cotoPendingTicket; if(!t) return;
+  const seleccionados=t.items.filter(i=>i.seleccionado);
+  if(!seleccionados.length){ cotoShowMsg('Tildá al menos un ítem para guardar.','err'); return; }
+  const facsExist=cotoFacturas[cotoMesActual]||[];
+  if(facsExist.find(f=>f.numero===t.comprobante && t.comprobante!=='—')){
+    cotoShowMsg('⚠️ Ya cargaste el ticket '+t.comprobante+' este mes.','err');
+    return;
+  }
+  const factor=t.subtotal>0 ? (t.total/t.subtotal) : 1;
+  const tasaIva = t.subtotal>0 ? (t.iva/t.subtotal) : 0.21;
+  const tasaPerc = t.subtotal>0 ? (t.percepciones/t.subtotal) : 0;
+  const subtotalSel=seleccionados.reduce((s,i)=>s+(Number(i.importe)||0),0);
+  const ivaSel=Math.round(subtotalSel*tasaIva*100)/100;
+  const otrosSel=Math.round(subtotalSel*tasaPerc*100)/100;
+  const totalSel=Math.round(subtotalSel*factor*100)/100;
+
+  // mes de gasto = mes de la fecha del ticket
+  let mesTicket=cotoMesActual;
+  const fm=(t.fecha||'').match(/^\d{2}\/(\d{2})\/\d{4}$/);
+  if(fm && CA_MES_MAP[fm[1]]) mesTicket=CA_MES_MAP[fm[1]];
+  if(mesTicket!==cotoMesActual){
+    cotoMesActual=mesTicket;
+    document.getElementById('cotoSub').textContent=MESES_LABEL[mesTicket]+' 2026 · Insumos (tickets de supermercado) · (mes detectado de la fecha del ticket)';
+  }
+
+  const ticket={
+    numero:t.comprobante, fecha:t.fecha,
+    subtotal:subtotalSel, iva:ivaSel, otrosImp:otrosSel, total:totalSel,
+    cantidadItems:seleccionados.length, cantidadTotalTicket:t.items.length,
+    totalTicketCompleto:t.total,
+    items:t.items
+  };
+  if(!cotoFacturas[cotoMesActual]) cotoFacturas[cotoMesActual]=[];
+  cotoFacturas[cotoMesActual].push(ticket);
+  reales['coto_'+cotoMesActual]=(cotoFacturas[cotoMesActual]||[]).reduce((s,f)=>s+f.total,0);
+
+  if(!currentUser){
+    cotoShowMsg('⚠️ No hay sesión activa: se guardó solo en este navegador, NO en la base.','err');
+  } else {
+    const ok=await cotoSaveDB(ticket);
+    if(!ok){ cotoShowMsg('⛔ Error al guardar en la base de datos. Revisá la consola (F12).','err'); return; }
+  }
+  showToast('✅ COTO '+ticket.numero+' guardado · '+fmt(ticket.total));
+  cotoResetForm();
+  cotoRenderKPIs();
+  cotoRenderFacturas();
+  render();
+}
+
+async function cotoSaveDB(ticket){
+  const row={
+    user_id:currentUser.id, mes:cotoMesActual, proveedor:'coto',
+    numero:ticket.numero, fecha:ticket.fecha, vto:ticket.fecha,
+    descripcion:ticket.cantidadItems+'/'+ticket.cantidadTotalTicket+' ítems tildados · ticket completo '+ticket.totalTicketCompleto,
+    tc:1,
+    subtotal_usd:ticket.subtotal, iva_usd:ticket.iva, otros_imp:ticket.otrosImp,
+    total_usd:ticket.total,
+    terminales:ticket.cantidadItems,
+    series:ticket.items||[]
+  };
+  const {error}=await sb.from('presupuesto_facturas').upsert(row,{onConflict:'numero,mes'});
+  if(error){ console.error('COTO DB error:',error); return false; }
+  return true;
+}
+
+async function cotoEliminarFactura(numero){
+  if(isReadonlyBlocked()) return;
+  const m=cotoMesActual;
+  const facs=cotoFacturas[m]||[];
+  const f=facs.find(x=>x.numero===numero);
+  if(!f) return;
+  if(!confirm('¿Eliminar el ticket '+numero+' ('+fmt(f.total)+') de '+MESES_LABEL[m]+'? Esta acción no se puede deshacer.')) return;
+  if(currentUser){
+    const {error}=await sb.from('presupuesto_facturas').delete().eq('numero',numero).eq('mes',m).eq('proveedor','coto');
+    if(error){ showToast('⛔ Error al eliminar en la base de datos. Revisá la consola (F12).'); console.error('COTO delete error:',error); return; }
+  }
+  cotoFacturas[m]=facs.filter(x=>x.numero!==numero);
+  const real=(cotoFacturas[m]||[]).reduce((s,x)=>s+x.total,0);
+  if(real>0) reales['coto_'+m]=real; else delete reales['coto_'+m];
+  showToast('🗑️ Ticket '+numero+' eliminado');
+  cotoRenderKPIs();
+  cotoRenderFacturas();
+  render();
+}
+
+function cotoShowMsg(txt,type){ const e=document.getElementById('cotoMsgImg');if(e){e.className='up-msg '+type;e.textContent=txt;} }
 // ── Fin Cabify + CALOG ────────────────────────────────────────────────────────
 
 // ── Telecom Personal state ───────────────────────────────────────────────────
@@ -2724,6 +3072,7 @@ function telecomCheckBtn(){
 }
 
 async function telecomGuardar(){
+  if(isReadonlyBlocked()) return;
   if(!telecomPendingXLS) return;
   const m=telecomPendingPDF?.mesFac||telecomMesActual;
   telecomData[m]={
@@ -2950,6 +3299,7 @@ function amazonUpdateRealPreview(){
 }
 
 async function amazonGuardar(){
+  if(isReadonlyBlocked()) return;
   const fac=amazonPendingFac;if(!fac)return;
   const m=amazonMesActual;
   const real=fac.totalUSD*amazonCurrentTC;
@@ -2990,6 +3340,13 @@ const { createClient } = supabase;
 const sb = createClient(SB_URL, SB_KEY);
 let currentUser = null;
 const READONLY = new URLSearchParams(location.search).get('readonly') === '1';
+// Guard de defensa en profundidad: además de ocultar botones por CSS,
+// las funciones que escriben/borran datos cortan acá si el link es de
+// solo lectura (por si alguien intenta ejecutarlas desde la consola).
+function isReadonlyBlocked(){
+  if(READONLY){ showToast('👁 Vista de solo lectura — no se pueden guardar cambios'); return true; }
+  return false;
+}
 
 async function doLogin() {
   const email = document.getElementById('loginEmail').value.trim();
@@ -3193,6 +3550,28 @@ async function loadFacturasFromDB() {
       }
     });
     epsaSyncReal();
+  }
+  // Cargar tickets COTO (guardados en presupuesto_facturas con proveedor='coto')
+  const { data: cotoData, error: cotoErr } = await sb.from('presupuesto_facturas')
+    .select('*').eq('proveedor','coto');
+  if(!cotoErr && cotoData && cotoData.length){
+    cotoData.forEach(row=>{
+      const m=row.mes;
+      if(!cotoFacturas[m]) cotoFacturas[m]=[];
+      if(!cotoFacturas[m].find(f=>f.numero===row.numero)){
+        const items=row.series||[];
+        cotoFacturas[m].push({
+          numero:row.numero, fecha:row.fecha,
+          subtotal:row.subtotal_usd, iva:row.iva_usd, otrosImp:row.otros_imp,
+          total:row.total_usd,
+          cantidadItems:row.terminales||items.filter(i=>i.seleccionado).length,
+          cantidadTotalTicket:items.length,
+          totalTicketCompleto:(()=>{ const m2=(row.descripcion||'').match(/ticket completo ([\d.]+)/); return m2?Number(m2[1]):row.total_usd; })(),
+          items
+        });
+      }
+    });
+    cotoSyncReal();
   }
   render();
   postResumenAlPortal();
@@ -3497,6 +3876,41 @@ logiAgregar = async function() {
 
     <div class="logi-footer">
       <button class="btn-cancel" onclick="closeEpsaModal()">Cerrar</button>
+    </div>
+  </div>
+</div>
+<!-- Modal COTO (Insumos) -->
+<div class="claro-bg" id="cotoBg">
+  <div class="claro-modal">
+    <h3>COTO CICSA (Insumos)</h3>
+    <p class="msub" id="cotoSub" style="font-size:12px;color:var(--text-muted);margin-bottom:22px"></p>
+
+    <div class="claro-kpis" id="cotoKpis" style="grid-template-columns:repeat(4,1fr)"></div>
+
+    <div style="font-size:11px;color:var(--text-muted);background:var(--navy-900);border:1px solid var(--border2);border-radius:9px;padding:10px 14px;margin-bottom:16px">
+      💡 Subí la foto del ticket — una IA lo lee y te arma la lista de ítems. Tildá los que correspondan a Alleata (podés destildar los que no, editar importes o agregar ítems a mano) y el sistema calcula el gasto real prorrateando el IVA y las percepciones del ticket solo sobre lo tildado.
+    </div>
+
+    <div class="up-title">📷 Foto del ticket</div>
+    <div class="up-zone" id="cotoZoneImg"
+      ondragover="event.preventDefault();this.classList.add('drag')"
+      ondragleave="this.classList.remove('drag')"
+      ondrop="this.classList.remove('drag');cotoHandleImg({files:event.dataTransfer.files});event.preventDefault()">
+      <input type="file" id="cotoImgInp" accept="image/*" onchange="cotoHandleImg(this)">
+      <div class="uz-icon">🧾</div>
+      <div class="uz-lbl">Soltá o seleccioná la foto del ticket</div>
+      <div class="uz-sub">JPG / PNG — se lee automáticamente con IA</div>
+      <div class="uz-fn" id="cotoImgName"></div>
+    </div>
+    <div class="up-msg" id="cotoMsgImg"></div>
+
+    <div id="cotoPendingWrap" style="display:none"></div>
+
+    <div class="sec-lbl" id="cotoFacSecLbl" style="display:none">Tickets cargados este mes <span></span> <span id="cotoFacBadge" style="background:rgba(29,191,142,.15);color:var(--teal);padding:1px 10px;border-radius:20px;font-size:10px;font-weight:700"></span></div>
+    <div id="cotoFacWrap"></div>
+
+    <div class="logi-footer">
+      <button class="btn-cancel" onclick="closeCotoModal()">Cerrar</button>
     </div>
   </div>
 </div>
