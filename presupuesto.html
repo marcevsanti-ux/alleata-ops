@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Alleata · Presupuesto Operaciones v1.9.7</title>
+<title>Alleata · Presupuesto Operaciones v1.9.8</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -197,7 +197,7 @@
   <div class="login-box">
     <h2>💰 Presupuesto</h2>
     <p class="login-sub">Alleata · Acceso restringido</p>
-    <div style="position:absolute;bottom:12px;right:16px;font-size:10px;font-family:'JetBrains Mono',monospace;color:rgba(232,237,243,.2)">v1.9.7</div>
+    <div style="position:absolute;bottom:12px;right:16px;font-size:10px;font-family:'JetBrains Mono',monospace;color:rgba(232,237,243,.2)">v1.9.8</div>
     <div class="login-field">
       <label>Email</label>
       <input type="email" id="loginEmail" placeholder="tu@email.com" onkeydown="if(event.key==='Enter')doLogin()">
@@ -213,7 +213,7 @@
 
 <div id="appContent" style="display:none">
 <h1>💰 Presupuesto Operaciones</h1>
-<p class="sub">Alleata · 2026 <span style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 8px;border-radius:4px;border:1px solid var(--border2);font-size:10px;margin-left:6px">v1.9.7</span></p>
+<p class="sub">Alleata · 2026 <span style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 8px;border-radius:4px;border:1px solid var(--border2);font-size:10px;margin-left:6px">v1.9.8</span></p>
 
 <div class="toolbar">
   <div class="mes-bar" id="mesBar"></div>
@@ -1226,12 +1226,12 @@ let cabifyMesActual = 'jun';
 let cabifyPendingFac = null;
 
 // ── EPSA (Envío Postal S.A) ──────────────────────────────────────────────────
-// Factura Napse/EPSA: la fecha de EMISIÓN suele ser del mes siguiente
-// (ej: factura emitida 13/07 por servicios de JUNIO), por eso NO usamos la
-// fecha de la factura para imputar el mes de gasto — usamos el campo
-// "PERIODO: <MES> <AÑO>" impreso en la propia factura, que es el mes real
-// del servicio prestado. La planilla de detalle (Excel, hoja "Detalle")
-// se usa para desglosar por tipo de servicio vía la columna "Servicio".
+// El mes de gasto se imputa por la FECHA DE EMISIÓN de la factura (decisión
+// confirmada por el usuario). La factura también trae un campo "PERIODO:
+// <MES> <AÑO>" que indica el mes del servicio prestado — se guarda solo
+// como dato informativo en la ficha, no determina el mes de la fila.
+// La planilla de detalle (Excel, hoja "Detalle") se usa para desglosar por
+// tipo de servicio vía la columna "Servicio".
 const epsaFacturas = {};
 let epsaMesActual = 'jun';
 let epsaPendingFac = null;
@@ -1241,10 +1241,6 @@ const EPSA_SERVICIO_MAP = {
   'ENTREGA Y RETIRO':        {concepto:'Cambios',                          corto:'Cambios'},
   'RENDICIONES':             {concepto:'Entregas de equipos (Barracas)',   corto:'Entregas Barracas'},
   'RECOLECCION A FACTURAR':  {concepto:'Colectas de envíos (Barracas)',    corto:'Colectas Barracas'},
-};
-const EPSA_MES_NOMBRE_MAP = {
-  'ENERO':'ene','FEBRERO':'feb','MARZO':'mar','ABRIL':'abr','MAYO':'may','JUNIO':'jun',
-  'JULIO':'jul','AGOSTO':'ago','SEPTIEMBRE':'sep','OCTUBRE':'oct','NOVIEMBRE':'nov','DICIEMBRE':'dic'
 };
 
 let logiCurrentTC     = 1428;
@@ -2395,11 +2391,12 @@ async function epsaHandlePDF(input){
     const fac=epsaParsePDF(text);
     if(!fac){ epsaShowMsg('No se pudo leer la factura de EPSA. Verificá el PDF.','err'); return; }
 
-    // El mes de gasto se toma del campo PERIODO impreso en la factura,
-    // NO de la fecha de emisión (que suele ser del mes siguiente).
+    // El mes de gasto se toma de la FECHA DE EMISIÓN de la factura
+    // (decisión confirmada por el usuario — antes se probó con el campo
+    // PERIODO, pero se prefirió imputar por fecha de emisión).
     if(fac.mesFac && fac.mesFac!==epsaMesActual){
       epsaMesActual=fac.mesFac;
-      document.getElementById('epsaSub').textContent=MESES_LABEL[fac.mesFac]+' 2026 · Servicios de mensajería (EPSA) · (mes detectado del período de la factura)';
+      document.getElementById('epsaSub').textContent=MESES_LABEL[fac.mesFac]+' 2026 · Servicios de mensajería (EPSA) · (mes detectado de la fecha de emisión)';
     }
 
     const facs=epsaFacturas[epsaMesActual]||[];
@@ -2421,7 +2418,7 @@ async function epsaHandlePDF(input){
       ['CAE', fac.cae],
     ]);
 
-    epsaShowMsg('✓ '+fac.numero+' leída · Período '+ (fac.periodoTexto||'?') +' · Total: '+fmt(fac.totalFactura),'ok');
+    epsaShowMsg('✓ '+fac.numero+' leída · Emitida '+fac.fecha+' (servicio '+(fac.periodoTexto||'?')+') · Total: '+fmt(fac.totalFactura),'ok');
     epsaRenderKPIs();
     document.getElementById('epsaBtnConfirm').style.display='block';
     // Si ya se había leído la planilla antes que el PDF, se adjunta acá
@@ -2445,10 +2442,15 @@ function epsaParsePDF(text){
     const vtoM=text.match(/Venc\.:\s*(\d{2}\/\d{2}\/\d{4})/i);
     const vto=vtoM?vtoM[1]:'—';
 
-    // Período facturado — es el mes real de gasto (puede diferir del mes de emisión)
+    // Mes de gasto = mes de la fecha de EMISIÓN de la factura
+    const mesEmisionM=fecha.match(/^\d{2}\/(\d{2})\/\d{4}$/);
+    const mesFac=mesEmisionM?CA_MES_MAP[mesEmisionM[1]]:null;
+
+    // Período facturado (informativo — el mes del servicio prestado, que
+    // puede diferir del mes de emisión; se muestra en la ficha pero ya
+    // NO se usa para imputar el gasto)
     const perM=text.match(/PERIODO:?\s*([A-ZÁÉÍÓÚÑ]+)\s+(\d{4})/i);
     const periodoTexto=perM?(perM[1].toUpperCase()+' '+perM[2]):null;
-    const mesFac=perM?EPSA_MES_NOMBRE_MAP[perM[1].toUpperCase()]:null;
 
     // Bloque Subtotal → IVA → CAE → Venc.CAE → Percepción → Total, en ese orden
     // dentro del texto (son valores sin etiqueta visible, la plantilla EPSA
@@ -3421,7 +3423,7 @@ logiAgregar = async function() {
     <div class="claro-kpis" id="epsaKpis" style="grid-template-columns:repeat(4,1fr)"></div>
 
     <div style="font-size:11px;color:var(--text-muted);background:var(--navy-900);border:1px solid var(--border2);border-radius:9px;padding:10px 14px;margin-bottom:16px">
-      💡 La factura EPSA se emite el mes siguiente al servicio (ej: se emite en julio por junio) — el sistema imputa el gasto al mes que dice <b>"PERIODO:"</b> en la factura, no a la fecha de emisión. Subí la factura (PDF) y la planilla de detalle (Excel) del mismo período: la planilla se agrupa por la columna <b>Servicio</b> → PACK=Instalaciones, ENTREGA Y RETIRO=Cambios, RENDICIONES=Entregas en Barracas, RECOLECCION A FACTURAR=Colectas en Barracas.
+      💡 El gasto se imputa al mes de la <b>fecha de emisión</b> de la factura (ej: factura emitida el 13/07 → se carga en julio, aunque el campo "PERIODO" diga que el servicio fue en junio — ese dato queda solo como referencia en la ficha). Subí la factura (PDF) y la planilla de detalle (Excel): la planilla se agrupa por la columna <b>Servicio</b> → PACK=Instalaciones, ENTREGA Y RETIRO=Cambios, RENDICIONES=Entregas en Barracas, RECOLECCION A FACTURAR=Colectas en Barracas.
     </div>
 
     <div class="up-grid">
