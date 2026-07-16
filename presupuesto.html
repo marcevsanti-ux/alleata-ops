@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Alleata · Presupuesto Operaciones v1.9.8</title>
+<title>Alleata · Presupuesto Operaciones v1.9.9</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -197,7 +197,7 @@
   <div class="login-box">
     <h2>💰 Presupuesto</h2>
     <p class="login-sub">Alleata · Acceso restringido</p>
-    <div style="position:absolute;bottom:12px;right:16px;font-size:10px;font-family:'JetBrains Mono',monospace;color:rgba(232,237,243,.2)">v1.9.8</div>
+    <div style="position:absolute;bottom:12px;right:16px;font-size:10px;font-family:'JetBrains Mono',monospace;color:rgba(232,237,243,.2)">v1.9.9</div>
     <div class="login-field">
       <label>Email</label>
       <input type="email" id="loginEmail" placeholder="tu@email.com" onkeydown="if(event.key==='Enter')doLogin()">
@@ -213,7 +213,7 @@
 
 <div id="appContent" style="display:none">
 <h1>💰 Presupuesto Operaciones</h1>
-<p class="sub">Alleata · 2026 <span style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 8px;border-radius:4px;border:1px solid var(--border2);font-size:10px;margin-left:6px">v1.9.8</span></p>
+<p class="sub">Alleata · 2026 <span style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 8px;border-radius:4px;border:1px solid var(--border2);font-size:10px;margin-left:6px">v1.9.9</span></p>
 
 <div class="toolbar">
   <div class="mes-bar" id="mesBar"></div>
@@ -2279,9 +2279,12 @@ function epsaRenderFacturas(){
           <span style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700">${f.numero}</span>
           <span style="font-size:11px;color:var(--text-muted);margin-left:8px">Emitida ${f.fecha} · Período facturado: ${f.periodoTexto||MESES_LABEL[m]+' 2026'}</span>
         </div>
-        <div style="text-align:right">
-          <div style="font-size:9px;color:var(--text-muted)">Subtotal ${fmt(f.subtotal)} · IVA ${fmt(f.iva)} · Perc. ${fmt(f.otrosImp)}</div>
-          <div style="font-family:'JetBrains Mono',monospace;font-weight:800;color:var(--teal)">${fmt(f.totalFactura)}</div>
+        <div style="text-align:right;display:flex;align-items:center;gap:10px">
+          <div>
+            <div style="font-size:9px;color:var(--text-muted)">Subtotal ${fmt(f.subtotal)} · IVA ${fmt(f.iva)} · Perc. ${fmt(f.otrosImp)}</div>
+            <div style="font-family:'JetBrains Mono',monospace;font-weight:800;color:var(--teal)">${fmt(f.totalFactura)}</div>
+          </div>
+          <button onclick="epsaEliminarFactura('${f.numero}')" title="Eliminar factura" style="background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.25);color:#f87171;border-radius:6px;padding:5px 9px;cursor:pointer;font-size:12px">🗑️</button>
         </div>
       </div>
       ${desgloseRows}
@@ -2476,6 +2479,25 @@ function epsaParsePDF(text){
     if(!totalFactura) return null;
     return {numero, fecha, vto, mesFac, periodoTexto, subtotal, ivaPct, iva, otrosImp, totalFactura, cae, vencCae};
   }catch(e){ return null; }
+}
+
+async function epsaEliminarFactura(numero){
+  const m=epsaMesActual;
+  const facs=epsaFacturas[m]||[];
+  const fac=facs.find(f=>f.numero===numero);
+  if(!fac) return;
+  if(!confirm('¿Eliminar la factura '+numero+' ('+fmt(fac.totalFactura)+') de '+MESES_LABEL[m]+'? Esta acción no se puede deshacer.')) return;
+  if(currentUser){
+    const {error}=await sb.from('presupuesto_facturas').delete().eq('numero',numero).eq('mes',m).eq('proveedor','epsa');
+    if(error){ showToast('⛔ Error al eliminar en la base de datos. Revisá la consola (F12).'); console.error('EPSA delete error:',error); return; }
+  }
+  epsaFacturas[m]=facs.filter(f=>f.numero!==numero);
+  const real=(epsaFacturas[m]||[]).reduce((s,f)=>s+f.totalFactura,0);
+  if(real>0) reales['epsa_'+m]=real; else delete reales['epsa_'+m];
+  showToast('🗑️ Factura '+numero+' eliminada');
+  epsaRenderKPIs();
+  epsaRenderFacturas();
+  render();
 }
 
 async function epsaGuardar(){
