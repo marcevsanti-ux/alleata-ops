@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Alleata · Presupuesto Operaciones v1.9.5</title>
+<title>Alleata · Presupuesto Operaciones v1.9.6</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -197,7 +197,7 @@
   <div class="login-box">
     <h2>💰 Presupuesto</h2>
     <p class="login-sub">Alleata · Acceso restringido</p>
-    <div style="position:absolute;bottom:12px;right:16px;font-size:10px;font-family:'JetBrains Mono',monospace;color:rgba(232,237,243,.2)">v1.9.5</div>
+    <div style="position:absolute;bottom:12px;right:16px;font-size:10px;font-family:'JetBrains Mono',monospace;color:rgba(232,237,243,.2)">v1.9.6</div>
     <div class="login-field">
       <label>Email</label>
       <input type="email" id="loginEmail" placeholder="tu@email.com" onkeydown="if(event.key==='Enter')doLogin()">
@@ -213,7 +213,7 @@
 
 <div id="appContent" style="display:none">
 <h1>💰 Presupuesto Operaciones</h1>
-<p class="sub">Alleata · 2026 <span style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 8px;border-radius:4px;border:1px solid var(--border2);font-size:10px;margin-left:6px">v1.9.5</span></p>
+<p class="sub">Alleata · 2026 <span style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 8px;border-radius:4px;border:1px solid var(--border2);font-size:10px;margin-left:6px">v1.9.6</span></p>
 
 <div class="toolbar">
   <div class="mes-bar" id="mesBar"></div>
@@ -548,11 +548,13 @@ function renderTabla(items) {
       const isAmazon=it.id==='amazon';
       const isCA=it.id==='ca';
       const isCabify=it.id==='cabify';
+      const isEpsa=it.id==='epsa';
       // Nro facturas para columna
       const logiFacs = isLogi ? logiGetFacturas(mes) : [];
       const napseFacsRow = isNapse ? (napseFacturas[mes]||[]) : [];
       const caFacsRow = isCA ? (caFacturas[mes]||[]) : [];
       const cabifyFacsRow = isCabify ? (cabifyFacturas[mes]||[]) : [];
+      const epsaFacsRow = isEpsa ? (epsaFacturas[mes]||[]) : [];
       // Nro factura para cada proveedor con modal
       const getChip = (num, sub) => `
         <div style="display:inline-block;margin:2px;vertical-align:top;text-align:center">
@@ -578,6 +580,12 @@ function renderTabla(items) {
             <span style="font-size:9px;color:var(--text-muted);margin-top:2px;display:block">${f.empresa}</span>
             ${(f.enviosAlleata||f.enviosVarios)?`<span style="font-size:9px;color:var(--teal);font-weight:700;display:block">${f.enviosAlleata||0} Alleata / ${f.enviosVarios||0} varios</span>`:''}
           </div>`).join('');
+      else if(isEpsa && epsaFacsRow.length)
+        nroFacCell = epsaFacsRow.map(f=>`
+          <div style="display:inline-block;margin:2px;vertical-align:top;text-align:center">
+            <span style="font-family:'JetBrains Mono',monospace;font-size:10px;background:rgba(29,191,142,.08);color:var(--teal);padding:1px 6px;border-radius:4px;border:1px solid rgba(29,191,142,.2);display:block">${f.numero}</span>
+            ${f.cantidadTotal?`<span style="font-size:9px;color:var(--text-muted);margin-top:2px;display:block">${f.cantidadTotal} envíos</span>`:''}
+          </div>`).join('');
       else if(isClaro && claroData[mes])
         nroFacCell = getChip(claroData[mes].nroFac||'—', claroData[mes].nroFac&&claroData[mes].nroFac!=='—'?'Claro':'');
       else if(isTelecom && telecomData[mes])
@@ -602,7 +610,7 @@ function renderTabla(items) {
           <td class="mono" style="color:${dc}">${(prev||real)?fmtDesv(desv,prev):'—'}</td>
           <td style="text-align:center">${pctBadge}</td>
           <td style="text-align:center">
-            <button class="btn-edit${(isLogi||isClaro)?' logi':''}" onclick="${isLogi?`openLogiModal('${mes}')`:isClaro?`openClaroModal('${mes}')`:isNapse?`openNapseModal('${mes}')`:isTelecom?`openTelecomModal('${mes}')`:isAmazon?`openAmazonModal('${mes}')`:isCA?`openCaModal('${mes}')`:isCabify?`openCabifyModal('${mes}')`:`openModal('${it.id}','${it.p}','${it.d}')`}">${(isLogi||isClaro||isNapse||isTelecom||isAmazon||isCA||isCabify)?'📎':'✏️'}</button>
+            <button class="btn-edit${(isLogi||isClaro)?' logi':''}" onclick="${isLogi?`openLogiModal('${mes}')`:isClaro?`openClaroModal('${mes}')`:isNapse?`openNapseModal('${mes}')`:isTelecom?`openTelecomModal('${mes}')`:isAmazon?`openAmazonModal('${mes}')`:isCA?`openCaModal('${mes}')`:isCabify?`openCabifyModal('${mes}')`:isEpsa?`openEpsaModal('${mes}')`:`openModal('${it.id}','${it.p}','${it.d}')`}">${(isLogi||isClaro||isNapse||isTelecom||isAmazon||isCA||isCabify||isEpsa)?'📎':'✏️'}</button>
           </td>
         </tr>`;
     });
@@ -1216,6 +1224,29 @@ const CA_MES_MAP = {'01':'ene','02':'feb','03':'mar','04':'abr','05':'may','06':
 const cabifyFacturas = {};
 let cabifyMesActual = 'jun';
 let cabifyPendingFac = null;
+
+// ── EPSA (Envío Postal S.A) ──────────────────────────────────────────────────
+// Factura Napse/EPSA: la fecha de EMISIÓN suele ser del mes siguiente
+// (ej: factura emitida 13/07 por servicios de JUNIO), por eso NO usamos la
+// fecha de la factura para imputar el mes de gasto — usamos el campo
+// "PERIODO: <MES> <AÑO>" impreso en la propia factura, que es el mes real
+// del servicio prestado. La planilla de detalle (Excel, hoja "Detalle")
+// se usa para desglosar por tipo de servicio vía la columna "Servicio".
+const epsaFacturas = {};
+let epsaMesActual = 'jun';
+let epsaPendingFac = null;
+// Mapeo de "Servicio" (columna de la planilla Napse) → concepto operativo
+const EPSA_SERVICIO_MAP = {
+  'PACK':                    {concepto:'Instalaciones',                    corto:'Instalaciones'},
+  'ENTREGA Y RETIRO':        {concepto:'Cambios',                          corto:'Cambios'},
+  'RENDICIONES':             {concepto:'Entregas de equipos (Barracas)',   corto:'Entregas Barracas'},
+  'RECOLECCION A FACTURAR':  {concepto:'Colectas de envíos (Barracas)',    corto:'Colectas Barracas'},
+};
+const EPSA_MES_NOMBRE_MAP = {
+  'ENERO':'ene','FEBRERO':'feb','MARZO':'mar','ABRIL':'abr','MAYO':'may','JUNIO':'jun',
+  'JULIO':'jul','AGOSTO':'ago','SEPTIEMBRE':'sep','OCTUBRE':'oct','NOVIEMBRE':'nov','DICIEMBRE':'dic'
+};
+
 let logiCurrentTC     = 1428;
 // (logiPendingFac declarado arriba)
 // (logiPendingRTO declarado arriba)
@@ -2163,6 +2194,316 @@ async function cabifySaveDB(fac){
 
 function cabifyShowMsg(txt,type){ const e=document.getElementById('cabifyMsgPdf');if(e){e.className='up-msg '+type;e.textContent=txt;} }
 function cabifyShowPreview(rows){ const e=document.getElementById('cabifyPrevPdf');if(e){e.style.display='block';e.innerHTML=rows.map(r=>`<div class="up-prow"><span class="pk">${r[0]}</span><span class="pv">${r[1]}</span></div>`).join('');} }
+
+// ── EPSA (Envío Postal S.A) ────────────────────────────────────────────────
+function openEpsaModal(m){
+  epsaMesActual=m;
+  document.getElementById('epsaBg').classList.add('open');
+  document.getElementById('epsaSub').textContent=MESES_LABEL[m]+' 2026 · Servicios de mensajería (EPSA)';
+  epsaResetForm();
+  epsaRenderKPIs();
+  epsaRenderFacturas();
+}
+function closeEpsaModal(){
+  document.getElementById('epsaBg').classList.remove('open');
+  epsaSyncReal(); render();
+}
+function epsaResetForm(){
+  const el=document.getElementById('epsaPrevPdf'); if(el){el.style.display='none';el.innerHTML='';}
+  const msg=document.getElementById('epsaMsgPdf'); if(msg){msg.className='up-msg';msg.textContent='';}
+  const inp=document.getElementById('epsaPdfInp'); if(inp) inp.value='';
+  document.getElementById('epsaZonePdf')?.classList.remove('loaded');
+  const fn=document.getElementById('epsaPdfName'); if(fn){fn.style.display='none';fn.textContent='';}
+  const btn=document.getElementById('epsaBtnConfirm'); if(btn) btn.style.display='none';
+  epsaPendingFac=null;
+  // Planilla de detalle (.xlsx)
+  const xlsInp=document.getElementById('epsaXlsInp'); if(xlsInp) xlsInp.value='';
+  const xlsFn=document.getElementById('epsaXlsName'); if(xlsFn){xlsFn.style.display='none';xlsFn.textContent='';}
+  const xlsMsg=document.getElementById('epsaMsgXls'); if(xlsMsg){xlsMsg.className='up-msg';xlsMsg.textContent='';}
+  document.getElementById('epsaZoneXls')?.classList.remove('loaded');
+  epsaPendingDesglose=null;
+}
+
+function epsaSyncReal(){
+  MESES.forEach(m=>{
+    const facs=epsaFacturas[m]||[];
+    const real=facs.reduce((s,f)=>s+f.totalFactura,0);
+    if(real>0) reales['epsa_'+m]=real;
+  });
+}
+
+function epsaRenderKPIs(){
+  const m=epsaMesActual;
+  const prev=DATA.find(i=>i.id==='epsa').prev[m]||0;
+  const facs=epsaFacturas[m]||[];
+  const real=facs.reduce((s,f)=>s+f.totalFactura,0);
+  const envios=facs.reduce((s,f)=>s+(f.cantidadTotal||0),0);
+  const desvPct=prev>0?((real-prev)/prev)*100:0;
+  const el=document.getElementById('epsaKpis'); if(!el) return;
+  el.innerHTML=[
+    {label:'PREV '+MESES_LABEL[m].substring(0,3).toUpperCase()+' 26', val:fmt(prev)||'—', sub:'presupuestado', cls:''},
+    {label:'REAL (con IVA)', val:real>0?fmt(real):'—', sub:facs.length+' factura(s)', cls:real>0?'green':''},
+    {label:'DESVÍO', val:real>0?fmtPct(desvPct):'—', sub:desvPct<=0?'por debajo':'por encima', cls:real>0?(Math.abs(desvPct)>20?'warn':'ok'):''},
+    {label:'Envíos del mes', val:envios||'—', sub:envios?'promedio '+fmt(real/envios):'sin planilla cargada', cls:''},
+  ].map(k=>`<div class="lk"><div class="lk-label">${k.label}</div><div class="lk-val ${k.cls}">${k.val}</div><div class="lk-sub">${k.sub}</div></div>`).join('');
+}
+
+function epsaRenderFacturas(){
+  const m=epsaMesActual;
+  const facs=epsaFacturas[m]||[];
+  const wrap=document.getElementById('epsaFacWrap');
+  const sec=document.getElementById('epsaFacSecLbl');
+  const badge=document.getElementById('epsaFacBadge');
+  if(!wrap) return;
+  if(!facs.length){ wrap.innerHTML=''; if(sec) sec.style.display='none'; return; }
+  if(sec) sec.style.display='flex';
+  if(badge) badge.textContent=facs.length+' factura'+(facs.length!==1?'s':'');
+  wrap.innerHTML=facs.map(f=>{
+    const desgloseRows=(f.desglose&&f.desglose.length)?`
+      <table class="fac-tbl" style="margin-top:8px">
+        <thead><tr><th>Servicio</th><th>Concepto</th><th style="text-align:right">Cant.</th><th style="text-align:right">Total</th><th style="text-align:right">Promedio</th></tr></thead>
+        <tbody>${f.desglose.map(d=>`<tr>
+          <td style="font-size:11px">${d.servicio}</td>
+          <td style="font-size:11px;color:var(--text-muted)">${d.concepto}</td>
+          <td class="nr">${d.cantidad}</td>
+          <td class="nr">${fmt(d.total)}</td>
+          <td class="nr" style="color:var(--text-muted)">${fmt(d.promedio)}</td>
+        </tr>`).join('')}
+        <tr><td colspan="2" style="font-weight:700;font-size:11px">Total planilla</td><td class="nr hi">${f.cantidadTotal}</td><td class="nr hi">${fmt(f.totalPlanilla)}</td><td class="nr" style="color:var(--text-muted)">${fmt(f.totalPlanilla/(f.cantidadTotal||1))}</td></tr>
+        </tbody>
+      </table>` : `<div style="font-size:11px;color:var(--text-muted);margin-top:6px">⚠️ Todavía no se cargó la planilla de detalle para esta factura.</div>`;
+    const chequeo = (f.desglose&&f.desglose.length)
+      ? (Math.abs(f.totalPlanilla-f.subtotal)<=1
+          ? `<div style="font-size:10px;color:var(--teal);margin-top:6px">✓ La planilla cuadra con el subtotal de la factura</div>`
+          : `<div style="font-size:10px;color:#f59e0b;margin-top:6px">⚠️ La planilla (${fmt(f.totalPlanilla)}) no coincide exactamente con el subtotal de la factura (${fmt(f.subtotal)}) — diferencia ${fmt(f.totalPlanilla-f.subtotal)}</div>`)
+      : '';
+    return `<div style="background:var(--navy-900);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px">
+        <div>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700">${f.numero}</span>
+          <span style="font-size:11px;color:var(--text-muted);margin-left:8px">Emitida ${f.fecha} · Período facturado: ${f.periodoTexto||MESES_LABEL[m]+' 2026'}</span>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:9px;color:var(--text-muted)">Subtotal ${fmt(f.subtotal)} · IVA ${fmt(f.iva)} · Perc. ${fmt(f.otrosImp)}</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-weight:800;color:var(--teal)">${fmt(f.totalFactura)}</div>
+        </div>
+      </div>
+      ${desgloseRows}
+      ${chequeo}
+    </div>`;
+  }).join('');
+}
+
+let epsaPendingDesglose = null; // desglose leído de la planilla, mientras no haya factura pendiente
+
+// Planilla Napse/EPSA (.xlsx) — hoja "Detalle": agrupa por columna "Servicio"
+// y calcula cantidad / total / promedio por tipo (PACK, ENTREGA Y RETIRO,
+// RENDICIONES, RECOLECCION A FACTURAR).
+async function epsaHandleXLS(input){
+  const file=input.files[0]; if(!file) return;
+  document.getElementById('epsaXlsName').textContent=file.name;
+  document.getElementById('epsaXlsName').style.display='block';
+  const msgEl=document.getElementById('epsaMsgXls');
+  const showXlsMsg=(txt,type)=>{ if(msgEl){msgEl.className='up-msg '+type;msgEl.textContent=txt;} };
+  showXlsMsg('Leyendo planilla...','ok');
+  try{
+    const buf=await file.arrayBuffer();
+    const wb=XLSX.read(buf,{type:'array'});
+    const sheetName=wb.SheetNames.find(n=>/detalle/i.test(n))||wb.SheetNames[wb.SheetNames.length-1];
+    const sheet=wb.Sheets[sheetName];
+    const rows=XLSX.utils.sheet_to_json(sheet,{defval:''});
+    if(!rows.length){ showXlsMsg('La planilla no tiene filas de datos en la hoja "'+sheetName+'".','err'); return; }
+
+    const grupos={};
+    let cantidadTotal=0, totalPlanilla=0;
+    rows.forEach(r=>{
+      const servRaw=(r['Servicio']||'').toString().trim().toUpperCase();
+      if(!servRaw) return;
+      const importe=Number(r['Importe'])||logiParseNum(r['Importe']);
+      if(!grupos[servRaw]) grupos[servRaw]={cantidad:0,total:0};
+      grupos[servRaw].cantidad++;
+      grupos[servRaw].total+=importe;
+      cantidadTotal++; totalPlanilla+=importe;
+    });
+    const desglose=Object.keys(grupos).map(serv=>{
+      const g=grupos[serv];
+      const map=EPSA_SERVICIO_MAP[serv];
+      return {
+        servicio:serv,
+        concepto:map?map.concepto:serv,
+        cantidad:g.cantidad,
+        total:Math.round(g.total*100)/100,
+        promedio:Math.round((g.total/g.cantidad)*100)/100
+      };
+    }).sort((a,b)=>b.total-a.total);
+
+    epsaPendingDesglose={desglose, cantidadTotal, totalPlanilla:Math.round(totalPlanilla*100)/100};
+
+    document.getElementById('epsaZoneXls').classList.add('loaded');
+
+    if(epsaPendingFac){
+      // Hay una factura recién leída sin confirmar: se adjunta el desglose y se guarda junto
+      Object.assign(epsaPendingFac, epsaPendingDesglose);
+      showXlsMsg(`✓ Planilla leída · ${cantidadTotal} envíos · ${desglose.length} tipos de servicio — se guarda junto con la factura`,'ok');
+      epsaRenderFacturas();
+    } else {
+      // No hay factura pendiente: si ya hay una guardada este mes sin desglose, se la completa directo
+      const facs=epsaFacturas[epsaMesActual]||[];
+      const target=facs.find(f=>!f.desglose||!f.desglose.length)||facs[0];
+      if(target){
+        Object.assign(target, epsaPendingDesglose);
+        if(currentUser){
+          const ok=await epsaSaveDB(target);
+          if(!ok){ showXlsMsg('Planilla leída pero hubo un error al guardar. Probá de nuevo.','err'); return; }
+        }
+        epsaRenderFacturas();
+        epsaRenderKPIs();
+        render();
+        showXlsMsg(`✓ ${cantidadTotal} envíos · ${desglose.length} tipos de servicio · actualizado en la factura ${target.numero}`,'ok');
+      } else {
+        showXlsMsg(`✓ Planilla leída · ${cantidadTotal} envíos (${fmt(totalPlanilla)}) — subí también el PDF de la factura para guardarlo`,'ok');
+      }
+    }
+  }catch(e){ showXlsMsg('Error leyendo la planilla: '+e.message,'err'); }
+}
+
+async function epsaHandlePDF(input){
+  const file=input.files[0]; if(!file) return;
+  document.getElementById('epsaPdfName').textContent=file.name;
+  document.getElementById('epsaPdfName').style.display='block';
+  epsaShowMsg('Leyendo PDF...','ok');
+  try{
+    const buf=await file.arrayBuffer();
+    const pdf=await pdfjsLib.getDocument({data:buf}).promise;
+    let text='';
+    for(let i=1;i<=pdf.numPages;i++){
+      const pg=await pdf.getPage(i);
+      const ct=await pg.getTextContent();
+      text+=ct.items.map(it=>it.str).join(' ')+'\n';
+    }
+    const fac=epsaParsePDF(text);
+    if(!fac){ epsaShowMsg('No se pudo leer la factura de EPSA. Verificá el PDF.','err'); return; }
+
+    // El mes de gasto se toma del campo PERIODO impreso en la factura,
+    // NO de la fecha de emisión (que suele ser del mes siguiente).
+    if(fac.mesFac && fac.mesFac!==epsaMesActual){
+      epsaMesActual=fac.mesFac;
+      document.getElementById('epsaSub').textContent=MESES_LABEL[fac.mesFac]+' 2026 · Servicios de mensajería (EPSA) · (mes detectado del período de la factura)';
+    }
+
+    const facs=epsaFacturas[epsaMesActual]||[];
+    if(facs.find(f=>f.numero===fac.numero)){
+      epsaShowMsg('⚠️ Ya cargaste la factura '+fac.numero+' este mes.','err');
+      return;
+    }
+
+    document.getElementById('epsaZonePdf').classList.add('loaded');
+    epsaShowPreview([
+      ['N° Factura', fac.numero],
+      ['Fecha emisión', fac.fecha],
+      ['Período facturado', fac.periodoTexto||'—'],
+      ['Vto. pago', fac.vto],
+      ['Subtotal', fmt(fac.subtotal)],
+      ['IVA (21%)', fmt(fac.iva)],
+      ['Percepción IIBB', fmt(fac.otrosImp)],
+      ['▶ Total factura (REAL)', fmt(fac.totalFactura)],
+      ['CAE', fac.cae],
+    ]);
+
+    epsaShowMsg('✓ '+fac.numero+' leída · Período '+ (fac.periodoTexto||'?') +' · Total: '+fmt(fac.totalFactura),'ok');
+    epsaRenderKPIs();
+    document.getElementById('epsaBtnConfirm').style.display='block';
+    // Si ya se había leído la planilla antes que el PDF, se adjunta acá
+    if(epsaPendingDesglose) Object.assign(fac, epsaPendingDesglose);
+    epsaPendingFac=fac;
+  }catch(e){ epsaShowMsg('Error: '+e.message,'err'); }
+}
+
+function epsaParsePDF(text){
+  try{
+    // N° de factura: formato "A00007-00026426"
+    const numM=text.match(/\b([A-Z]\d{5}-\d{8})\b/);
+    const numero=numM?numM[1]:'—';
+
+    // Fecha de emisión: aparece junto al código de punto de venta, ej "001 13/07/2026"
+    const fechaM=text.match(/\b0\d{2}\s+(\d{2}\/\d{2}\/\d{4})\b/);
+    const todasFechas=[...text.matchAll(/\b(\d{2}\/\d{2}\/\d{4})\b/g)].map(m=>m[1]);
+    const fecha=fechaM?fechaM[1]:(todasFechas[0]||'—');
+
+    // Vto. de pago: "Venc.: 12/08/2026" (con punto — distinto del "VENC:" del CAE)
+    const vtoM=text.match(/Venc\.:\s*(\d{2}\/\d{2}\/\d{4})/i);
+    const vto=vtoM?vtoM[1]:'—';
+
+    // Período facturado — es el mes real de gasto (puede diferir del mes de emisión)
+    const perM=text.match(/PERIODO:?\s*([A-ZÁÉÍÓÚÑ]+)\s+(\d{4})/i);
+    const periodoTexto=perM?(perM[1].toUpperCase()+' '+perM[2]):null;
+    const mesFac=perM?EPSA_MES_NOMBRE_MAP[perM[1].toUpperCase()]:null;
+
+    // Bloque Subtotal → IVA → CAE → Venc.CAE → Percepción → Total, en ese orden
+    // dentro del texto (son valores sin etiqueta visible, la plantilla EPSA
+    // los imprime como imágenes fijas y solo el valor queda como texto real).
+    const bloqueM=text.match(/PERIODO:?\s*[A-ZÁÉÍÓÚÑ]+\s+\d{4}\s+([\d.,]+)\s+([\d.]+)%\s+([\d.,]+)\s+CAE:\s*(\d+)\s+VENC:\s*(\d{2}\/\d{2}\/\d{4})\s+([A-Z0-9]+)\s+([\d.,]+)\s+([\d.,]+)/i);
+
+    let subtotal=0, ivaPct=21, iva=0, cae='—', vencCae='—', otrosImp=0, totalFactura=0;
+    if(bloqueM){
+      subtotal=logiParseNum(bloqueM[1]);
+      ivaPct=parseFloat(bloqueM[2])||21;
+      iva=logiParseNum(bloqueM[3]);
+      cae=bloqueM[4];
+      vencCae=bloqueM[5];
+      otrosImp=logiParseNum(bloqueM[7]);
+      totalFactura=logiParseNum(bloqueM[8]);
+    } else {
+      // Fallback: tomar el último número grande del texto como total
+      const nums=[...text.matchAll(/\b([\d]{1,3}(?:[.,]\d{3})*[.,]\d{2})\b/g)].map(m=>logiParseNum(m[1]));
+      if(nums.length){ totalFactura=nums[nums.length-1]; subtotal=totalFactura; }
+      const caeM=text.match(/CAE:\s*(\d+)/i); if(caeM) cae=caeM[1];
+    }
+
+    if(!totalFactura) return null;
+    return {numero, fecha, vto, mesFac, periodoTexto, subtotal, ivaPct, iva, otrosImp, totalFactura, cae, vencCae};
+  }catch(e){ return null; }
+}
+
+async function epsaGuardar(){
+  const fac=epsaPendingFac; if(!fac) return;
+  if(!epsaFacturas[epsaMesActual]) epsaFacturas[epsaMesActual]=[];
+  epsaFacturas[epsaMesActual].push(fac);
+  reales['epsa_'+epsaMesActual]=(epsaFacturas[epsaMesActual]||[]).reduce((s,f)=>s+f.totalFactura,0);
+  if(!currentUser){
+    epsaShowMsg('⚠️ No hay sesión activa: se guardó solo en este navegador, NO en la base.','err');
+  } else {
+    const ok=await epsaSaveDB(fac);
+    if(!ok){
+      epsaShowMsg('⛔ Error al guardar en la base de datos. Revisá la consola (F12).','err');
+      return;
+    }
+  }
+  showToast('✅ EPSA '+fac.numero+' guardada · '+fmt(fac.totalFactura));
+  epsaResetForm();
+  epsaRenderKPIs();
+  epsaRenderFacturas();
+  render();
+}
+
+async function epsaSaveDB(fac){
+  const row={
+    user_id:currentUser.id, mes:epsaMesActual, proveedor:'epsa',
+    numero:fac.numero, fecha:fac.fecha, vto:fac.vto,
+    descripcion:'Período '+(fac.periodoTexto||'—')+' · CAE '+fac.cae,
+    tc:fac.ivaPct||21,
+    subtotal_usd:fac.subtotal, iva_usd:fac.iva, otros_imp:fac.otrosImp,
+    total_usd:fac.totalFactura,
+    terminales:fac.cantidadTotal||0,
+    series:fac.desglose||[]
+  };
+  const {error}=await sb.from('presupuesto_facturas').upsert(row,{onConflict:'numero,mes'});
+  if(error){ console.error('EPSA DB error:',error); return false; }
+  return true;
+}
+
+function epsaShowMsg(txt,type){ const e=document.getElementById('epsaMsgPdf');if(e){e.className='up-msg '+type;e.textContent=txt;} }
+function epsaShowPreview(rows){ const e=document.getElementById('epsaPrevPdf');if(e){e.style.display='block';e.innerHTML=rows.map(r=>`<div class="up-prow"><span class="pk">${r[0]}</span><span class="pv">${r[1]}</span></div>`).join('');} }
 // ── Fin Cabify + CALOG ────────────────────────────────────────────────────────
 
 // ── Telecom Personal state ───────────────────────────────────────────────────
@@ -2787,6 +3128,29 @@ async function loadFacturasFromDB() {
     });
     cabifySyncReal();
   }
+  // Cargar facturas EPSA (guardadas en presupuesto_facturas con proveedor='epsa')
+  const { data: epsaData, error: epsaErr } = await sb.from('presupuesto_facturas')
+    .select('*').eq('proveedor','epsa');
+  if(!epsaErr && epsaData && epsaData.length){
+    epsaData.forEach(row=>{
+      const m=row.mes;
+      if(!epsaFacturas[m]) epsaFacturas[m]=[];
+      if(!epsaFacturas[m].find(f=>f.numero===row.numero)){
+        const descM=(row.descripcion||'').match(/Período\s+(.*?)\s+·\s+CAE\s+(.*)$/);
+        epsaFacturas[m].push({
+          numero:row.numero, fecha:row.fecha, vto:row.vto, mesFac:m,
+          periodoTexto:descM?descM[1]:null, cae:descM?descM[2]:'—',
+          ivaPct:row.tc||21,
+          subtotal:row.subtotal_usd, iva:row.iva_usd, otrosImp:row.otros_imp,
+          totalFactura:row.total_usd,
+          cantidadTotal:row.terminales||0,
+          desglose:row.series||[],
+          totalPlanilla:(row.series||[]).reduce((s,d)=>s+(d.total||0),0)
+        });
+      }
+    });
+    epsaSyncReal();
+  }
   render();
   postResumenAlPortal();
 }
@@ -3034,6 +3398,62 @@ logiAgregar = async function() {
 
     <div class="logi-footer">
       <button class="btn-cancel" onclick="closeCabifyModal()">Cerrar</button>
+    </div>
+  </div>
+</div>
+<!-- Modal EPSA -->
+<div class="claro-bg" id="epsaBg">
+  <div class="claro-modal">
+    <h3>EPSA (Envío Postal S.A)</h3>
+    <p class="msub" id="epsaSub" style="font-size:12px;color:var(--text-muted);margin-bottom:22px"></p>
+
+    <div class="claro-kpis" id="epsaKpis" style="grid-template-columns:repeat(4,1fr)"></div>
+
+    <div style="font-size:11px;color:var(--text-muted);background:var(--navy-900);border:1px solid var(--border2);border-radius:9px;padding:10px 14px;margin-bottom:16px">
+      💡 La factura EPSA se emite el mes siguiente al servicio (ej: se emite en julio por junio) — el sistema imputa el gasto al mes que dice <b>"PERIODO:"</b> en la factura, no a la fecha de emisión. Subí la factura (PDF) y la planilla de detalle (Excel) del mismo período: la planilla se agrupa por la columna <b>Servicio</b> → PACK=Instalaciones, ENTREGA Y RETIRO=Cambios, RENDICIONES=Entregas en Barracas, RECOLECCION A FACTURAR=Colectas en Barracas.
+    </div>
+
+    <div class="up-grid">
+      <div>
+        <div class="up-title">📄 Factura EPSA (PDF)</div>
+        <div class="up-zone" id="epsaZonePdf"
+          ondragover="event.preventDefault();this.classList.add('drag')"
+          ondragleave="this.classList.remove('drag')"
+          ondrop="this.classList.remove('drag');epsaHandlePDF({files:event.dataTransfer.files});event.preventDefault()">
+          <input type="file" id="epsaPdfInp" accept=".pdf" onchange="epsaHandlePDF(this)">
+          <div class="uz-icon">📑</div>
+          <div class="uz-lbl">Soltá o seleccioná el PDF</div>
+          <div class="uz-sub">EPSA_-_FACA0000700026426-JULIO.pdf</div>
+          <div class="uz-fn" id="epsaPdfName"></div>
+        </div>
+        <div class="up-preview" id="epsaPrevPdf"></div>
+        <div class="up-msg" id="epsaMsgPdf"></div>
+      </div>
+      <div>
+        <div class="up-title">📊 Planilla de detalle — hoja "Detalle" (Excel)</div>
+        <div class="up-zone" id="epsaZoneXls"
+          ondragover="event.preventDefault();this.classList.add('drag')"
+          ondragleave="this.classList.remove('drag')"
+          ondrop="this.classList.remove('drag');epsaHandleXLS({files:event.dataTransfer.files});event.preventDefault()">
+          <input type="file" id="epsaXlsInp" accept=".xls,.xlsx" onchange="epsaHandleXLS(this)">
+          <div class="uz-icon">📋</div>
+          <div class="uz-lbl">Soltá o seleccioná el Excel</div>
+          <div class="uz-sub">SOPORTE_DE_FACT_*.xlsx (hoja "Detalle", columna "Servicio")</div>
+          <div class="uz-fn" id="epsaXlsName"></div>
+        </div>
+        <div class="up-msg" id="epsaMsgXls"></div>
+      </div>
+    </div>
+
+    <button class="btn-confirm" id="epsaBtnConfirm" onclick="epsaGuardar()" style="display:none;margin-top:14px">
+      ✓ Confirmar y guardar REAL
+    </button>
+
+    <div class="sec-lbl" id="epsaFacSecLbl" style="display:none">Facturas cargadas este mes <span></span> <span id="epsaFacBadge" style="background:rgba(29,191,142,.15);color:var(--teal);padding:1px 10px;border-radius:20px;font-size:10px;font-weight:700"></span></div>
+    <div id="epsaFacWrap"></div>
+
+    <div class="logi-footer">
+      <button class="btn-cancel" onclick="closeEpsaModal()">Cerrar</button>
     </div>
   </div>
 </div>
