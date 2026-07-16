@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Alleata · Presupuesto Operaciones v1.9.6</title>
+<title>Alleata · Presupuesto Operaciones v1.9.7</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -197,7 +197,7 @@
   <div class="login-box">
     <h2>💰 Presupuesto</h2>
     <p class="login-sub">Alleata · Acceso restringido</p>
-    <div style="position:absolute;bottom:12px;right:16px;font-size:10px;font-family:'JetBrains Mono',monospace;color:rgba(232,237,243,.2)">v1.9.6</div>
+    <div style="position:absolute;bottom:12px;right:16px;font-size:10px;font-family:'JetBrains Mono',monospace;color:rgba(232,237,243,.2)">v1.9.7</div>
     <div class="login-field">
       <label>Email</label>
       <input type="email" id="loginEmail" placeholder="tu@email.com" onkeydown="if(event.key==='Enter')doLogin()">
@@ -213,7 +213,7 @@
 
 <div id="appContent" style="display:none">
 <h1>💰 Presupuesto Operaciones</h1>
-<p class="sub">Alleata · 2026 <span style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 8px;border-radius:4px;border:1px solid var(--border2);font-size:10px;margin-left:6px">v1.9.6</span></p>
+<p class="sub">Alleata · 2026 <span style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 8px;border-radius:4px;border:1px solid var(--border2);font-size:10px;margin-left:6px">v1.9.7</span></p>
 
 <div class="toolbar">
   <div class="mes-bar" id="mesBar"></div>
@@ -2296,6 +2296,16 @@ function epsaRenderFacturas(){
 
 let epsaPendingDesglose = null; // desglose leído de la planilla, mientras no haya factura pendiente
 
+// Los headers de la planilla Napse a veces vienen con espacios extra
+// (ej: " Importe " en lugar de "Importe") — pandas los recorta al leer,
+// pero SheetJS (navegador) no, así que buscamos la columna por nombre
+// normalizado (trim + minúsculas) en vez de por clave exacta.
+function epsaGetField(row, nombre){
+  const target=nombre.trim().toLowerCase();
+  const key=Object.keys(row).find(k=>k.trim().toLowerCase()===target);
+  return key!==undefined ? row[key] : undefined;
+}
+
 // Planilla Napse/EPSA (.xlsx) — hoja "Detalle": agrupa por columna "Servicio"
 // y calcula cantidad / total / promedio por tipo (PACK, ENTREGA Y RETIRO,
 // RENDICIONES, RECOLECCION A FACTURAR).
@@ -2317,9 +2327,10 @@ async function epsaHandleXLS(input){
     const grupos={};
     let cantidadTotal=0, totalPlanilla=0;
     rows.forEach(r=>{
-      const servRaw=(r['Servicio']||'').toString().trim().toUpperCase();
+      const servRaw=(epsaGetField(r,'Servicio')||'').toString().trim().toUpperCase();
       if(!servRaw) return;
-      const importe=Number(r['Importe'])||logiParseNum(r['Importe']);
+      const importeRaw=epsaGetField(r,'Importe');
+      const importe=Number(importeRaw)||logiParseNum(importeRaw);
       if(!grupos[servRaw]) grupos[servRaw]={cantidad:0,total:0};
       grupos[servRaw].cantidad++;
       grupos[servRaw].total+=importe;
