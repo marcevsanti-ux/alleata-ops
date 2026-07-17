@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Alleata · Presupuesto Operaciones v1.12.0</title>
+<title>Alleata · Presupuesto Operaciones v1.13.0</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -17,6 +17,7 @@
   body.readonly-mode .tc-inp { pointer-events:none; opacity:.5; }
   body.readonly-mode .up-zone { pointer-events:none; opacity:.45; }
   body.readonly-mode .btn-del-fac { display:none !important; }
+  body.readonly-mode .btn-adjuntar { display:none !important; }
   .readonly-banner{background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.35);color:#f59e0b;padding:9px 16px;border-radius:8px;font-size:12px;font-weight:700;margin-bottom:18px;text-align:center;letter-spacing:.3px}
   :root {
     --navy-900:#0d1b2a; --navy-800:#112236; --navy-700:#162d45;
@@ -199,7 +200,7 @@
   <div class="login-box">
     <h2>💰 Presupuesto</h2>
     <p class="login-sub">Alleata · Acceso restringido</p>
-    <div style="position:absolute;bottom:12px;right:16px;font-size:10px;font-family:'JetBrains Mono',monospace;color:rgba(232,237,243,.2)">v1.12.0</div>
+    <div style="position:absolute;bottom:12px;right:16px;font-size:10px;font-family:'JetBrains Mono',monospace;color:rgba(232,237,243,.2)">v1.13.0</div>
     <div class="login-field">
       <label>Email</label>
       <input type="email" id="loginEmail" placeholder="tu@email.com" onkeydown="if(event.key==='Enter')doLogin()">
@@ -215,7 +216,7 @@
 
 <div id="appContent" style="display:none">
 <h1>💰 Presupuesto Operaciones</h1>
-<p class="sub">Alleata · 2026 <span style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 8px;border-radius:4px;border:1px solid var(--border2);font-size:10px;margin-left:6px">v1.12.0</span></p>
+<p class="sub">Alleata · 2026 <span style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 8px;border-radius:4px;border:1px solid var(--border2);font-size:10px;margin-left:6px">v1.13.0</span></p>
 
 <div class="toolbar">
   <div class="mes-bar" id="mesBar"></div>
@@ -762,7 +763,7 @@ function logiRenderFacturas() {
         <td class="nr" style="color:var(--text-muted)">${fmtUSD(f.totalUSD)}</td>
         <td style="text-align:center;font-weight:700">${f.terminales||'—'}</td>
         <td style="text-align:center"><span class="tag-ok">${f.series?f.series.length:0}</span></td>
-        <td>${presupRenderAdjuntos(f.adjuntos)}</td>
+        <td>${presupRenderAdjuntosConBoton(f.adjuntos, ['pdf','xls'], 'logiAdjuntarArchivo', f.numero)}</td>
       </tr>`;
     }).join('')}</tbody>
   </table></div>`;
@@ -1173,6 +1174,15 @@ async function logiHandleXLS(input){
   }catch(e){logiShowMsg('msgXls','Error: '+e.message,'err');}
 }
 
+async function logiAdjuntarArchivo(numero, tipo){
+  const fac=(logiFacturas[logiMesActual]||[]).find(f=>f.numero===numero);
+  if(!fac) return;
+  presupAdjuntarArchivo(fac, 'logicalis', logiMesActual, tipo, async ()=>{
+    if(currentUser) await saveFacturaDB(fac, logiMesActual);
+    logiRenderFacturas();
+  });
+}
+
 function logiAgregar(){
   if(!logiPendingFac||!logiPendingRTO) return; // ambos requeridos
   let fac = logiPendingFac ? {...logiPendingFac, tc:logiCurrentTC} : {
@@ -1333,7 +1343,7 @@ function claroRenderKPIs() {
   if(!el)return;
   el.innerHTML=kpis.map(k=>`<div class="lk"><div class="lk-label">${k.label}</div><div class="lk-val ${k.cls}">${k.val}</div><div class="lk-sub">${k.sub}</div></div>`).join('');
   const aw=document.getElementById('claroAdjuntosWrap');
-  if(aw) aw.innerHTML=presupRenderAdjuntos(saved?.adjuntos);
+  if(aw) aw.innerHTML=presupRenderAdjuntosConBoton(saved?.adjuntos, ['pdf','xls'], 'claroAdjuntarArchivo', m);
 }
 
 // Mapeo columna → mes: la planilla tiene bloques de 6 cols por mes
@@ -1508,6 +1518,15 @@ function claroCheckBtn(){
   }
 }
 
+async function claroAdjuntarArchivo(mes, tipo){
+  const d=claroData[mes];
+  if(!d) return;
+  presupAdjuntarArchivo(d, 'claro', mes, tipo, async ()=>{
+    if(currentUser) await claraSaveDB(mes);
+    claroRenderKPIs();
+  });
+}
+
 async function claroGuardar(){
   if(isReadonlyBlocked()) return;
   if(!claroPendingXLS) return;
@@ -1634,7 +1653,7 @@ function napseRenderFacturas(){
       <td class="nr" style="color:var(--text-muted)">${fmtUSD(f.ivaUSD)}</td>
       <td class="nr" style="color:var(--text-muted)">${fmtUSD(f.totalUSD)}</td>
       <td class="nr" style="color:var(--teal);font-weight:800">$ ${Math.round(f.totalUSD*f.tc).toLocaleString('es-AR')}</td>
-      <td>${presupRenderAdjuntos(f.adjuntos)}</td>
+      <td>${presupRenderAdjuntosConBoton(f.adjuntos, ['pdf'], 'napseAdjuntarArchivo', f.numero)}</td>
     </tr>`).join('')}</tbody>
   </table></div>`;
 }
@@ -1709,6 +1728,15 @@ function napseParsePDF(text){
     const totalUSD=totalM?logiParseNum(totalM[1]):brutoUSD+ivaUSD;
     return{numero,fecha,desc,tc,brutoUSD,ivaUSD,totalUSD};
   }catch(e){return null;}
+}
+
+async function napseAdjuntarArchivo(numero, tipo){
+  const fac=(napseFacturas[napseMesActual]||[]).find(f=>f.numero===numero);
+  if(!fac) return;
+  presupAdjuntarArchivo(fac, 'napse', napseMesActual, tipo, async ()=>{
+    if(currentUser) await napseSaveDB(fac);
+    napseRenderFacturas();
+  });
 }
 
 async function napseGuardar(){
@@ -1833,7 +1861,7 @@ function caRenderFacturas(){
       <td class="nr hi">${fmt(f.totalFactura)}</td>
       <td class="nr" style="color:var(--text-muted)">${f.cantidadAlleata}</td>
       <td class="nr" style="color:var(--teal);font-weight:800">${fmt(f.totalAlleata)}</td>
-      <td>${presupRenderAdjuntos(f.adjuntos)}</td>
+      <td>${presupRenderAdjuntosConBoton(f.adjuntos, ['pdf'], 'caAdjuntarArchivo', f.numero)}</td>
     </tr>`).join('')}</tbody>
   </table></div>
   <div style="font-size:10px;color:var(--text-muted);margin-top:8px">
@@ -1939,6 +1967,15 @@ function caCheckBtn(){
   const btn=document.getElementById('caBtnConfirm');
   if(!btn) return;
   btn.style.display=caPendingFac?'block':'none';
+}
+
+async function caAdjuntarArchivo(numero, tipo){
+  const fac=(caFacturas[caMesActual]||[]).find(f=>f.numero===numero);
+  if(!fac) return;
+  presupAdjuntarArchivo(fac, 'ca', caMesActual, tipo, async ()=>{
+    if(currentUser) await caSaveDB(fac);
+    caRenderFacturas();
+  });
 }
 
 async function caGuardar(){
@@ -2060,7 +2097,7 @@ function cabifyRenderFacturas(){
       <td class="nr" style="color:var(--text-muted)">${fmt(f.impuestos)}</td>
       <td class="nr hi" style="color:var(--teal);font-weight:800">${fmt(f.totalFactura)}</td>
       <td class="nr" style="font-size:10px;color:var(--text-muted)">${(f.enviosAlleata||f.enviosVarios)?`${f.enviosAlleata||0} Alleata / ${f.enviosVarios||0} varios`:'—'}</td>
-      <td>${presupRenderAdjuntos(f.adjuntos)}</td>
+      <td>${presupRenderAdjuntosConBoton(f.adjuntos, ['pdf','xls'], 'cabifyAdjuntarArchivo', f.numero)}</td>
     </tr>`).join('')}</tbody>
   </table></div>`;
 }
@@ -2215,6 +2252,15 @@ function cabifyParsePDF(text){
   }catch(e){ return null; }
 }
 
+async function cabifyAdjuntarArchivo(numero, tipo){
+  const fac=(cabifyFacturas[cabifyMesActual]||[]).find(f=>f.numero===numero);
+  if(!fac) return;
+  presupAdjuntarArchivo(fac, 'cabify', cabifyMesActual, tipo, async ()=>{
+    if(currentUser) await cabifySaveDB(fac);
+    cabifyRenderFacturas();
+  });
+}
+
 async function cabifyGuardar(){
   if(isReadonlyBlocked()) return;
   const fac=cabifyPendingFac; if(!fac) return;
@@ -2358,7 +2404,7 @@ function epsaRenderFacturas(){
       </div>
       ${desgloseRows}
       ${chequeo}
-      ${presupRenderAdjuntos(f.adjuntos)}
+      ${presupRenderAdjuntosConBoton(f.adjuntos, ['pdf','xls'], 'epsaAdjuntarArchivo', f.numero)}
     </div>`;
   }).join('');
 }
@@ -2554,6 +2600,15 @@ function epsaParsePDF(text){
   }catch(e){ return null; }
 }
 
+async function epsaAdjuntarArchivo(numero, tipo){
+  const fac=(epsaFacturas[epsaMesActual]||[]).find(f=>f.numero===numero);
+  if(!fac) return;
+  presupAdjuntarArchivo(fac, 'epsa', epsaMesActual, tipo, async ()=>{
+    if(currentUser) await epsaSaveDB(fac);
+    epsaRenderFacturas();
+  });
+}
+
 async function epsaEliminarFactura(numero){
   if(isReadonlyBlocked()) return;
   const m=epsaMesActual;
@@ -2698,7 +2753,7 @@ function cotoRenderFacturas(){
         <thead><tr><th>Ítem</th><th style="text-align:right">Cant.</th><th style="text-align:right">Importe (sin imp.)</th></tr></thead>
         <tbody>${itemsRows}</tbody>
       </table>
-      ${presupRenderAdjuntos(f.adjuntos)}
+      ${presupRenderAdjuntosConBoton(f.adjuntos, ['img'], 'cotoAdjuntarArchivo', f.numero)}
     </div>`;
   }).join('');
 }
@@ -2997,6 +3052,15 @@ async function cotoSaveDB(ticket){
   return true;
 }
 
+async function cotoAdjuntarArchivo(numero, tipo){
+  const t=(cotoFacturas[cotoMesActual]||[]).find(f=>f.numero===numero);
+  if(!t) return;
+  presupAdjuntarArchivo(t, 'coto', cotoMesActual, tipo, async ()=>{
+    if(currentUser) await cotoSaveDB(t);
+    cotoRenderFacturas();
+  });
+}
+
 async function cotoEliminarFactura(numero){
   if(isReadonlyBlocked()) return;
   const m=cotoMesActual;
@@ -3065,7 +3129,7 @@ function telecomRenderKPIs(){
     {label:'DESVÍO',val:real>0?fmtPct(desvPct):'—',sub:desvPct<=0?'por debajo':'por encima',cls:real>0?(Math.abs(desvPct)>20?'warn':'ok'):''},
   ].map(k=>`<div class="lk"><div class="lk-label">${k.label}</div><div class="lk-val ${k.cls}">${k.val}</div><div class="lk-sub">${k.sub}</div></div>`).join('');
   const aw=document.getElementById('telecomAdjuntosWrap');
-  if(aw) aw.innerHTML=presupRenderAdjuntos(saved?.adjuntos);
+  if(aw) aw.innerHTML=presupRenderAdjuntosConBoton(saved?.adjuntos, ['pdf','xls'], 'telecomAdjuntarArchivo', m);
 }
 
 async function telecomHandleXLS(input){
@@ -3196,6 +3260,15 @@ function telecomCheckBtn(){
   } else { btn.style.display='none'; }
 }
 
+async function telecomAdjuntarArchivo(mes, tipo){
+  const d=telecomData[mes];
+  if(!d) return;
+  presupAdjuntarArchivo(d, 'telecom', mes, tipo, async ()=>{
+    if(currentUser) await telecomSaveDB(mes);
+    telecomRenderKPIs();
+  });
+}
+
 async function telecomGuardar(){
   if(isReadonlyBlocked()) return;
   if(!telecomPendingXLS) return;
@@ -3282,7 +3355,7 @@ function amazonRenderKPIs(){
     {label:'DESVÍO',val:real>0?fmtPct(desvPct):'—',sub:desvPct<=0?'por debajo':'por encima',cls:real>0?(Math.abs(desvPct)>20?'warn':'ok'):''},
   ].map(k=>`<div class="lk"><div class="lk-label">${k.label}</div><div class="lk-val ${k.cls}">${k.val}</div><div class="lk-sub">${k.sub}</div></div>`).join('');
   const aw=document.getElementById('amazonAdjuntosWrap');
-  if(aw) aw.innerHTML=presupRenderAdjuntos(saved?.adjuntos);
+  if(aw) aw.innerHTML=presupRenderAdjuntosConBoton(saved?.adjuntos, ['pdf'], 'amazonAdjuntarArchivo', m);
 }
 
 async function amazonHandlePDF(input){
@@ -3431,6 +3504,15 @@ function amazonUpdateRealPreview(){
   if(et) et.textContent=amazonCurrentTC.toLocaleString('es-AR');
 }
 
+async function amazonAdjuntarArchivo(mes, tipo){
+  const d=amazonData[mes];
+  if(!d) return;
+  presupAdjuntarArchivo(d, 'amazon', mes, tipo, async ()=>{
+    if(currentUser) await amazonSaveDB(mes);
+    amazonRenderKPIs();
+  });
+}
+
 async function amazonGuardar(){
   if(isReadonlyBlocked()) return;
   const fac=amazonPendingFac;if(!fac)return;
@@ -3518,6 +3600,45 @@ function presupRenderAdjuntos(adjuntos){
   return `<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">${adjuntos.map(a=>
     `<a href="${a.url}" target="_blank" rel="noopener" style="font-size:10px;color:var(--teal);text-decoration:none;background:rgba(29,191,142,.08);border:1px solid rgba(29,191,142,.2);padding:3px 8px;border-radius:5px">${iconos[a.tipo]||'📎'} ${a.nombre}</a>`
   ).join('')}</div>`;
+}
+
+// Igual que presupRenderAdjuntos, pero además agrega botones "+ adjuntar"
+// para cargar un archivo a una factura YA GUARDADA (sin borrarla y volver a
+// cargarla). `tipos` es la lista de etiquetas que tiene sentido ofrecer para
+// ese proveedor (ej: ['pdf','xls'] o solo ['img']). `fnName` es el nombre de
+// la función (definida por módulo) que abre el selector de archivo y hace el
+// upload+guardado; `key` es lo que esa función necesita para encontrar el
+// registro (normalmente el número de factura, o el mes para los proveedores
+// que guardan un solo registro por mes).
+function presupRenderAdjuntosConBoton(adjuntos, tipos, fnName, key){
+  const iconos={pdf:'📄', xls:'📊', img:'🧾'};
+  const chips=(adjuntos||[]).map(a=>
+    `<a href="${a.url}" target="_blank" rel="noopener" style="font-size:10px;color:var(--teal);text-decoration:none;background:rgba(29,191,142,.08);border:1px solid rgba(29,191,142,.2);padding:3px 8px;border-radius:5px">${iconos[a.tipo]||'📎'} ${a.nombre}</a>`
+  ).join('');
+  const yaTiene=new Set((adjuntos||[]).map(a=>a.tipo));
+  const botones=(tipos||[]).filter(t=>!yaTiene.has(t)).map(t=>
+    `<button onclick="${fnName}('${key}','${t}')" class="btn-adjuntar" style="font-size:10px;color:var(--text-muted);background:none;border:1px dashed var(--border2);padding:3px 8px;border-radius:5px;cursor:pointer">+ ${iconos[t]||'📎'} adjuntar</button>`
+  ).join('');
+  return `<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">${chips}${botones}</div>`;
+}
+
+// Abre el selector de archivo del navegador, sube lo elegido y ejecuta
+// onSaved() (que cada módulo define para persistir + re-renderizar).
+function presupAdjuntarArchivo(targetObj, proveedor, mes, etiqueta, onSaved){
+  if(isReadonlyBlocked()) return;
+  const inp=document.createElement('input');
+  inp.type='file';
+  inp.accept = etiqueta==='xls' ? '.xls,.xlsx' : (etiqueta==='img' ? 'image/*' : '.pdf');
+  inp.onchange=async ()=>{
+    const file=inp.files[0]; if(!file) return;
+    showToast('Subiendo archivo...');
+    const a=await presupSubirAdjunto(file, proveedor, mes, etiqueta);
+    if(!a){ showToast('⛔ Error al subir el archivo'); return; }
+    targetObj.adjuntos=[...(targetObj.adjuntos||[]), a];
+    await onSaved();
+    showToast('✅ Archivo adjuntado');
+  };
+  inp.click();
 }
 
 async function doLogin() {
