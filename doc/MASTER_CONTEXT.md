@@ -99,7 +99,7 @@ No es un demo. Es **producción real** usada por:
 
 ### Credenciales API oficial (producción)
 - **Usuario:** MorettiAPI
-- **Password:** Pelota22+
+- **Password:** [MICORREO_PASSWORD_ROTAR]
 - **Customer ID:** 0001226778
 - **URL:** `https://api.correoargentino.com.ar/micorreo/v1`
 
