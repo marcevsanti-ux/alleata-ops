@@ -165,7 +165,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
       <div class="login-logo">
         <img id="loginLogo" src="" alt="Alleata">
         <div class="login-sub">Portal de Operaciones</div>
-        <div class="login-version">v2.14.9 · mobile</div>
+        <div class="login-version">v2.14.10 · mobile</div>
       </div>
       <div class="field"><label class="label">Email</label><input class="input" id="lEmail" type="email" placeholder="usuario@alleata.com" autocomplete="email"></div>
       <div class="field"><label class="label">Contraseña</label><input class="input" id="lPass" type="password" placeholder="••••••••" autocomplete="current-password"></div>
@@ -181,7 +181,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
   <div class="topbar">
     <img id="appLogo" src="" alt="Alleata">
     <div class="topbar-title" id="topbarTitle">Operaciones</div>
-    <div class="topbar-version">v2.14.9</div>
+    <div class="topbar-version">v2.14.10</div>
     <div class="topbar-avatar" id="topbarAvatar" onclick="openDrawer()">?</div>
   </div>
 
@@ -299,6 +299,15 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
         🔒 Cerrar hoja de ruta y buscar desinstalaciones cercanas
       </button>
       <div id="sugerenciasDesinstWrap" style="margin-top:12px"></div>
+
+      <!-- SOLO DESINSTALACIONES — para cuando no hay nada de entregas hoy -->
+      <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border)">
+        <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px">¿No tenés entregas hoy? Mirá las desinstalaciones disponibles agrupadas por zona.</div>
+        <button id="btnVerPorZona" onclick="verDesinstalacionesPorZona()" style="width:100%;background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:12px;font-size:13px;font-weight:700;border-radius:10px;cursor:pointer;font-family:'Inter',sans-serif">
+          📦 Ver desinstalaciones por zona
+        </button>
+        <div id="desinstPorZonaWrap" style="margin-top:12px"></div>
+      </div>
     </div>
 
   </div>
@@ -690,12 +699,16 @@ function haversine(lat1,lng1,lat2,lng2){
 function getZona(ciudad,provincia){
   const c=(ciudad||'').toLowerCase().trim();
   const p=(provincia||'').toLowerCase().trim();
-  if(p.includes('ciudad autónoma')||p.includes('caba'))return{zona:'CABA',color:'#1a9fd4'};
-  const norte=['san isidro','vicente lópez','vicente lopez','san martín','san martin','tigre','escobar','pilar','san fernando','malvinas argentinas','josé c. paz','jose c. paz','san miguel'];
+  const cabaBarrios=['almagro','balvanera','flores','belgrano','constitución','constitucion','san telmo','barracas','caba'];
+  if(p.includes('ciudad autónoma')||p.includes('caba')||cabaBarrios.some(b=>c.includes(b)))return{zona:'CABA',color:'#1a9fd4'};
+  const norte=['san isidro','vicente lópez','vicente lopez','san martín','san martin','tigre','escobar','pilar','san fernando','malvinas argentinas','josé c. paz','jose c. paz','san miguel',
+    'martínez','martinez','villa ballester','presidente derqui','don torcuato','general pacheco','grand bourg','villa adelina','san andrés','san andres','villa rosa'];
   if(norte.some(n=>c.includes(n)))return{zona:'Norte',color:'#10b981'};
-  const sur=['lomas de zamora','lanús','lanus','avellaneda','quilmes','berazategui','florencio varela','almirante brown','ezeiza','esteban echeverría','esteban echeverria','la plata','guernica','monte grande','temperley','banfield'];
+  const sur=['lomas de zamora','lanús','lanus','avellaneda','quilmes','berazategui','florencio varela','almirante brown','ezeiza','esteban echeverría','esteban echeverria','la plata','guernica','monte grande','temperley','banfield',
+    'city bell','ezpeleta','los hornos','rafael calzada','burzaco','adrogué','adrogue','canning','glew','llavallol','wilde','el jagüel','el jaguel','gonnet'];
   if(sur.some(s=>c.includes(s)))return{zona:'Sur',color:'#f59e0b'};
-  const oeste=['la matanza','morón','moron','hurlingham','ituzaingó','ituzaingo','merlo','moreno','tres de febrero','luján','lujan','ramos mejía','ramos mejia','san justo','haedo','castelar'];
+  const oeste=['la matanza','morón','moron','hurlingham','ituzaingó','ituzaingo','merlo','moreno','tres de febrero','luján','lujan','ramos mejía','ramos mejia','san justo','haedo','castelar',
+    'francisco álvarez','francisco alvarez','gonzález catán','gonzalez catan','gregorio de laferrere','isidro casanova','loma hermosa','cañuelas','canuelas','la reja','villa madero','pablo podestá','pablo podesta','lomas del mirador','villa sarmiento'];
   if(oeste.some(o=>c.includes(o)))return{zona:'Oeste',color:'#8b5cf6'};
   return{zona:'Fuera',color:'#ef4444'};
 }
@@ -1309,12 +1322,13 @@ function descartarSugerencia(id){
   renderSugerenciasDesinst();
 }
 
-async function tomarDesinstalacionSugerida(id){
-  const ot=_sugerenciasActuales.find(o=>o.id===id);
-  if(!ot) return;
+// Helper compartido: marca una desinstalación como tomada por el operador
+// actual. Lo usan tanto "sugeridas cerca de tu ruta" como "por zona".
+// Devuelve true/false según si pudo asignarla.
+async function asignarDesinstalacionAOperador(ot){
   const miNombre=(currentProfile?.nombre||currentUser?.email||'Operador').trim();
   const yaAsignada=ot.operador_id&&ot.operador_id.trim()&&ot.operador_id.trim()!==miNombre;
-  if(yaAsignada && !confirm('Esta OT ya estaba asignada a "'+ot.operador_id+'". ¿Confirmás que la tomás vos igual?')) return;
+  if(yaAsignada && !confirm('Esta OT ya estaba asignada a "'+ot.operador_id+'". ¿Confirmás que la tomás vos igual?')) return false;
 
   const fecha=new Date().toISOString().slice(0,10);
   const{error}=await sb.from('ordenes_trabajo').update({
@@ -1322,13 +1336,122 @@ async function tomarDesinstalacionSugerida(id){
     hoja_ruta_fecha:fecha,
     operador_id:miNombre,
     fecha_asignacion:fecha
-  }).eq('id',id);
-  if(error){ showScanFeedback('⚠️ Error al asignar: '+error.message,'error'); return; }
+  }).eq('id',ot.id);
+  if(error){ showScanFeedback('⚠️ Error al asignar: '+error.message,'error'); return false; }
 
   showScanFeedback('✅ OT '+ot.ot+' sumada a tu ruta de desinstalaciones','ok');
+  await loadDesinstalaciones(); // refresca la lista del tab Desinstalaciones
+  return true;
+}
+
+async function tomarDesinstalacionSugerida(id){
+  const ot=_sugerenciasActuales.find(o=>o.id===id);
+  if(!ot) return;
+  const ok=await asignarDesinstalacionAOperador(ot);
+  if(!ok) return;
   _sugerenciasActuales=_sugerenciasActuales.filter(o=>o.id!==id);
   renderSugerenciasDesinst();
-  await loadDesinstalaciones(); // refresca la lista del tab Desinstalaciones
+}
+
+// ── DESINSTALACIONES POR ZONA — para cuando no hay ruta de entregas hoy ────
+// No depende de rutaDelDia (no hace falta tener nada aceptado): trae TODAS
+// las desinstalaciones disponibles (mismas 4 condiciones que el otro modo)
+// y las agrupa por zona AMBA, para que el operador elija con qué zona
+// arrancar el día.
+let _desinstPorZona={}; // { 'CABA':[...], 'Norte':[...], 'Sur':[...], 'Oeste':[...], 'Fuera':[...] }
+let _zonaAbierta=null;
+
+async function verDesinstalacionesPorZona(){
+  const btn=document.getElementById('btnVerPorZona');
+  btn.disabled=true; btn.textContent='⏳ Buscando...';
+  try{
+    const{data,error}=await sb.from('ordenes_trabajo')
+      .select('id,ot,comercio,cuenta,contacto,horario,calle,direccion,ciudad,provincia,operador_id,hoja_ruta_activa')
+      .eq('tipo','desinstalacion')
+      .eq('logistica','ALLEATA')
+      .eq('estado','En Proceso')
+      .eq('gestion_retiros','Contactado')
+      .eq('status_gestion_retiros','Visita presencial');
+    if(error) throw new Error(error.message);
+
+    _desinstPorZona={CABA:[],Norte:[],Sur:[],Oeste:[],Fuera:[]};
+    (data||[]).forEach(ot=>{
+      const z=getZona(ot.ciudad,ot.provincia).zona;
+      (_desinstPorZona[z]||_desinstPorZona.Fuera).push(ot);
+    });
+    _zonaAbierta=null;
+    renderDesinstPorZona();
+  }catch(e){
+    showScanFeedback('⚠️ Error buscando desinstalaciones: '+e.message,'error');
+    console.error('[verDesinstalacionesPorZona]',e);
+  }
+  btn.disabled=false; btn.textContent='📦 Ver desinstalaciones por zona';
+}
+
+function abrirZona(zona){
+  _zonaAbierta = (_zonaAbierta===zona) ? null : zona;
+  renderDesinstPorZona();
+}
+
+function renderDesinstPorZona(){
+  const wrap=document.getElementById('desinstPorZonaWrap');
+  if(!wrap) return;
+  const zonas=[
+    {key:'Sur',   label:'Z. Sur',   color:'#f59e0b'},
+    {key:'Norte', label:'Z. Norte', color:'#10b981'},
+    {key:'Oeste', label:'Z. Oeste', color:'#8b5cf6'},
+    {key:'CABA',  label:'CABA',     color:'#1a9fd4'},
+    {key:'Fuera', label:'Fuera de AMBA', color:'#ef4444'},
+  ];
+  const totalGeneral=Object.values(_desinstPorZona).reduce((s,arr)=>s+arr.length,0);
+  if(!totalGeneral){ wrap.innerHTML='<div class="empty" style="padding:12px 0"><p>Sin desinstalaciones disponibles ahora mismo</p></div>'; return; }
+
+  const tiles=zonas.filter(z=>_desinstPorZona[z.key]?.length).map(z=>{
+    const n=_desinstPorZona[z.key].length;
+    const abierta=_zonaAbierta===z.key;
+    return `<button onclick="abrirZona('${z.key}')" style="display:flex;justify-content:space-between;align-items:center;width:100%;padding:12px 14px;margin-bottom:6px;background:${abierta?z.color+'20':'var(--surface)'};border:1px solid ${abierta?z.color+'60':'var(--border)'};border-radius:10px;cursor:pointer;font-family:'Inter',sans-serif">
+      <span style="font-size:13px;font-weight:700;color:${z.color}">${z.label}</span>
+      <span style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:800;color:var(--text)">${n} OT${n!==1?'s':''} ${abierta?'▲':'▼'}</span>
+    </button>
+    ${abierta?renderListaZona(_desinstPorZona[z.key]):''}`;
+  }).join('');
+
+  wrap.innerHTML=`<div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px">${totalGeneral} desinstalaciones disponibles</div>${tiles}`;
+}
+
+function renderListaZona(lista){
+  return `<div style="margin:0 0 12px 0;padding-left:4px">${lista.map(ot=>{
+    const dir=ot.direccion||ot.calle||'';
+    const maps='https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(dir+' '+(ot.ciudad||'')+' Argentina');
+    return `<div class="ot-card" style="margin-bottom:8px;border-left:3px solid var(--border2)">
+      <div class="ot-num">${ot.ot||'—'}</div>
+      <div class="ot-comercio">${ot.comercio||ot.cuenta||'—'}</div>
+      <div style="display:flex;flex-direction:column;gap:4px;margin:6px 0">
+        ${dir?`<div class="ot-row"><span>📍</span>${dir}${ot.ciudad?', '+ot.ciudad:''}</div>`:''}
+        ${ot.horario?`<div class="ot-row"><span>🕐</span>${ot.horario}</div>`:''}
+      </div>
+      <div class="ot-actions" style="flex-wrap:wrap;gap:5px">
+        <button class="btn-sm" style="flex:1;min-width:120px;background:var(--grad);color:#fff;border:none" onclick="tomarDesinstalacionPorZona('${ot.id}')">✅ Sumar a mi ruta</button>
+        <a href="${maps}" target="_blank" class="btn-sm btn-maps" style="flex:0 0 40px">🗺️</a>
+      </div>
+    </div>`;
+  }).join('')}</div>`;
+}
+
+async function tomarDesinstalacionPorZona(id){
+  let ot=null;
+  for(const z of Object.keys(_desinstPorZona)){
+    const found=_desinstPorZona[z].find(o=>o.id===id);
+    if(found){ ot=found; break; }
+  }
+  if(!ot) return;
+  const okAsignada=await asignarDesinstalacionAOperador(ot);
+  if(!okAsignada) return;
+  // sacarla de todas las zonas donde pudiera estar listada y re-renderizar
+  Object.keys(_desinstPorZona).forEach(z=>{
+    _desinstPorZona[z]=_desinstPorZona[z].filter(o=>o.id!==id);
+  });
+  renderDesinstPorZona();
 }
 
 // Llamado desde handleRutaQR cuando se escanea un QR válido
