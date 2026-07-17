@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Alleata · Presupuesto Operaciones v1.13.0</title>
+<title>Alleata · Presupuesto Operaciones v1.13.1</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -200,7 +200,7 @@
   <div class="login-box">
     <h2>💰 Presupuesto</h2>
     <p class="login-sub">Alleata · Acceso restringido</p>
-    <div style="position:absolute;bottom:12px;right:16px;font-size:10px;font-family:'JetBrains Mono',monospace;color:rgba(232,237,243,.2)">v1.13.0</div>
+    <div style="position:absolute;bottom:12px;right:16px;font-size:10px;font-family:'JetBrains Mono',monospace;color:rgba(232,237,243,.2)">v1.13.1</div>
     <div class="login-field">
       <label>Email</label>
       <input type="email" id="loginEmail" placeholder="tu@email.com" onkeydown="if(event.key==='Enter')doLogin()">
@@ -216,7 +216,7 @@
 
 <div id="appContent" style="display:none">
 <h1>💰 Presupuesto Operaciones</h1>
-<p class="sub">Alleata · 2026 <span style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 8px;border-radius:4px;border:1px solid var(--border2);font-size:10px;margin-left:6px">v1.13.0</span></p>
+<p class="sub">Alleata · 2026 <span style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 8px;border-radius:4px;border:1px solid var(--border2);font-size:10px;margin-left:6px">v1.13.1</span></p>
 
 <div class="toolbar">
   <div class="mes-bar" id="mesBar"></div>
@@ -740,19 +740,19 @@ function logiRenderFacturas() {
   if(!facs.length){ el.innerHTML='<div class="fac-empty">Todavía no cargaste ninguna factura este mes</div>'; return; }
   el.innerHTML=`<div class="fac-wrap"><table class="fac-tbl">
     <thead><tr>
-      <th>N° factura</th><th>Fecha</th><th>Vto.</th><th>Descripción</th>
+      <th>N° factura</th><th>Archivos</th><th>Fecha</th><th>Vto.</th><th>Descripción</th>
       <th style="text-align:right">T.C. $/USD</th>
       <th style="text-align:right">Neto USD</th>
       <th style="text-align:right;color:var(--teal);font-size:10px">▶ REAL EN $ (Total×TC)</th>
       <th style="text-align:right">IVA USD</th><th style="text-align:right">Otros imp.</th>
       <th style="text-align:right">Total USD</th>
       <th style="text-align:center">Term.</th><th style="text-align:center">Series</th>
-      <th>Archivos</th>
     </tr></thead>
     <tbody>${facs.map(f=>{
       const sub$=f.subtotalUSD*logiCurrentTC;
       return `<tr>
         <td style="font-family:'JetBrains Mono',monospace">${f.numero}</td>
+        <td>${presupRenderAdjuntosConBoton(f.adjuntos, ['pdf','xls'], 'logiAdjuntarArchivo', f.numero)}</td>
         <td>${f.fecha}</td><td>${f.vto}</td>
         <td>${f.desc}</td>
         <td class="nr">${f.tc.toLocaleString('es-AR')}</td>
@@ -763,7 +763,6 @@ function logiRenderFacturas() {
         <td class="nr" style="color:var(--text-muted)">${fmtUSD(f.totalUSD)}</td>
         <td style="text-align:center;font-weight:700">${f.terminales||'—'}</td>
         <td style="text-align:center"><span class="tag-ok">${f.series?f.series.length:0}</span></td>
-        <td>${presupRenderAdjuntosConBoton(f.adjuntos, ['pdf','xls'], 'logiAdjuntarArchivo', f.numero)}</td>
       </tr>`;
     }).join('')}</tbody>
   </table></div>`;
@@ -1636,16 +1635,16 @@ function napseRenderFacturas(){
   if(badge) badge.textContent=facs.length+' factura'+(facs.length!==1?'s':'');
   wrap.innerHTML=`<div style="overflow-x:auto"><table class="fac-tbl">
     <thead><tr>
-      <th>N° factura</th><th>Fecha</th><th>Descripción</th>
+      <th>N° factura</th><th>Archivos</th><th>Fecha</th><th>Descripción</th>
       <th style="text-align:right">T.C.</th>
       <th style="text-align:right">Bruto USD</th>
       <th style="text-align:right">IVA USD</th>
       <th style="text-align:right">Total USD</th>
       <th style="text-align:right;color:var(--teal)">▶ REAL $</th>
-      <th>Archivos</th>
     </tr></thead>
     <tbody>${facs.map(f=>`<tr>
       <td style="font-family:'JetBrains Mono',monospace;font-size:11px">${f.numero}</td>
+      <td>${presupRenderAdjuntosConBoton(f.adjuntos, ['pdf'], 'napseAdjuntarArchivo', f.numero)}</td>
       <td>${f.fecha}</td>
       <td style="font-size:11px;max-width:160px">${f.desc}</td>
       <td class="nr">${f.tc.toLocaleString('es-AR')}</td>
@@ -1653,7 +1652,6 @@ function napseRenderFacturas(){
       <td class="nr" style="color:var(--text-muted)">${fmtUSD(f.ivaUSD)}</td>
       <td class="nr" style="color:var(--text-muted)">${fmtUSD(f.totalUSD)}</td>
       <td class="nr" style="color:var(--teal);font-weight:800">$ ${Math.round(f.totalUSD*f.tc).toLocaleString('es-AR')}</td>
-      <td>${presupRenderAdjuntosConBoton(f.adjuntos, ['pdf'], 'napseAdjuntarArchivo', f.numero)}</td>
     </tr>`).join('')}</tbody>
   </table></div>`;
 }
@@ -1849,19 +1847,18 @@ function caRenderFacturas(){
   if(badge) badge.textContent=facs.length+' factura'+(facs.length!==1?'s':'');
   wrap.innerHTML=`<div style="overflow-x:auto"><table class="fac-tbl">
     <thead><tr>
-      <th>N° factura</th><th>Fecha</th>
+      <th>N° factura</th><th>Archivos</th><th>Fecha</th>
       <th style="text-align:right">Total factura (REAL)</th>
       <th style="text-align:right">Envíos Alleata</th>
       <th style="text-align:right;color:var(--teal)">Monto Alleata (nota)</th>
-      <th>Archivos</th>
     </tr></thead>
     <tbody>${facs.map(f=>`<tr>
       <td style="font-family:'JetBrains Mono',monospace;font-size:11px">${f.numero}</td>
+      <td>${presupRenderAdjuntosConBoton(f.adjuntos, ['pdf'], 'caAdjuntarArchivo', f.numero)}</td>
       <td>${f.fecha}</td>
       <td class="nr hi">${fmt(f.totalFactura)}</td>
       <td class="nr" style="color:var(--text-muted)">${f.cantidadAlleata}</td>
       <td class="nr" style="color:var(--teal);font-weight:800">${fmt(f.totalAlleata)}</td>
-      <td>${presupRenderAdjuntosConBoton(f.adjuntos, ['pdf'], 'caAdjuntarArchivo', f.numero)}</td>
     </tr>`).join('')}</tbody>
   </table></div>
   <div style="font-size:10px;color:var(--text-muted);margin-top:8px">
@@ -2082,22 +2079,21 @@ function cabifyRenderFacturas(){
   if(badge) badge.textContent=facs.length+' factura'+(facs.length!==1?'s':'');
   wrap.innerHTML=`<div style="overflow-x:auto"><table class="fac-tbl">
     <thead><tr>
-      <th>Empresa</th><th>N° factura</th><th>Fecha</th>
+      <th>Empresa</th><th>N° factura</th><th>Archivos</th><th>Fecha</th>
       <th style="text-align:right">Subtotal</th>
       <th style="text-align:right">Impuestos</th>
       <th style="text-align:right;color:var(--teal)">Total</th>
       <th style="text-align:right">Envíos</th>
-      <th>Archivos</th>
     </tr></thead>
     <tbody>${facs.map(f=>`<tr>
       <td style="font-size:11px">${f.empresa}</td>
       <td style="font-family:'JetBrains Mono',monospace;font-size:11px">${f.numero}</td>
+      <td>${presupRenderAdjuntosConBoton(f.adjuntos, ['pdf','xls'], 'cabifyAdjuntarArchivo', f.numero)}</td>
       <td>${f.fecha}</td>
       <td class="nr" style="color:var(--text-muted)">${fmt(f.subtotal)}</td>
       <td class="nr" style="color:var(--text-muted)">${fmt(f.impuestos)}</td>
       <td class="nr hi" style="color:var(--teal);font-weight:800">${fmt(f.totalFactura)}</td>
       <td class="nr" style="font-size:10px;color:var(--text-muted)">${(f.enviosAlleata||f.enviosVarios)?`${f.enviosAlleata||0} Alleata / ${f.enviosVarios||0} varios`:'—'}</td>
-      <td>${presupRenderAdjuntosConBoton(f.adjuntos, ['pdf','xls'], 'cabifyAdjuntarArchivo', f.numero)}</td>
     </tr>`).join('')}</tbody>
   </table></div>`;
 }
