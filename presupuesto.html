@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Alleata · Presupuesto Operaciones v1.11.0</title>
+<title>Alleata · Presupuesto Operaciones v1.12.0</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -199,7 +199,7 @@
   <div class="login-box">
     <h2>💰 Presupuesto</h2>
     <p class="login-sub">Alleata · Acceso restringido</p>
-    <div style="position:absolute;bottom:12px;right:16px;font-size:10px;font-family:'JetBrains Mono',monospace;color:rgba(232,237,243,.2)">v1.11.0</div>
+    <div style="position:absolute;bottom:12px;right:16px;font-size:10px;font-family:'JetBrains Mono',monospace;color:rgba(232,237,243,.2)">v1.12.0</div>
     <div class="login-field">
       <label>Email</label>
       <input type="email" id="loginEmail" placeholder="tu@email.com" onkeydown="if(event.key==='Enter')doLogin()">
@@ -215,7 +215,7 @@
 
 <div id="appContent" style="display:none">
 <h1>💰 Presupuesto Operaciones</h1>
-<p class="sub">Alleata · 2026 <span style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 8px;border-radius:4px;border:1px solid var(--border2);font-size:10px;margin-left:6px">v1.11.0</span></p>
+<p class="sub">Alleata · 2026 <span style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 8px;border-radius:4px;border:1px solid var(--border2);font-size:10px;margin-left:6px">v1.12.0</span></p>
 
 <div class="toolbar">
   <div class="mes-bar" id="mesBar"></div>
@@ -746,6 +746,7 @@ function logiRenderFacturas() {
       <th style="text-align:right">IVA USD</th><th style="text-align:right">Otros imp.</th>
       <th style="text-align:right">Total USD</th>
       <th style="text-align:center">Term.</th><th style="text-align:center">Series</th>
+      <th>Archivos</th>
     </tr></thead>
     <tbody>${facs.map(f=>{
       const sub$=f.subtotalUSD*logiCurrentTC;
@@ -761,6 +762,7 @@ function logiRenderFacturas() {
         <td class="nr" style="color:var(--text-muted)">${fmtUSD(f.totalUSD)}</td>
         <td style="text-align:center;font-weight:700">${f.terminales||'—'}</td>
         <td style="text-align:center"><span class="tag-ok">${f.series?f.series.length:0}</span></td>
+        <td>${presupRenderAdjuntos(f.adjuntos)}</td>
       </tr>`;
     }).join('')}</tbody>
   </table></div>`;
@@ -911,6 +913,7 @@ async function logiHandlePDF(input){
       logiShowManualEntry();
       return;
     }
+    fac._filePdf=file;
     logiPendingFac=fac;
     if(fac.tc && fac.tc !== logiCurrentTC) {
       logiCurrentTC = fac.tc;
@@ -1158,7 +1161,7 @@ async function logiHandleXLS(input){
         }
       }
     }
-    logiPendingRTO={terminales:terminales||series.length, series, totalUSD:rtoTotalUSD};
+    logiPendingRTO={terminales:terminales||series.length, series, totalUSD:rtoTotalUSD, _fileXls:file};
     document.getElementById('upZoneXls').classList.add('loaded');
     logiShowPreview('prevXls',[
       ['Terminales despachadas',(terminales||series.length).toString()],
@@ -1329,6 +1332,8 @@ function claroRenderKPIs() {
   const el=document.getElementById('claroKpis');
   if(!el)return;
   el.innerHTML=kpis.map(k=>`<div class="lk"><div class="lk-label">${k.label}</div><div class="lk-val ${k.cls}">${k.val}</div><div class="lk-sub">${k.sub}</div></div>`).join('');
+  const aw=document.getElementById('claroAdjuntosWrap');
+  if(aw) aw.innerHTML=presupRenderAdjuntos(saved?.adjuntos);
 }
 
 // Mapeo columna → mes: la planilla tiene bloques de 6 cols por mes
@@ -1384,7 +1389,7 @@ async function claroHandleXLS(input) {
 
     if(!subtotalAlleata){ claroShowMsg('claroMsgXls','No se encontró SUBTOTAL Alleata en el bloque Vto '+mesVtoLabel+' (factura de '+MESES_LABEL[m]+'). Verificá la planilla.','err'); return; }
 
-    claroPendingXLS={ subtotalAlleata, totalFactura, detalle, mes:m };
+    claroPendingXLS={ subtotalAlleata, totalFactura, detalle, mes:m, _fileXls:file };
 
     // Preview
     claroShowPreview('claroPrevXls',[
@@ -1452,7 +1457,7 @@ async function claroHandlePDF(input) {
       document.getElementById('claroSub').textContent = MESES_LABEL[mesFac]+' 2026 · Chips Alleata · (mes detectado del PDF)';
     }
 
-    claroPendingPDF={ nroFac, fecha, periodo, totalFac, mesFac };
+    claroPendingPDF={ nroFac, fecha, periodo, totalFac, mesFac, _filePdf:file };
     document.getElementById('claroZonePdf').classList.add('loaded');
     claroShowPreview('claroPrevPdf',[
       ['N° Factura', nroFac],
@@ -1516,6 +1521,10 @@ async function claroGuardar(){
     fecha:           claroPendingPDF?.fecha||'—',
     periodo:         claroPendingPDF?.periodo||'—',
     totalFacPDF:     claroPendingPDF?.totalFac||0,
+    adjuntos: await presupSubirAdjuntos([
+      {file:claroPendingPDF?._filePdf, etiqueta:'pdf'},
+      {file:claroPendingXLS?._fileXls, etiqueta:'xls'},
+    ], 'claro', m),
   };
   reales['claro_'+m]=claroPendingXLS.subtotalAlleata;
   // Guardar en Supabase si hay sesión
@@ -1540,7 +1549,7 @@ async function claraSaveDB(m){
     user_id:currentUser.id, item_id:'claro', proveedor:'claro', mes:m,
     real_pesos:d.subtotalAlleata, total_factura:d.totalFactura,
     nro_factura:d.nroFac, fecha:d.fecha, periodo:d.periodo,
-    detalle:d.detalle
+    detalle:d.detalle, adjuntos:d.adjuntos||[]
   };
   const {error}=await sb.from('presupuesto_reales').upsert(row,{onConflict:'proveedor,mes'});
   if(error){ console.error('Error guardando Claro:',error); return false; }
@@ -1614,6 +1623,7 @@ function napseRenderFacturas(){
       <th style="text-align:right">IVA USD</th>
       <th style="text-align:right">Total USD</th>
       <th style="text-align:right;color:var(--teal)">▶ REAL $</th>
+      <th>Archivos</th>
     </tr></thead>
     <tbody>${facs.map(f=>`<tr>
       <td style="font-family:'JetBrains Mono',monospace;font-size:11px">${f.numero}</td>
@@ -1624,6 +1634,7 @@ function napseRenderFacturas(){
       <td class="nr" style="color:var(--text-muted)">${fmtUSD(f.ivaUSD)}</td>
       <td class="nr" style="color:var(--text-muted)">${fmtUSD(f.totalUSD)}</td>
       <td class="nr" style="color:var(--teal);font-weight:800">$ ${Math.round(f.totalUSD*f.tc).toLocaleString('es-AR')}</td>
+      <td>${presupRenderAdjuntos(f.adjuntos)}</td>
     </tr>`).join('')}</tbody>
   </table></div>`;
 }
@@ -1677,6 +1688,7 @@ async function napseHandlePDF(input){
 
     napseShowMsg('✓ Factura leída · T.C. $'+fac.tc.toLocaleString('es-AR')+' · REAL: '+fmt(fac.totalUSD*fac.tc),'ok');
     document.getElementById('napseBtnConfirm').style.display='block';
+    fac._filePdf=file;
     document.getElementById('napseBtnConfirm')._pendingFac=fac;
   }catch(e){ napseShowMsg('Error: '+e.message,'err'); }
 }
@@ -1703,6 +1715,7 @@ async function napseGuardar(){
   if(isReadonlyBlocked()) return;
   const btn=document.getElementById('napseBtnConfirm');
   const fac=btn._pendingFac; if(!fac) return;
+  fac.adjuntos=await presupSubirAdjuntos([{file:fac._filePdf, etiqueta:'pdf'}], 'napse', napseMesActual);
   if(!napseFacturas[napseMesActual]) napseFacturas[napseMesActual]=[];
   napseFacturas[napseMesActual].push(fac);
   reales['napse_'+napseMesActual]=(napseFacturas[napseMesActual]||[]).reduce((s,f)=>s+f.totalUSD*f.tc,0);
@@ -1727,7 +1740,8 @@ async function napseSaveDB(fac){
     user_id:currentUser.id, mes:napseMesActual,
     numero:fac.numero, fecha:fac.fecha, descripcion:fac.desc,
     tc:fac.tc, subtotal_usd:fac.brutoUSD, iva_usd:fac.ivaUSD,
-    otros_imp:0, total_usd:fac.totalUSD, terminales:0, series:[]
+    otros_imp:0, total_usd:fac.totalUSD, terminales:0, series:[],
+    adjuntos:fac.adjuntos||[]
   };
   // Reusar tabla presupuesto_facturas con proveedor en descripción
   const {error}=await sb.from('presupuesto_facturas').upsert({...row, proveedor:'napse'},{onConflict:'numero,mes'});
@@ -1811,6 +1825,7 @@ function caRenderFacturas(){
       <th style="text-align:right">Total factura (REAL)</th>
       <th style="text-align:right">Envíos Alleata</th>
       <th style="text-align:right;color:var(--teal)">Monto Alleata (nota)</th>
+      <th>Archivos</th>
     </tr></thead>
     <tbody>${facs.map(f=>`<tr>
       <td style="font-family:'JetBrains Mono',monospace;font-size:11px">${f.numero}</td>
@@ -1818,6 +1833,7 @@ function caRenderFacturas(){
       <td class="nr hi">${fmt(f.totalFactura)}</td>
       <td class="nr" style="color:var(--text-muted)">${f.cantidadAlleata}</td>
       <td class="nr" style="color:var(--teal);font-weight:800">${fmt(f.totalAlleata)}</td>
+      <td>${presupRenderAdjuntos(f.adjuntos)}</td>
     </tr>`).join('')}</tbody>
   </table></div>
   <div style="font-size:10px;color:var(--text-muted);margin-top:8px">
@@ -1875,6 +1891,7 @@ async function caHandlePDF(input){
 
     caRenderKPIs();
     document.getElementById('caBtnConfirm').style.display='block';
+    fac._filePdf=file;
     caPendingFac=fac;
   }catch(e){ caShowMsg('Error: '+e.message,'err'); }
 }
@@ -1927,6 +1944,7 @@ function caCheckBtn(){
 async function caGuardar(){
   if(isReadonlyBlocked()) return;
   const fac=caPendingFac; if(!fac) return;
+  fac.adjuntos=await presupSubirAdjuntos([{file:fac._filePdf, etiqueta:'pdf'}], 'ca', caMesActual);
   if(!caFacturas[caMesActual]) caFacturas[caMesActual]=[];
   caFacturas[caMesActual].push(fac);
   reales['ca_'+caMesActual]=(caFacturas[caMesActual]||[]).reduce((s,f)=>s+f.totalFactura,0);
@@ -1951,7 +1969,8 @@ async function caSaveDB(fac){
     user_id:currentUser.id, mes:caMesActual, proveedor:'ca',
     numero:fac.numero, fecha:fac.fecha, descripcion:'Envíos Alleata (2/4/6kg) — nota informativa',
     tc:fac.ivaPct, subtotal_usd:fac.subtotalAlleata, iva_usd:fac.ivaAlleata,
-    otros_imp:0, total_usd:fac.totalFactura, terminales:fac.cantidadAlleata, series:[]
+    otros_imp:0, total_usd:fac.totalFactura, terminales:fac.cantidadAlleata, series:[],
+    adjuntos:fac.adjuntos||[]
   };
   const {error}=await sb.from('presupuesto_facturas').upsert(row,{onConflict:'numero,mes'});
   if(error){ console.error('CA DB error:',error); return false; }
@@ -2031,6 +2050,7 @@ function cabifyRenderFacturas(){
       <th style="text-align:right">Impuestos</th>
       <th style="text-align:right;color:var(--teal)">Total</th>
       <th style="text-align:right">Envíos</th>
+      <th>Archivos</th>
     </tr></thead>
     <tbody>${facs.map(f=>`<tr>
       <td style="font-size:11px">${f.empresa}</td>
@@ -2040,6 +2060,7 @@ function cabifyRenderFacturas(){
       <td class="nr" style="color:var(--text-muted)">${fmt(f.impuestos)}</td>
       <td class="nr hi" style="color:var(--teal);font-weight:800">${fmt(f.totalFactura)}</td>
       <td class="nr" style="font-size:10px;color:var(--text-muted)">${(f.enviosAlleata||f.enviosVarios)?`${f.enviosAlleata||0} Alleata / ${f.enviosVarios||0} varios`:'—'}</td>
+      <td>${presupRenderAdjuntos(f.adjuntos)}</td>
     </tr>`).join('')}</tbody>
   </table></div>`;
 }
@@ -2067,11 +2088,12 @@ async function cabifyHandleXLS(input){
       const tipoVeh=(r['Tipo de vehículo']||'').toString().trim();
       if(tipoVeh) enviosVarios++; else enviosAlleata++;
     });
-    cabifyPendingReporte={enviosAlleata, enviosVarios};
+    cabifyPendingReporte={enviosAlleata, enviosVarios, _fileXls:file};
     if(cabifyPendingFac){
       // Hay una factura recién leída, todavía sin confirmar: se suma y se guarda junto con ella
       cabifyPendingFac.enviosAlleata=enviosAlleata;
       cabifyPendingFac.enviosVarios=enviosVarios;
+      cabifyPendingFac._fileXls=file;
       showXlsMsg(`✓ Reporte leído · ${enviosAlleata} envíos Alleata / ${enviosVarios} envíos varios (de ${rows.length} filas) — se guarda junto con la factura`,'ok');
     } else {
       // No hay factura pendiente: si ya hay una guardada este mes, la actualizamos directo
@@ -2081,6 +2103,8 @@ async function cabifyHandleXLS(input){
       if(target){
         target.enviosAlleata=enviosAlleata;
         target.enviosVarios=enviosVarios;
+        const nuevoAdj=await presupSubirAdjunto(file, 'cabify', cabifyMesActual, 'xls');
+        if(nuevoAdj) target.adjuntos=[...(target.adjuntos||[]), nuevoAdj];
         if(currentUser){
           const ok=await cabifySaveDB(target);
           if(!ok){ showXlsMsg('Reporte leído pero hubo un error al guardar. Probá de nuevo.','err'); return; }
@@ -2141,10 +2165,12 @@ async function cabifyHandlePDF(input){
     cabifyShowMsg('✓ '+fac.empresa+' · '+fac.numero+' leída · Total: '+fmt(fac.totalFactura),'ok');
     cabifyRenderKPIs();
     document.getElementById('cabifyBtnConfirm').style.display='block';
+    fac._filePdf=file;
     // Si ya se había leído el reporte de consumo antes del PDF, lo sumamos acá
     if(cabifyPendingReporte){
       fac.enviosAlleata=cabifyPendingReporte.enviosAlleata;
       fac.enviosVarios=cabifyPendingReporte.enviosVarios;
+      fac._fileXls=cabifyPendingReporte._fileXls;
     }
     cabifyPendingFac=fac;
   }catch(e){ cabifyShowMsg('Error: '+e.message,'err'); }
@@ -2192,6 +2218,10 @@ function cabifyParsePDF(text){
 async function cabifyGuardar(){
   if(isReadonlyBlocked()) return;
   const fac=cabifyPendingFac; if(!fac) return;
+  fac.adjuntos=await presupSubirAdjuntos([
+    {file:fac._filePdf, etiqueta:'pdf'},
+    {file:fac._fileXls, etiqueta:'xls'},
+  ], 'cabify', cabifyMesActual);
   if(!cabifyFacturas[cabifyMesActual]) cabifyFacturas[cabifyMesActual]=[];
   cabifyFacturas[cabifyMesActual].push(fac);
   reales['cabify_'+cabifyMesActual]=(cabifyFacturas[cabifyMesActual]||[]).reduce((s,f)=>s+f.totalFactura,0);
@@ -2219,7 +2249,8 @@ async function cabifySaveDB(fac){
     tc:0, subtotal_usd:fac.subtotal, iva_usd:fac.impuestos,
     otros_imp:0, total_usd:fac.totalFactura,
     terminales:fac.enviosAlleata||0,
-    series:fac.enviosVarios?[{enviosVarios:fac.enviosVarios}]:[]
+    series:fac.enviosVarios?[{enviosVarios:fac.enviosVarios}]:[],
+    adjuntos:fac.adjuntos||[]
   };
   const {error}=await sb.from('presupuesto_facturas').upsert(row,{onConflict:'numero,mes'});
   if(error){ console.error('Cabify DB error:',error); return false; }
@@ -2327,6 +2358,7 @@ function epsaRenderFacturas(){
       </div>
       ${desgloseRows}
       ${chequeo}
+      ${presupRenderAdjuntos(f.adjuntos)}
     </div>`;
   }).join('');
 }
@@ -2385,7 +2417,7 @@ async function epsaHandleXLS(input){
       };
     }).sort((a,b)=>b.total-a.total);
 
-    epsaPendingDesglose={desglose, cantidadTotal, totalPlanilla:Math.round(totalPlanilla*100)/100};
+    epsaPendingDesglose={desglose, cantidadTotal, totalPlanilla:Math.round(totalPlanilla*100)/100, _fileXls:file};
 
     document.getElementById('epsaZoneXls').classList.add('loaded');
 
@@ -2400,6 +2432,8 @@ async function epsaHandleXLS(input){
       const target=facs.find(f=>!f.desglose||!f.desglose.length)||facs[0];
       if(target){
         Object.assign(target, epsaPendingDesglose);
+        const nuevoAdj=await presupSubirAdjunto(file, 'epsa', epsaMesActual, 'xls');
+        if(nuevoAdj) target.adjuntos=[...(target.adjuntos||[]), nuevoAdj];
         if(currentUser){
           const ok=await epsaSaveDB(target);
           if(!ok){ showXlsMsg('Planilla leída pero hubo un error al guardar. Probá de nuevo.','err'); return; }
@@ -2462,6 +2496,7 @@ async function epsaHandlePDF(input){
     epsaShowMsg('✓ '+fac.numero+' leída · Emitida '+fac.fecha+' (servicio '+(fac.periodoTexto||'?')+') · Total: '+fmt(fac.totalFactura),'ok');
     epsaRenderKPIs();
     document.getElementById('epsaBtnConfirm').style.display='block';
+    fac._filePdf=file; // se sube a Storage recién al confirmar, no ahora
     // Si ya se había leído la planilla antes que el PDF, se adjunta acá
     if(epsaPendingDesglose) Object.assign(fac, epsaPendingDesglose);
     epsaPendingFac=fac;
@@ -2542,6 +2577,10 @@ async function epsaEliminarFactura(numero){
 async function epsaGuardar(){
   if(isReadonlyBlocked()) return;
   const fac=epsaPendingFac; if(!fac) return;
+  fac.adjuntos=await presupSubirAdjuntos([
+    {file:fac._filePdf, etiqueta:'pdf'},
+    {file:fac._fileXls, etiqueta:'xls'},
+  ], 'epsa', epsaMesActual);
   if(!epsaFacturas[epsaMesActual]) epsaFacturas[epsaMesActual]=[];
   epsaFacturas[epsaMesActual].push(fac);
   reales['epsa_'+epsaMesActual]=(epsaFacturas[epsaMesActual]||[]).reduce((s,f)=>s+f.totalFactura,0);
@@ -2570,7 +2609,8 @@ async function epsaSaveDB(fac){
     subtotal_usd:fac.subtotal, iva_usd:fac.iva, otros_imp:fac.otrosImp,
     total_usd:fac.totalFactura,
     terminales:fac.cantidadTotal||0,
-    series:fac.desglose||[]
+    series:fac.desglose||[],
+    adjuntos:fac.adjuntos||[]
   };
   const {error}=await sb.from('presupuesto_facturas').upsert(row,{onConflict:'numero,mes'});
   if(error){ console.error('EPSA DB error:',error); return false; }
@@ -2658,6 +2698,7 @@ function cotoRenderFacturas(){
         <thead><tr><th>Ítem</th><th style="text-align:right">Cant.</th><th style="text-align:right">Importe (sin imp.)</th></tr></thead>
         <tbody>${itemsRows}</tbody>
       </table>
+      ${presupRenderAdjuntos(f.adjuntos)}
     </div>`;
   }).join('');
 }
@@ -2795,7 +2836,8 @@ async function cotoHandleImg(input){
       iva:Number(parsed.iva)||0,
       percepciones:Number(parsed.percepciones)||0,
       total:Number(parsed.total)||0,
-      rawText
+      rawText,
+      _fileImg:file
     };
     if(items.length) cotoShowMsg('✓ Ticket leído · '+items.length+' ítem(s) detectados · revisá y tildá los que correspondan','ok');
     else cotoShowMsg('⚠️ No se detectaron ítems automáticamente. Revisá el texto leído (abajo) y agregalos a mano.','err');
@@ -2867,7 +2909,9 @@ function cotoRenderPending(){
     </tr>`).join('');
   wrap.innerHTML=`
     <div style="font-size:11px;color:var(--text-muted);margin:10px 0 6px">
-      Ticket <b style="color:var(--text)">${t.comprobante}</b> · ${t.fecha} · ${t.proveedorTicket}
+      Ticket <input type="text" value="${t.comprobante.replace(/"/g,'&quot;')}" oninput="cotoPendingTicket.comprobante=this.value" title="N° de comprobante — editalo si el OCR lo leyó mal" style="width:110px;background:transparent;border:none;border-bottom:1px dashed var(--border2);color:var(--text);font-weight:700;font-family:'JetBrains Mono',monospace;font-size:11px;padding:1px 2px">
+      · <input type="text" value="${t.fecha.replace(/"/g,'&quot;')}" oninput="cotoPendingTicket.fecha=this.value" title="Fecha — editala si el OCR la leyó mal" style="width:78px;background:transparent;border:none;border-bottom:1px dashed var(--border2);color:var(--text);font-size:11px;padding:1px 2px">
+      · ${t.proveedorTicket}
       &nbsp;·&nbsp; Total ticket completo: <b>${fmt(t.total)}</b>
     </div>
     ${t.rawText?`<details style="margin-bottom:10px"><summary style="cursor:pointer;font-size:10px;color:var(--text-muted)">Ver texto crudo leído por OCR (por si algún ítem quedó mal)</summary><pre style="white-space:pre-wrap;font-size:10px;color:var(--text-muted);background:var(--navy-900);border:1px solid var(--border2);padding:8px;border-radius:6px;margin-top:6px;max-height:220px;overflow:auto">${t.rawText.replace(/</g,'&lt;')}</pre></details>`:''}
@@ -2880,7 +2924,7 @@ function cotoRenderPending(){
       <div class="coto-sum-left" style="font-size:11px;color:var(--text-muted)">${seleccionados.length}/${t.items.length} ítems tildados · impuestos prorrateados (factor ${factor.toFixed(3)})</div>
       <div class="coto-sum-right" style="font-family:'JetBrains Mono',monospace;font-weight:800;color:var(--teal);font-size:16px">${fmt(totalConImp)}</div>
     </div>
-    <button class="btn-confirm" onclick="cotoGuardar()" style="margin-top:12px">✓ Confirmar y guardar REAL</button>
+    <button class="btn-confirm" onclick="cotoGuardar()" style="display:block;margin-top:12px">✓ Confirmar y guardar REAL</button>
   `;
 }
 
@@ -2916,7 +2960,8 @@ async function cotoGuardar(){
     subtotal:subtotalSel, iva:ivaSel, otrosImp:otrosSel, total:totalSel,
     cantidadItems:seleccionados.length, cantidadTotalTicket:t.items.length,
     totalTicketCompleto:t.total,
-    items:t.items
+    items:t.items,
+    adjuntos:await presupSubirAdjuntos([{file:t._fileImg, etiqueta:'img'}], 'coto', cotoMesActual)
   };
   if(!cotoFacturas[cotoMesActual]) cotoFacturas[cotoMesActual]=[];
   cotoFacturas[cotoMesActual].push(ticket);
@@ -2944,7 +2989,8 @@ async function cotoSaveDB(ticket){
     subtotal_usd:ticket.subtotal, iva_usd:ticket.iva, otros_imp:ticket.otrosImp,
     total_usd:ticket.total,
     terminales:ticket.cantidadItems,
-    series:ticket.items||[]
+    series:ticket.items||[],
+    adjuntos:ticket.adjuntos||[]
   };
   const {error}=await sb.from('presupuesto_facturas').upsert(row,{onConflict:'numero,mes'});
   if(error){ console.error('COTO DB error:',error); return false; }
@@ -3018,6 +3064,8 @@ function telecomRenderKPIs(){
     {label:'REAL '+MESES_LABEL[m].substring(0,3).toUpperCase()+' 26',val:real>0?fmt(real):'—',sub:'SUBTOTAL Telecom',cls:real>0?'green':''},
     {label:'DESVÍO',val:real>0?fmtPct(desvPct):'—',sub:desvPct<=0?'por debajo':'por encima',cls:real>0?(Math.abs(desvPct)>20?'warn':'ok'):''},
   ].map(k=>`<div class="lk"><div class="lk-label">${k.label}</div><div class="lk-val ${k.cls}">${k.val}</div><div class="lk-sub">${k.sub}</div></div>`).join('');
+  const aw=document.getElementById('telecomAdjuntosWrap');
+  if(aw) aw.innerHTML=presupRenderAdjuntos(saved?.adjuntos);
 }
 
 async function telecomHandleXLS(input){
@@ -3056,7 +3104,7 @@ async function telecomHandleXLS(input){
 
     if(!subtotal && !total){ telecomShowMsg('telecomMsgXls','No se encontró SUBTOTAL para '+MESES_LABEL[m]+'. Verificá que la planilla tenga la solapa TELECOM.','err'); return; }
 
-    telecomPendingXLS={subtotal, impuestos, total, detalle, mes:m};
+    telecomPendingXLS={subtotal, impuestos, total, detalle, mes:m, _fileXls:file};
     document.getElementById('telecomZoneXls').classList.add('loaded');
 
     // Preview
@@ -3117,7 +3165,7 @@ async function telecomHandlePDF(input){
       document.getElementById('telecomSub').textContent=MESES_LABEL[mesFac]+' 2026 · Servicios telefonía · (mes detectado del PDF)';
     }
 
-    telecomPendingPDF={nroFac, fecha, periodo, totalFac, mesFac};
+    telecomPendingPDF={nroFac, fecha, periodo, totalFac, mesFac, _filePdf:file};
     document.getElementById('telecomZonePdf').classList.add('loaded');
     telecomShowPreview('telecomPrevPdf',[
       ['N° Factura', nroFac],
@@ -3160,6 +3208,10 @@ async function telecomGuardar(){
     nroFac:      telecomPendingPDF?.nroFac||'—',
     fecha:       telecomPendingPDF?.fecha||'—',
     periodo:     telecomPendingPDF?.periodo||'—',
+    adjuntos: await presupSubirAdjuntos([
+      {file:telecomPendingPDF?._filePdf, etiqueta:'pdf'},
+      {file:telecomPendingXLS?._fileXls, etiqueta:'xls'},
+    ], 'telecom', m),
   };
   reales['telecom_'+m]=telecomPendingXLS.subtotal;
   if(!currentUser){
@@ -3180,7 +3232,8 @@ async function telecomGuardar(){
 async function telecomSaveDB(m){
   const d=telecomData[m];
   const row={user_id:currentUser.id, item_id:'telecom', proveedor:'telecom', mes:m, real_pesos:d.subtotal,
-    total_factura:d.total, nro_factura:d.nroFac, fecha:d.fecha, periodo:d.periodo, detalle:d.detalle};
+    total_factura:d.total, nro_factura:d.nroFac, fecha:d.fecha, periodo:d.periodo, detalle:d.detalle,
+    adjuntos:d.adjuntos||[]};
   const {error}=await sb.from('presupuesto_reales').upsert(row,{onConflict:'proveedor,mes'});
   if(error){ console.error('Telecom DB error:',error); return false; }
   return true;
@@ -3228,6 +3281,8 @@ function amazonRenderKPIs(){
     {label:'REAL '+MESES_LABEL[m].substring(0,3).toUpperCase()+' 26',val:real>0?fmt(real):'—',sub:'Total USD × TC',cls:real>0?'green':''},
     {label:'DESVÍO',val:real>0?fmtPct(desvPct):'—',sub:desvPct<=0?'por debajo':'por encima',cls:real>0?(Math.abs(desvPct)>20?'warn':'ok'):''},
   ].map(k=>`<div class="lk"><div class="lk-label">${k.label}</div><div class="lk-val ${k.cls}">${k.val}</div><div class="lk-sub">${k.sub}</div></div>`).join('');
+  const aw=document.getElementById('amazonAdjuntosWrap');
+  if(aw) aw.innerHTML=presupRenderAdjuntos(saved?.adjuntos);
 }
 
 async function amazonHandlePDF(input){
@@ -3259,6 +3314,7 @@ async function amazonHandlePDF(input){
     const mesOk=mesFac===amazonMesActual;
 
     amazonPendingFac=fac;
+    fac._filePdf=file;
     amazonCurrentTC=parseFloat(document.getElementById('amazonTC').value)||1470;
     document.getElementById('amazonZonePdf').classList.add('loaded');
 
@@ -3381,7 +3437,8 @@ async function amazonGuardar(){
   const m=amazonMesActual;
   const real=fac.totalUSD*amazonCurrentTC;
   amazonData[m]={totalUSD:fac.totalUSD, tc:amazonCurrentTC, realPesos:real,
-    periodo:fac.periodo, idCuenta:fac.idCuenta, fechaFactura:fac.fechaFactura, cuentas:fac.cuentas};
+    periodo:fac.periodo, idCuenta:fac.idCuenta, fechaFactura:fac.fechaFactura, cuentas:fac.cuentas,
+    adjuntos: await presupSubirAdjuntos([{file:fac._filePdf, etiqueta:'pdf'}], 'amazon', m)};
   reales['amazon_'+m]=real;
   if(!currentUser){
     amazonShowMsg('⚠️ No hay sesión activa: se guardó solo en este navegador, NO en la base. Volvé a iniciar sesión.','err');
@@ -3401,7 +3458,7 @@ async function amazonSaveDB(m){
   const row={user_id:currentUser.id, item_id:'amazon', proveedor:'amazon', mes:m,
     real_pesos:d.realPesos, total_factura:d.totalUSD,
     nro_factura:d.idCuenta, fecha:d.fechaFactura||'—', periodo:d.periodo,
-    detalle:{tc:d.tc, cuentas:d.cuentas}};
+    detalle:{tc:d.tc, cuentas:d.cuentas}, adjuntos:d.adjuntos||[]};
   const {error}=await sb.from('presupuesto_reales').upsert(row,{onConflict:'proveedor,mes'});
   if(error){ console.error('Amazon DB error:',error); return false; }
   return true;
@@ -3423,6 +3480,44 @@ const READONLY = new URLSearchParams(location.search).get('readonly') === '1';
 function isReadonlyBlocked(){
   if(READONLY){ showToast('👁 Vista de solo lectura — no se pueden guardar cambios'); return true; }
   return false;
+}
+
+// ── Adjuntos originales (PDF / Excel / fotos) en Supabase Storage ──────────
+// Bucket: 'presupuesto-adjuntos' (crear una sola vez en Supabase — ver
+// instrucciones aparte). Cada archivo confirmado se sube ahí y el link queda
+// guardado en la columna `adjuntos` (jsonb) de presupuesto_facturas, junto al
+// resto de los datos de la factura/ticket.
+async function presupSubirAdjunto(file, proveedor, mes, etiqueta){
+  if(!file || !currentUser) return null;
+  try{
+    const nombreLimpio=file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
+    const path=`${proveedor}/${mes}/${Date.now()}_${etiqueta}_${nombreLimpio}`;
+    const {error}=await sb.storage.from('presupuesto-adjuntos').upload(path, file, {upsert:false});
+    if(error){ console.error('[adjuntos] error al subir:',error); return null; }
+    const {data}=sb.storage.from('presupuesto-adjuntos').getPublicUrl(path);
+    return {nombre:file.name, tipo:etiqueta, url:data?.publicUrl||null, path};
+  }catch(e){ console.error('[adjuntos] excepción:',e); return null; }
+}
+
+// Sube una lista de {file, etiqueta} y devuelve el array de adjuntos ya
+// guardados (omite silenciosamente los que fallen — no bloquea el guardado
+// de los datos numéricos por un problema de Storage).
+async function presupSubirAdjuntos(archivos, proveedor, mes){
+  const out=[];
+  for(const {file, etiqueta} of archivos){
+    if(!file) continue;
+    const a=await presupSubirAdjunto(file, proveedor, mes, etiqueta);
+    if(a) out.push(a);
+  }
+  return out;
+}
+
+function presupRenderAdjuntos(adjuntos){
+  if(!adjuntos || !adjuntos.length) return '';
+  const iconos={pdf:'📄', xls:'📊', img:'🧾'};
+  return `<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">${adjuntos.map(a=>
+    `<a href="${a.url}" target="_blank" rel="noopener" style="font-size:10px;color:var(--teal);text-decoration:none;background:rgba(29,191,142,.08);border:1px solid rgba(29,191,142,.2);padding:3px 8px;border-radius:5px">${iconos[a.tipo]||'📎'} ${a.nombre}</a>`
+  ).join('')}</div>`;
 }
 
 async function doLogin() {
@@ -3483,7 +3578,8 @@ async function saveFacturaDB(fac, mesKey) {
     otros_imp:    fac.otrosImp,
     total_usd:    fac.totalUSD,
     terminales:   fac.terminales || 0,
-    series:       fac.series || []
+    series:       fac.series || [],
+    adjuntos:     fac.adjuntos || []
   };
   const { error } = await sb.from('presupuesto_facturas').upsert(row, { onConflict:'numero,mes' });
   if(error) console.error('Error guardando factura:', error);
@@ -3506,7 +3602,8 @@ async function loadFacturasFromDB() {
           numero:row.numero, fecha:row.fecha, vto:row.vto, desc:row.descripcion,
           tc:row.tc, subtotalUSD:row.subtotal_usd, ivaUSD:row.iva_usd,
           otrosImp:row.otros_imp, totalUSD:row.total_usd,
-          terminales:row.terminales, series:row.series||[]
+          terminales:row.terminales, series:row.series||[],
+          adjuntos:row.adjuntos||[]
         });
       }
     });
@@ -3523,7 +3620,8 @@ async function loadFacturasFromDB() {
           nroFac:          row.nro_factura||'—',
           fecha:           row.fecha||'—',
           periodo:         row.periodo||'—',
-          detalle:         row.detalle||{}
+          detalle:         row.detalle||{},
+          adjuntos:        row.adjuntos||[]
         };
       }
     });
@@ -3535,7 +3633,8 @@ async function loadFacturasFromDB() {
     amazonDbData.forEach(row=>{
       amazonData[row.mes]={totalUSD:row.total_factura, tc:row.detalle?.tc||1470,
         realPesos:row.real_pesos, periodo:row.periodo||'—',
-        idCuenta:row.nro_factura||'—', fechaFactura:row.fecha||'—', cuentas:row.detalle?.cuentas||[]};
+        idCuenta:row.nro_factura||'—', fechaFactura:row.fecha||'—', cuentas:row.detalle?.cuentas||[],
+        adjuntos:row.adjuntos||[]};
       reales['amazon_'+row.mes]=row.real_pesos;
     });
   }
@@ -3545,7 +3644,8 @@ async function loadFacturasFromDB() {
   if(!telecomDbErr && telecomDbData && telecomDbData.length){
     telecomDbData.forEach(row=>{
       telecomData[row.mes]={subtotal:row.real_pesos, total:row.total_factura,
-        nroFac:row.nro_factura||'—', fecha:row.fecha||'—', periodo:row.periodo||'—', detalle:row.detalle||[]};
+        nroFac:row.nro_factura||'—', fecha:row.fecha||'—', periodo:row.periodo||'—', detalle:row.detalle||[],
+        adjuntos:row.adjuntos||[]};
       reales['telecom_'+row.mes]=row.real_pesos;
     });
   }
@@ -3559,7 +3659,8 @@ async function loadFacturasFromDB() {
       if(!napseFacturas[m].find(f=>f.numero===row.numero)){
         napseFacturas[m].push({
           numero:row.numero, fecha:row.fecha, desc:row.descripcion,
-          tc:row.tc, brutoUSD:row.subtotal_usd, ivaUSD:row.iva_usd, totalUSD:row.total_usd
+          tc:row.tc, brutoUSD:row.subtotal_usd, ivaUSD:row.iva_usd, totalUSD:row.total_usd,
+          adjuntos:row.adjuntos||[]
         });
       }
     });
@@ -3577,7 +3678,8 @@ async function loadFacturasFromDB() {
           numero:row.numero, fecha:row.fecha, mesFac:m,
           totalFactura:row.total_usd, ivaPct:row.tc,
           subtotalAlleata:row.subtotal_usd, ivaAlleata:row.iva_usd,
-          totalAlleata:row.subtotal_usd+row.iva_usd, cantidadAlleata:row.terminales
+          totalAlleata:row.subtotal_usd+row.iva_usd, cantidadAlleata:row.terminales,
+          adjuntos:row.adjuntos||[]
         });
       }
     });
@@ -3599,7 +3701,8 @@ async function loadFacturasFromDB() {
           vto:(descParts[2]||'').replace('Vto ','')||'—',
           cae:(descParts[1]||'').replace('CAE ','')||'—',
           enviosAlleata:row.terminales||0,
-          enviosVarios:(row.series&&row.series[0]&&row.series[0].enviosVarios)||0
+          enviosVarios:(row.series&&row.series[0]&&row.series[0].enviosVarios)||0,
+          adjuntos:row.adjuntos||[]
         });
       }
     });
@@ -3622,7 +3725,8 @@ async function loadFacturasFromDB() {
           totalFactura:row.total_usd,
           cantidadTotal:row.terminales||0,
           desglose:row.series||[],
-          totalPlanilla:(row.series||[]).reduce((s,d)=>s+(d.total||0),0)
+          totalPlanilla:(row.series||[]).reduce((s,d)=>s+(d.total||0),0),
+          adjuntos:row.adjuntos||[]
         });
       }
     });
@@ -3644,7 +3748,8 @@ async function loadFacturasFromDB() {
           cantidadItems:row.terminales||items.filter(i=>i.seleccionado).length,
           cantidadTotalTicket:items.length,
           totalTicketCompleto:(()=>{ const m2=(row.descripcion||'').match(/ticket completo ([\d.]+)/); return m2?Number(m2[1]):row.total_usd; })(),
-          items
+          items,
+          adjuntos:row.adjuntos||[]
         });
       }
     });
@@ -3685,6 +3790,10 @@ logiAgregar = async function() {
   if(!logiFacturas[logiMesActual]) logiFacturas[logiMesActual]=[];
   const yaExiste=logiFacturas[logiMesActual].find(f=>f.numero===fac.numero&&fac.numero!=='RTO s/factura');
   if(yaExiste){ showToast('⚠️ Boludo, ya cargaste la '+fac.numero); return; }
+  fac.adjuntos=await presupSubirAdjuntos([
+    {file:logiPendingFac._filePdf, etiqueta:'pdf'},
+    {file:logiPendingRTO._fileXls, etiqueta:'xls'},
+  ], 'logicalis', logiMesActual);
   logiFacturas[logiMesActual].push(fac);
   const msg = logiPendingFac ? '✅ Factura '+fac.numero+' agregada' : '✅ RTO guardado (falta PDF)';
   logiPendingFac=null;
@@ -3715,6 +3824,7 @@ logiAgregar = async function() {
     <p class="msub" id="claroSub" style="font-size:12px;color:var(--text-muted);margin-bottom:22px"></p>
 
     <div class="claro-kpis" id="claroKpis"></div>
+    <div id="claroAdjuntosWrap" style="margin:-8px 0 18px"></div>
 
     <div class="sec-lbl">Cargar documentos <span></span></div>
     <div class="up-grid">
@@ -3997,6 +4107,7 @@ logiAgregar = async function() {
     <h3>Telecom Personal</h3>
     <p class="msub" id="telecomSub" style="font-size:12px;color:var(--text-muted);margin-bottom:22px"></p>
     <div class="claro-kpis" id="telecomKpis"></div>
+    <div id="telecomAdjuntosWrap" style="margin:-8px 0 18px"></div>
     <div class="sec-lbl">Cargar documentos <span></span></div>
     <div class="up-grid">
       <div>
@@ -4049,6 +4160,7 @@ logiAgregar = async function() {
     <h3>Amazon Web Services</h3>
     <p class="msub" id="amazonSub" style="font-size:12px;color:var(--text-muted);margin-bottom:22px"></p>
     <div class="claro-kpis" id="amazonKpis"></div>
+    <div id="amazonAdjuntosWrap" style="margin:0 0 10px"></div>
 
     <div class="sec-lbl">Cargar factura <span></span></div>
     <div style="max-width:420px">
