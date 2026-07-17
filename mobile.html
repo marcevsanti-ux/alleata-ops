@@ -165,7 +165,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
       <div class="login-logo">
         <img id="loginLogo" src="" alt="Alleata">
         <div class="login-sub">Portal de Operaciones</div>
-        <div class="login-version">v2.14.2 · mobile</div>
+        <div class="login-version">v2.14.8 · mobile</div>
       </div>
       <div class="field"><label class="label">Email</label><input class="input" id="lEmail" type="email" placeholder="usuario@alleata.com" autocomplete="email"></div>
       <div class="field"><label class="label">Contraseña</label><input class="input" id="lPass" type="password" placeholder="••••••••" autocomplete="current-password"></div>
@@ -181,7 +181,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
   <div class="topbar">
     <img id="appLogo" src="" alt="Alleata">
     <div class="topbar-title" id="topbarTitle">Operaciones</div>
-    <div class="topbar-version">v2.14.2</div>
+    <div class="topbar-version">v2.14.8</div>
     <div class="topbar-avatar" id="topbarAvatar" onclick="openDrawer()">?</div>
   </div>
 
@@ -286,6 +286,19 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
       <button id="btnFinalizarRuta" onclick="abrirResumenModal()" style="width:100%;margin-top:12px;background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:12px;font-size:13px;font-weight:700;border-radius:10px;cursor:pointer;font-family:'Inter',sans-serif">
         🏁 Finalizar ruta y generar resumen
       </button>
+
+      <!-- CERRAR HOJA DE RUTA → sugiere desinstalaciones cercanas -->
+      <div style="display:flex;align-items:center;gap:8px;margin-top:14px;padding:10px 12px;background:var(--surface);border:1px solid var(--border);border-radius:10px">
+        <span style="font-size:11px;color:var(--text-muted);white-space:nowrap">📍 Radio de búsqueda</span>
+        <input type="number" id="radioSugerenciaInput" min="1" max="50" value="10"
+          onchange="guardarRadioSugerencia(this.value)"
+          style="width:56px;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;color:var(--text);text-align:center;font-family:'JetBrains Mono',monospace;font-size:13px;padding:4px">
+        <span style="font-size:11px;color:var(--text-muted)">km</span>
+      </div>
+      <button id="btnCerrarHojaRuta" onclick="cerrarHojaDeRuta()" style="width:100%;margin-top:8px;background:var(--grad);border:none;color:#fff;padding:12px;font-size:13px;font-weight:700;border-radius:10px;cursor:pointer;font-family:'Inter',sans-serif">
+        🔒 Cerrar hoja de ruta y buscar desinstalaciones cercanas
+      </button>
+      <div id="sugerenciasDesinstWrap" style="margin-top:12px"></div>
     </div>
 
   </div>
@@ -633,7 +646,21 @@ function closeDrawer(){document.getElementById('drawer').classList.remove('show'
 // ── ZONA ──
 const CENTRAL_LAT=-34.648,CENTRAL_LNG=-58.377;
 const COORDS_CIUDAD={
-  'buenos aires':{lat:-34.603,lng:-58.381},'ciudad autónoma de buenos aires':{lat:-34.603,lng:-58.381},
+  'buenos aires':{lat:-34.603,lng:-58.381},'ciudad autónoma de buenos aires':{lat:-34.603,lng:-58.381},'caba':{lat:-34.603,lng:-58.381},
+  // Barrios de CABA que aparecen seguido en las OTs de desinstalación (no estaban cubiertos)
+  'almagro':{lat:-34.611,lng:-58.421},'balvanera':{lat:-34.609,lng:-58.401},'flores':{lat:-34.629,lng:-58.463},
+  'belgrano':{lat:-34.562,lng:-58.456},'constitución':{lat:-34.627,lng:-58.381},'constitucion':{lat:-34.627,lng:-58.381},
+  // Localidades de GBA que aparecen en los datos y no estaban
+  'bernal':{lat:-34.708,lng:-58.278},'canning':{lat:-34.837,lng:-58.491},'cañuelas':{lat:-35.052,lng:-58.760},'canuelas':{lat:-35.052,lng:-58.760},
+  'don torcuato':{lat:-34.499,lng:-58.617},'general pacheco':{lat:-34.462,lng:-58.635},'grand bourg':{lat:-34.500,lng:-58.702},
+  'glew':{lat:-34.845,lng:-58.428},'llavallol':{lat:-34.797,lng:-58.402},'isidro casanova':{lat:-34.697,lng:-58.583},
+  'gregorio de laferrere':{lat:-34.727,lng:-58.611},'gonzález catán':{lat:-34.760,lng:-58.635},'gonzalez catan':{lat:-34.760,lng:-58.635},
+  'loma hermosa':{lat:-34.564,lng:-58.596},
+  'city bell':{lat:-34.870,lng:-58.043},'el jagüel':{lat:-34.812,lng:-58.548},'el jaguel':{lat:-34.812,lng:-58.548},
+  'la reja':{lat:-34.641,lng:-58.827},'lomas del mirador':{lat:-34.675,lng:-58.567},
+  'rafael calzada':{lat:-34.812,lng:-58.365},'burzaco':{lat:-34.826,lng:-58.386},'adrogué':{lat:-34.798,lng:-58.391},'adrogue':{lat:-34.798,lng:-58.391},
+  'villa ballester':{lat:-34.542,lng:-58.564},'villa adelina':{lat:-34.504,lng:-58.548},'wilde':{lat:-34.706,lng:-58.331},
+  'villa sarmiento':{lat:-34.648,lng:-58.577},'villa madero':{lat:-34.696,lng:-58.500},'san telmo':{lat:-34.622,lng:-58.371},
   'san isidro':{lat:-34.472,lng:-58.527},'vicente lópez':{lat:-34.527,lng:-58.479},'vicente lopez':{lat:-34.527,lng:-58.479},
   'san martín':{lat:-34.576,lng:-58.540},'san martin':{lat:-34.576,lng:-58.540},'tigre':{lat:-34.426,lng:-58.579},
   'escobar':{lat:-34.348,lng:-58.793},'pilar':{lat:-34.459,lng:-58.914},'san fernando':{lat:-34.445,lng:-58.557},
@@ -669,8 +696,33 @@ function getZona(ciudad,provincia){
   if(oeste.some(o=>c.includes(o)))return{zona:'Oeste',color:'#8b5cf6'};
   return{zona:'Fuera',color:'#ef4444'};
 }
+// Claves ordenadas de más larga a más corta, para que un match de "lomas de
+// zamora" gane por sobre uno más corto y ambiguo si alguna vez lo hubiera.
+const _COORDS_KEYS_ORDENADAS=Object.keys(COORDS_CIUDAD).sort((a,b)=>b.length-a.length);
+
+// Las ciudades vienen de Salesforce con formato bastante sucio: paréntesis
+// con la zona ("Almagro (CABA)"), guiones ("Flores (Zona Oeste – CABA)"),
+// texto adicional separado por coma ("Ingeniero Budge, Lomas de Zamora").
+// Este resolver intenta varias formas de limpiar el texto antes de buscar
+// en COORDS_CIUDAD, en vez de exigir una coincidencia exacta.
+function resolverCoordsCiudad(ciudadRaw){
+  if(!ciudadRaw) return null;
+  const partes=String(ciudadRaw).split(',').map(p=>p.trim()).filter(Boolean);
+  const candidatos=[ciudadRaw, ...partes];
+  for(const cand of candidatos){
+    let c=cand.toLowerCase().trim();
+    c=c.replace(/\([^)]*\)/g,' ');       // saca "(CABA)", "(Zona Sur)", etc.
+    c=c.replace(/[–—-]/g,' ').replace(/\s+/g,' ').trim();
+    if(COORDS_CIUDAD[c]) return COORDS_CIUDAD[c];
+    for(const key of _COORDS_KEYS_ORDENADAS){
+      if(c.includes(key)) return COORDS_CIUDAD[key];
+    }
+  }
+  return null;
+}
+
 function getDistKm(ciudad){
-  const coords=COORDS_CIUDAD[(ciudad||'').toLowerCase().trim()];
+  const coords=resolverCoordsCiudad(ciudad);
   if(!coords)return null;
   return Math.round(haversine(CENTRAL_LAT,CENTRAL_LNG,coords.lat,coords.lng));
 }
@@ -941,6 +993,7 @@ let otScaneadaActual=null; // OT mostrada en el card de confirmación
 
 async function loadRuta(){
   if(!currentUser)return;
+  cargarRadioSugerencia();
   // Cargar ruta del día guardada (para restaurar km si recarga la app)
   const fecha=new Date().toISOString().slice(0,10);
   const{data:rutaHoy}=await sb.from('rutas_diarias')
@@ -1033,6 +1086,248 @@ async function loadEnTransito(){
   }).join('');
 }
 
+// ── RADIO DE SUGERENCIA (configurable por operador, guardado en el device) ──
+function _radioKey(){ return 'alleata_radio_km_'+(currentUser?.id||''); }
+function cargarRadioSugerencia(){
+  const v=parseInt(localStorage.getItem(_radioKey()))||10;
+  const inp=document.getElementById('radioSugerenciaInput');
+  if(inp) inp.value=v;
+  return v;
+}
+function guardarRadioSugerencia(val){
+  const v=Math.max(1,Math.min(50,parseInt(val)||10));
+  localStorage.setItem(_radioKey(),v);
+  const inp=document.getElementById('radioSugerenciaInput');
+  if(inp) inp.value=v;
+  showScanFeedback('📍 Radio guardado: '+v+' km','ok');
+}
+
+// ── CERRAR HOJA DE RUTA → sugerir desinstalaciones cercanas ─────────────────
+// No reemplaza la hoja de ruta que arma el admin desde desktop (flag
+// hoja_ruta_activa) — la complementa: busca entre TODAS las desinstalaciones
+// disponibles (estén ya planificadas para otro operador o sueltas) cuáles
+// caen dentro del radio configurado de alguna parada de la ruta que el
+// operador ya confirmó hoy (rutaDelDia), usando distancia real (haversine +
+// COORDS_CIUDAD), no solo la zona AMBA.
+let _sugerenciasActuales=[];
+let _esFallbackFueraDeRadio=false; // true = ninguna entró en el radio, se muestran las más cercanas igual
+
+// ── AVISO "SALIDA DE RUTA" a Ally + Ops / Ally + Sales ──────────────────────
+// Se dispara al cerrar la hoja de ruta: informa lo que el operador escaneó o
+// cargó a mano para entregar hoy, ANTES de que pasen las entregas — así, si
+// un comercio llama preguntando por su OT, Sales/Ops ya saben que está en
+// ruta sin tener que averiguarlo.
+// Los grupos NO están hardcodeados: se buscan en ally_grupos por tipo
+// ('ops','intel'), igual que ya hace el resto de los avisos de Ally — si se
+// agrega/saca un grupo desde Configuración Ally, este aviso se ajusta solo.
+async function allyRuta_enviarMensaje(mensaje,contexto){
+  try{
+    const{data:grupos,error}=await sb.from('ally_grupos')
+      .select('group_id,nombre').in('tipo',['ops','intel']).eq('activo',true);
+    if(error){ console.warn('[ALLY RUTA] error consultando ally_grupos:',error.message); return false; }
+    if(!grupos||!grupos.length){ console.warn('[ALLY RUTA] sin grupos ops/intel activos en ally_grupos'); return false; }
+    let okCount=0;
+    for(const g of grupos){
+      try{
+        const res=await fetch(ALLY_URL+'/automations/send-message',{
+          method:'POST',
+          headers:{'Content-Type':'application/json','x-automation-secret':'123456'},
+          body:JSON.stringify({group_id:g.group_id,message:mensaje,context:contexto})
+        });
+        if(res.ok) okCount++;
+        else console.warn('[ALLY RUTA] error enviando a',g.nombre,res.status);
+      }catch(e){ console.warn('[ALLY RUTA] fetch error a',g.nombre,e.message); }
+    }
+    return okCount>0;
+  }catch(e){ console.warn('[ALLY RUTA] error general:',e.message); return false; }
+}
+
+function generarMensajeSalidaRuta(){
+  const nombreCompleto=(currentProfile?.nombre||currentUser?.email||'Operador').trim();
+  const primerNombre=nombreCompleto.split(' ')[0];
+  const fecha=new Date().toLocaleDateString('es-AR',{weekday:'long',day:'2-digit',month:'2-digit'});
+  const lineas=rutaDelDia.map(ot=>{
+    const prop=ot.propietario_cuenta?` — *${ot.propietario_cuenta}*`:'';
+    return `• OT ${ot.ot_numero} — ${ot.tipo||'—'} — ${ot.nombre_comercio||ot.cuenta||'—'} (${ot.ciudad||'—'})${prop}`;
+  });
+  return [
+    `📦 Salida de ruta — Logística Alleata`,
+    ``,
+    `👤 Operador: ${nombreCompleto}`,
+    `📅 Hoy, ${fecha}`,
+    ``,
+    `🚚 ${rutaDelDia.length} OT en ruta hoy:`,
+    ...lineas,
+    ``,
+    `ℹ️ Si un comercio consulta por su OT, está en ruta con ${primerNombre} hoy.`,
+  ].join('\n');
+}
+
+async function enviarAvisoSalidaRuta(){
+  try{
+    const msg=generarMensajeSalidaRuta();
+    const ok=await allyRuta_enviarMensaje(msg,'salida_ruta');
+    if(ok) showScanFeedback('📲 Aviso de salida de ruta enviado a Ops/Sales','ok');
+  }catch(e){ console.warn('[enviarAvisoSalidaRuta] error:',e.message); }
+}
+
+async function cerrarHojaDeRuta(){
+  if(!rutaDelDia.length){
+    showScanFeedback('⚠️ Todavía no aceptaste ninguna OT hoy — no hay ruta para cerrar','warn');
+    return;
+  }
+  const btn=document.getElementById('btnCerrarHojaRuta');
+  btn.disabled=true; btn.textContent='⏳ Avisando a Ops/Sales...';
+
+  // Aviso de salida de ruta — no bloquea la búsqueda de desinstalaciones
+  // aunque falle el envío por WhatsApp (ej: sin conexión momentánea)
+  await enviarAvisoSalidaRuta();
+
+  btn.textContent='⏳ Buscando desinstalaciones cercanas...';
+
+  try{
+    const radio=cargarRadioSugerencia();
+
+    // Coordenadas de las paradas ya confirmadas hoy (se ignoran las ciudades
+    // sin coordenadas conocidas, igual que hace calcKmRuta)
+    const paradas=rutaDelDia
+      .map(o=>({ot_numero:o.ot_numero,ciudad:o.ciudad,coords:resolverCoordsCiudad(o.ciudad)}))
+      .filter(p=>p.coords);
+
+    if(!paradas.length){
+      showScanFeedback('⚠️ Ninguna ciudad de tu ruta de hoy tiene coordenadas cargadas — no se puede calcular cercanía','warn');
+      return;
+    }
+
+    // Desinstalaciones disponibles (planificadas o sueltas, como se definió).
+    // Los 4 filtros exactos según Salesforce:
+    //   Estado = En Proceso · Logística = ALLEATA
+    //   Gestión Retiros = Contactado
+    //   Status Gestión Retiros = Visita presencial
+    // NOTA: la tabla ordenes_trabajo tenía datos viejos con un valor
+    // distinto ("CONFIRMACION RETIRO PRESENCIAL") de cuando esto se
+    // sincronizaba solo con un script manual que no corría hace ~2 meses.
+    // Ahora ordenes_trabajo se actualiza sola desde el mismo sync SF que ya
+    // corre cada ~10min (ver syncDesinstalacionesAOrdenesTrabajo en
+    // salesforce.js), que trae el valor real y actual del campo de SF.
+    const{data:candidatas,error}=await sb.from('ordenes_trabajo')
+      .select('id,ot,comercio,cuenta,contacto,horario,calle,direccion,ciudad,provincia,operador_id,hoja_ruta_activa')
+      .eq('tipo','desinstalacion')
+      .eq('logistica','ALLEATA')
+      .eq('estado','En Proceso')
+      .eq('gestion_retiros','Contactado')
+      .eq('status_gestion_retiros','Visita presencial');
+    if(error) throw new Error(error.message);
+
+    // Para cada candidata: distancia mínima a cualquier parada de la ruta de hoy.
+    // Se calcula para TODAS (no solo las que entran en el radio) porque si
+    // ninguna cae dentro del radio configurado, igual mostramos las más
+    // cercanas como referencia (ver más abajo).
+    const conDistancia=(candidatas||[]).map(ot=>{
+      const coords=resolverCoordsCiudad(ot.ciudad);
+      if(!coords) return null;
+      let distMin=Infinity, paradaCercana=null;
+      for(const p of paradas){
+        const d=haversine(p.coords.lat,p.coords.lng,coords.lat,coords.lng);
+        if(d<distMin){ distMin=d; paradaCercana=p; }
+      }
+      return {...ot,_distKm:Math.round(distMin*10)/10,_paradaCercana:paradaCercana};
+    }).filter(Boolean).sort((a,b)=>a._distKm-b._distKm);
+
+    const dentroDelRadio=conDistancia.filter(ot=>ot._distKm<=radio);
+
+    if(dentroDelRadio.length){
+      _sugerenciasActuales=dentroDelRadio;
+      _esFallbackFueraDeRadio=false;
+    } else {
+      // Nada dentro del radio configurado — mostramos igual las 5 más
+      // cercanas (aunque estén lejos) para que el operador decida, en vez
+      // de dejarlo sin ninguna sugerencia.
+      _sugerenciasActuales=conDistancia.slice(0,5);
+      _esFallbackFueraDeRadio=true;
+    }
+    renderSugerenciasDesinst();
+
+    if(!conDistancia.length){
+      showScanFeedback('✅ Hoja de ruta cerrada — no hay desinstalaciones disponibles con coordenadas para calcular cercanía','ok');
+    } else if(dentroDelRadio.length){
+      showScanFeedback('📦 '+dentroDelRadio.length+' desinstalación(es) dentro de '+radio+'km de tu ruta','ok');
+    } else {
+      showScanFeedback('📦 Nada dentro de '+radio+'km — te muestro las '+_sugerenciasActuales.length+' más cercanas igual','warn');
+    }
+  }catch(e){
+    showScanFeedback('⚠️ Error buscando desinstalaciones: '+e.message,'error');
+    console.error('[cerrarHojaDeRuta]',e);
+  }
+  btn.disabled=false; btn.textContent='🔒 Cerrar hoja de ruta y buscar desinstalaciones cercanas';
+}
+
+function renderSugerenciasDesinst(){
+  const wrap=document.getElementById('sugerenciasDesinstWrap');
+  if(!wrap) return;
+  if(!_sugerenciasActuales.length){ wrap.innerHTML=''; return; }
+  const miNombre=(currentProfile?.nombre||'').trim();
+  const tituloAviso=_esFallbackFueraDeRadio
+    ? `⚠️ NINGUNA DENTRO DE TU RADIO — LAS ${_sugerenciasActuales.length} MÁS CERCANAS IGUAL`
+    : `📦 DESINSTALACIONES CERCA DE TU RUTA`;
+  wrap.innerHTML=`
+    <div style="font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:${_esFallbackFueraDeRadio?'var(--yellow)':'var(--text-muted)'};margin-bottom:10px">
+      ${tituloAviso}
+    </div>
+    ${_sugerenciasActuales.map(ot=>{
+      const dir=ot.direccion||ot.calle||''; // Direccion_de_envio__c = dirección real de retiro
+      const maps='https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(dir+' '+(ot.ciudad||'')+' Argentina');
+      const yaAsignada=ot.operador_id&&ot.operador_id.trim()&&ot.operador_id.trim()!==miNombre;
+      return `<div class="ot-card" style="margin-bottom:10px;border-left:3px solid var(--yellow)">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px">
+          <div>
+            <div class="ot-num">${ot.ot||'—'}<span class="badge-desinstal">DESINSTALACIÓN</span></div>
+          </div>
+          <span class="zona-badge" style="color:var(--teal);background:var(--teal)20;border:1px solid var(--teal)40">~${ot._distKm}km de ${ot._paradaCercana?.ot_numero||'tu ruta'}</span>
+        </div>
+        <div class="ot-comercio">${ot.comercio||ot.cuenta||'—'}</div>
+        <div style="display:flex;flex-direction:column;gap:4px;margin:8px 0">
+          ${dir?`<div class="ot-row"><span>📍</span>${dir}${ot.ciudad?', '+ot.ciudad:''}</div>`:''}
+          ${ot.horario?`<div class="ot-row"><span>🕐</span>${ot.horario}</div>`:''}
+        </div>
+        ${yaAsignada?`<div style="font-size:11px;color:var(--yellow);margin-bottom:8px">⚠️ Ya estaba asignada a ${ot.operador_id}</div>`:''}
+        <div class="ot-actions" style="flex-wrap:wrap;gap:5px">
+          <button class="btn-sm" style="flex:1;min-width:120px;background:var(--grad);color:#fff;border:none" onclick="tomarDesinstalacionSugerida('${ot.id}')">✅ Sumar a mi ruta</button>
+          <button class="btn-sm" style="flex:0 0 auto;background:none;border:1px solid var(--border2);color:var(--text-muted)" onclick="descartarSugerencia('${ot.id}')">✕</button>
+          <a href="${maps}" target="_blank" class="btn-sm btn-maps" style="flex:0 0 40px">🗺️</a>
+        </div>
+      </div>`;
+    }).join('')}
+  `;
+}
+
+function descartarSugerencia(id){
+  _sugerenciasActuales=_sugerenciasActuales.filter(o=>o.id!==id);
+  renderSugerenciasDesinst();
+}
+
+async function tomarDesinstalacionSugerida(id){
+  const ot=_sugerenciasActuales.find(o=>o.id===id);
+  if(!ot) return;
+  const miNombre=(currentProfile?.nombre||currentUser?.email||'Operador').trim();
+  const yaAsignada=ot.operador_id&&ot.operador_id.trim()&&ot.operador_id.trim()!==miNombre;
+  if(yaAsignada && !confirm('Esta OT ya estaba asignada a "'+ot.operador_id+'". ¿Confirmás que la tomás vos igual?')) return;
+
+  const fecha=new Date().toISOString().slice(0,10);
+  const{error}=await sb.from('ordenes_trabajo').update({
+    hoja_ruta_activa:true,
+    hoja_ruta_fecha:fecha,
+    operador_id:miNombre,
+    fecha_asignacion:fecha
+  }).eq('id',id);
+  if(error){ showScanFeedback('⚠️ Error al asignar: '+error.message,'error'); return; }
+
+  showScanFeedback('✅ OT '+ot.ot+' sumada a tu ruta de desinstalaciones','ok');
+  _sugerenciasActuales=_sugerenciasActuales.filter(o=>o.id!==id);
+  renderSugerenciasDesinst();
+  await loadDesinstalaciones(); // refresca la lista del tab Desinstalaciones
+}
+
 // Llamado desde handleRutaQR cuando se escanea un QR válido
 async function mostrarOTScaneada(sfId){
   const status=document.getElementById('rutaScanStatus');
@@ -1041,7 +1336,7 @@ async function mostrarOTScaneada(sfId){
   // Primero buscar en sf_workorders (instalaciones Alleata)
   let ot=null, esSFWorkorder=false;
   const{data:sfOT,error:sfErr}=await sb.from('sf_workorders')
-    .select('id,sf_id,workorder_number,record_type,status,logistica,cuenta,nombre_comercio,direccion_formula,direccion,localidad,ciudad,provincia,codigo_postal,contacto_celular,horario,horario_entrega,responsable')
+    .select('id,sf_id,workorder_number,record_type,status,logistica,cuenta,nombre_comercio,propietario_cuenta,direccion_formula,direccion,localidad,ciudad,provincia,codigo_postal,contacto_celular,horario,horario_entrega,responsable')
     .eq('sf_id',sfId).eq('logistica','ALLEATA').maybeSingle();
 
   if(sfErr) console.warn('[mostrarOTScaneada] sf_workorders error:', sfErr.message);
@@ -1055,6 +1350,7 @@ async function mostrarOTScaneada(sfId){
       estado:        sfOT.status,
       cuenta:        sfOT.cuenta,
       nombre_comercio: sfOT.nombre_comercio,
+      propietario_cuenta: sfOT.propietario_cuenta,
       direccion_completa: sfOT.direccion||sfOT.direccion_formula||'',
       ciudad:        sfOT.ciudad,
       provincia:     sfOT.provincia,
@@ -1148,7 +1444,7 @@ async function buscarOTManual(){
   msgEl.style.color='var(--text-muted)';
 
   const{data:sfOT,error}=await sb.from('sf_workorders')
-    .select('id,sf_id,workorder_number,record_type,status,logistica,cuenta,nombre_comercio,direccion_formula,direccion,localidad,ciudad,provincia,codigo_postal,contacto_celular,horario,horario_entrega,responsable')
+    .select('id,sf_id,workorder_number,record_type,status,logistica,cuenta,nombre_comercio,propietario_cuenta,direccion_formula,direccion,localidad,ciudad,provincia,codigo_postal,contacto_celular,horario,horario_entrega,responsable')
     .eq('logistica','ALLEATA')
     .ilike('workorder_number','%'+numLimpio)
     .maybeSingle();
@@ -1177,6 +1473,7 @@ async function buscarOTManual(){
     estado:             sfOT.status,
     cuenta:             sfOT.cuenta,
     nombre_comercio:    sfOT.nombre_comercio,
+    propietario_cuenta: sfOT.propietario_cuenta,
     direccion_completa: sfOT.direccion||sfOT.direccion_formula||'',
     ciudad:             sfOT.ciudad,
     provincia:          sfOT.provincia,
@@ -2357,7 +2654,7 @@ async function loadDesinstalaciones(){
   el.innerHTML=list.map(ot=>{
     const zona=getZona(ot.ciudad,ot.provincia);
     const distKm=getDistKm(ot.ciudad);
-    const dir=ot.calle||ot.direccion||'';
+    const dir=ot.direccion||ot.calle||''; // Direccion_de_envio__c = dirección real de retiro
     const maps='https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(dir+' '+(ot.ciudad||'')+' Argentina');
     const obs=ot.observacion_estado||ot.observaciones||'';
     const tel=String(ot.contacto||'').replace(/\D/g,'');
@@ -2466,7 +2763,7 @@ async function allyDesinst_retiroFallido(ot, motivo) {
 
 📦 OT: ${ot.ot||ot}
 🏢 Comercio: ${ot.comercio||ot.cuenta||'—'}
-📍 ${ot.calle||''}${ot.ciudad?', '+ot.ciudad:''}
+📍 ${ot.direccion||ot.calle||''}${ot.ciudad?', '+ot.ciudad:''}
 ${motivo?'❌ Motivo: '+motivo:''}
 📝 ${ot.observaciones||ot.observacion_estado||''}
 
