@@ -165,7 +165,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
       <div class="login-logo">
         <img id="loginLogo" src="" alt="Alleata">
         <div class="login-sub">Portal de Operaciones</div>
-        <div class="login-version">v2.14.12 · mobile</div>
+        <div class="login-version">v2.14.13 · mobile</div>
       </div>
       <div class="field"><label class="label">Email</label><input class="input" id="lEmail" type="email" placeholder="usuario@alleata.com" autocomplete="email"></div>
       <div class="field"><label class="label">Contraseña</label><input class="input" id="lPass" type="password" placeholder="••••••••" autocomplete="current-password"></div>
@@ -181,7 +181,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
   <div class="topbar">
     <img id="appLogo" src="" alt="Alleata">
     <div class="topbar-title" id="topbarTitle">Operaciones</div>
-    <div class="topbar-version">v2.14.12</div>
+    <div class="topbar-version">v2.14.13</div>
     <div class="topbar-avatar" id="topbarAvatar" onclick="openDrawer()">?</div>
   </div>
 
@@ -554,6 +554,14 @@ const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSI
 //     control" que ya tenía el lado de Supabase.
 //   - Resultado de SIM ahora muestra la fuente: "Confirmado en vivo con
 //     Salesforce" vs "Caché local — no se pudo confirmar"
+// Cambios v2.14.13:
+//   - Fix: cerrar una desinstalación como "Retirada" solo actualizaba
+//     ordenes_trabajo en Supabase — nunca tocaba Salesforce. Ahora, al
+//     retirar, llama a POST /automations/recuperar-terminal (nuevo
+//     endpoint en el agente) que transiciona el WorkOrder a
+//     Status='Recuperada' y carga N_de_seguimiento__c con el nombre de
+//     quien cerró la OT (currentProfile.nombre). Si SF no responde, el
+//     cierre local igual queda guardado y se avisa con un warning.
 const{createClient}=supabase;
 const sb=createClient(SUPABASE_URL,SUPABASE_KEY);
 
@@ -1941,6 +1949,31 @@ async function confirmarCierreOT(){
       resultado: retirado?'Retirado':'Fallido',
       motivo:    retirado?null:(datoEnvio||notas||'Sin detalle'),
     });
+    // Al retirar la terminal, transicionar en Salesforce (Status='Recuperada' +
+    // N_de_seguimiento__c = quien la cerró) — no bloquea el cierre local si
+    // falla la escritura a SF, pero avisa igual que muestra un warning.
+    if(retirado){
+      const sfIdDesinst=_dsmCierreCtx?.sfId;
+      const tecnicoDesinst=(currentProfile?.nombre||currentUser?.email||'Operador').trim();
+      if(sfIdDesinst){
+        try{
+          const resSF=await railwayFetch('/automations/recuperar-terminal',{
+            method:'POST',
+            body:JSON.stringify({sf_id:sfIdDesinst,tecnico:tecnicoDesinst})
+          });
+          const dataSF=await resSF.json();
+          if(!resSF.ok||!dataSF.ok){
+            console.warn('[recuperar-terminal] SF no se pudo actualizar:',dataSF?.error);
+            showScanFeedback('⚠️ Retiro guardado, pero no se pudo actualizar Salesforce','warn');
+          }
+        }catch(e){
+          console.warn('[recuperar-terminal] error:',e);
+          showScanFeedback('⚠️ Retiro guardado, pero no se pudo actualizar Salesforce','warn');
+        }
+      }else{
+        console.warn('[recuperar-terminal] sin sf_id en contexto — no se pudo notificar a SF');
+      }
+    }
     // Hook Ally — notificar grupo interno (no envía a merchants)
     try {
       const _otObj = {ot:otNumResuelto, comercio:'', cuenta:'', ciudad:'', calle:'', observaciones:notas};
@@ -2810,7 +2843,7 @@ async function loadDesinstalaciones(){
   if(!el)return;
   el.innerHTML='<div class="empty"><div class="empty-icon">⏳</div><p>Cargando...</p></div>';
   const{data:ots,error}=await sb.from('ordenes_trabajo')
-    .select('id,ot,comercio,cuenta,contacto,horario,calle,direccion,ciudad,provincia,estado,observaciones,observacion_estado,hoja_ruta_orden,hoja_ruta_fecha')
+    .select('id,sf_id,ot,comercio,cuenta,contacto,horario,calle,direccion,ciudad,provincia,estado,observaciones,observacion_estado,hoja_ruta_orden,hoja_ruta_fecha')
     .eq('tipo','desinstalacion').eq('hoja_ruta_activa',true)
     .order('hoja_ruta_orden',{ascending:true});
   if(error){el.innerHTML=`<div class="empty"><p>Error: ${error.message}</p></div>`;return;}
@@ -2848,9 +2881,9 @@ async function loadDesinstalaciones(){
         ${obs?`<div class="ot-row" style="color:var(--text-muted)"><span>📝</span>${obs}</div>`:''}
       </div>
       <div class="ot-actions" style="flex-wrap:wrap;gap:5px">
-        <button class="btn-sm btn-retirado" style="flex:1;min-width:120px" onclick="dsm_openCierre('${ot.id}','${ot.ot}','DESINST_RETIRADO')">✅ Retirada</button>
-        <button class="btn-sm btn-no-retiro" style="flex:1;min-width:120px" onclick="dsm_openCierre('${ot.id}','${ot.ot}','DESINST_FALLIDO')">❌ Fallido</button>
-        <button class="btn-sm btn-evidencia" style="flex:1" onclick="dsm_openCierre('${ot.id}','${ot.ot}','DESINST_RETIRADO')">📸 Foto</button>
+        <button class="btn-sm btn-retirado" style="flex:1;min-width:120px" onclick="dsm_openCierre('${ot.id}','${ot.ot}','DESINST_RETIRADO','${ot.sf_id||''}')">✅ Retirada</button>
+        <button class="btn-sm btn-no-retiro" style="flex:1;min-width:120px" onclick="dsm_openCierre('${ot.id}','${ot.ot}','DESINST_FALLIDO','${ot.sf_id||''}')">❌ Fallido</button>
+        <button class="btn-sm btn-evidencia" style="flex:1" onclick="dsm_openCierre('${ot.id}','${ot.ot}','DESINST_RETIRADO','${ot.sf_id||''}')">📸 Foto</button>
         ${ot.contacto?`<a href="tel:${ot.contacto}" class="btn-sm" style="flex:1;background:rgba(26,159,212,.15);color:var(--blue);border:1px solid rgba(26,159,212,.3);text-decoration:none;display:flex;align-items:center;justify-content:center">📞</a>`:''}
         ${wa?`<a href="${wa}" target="_blank" class="btn-sm" style="flex:1;background:rgba(37,211,102,.15);color:#25D366;border:1px solid rgba(37,211,102,.3);text-decoration:none;display:flex;align-items:center;justify-content:center;font-weight:800">WA</a>`:''}
         <a href="${maps}" target="_blank" class="btn-sm btn-maps" style="flex:0 0 40px">🗺️</a>
@@ -2859,8 +2892,8 @@ async function loadDesinstalaciones(){
   }).join('');
 }
 
-function dsm_openCierre(otId,otNum,resultado){
-  _dsmCierreCtx={otId,otNum};
+function dsm_openCierre(otId,otNum,resultado,sfId){
+  _dsmCierreCtx={otId,otNum,sfId};
   document.getElementById('modalCierre-id').value=otId;
   document.getElementById('modalCierre-resultado').value=resultado;
   document.getElementById('modalCierre-notas').value='';
