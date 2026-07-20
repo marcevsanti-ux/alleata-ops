@@ -165,7 +165,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
       <div class="login-logo">
         <img id="loginLogo" src="" alt="Alleata">
         <div class="login-sub">Portal de Operaciones</div>
-        <div class="login-version">v2.14.11 · mobile</div>
+        <div class="login-version">v2.14.12 · mobile</div>
       </div>
       <div class="field"><label class="label">Email</label><input class="input" id="lEmail" type="email" placeholder="usuario@alleata.com" autocomplete="email"></div>
       <div class="field"><label class="label">Contraseña</label><input class="input" id="lPass" type="password" placeholder="••••••••" autocomplete="current-password"></div>
@@ -181,7 +181,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
   <div class="topbar">
     <img id="appLogo" src="" alt="Alleata">
     <div class="topbar-title" id="topbarTitle">Operaciones</div>
-    <div class="topbar-version">v2.14.11</div>
+    <div class="topbar-version">v2.14.12</div>
     <div class="topbar-avatar" id="topbarAvatar" onclick="openDrawer()">?</div>
   </div>
 
@@ -545,6 +545,15 @@ const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSI
 //   - Fix: simLookup() prueba con y sin el último dígito (checksum) antes
 //     de declarar una SIM "no registrada" — algunos chips lo imprimen
 //     pegado al resto y el OCR lo suma sin querer
+// Cambios v2.14.12:
+//   - Fix: simLookup() consultaba SOLO la caché de Supabase (sync nocturno
+//     06:10), nunca a Salesforce en vivo — a diferencia de desktop, que sí
+//     confirma con SF. Ahora consulta primero /automations/sims/lookup
+//     (SF en vivo, vía Railway) y usa Supabase solo de respaldo si Railway
+//     no responde. Mismo endpoint recibió el fallback "sin dígito de
+//     control" que ya tenía el lado de Supabase.
+//   - Resultado de SIM ahora muestra la fuente: "Confirmado en vivo con
+//     Salesforce" vs "Caché local — no se pudo confirmar"
 const{createClient}=supabase;
 const sb=createClient(SUPABASE_URL,SUPABASE_KEY);
 
@@ -2545,7 +2554,33 @@ function parseVisionSIM(text){
   return{serie,linea,sufijo,prefijo};
 }
 
+// Consulta EN VIVO contra Salesforce (Product2), vía el agente Railway.
+// Es la fuente de verdad — la caché de Supabase puede tener filas viejas
+// (sync nocturno) o, peor, matchear una fila equivocada por sufijo
+// repetido. Devuelve null si Railway/SF no responde (sin conexión, etc.)
+async function simLookupLiveSF(query){
+  try{
+    const resp=await railwayFetch('/automations/sims/lookup?q='+encodeURIComponent(query));
+    const data=await resp.json();
+    if(!resp.ok||!data.ok)return null;
+    return data.sim;
+  }catch(e){
+    console.warn('[simLookupLiveSF] error:',e);
+    return null;
+  }
+}
+
 async function simLookup(serie,linea,sufijo,prefijo){
+  // 1) SF EN VIVO primero — fuente de verdad. Se prueba con la mejor cadena
+  // disponible (serie completa > prefijo+sufijo > sufijo > línea), en el
+  // mismo orden de prioridad que usa el endpoint del lado del agente.
+  const queryLive = serie || (prefijo&&sufijo ? (prefijo+sufijo).replace(/\s/g,'') : null) || sufijo || linea;
+  if(queryLive){
+    const live=await simLookupLiveSF(queryLive);
+    if(live)return{found:true,...live,_source:'sf_live'};
+  }
+  // 2) Respaldo: caché local en Supabase, solo si SF no respondió (sin
+  // conexión, Railway caído, etc.) — puede estar desactualizada.
   if(serie){
     const{data}=await sb.from('sims').select('*').eq('serie',serie).limit(1);
     if(data?.length)return{found:true,...data[0]};
@@ -2593,6 +2628,7 @@ function appendSimResult(container,result,rawSerie){
   div.className='sim-result';
   const statusColor=result.found?(result.estado==='ASIGNADA'?'var(--green)':result.estado==='DISPONIBLE'?'var(--blue)':'var(--yellow)'):'var(--red)';
   const statusText=result.found?(result.estado||'SIN ESTADO'):'NO REGISTRADA';
+  const sourceLabel=result.found?(result._source==='sf_live'?'● Confirmado en vivo con Salesforce':'⚠️ Caché local — no se pudo confirmar con Salesforce'):'';
   div.innerHTML=`<div class="sim-result-head" style="border-bottom:1px solid var(--border)">
     <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-mid);word-break:break-all">${result.serie||rawSerie||'—'}</div>
     <span class="badge" style="background:${statusColor}20;color:${statusColor};border:1px solid ${statusColor}40">${statusText}</span>
@@ -2602,7 +2638,8 @@ function appendSimResult(container,result,rawSerie){
     ${result.cuenta?`<div class="sim-row"><span class="sim-key">Cuenta</span><span class="sim-val">${result.cuenta}</span></div>`:''}
     ${result.ubicacion?`<div class="sim-row"><span class="sim-key">Ubicación</span><span class="sim-val">${result.ubicacion}</span></div>`:''}
     <button class="btn-sm" style="margin-top:10px;width:100%;background:rgba(26,159,212,.12);color:var(--blue);border:1px solid rgba(26,159,212,.3)" onclick='abrirModalActualizarSim(${JSON.stringify({sf_id:result.sf_id,serie:result.serie||rawSerie,estado:result.estado||"",ubicacion:result.ubicacion||""}).replace(/'/g,"&#39;")})'>✏️ Actualizar</button>
-  </div>`:'<div style="padding:10px 14px;font-size:12px;color:var(--text-muted)">SIM no encontrada en la base de datos</div>'}`;
+    <div style="font-size:9px;color:var(--text-muted);margin-top:8px;text-align:right">${sourceLabel}</div>
+  </div>`:'<div style="padding:10px 14px;font-size:12px;color:var(--text-muted)">SIM no encontrada (ni en Salesforce en vivo ni en caché)</div>'}`;
   container.appendChild(div);
 }
 
