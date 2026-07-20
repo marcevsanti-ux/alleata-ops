@@ -2570,8 +2570,16 @@ async function simLookup(serie,linea,sufijo,prefijo){
     }
   }
   if(sufijo){
-    const{data}=await sb.from('sims').select('*').ilike('serie','%'+sufijo.replace(/\s/g,'')).limit(1);
+    const sufijoLimpio=sufijo.replace(/\s/g,'');
+    const{data}=await sb.from('sims').select('*').ilike('serie','%'+sufijoLimpio).limit(1);
     if(data?.length)return{found:true,...data[0]};
+    // Mismo fallback que serie/combinada: probar sin el último dígito
+    // de control, por si el OCR lo sumó de más al sufijo.
+    if(sufijoLimpio.length>=4){
+      const sufijoSinControl=sufijoLimpio.slice(0,-1);
+      const{data:dataSC}=await sb.from('sims').select('*').ilike('serie','%'+sufijoSinControl).limit(1);
+      if(dataSC?.length)return{found:true,...dataSC[0]};
+    }
   }
   if(linea){
     const{data}=await sb.from('sims').select('*').eq('linea',linea).limit(1);
