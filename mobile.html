@@ -165,7 +165,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
       <div class="login-logo">
         <img id="loginLogo" src="" alt="Alleata">
         <div class="login-sub">Portal de Operaciones</div>
-        <div class="login-version">v2.14.15 · mobile</div>
+        <div class="login-version">v2.14.16 · mobile</div>
       </div>
       <div class="field"><label class="label">Email</label><input class="input" id="lEmail" type="email" placeholder="usuario@alleata.com" autocomplete="email"></div>
       <div class="field"><label class="label">Contraseña</label><input class="input" id="lPass" type="password" placeholder="••••••••" autocomplete="current-password"></div>
@@ -181,7 +181,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
   <div class="topbar">
     <img id="appLogo" src="" alt="Alleata">
     <div class="topbar-title" id="topbarTitle">Operaciones</div>
-    <div class="topbar-version">v2.14.15</div>
+    <div class="topbar-version">v2.14.16</div>
     <div class="topbar-avatar" id="topbarAvatar" onclick="openDrawer()">?</div>
   </div>
 
@@ -554,6 +554,13 @@ const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSI
 //     control" que ya tenía el lado de Supabase.
 //   - Resultado de SIM ahora muestra la fuente: "Confirmado en vivo con
 //     Salesforce" vs "Caché local — no se pudo confirmar"
+// Cambios v2.14.16:
+//   - Envíos "En camino" (loadEnTransito): agrega link WA junto al teléfono
+//     (antes solo tenía tel:, sin WhatsApp). El botón de mapa 🗺️ ya existía.
+//   - Desinstalaciones "por zona" (renderListaZona) y "sugerencias cerca de
+//     tu ruta" (renderSugerenciasDesinst): agrega fila 📞 + WA — el query ya
+//     traía 'contacto' pero la card nunca lo mostraba. El botón de mapa 🗺️
+//     ya existía en las dos.
 // Cambios v2.14.15:
 //   - Nuevo: buscarSIM() (tab Buscar manual) ahora consulta primero
 //     /automations/sims/duplicados (SF en vivo). Si el mismo chip está
@@ -1106,6 +1113,8 @@ async function loadEnTransito(){
     const z=getZona(e.ciudad,e.provincia);
     const km=getDistKm(e.ciudad);
     const mapsUrl='https://www.google.com/maps/search/?api=1&query='+encodeURIComponent((e.direccion_completa||'')+' '+(e.ciudad||'')+' Argentina');
+    const telE=String(e.contacto||'').replace(/\D/g,'');
+    const waE=telE?`https://wa.me/${telE.startsWith('54')?telE:'54'+telE}?text=${encodeURIComponent('Hola'+(e.nombre_comercio?' '+e.nombre_comercio:'')+'👋\nTe contactamos de Alleata por la OT '+(e.ot_numero||'')+'.')}`:'';
     return`<div class="ot-card en-transito" style="margin-bottom:10px">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px">
         <div>
@@ -1119,7 +1128,7 @@ async function loadEnTransito(){
       <div style="display:flex;flex-direction:column;gap:4px;margin:8px 0">
         <div class="ot-row"><span>📍</span>${e.direccion_completa||''}, ${e.ciudad||''}</div>
         ${e.horario?`<div class="ot-row"><span>🕐</span>${e.horario}</div>`:''}
-        ${e.contacto?`<div class="ot-row"><span>📞</span><a href="tel:${e.contacto}" style="color:var(--blue);text-decoration:none">${e.contacto}</a></div>`:''}
+        ${e.contacto?`<div class="ot-row"><span>📞</span><a href="tel:${e.contacto}" style="color:var(--blue);text-decoration:none">${e.contacto}</a> ${waE?`<a href="${waE}" target="_blank" style="margin-left:8px;color:#25D366;text-decoration:none;font-weight:800">WA</a>`:''}</div>`:''}
       </div>
       <div class="ot-actions">
         <button class="btn-sm btn-entregar" style="flex:1" onclick="openCierreModal('${e.id}','Entregado')">✅ Entregado</button>
@@ -1322,6 +1331,8 @@ function renderSugerenciasDesinst(){
       const dir=ot.direccion||ot.calle||''; // Direccion_de_envio__c = dirección real de retiro
       const maps='https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(dir+' '+(ot.ciudad||'')+' Argentina');
       const yaAsignada=ot.operador_id&&ot.operador_id.trim()&&ot.operador_id.trim()!==miNombre;
+      const telS=String(ot.contacto||'').replace(/\D/g,'');
+      const waS=telS?`https://wa.me/${telS.startsWith('54')?telS:'54'+telS}?text=${encodeURIComponent('Hola'+(ot.comercio?' '+ot.comercio:'')+'👋\nTe contactamos de Alleata para coordinar el retiro de la terminal de la OT '+(ot.ot||'')+'.\n\nPor favor confirmanos dirección, horario disponible y contacto.\n\nGracias,\nEquipo Alleata')}`:'';
       return `<div class="ot-card" style="margin-bottom:10px;border-left:3px solid var(--yellow)">
         <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px">
           <div>
@@ -1333,6 +1344,7 @@ function renderSugerenciasDesinst(){
         <div style="display:flex;flex-direction:column;gap:4px;margin:8px 0">
           ${dir?`<div class="ot-row"><span>📍</span>${dir}${ot.ciudad?', '+ot.ciudad:''}</div>`:''}
           ${ot.horario?`<div class="ot-row"><span>🕐</span>${ot.horario}</div>`:''}
+          ${ot.contacto?`<div class="ot-row"><span>📞</span><a href="tel:${ot.contacto}" style="color:var(--blue);text-decoration:none">${ot.contacto}</a> ${waS?`<a href="${waS}" target="_blank" style="margin-left:8px;color:#25D366;text-decoration:none;font-weight:800">WA</a>`:''}</div>`:''}
         </div>
         ${yaAsignada?`<div style="font-size:11px;color:var(--yellow);margin-bottom:8px">⚠️ Ya estaba asignada a ${ot.operador_id}</div>`:''}
         <div class="ot-actions" style="flex-wrap:wrap;gap:5px">
@@ -1451,12 +1463,15 @@ function renderListaZona(lista){
   return `<div style="margin:0 0 12px 0;padding-left:4px">${lista.map(ot=>{
     const dir=ot.direccion||ot.calle||'';
     const maps='https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(dir+' '+(ot.ciudad||'')+' Argentina');
+    const telZ=String(ot.contacto||'').replace(/\D/g,'');
+    const waZ=telZ?`https://wa.me/${telZ.startsWith('54')?telZ:'54'+telZ}?text=${encodeURIComponent('Hola'+(ot.comercio?' '+ot.comercio:'')+'👋\nTe contactamos de Alleata para coordinar el retiro de la terminal de la OT '+(ot.ot||'')+'.\n\nPor favor confirmanos dirección, horario disponible y contacto.\n\nGracias,\nEquipo Alleata')}`:'';
     return `<div class="ot-card" style="margin-bottom:8px;border-left:3px solid var(--border2)">
       <div class="ot-num">${ot.ot||'—'}</div>
       <div class="ot-comercio">${ot.comercio||ot.cuenta||'—'}</div>
       <div style="display:flex;flex-direction:column;gap:4px;margin:6px 0">
         ${dir?`<div class="ot-row"><span>📍</span>${dir}${ot.ciudad?', '+ot.ciudad:''}</div>`:''}
         ${ot.horario?`<div class="ot-row"><span>🕐</span>${ot.horario}</div>`:''}
+        ${ot.contacto?`<div class="ot-row"><span>📞</span><a href="tel:${ot.contacto}" style="color:var(--blue);text-decoration:none">${ot.contacto}</a> ${waZ?`<a href="${waZ}" target="_blank" style="margin-left:8px;color:#25D366;text-decoration:none;font-weight:800">WA</a>`:''}</div>`:''}
       </div>
       <div class="ot-actions" style="flex-wrap:wrap;gap:5px">
         <button class="btn-sm" style="flex:1;min-width:120px;background:var(--grad);color:#fff;border:none" onclick="tomarDesinstalacionPorZona('${ot.id}')">✅ Sumar a mi ruta</button>
