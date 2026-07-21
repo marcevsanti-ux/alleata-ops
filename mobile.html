@@ -165,7 +165,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
       <div class="login-logo">
         <img id="loginLogo" src="" alt="Alleata">
         <div class="login-sub">Portal de Operaciones</div>
-        <div class="login-version">v2.14.17 · mobile</div>
+        <div class="login-version">v2.14.18 · mobile</div>
       </div>
       <div class="field"><label class="label">Email</label><input class="input" id="lEmail" type="email" placeholder="usuario@alleata.com" autocomplete="email"></div>
       <div class="field"><label class="label">Contraseña</label><input class="input" id="lPass" type="password" placeholder="••••••••" autocomplete="current-password"></div>
@@ -181,7 +181,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
   <div class="topbar">
     <img id="appLogo" src="" alt="Alleata">
     <div class="topbar-title" id="topbarTitle">Operaciones</div>
-    <div class="topbar-version">v2.14.17</div>
+    <div class="topbar-version">v2.14.18</div>
     <div class="topbar-avatar" id="topbarAvatar" onclick="openDrawer()">?</div>
   </div>
 
@@ -558,6 +558,15 @@ const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSI
 //     control" que ya tenía el lado de Supabase.
 //   - Resultado de SIM ahora muestra la fuente: "Confirmado en vivo con
 //     Salesforce" vs "Caché local — no se pudo confirmar"
+// Cambios v2.14.18:
+//   - Badge "🔄 ROLLOUT" visible en mobile — mismo criterio y estilo que ya
+//     usa desktop (esRolloutOT: Cambio de Terminal + Perfil NAPSE + checkbox
+//     Rollout + logística ALLEATA). Se muestra al escanear el QR, al cargar
+//     OT a mano, y en la lista "En camino" — antes solo se usaba puertas
+//     adentro (para pedir el chip nuevo al cerrar), sin mostrarse en la UI.
+//   - Fix: los 3 selects a sf_workorders que arman la card de OT no traían
+//     'perfil' ni 'rollout' — esRolloutOT() los necesita y sin esos campos
+//     siempre daba false.
 // Cambios v2.14.17:
 //   - Íconos con más onda: el link "WA" (texto plano verde) ahora es el
 //     logo real de WhatsApp (SVG inline, ICON_WA). El emoji 🗺️ del botón
@@ -1109,6 +1118,9 @@ async function loadEnTransito(){
     horario:            r.horario||r.horario_entrega,
     contacto:           r.contacto_celular,
     responsable:        r.responsable,
+    perfil:             r.perfil,
+    rollout:            r.rollout,
+    logistica:          r.logistica,
   }));
   // Guardar por id para poder resolver sf_id al cerrar la OT (Entregado/Fallido)
   // sin depender de rutaDelDia, que solo tiene lo aceptado en la sesión actual.
@@ -1129,7 +1141,7 @@ async function loadEnTransito(){
       <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px">
         <div>
           <div class="ot-num">${e.ot_numero||'—'}</div>
-          <div class="ot-tipo">${e.tipo||''}</div>
+          <div class="ot-tipo">${e.tipo||''}${esRolloutOT(e)?' <span style="font-size:9px;font-weight:700;color:#8b5cf6;background:rgba(139,92,246,.15);border:1px solid rgba(139,92,246,.35);padding:1px 6px;border-radius:10px;display:inline-block;margin-left:2px">🔄 ROLLOUT</span>':''}</div>
         </div>
         <span class="zona-badge" style="color:${z.color};background:${z.color}20;border:1px solid ${z.color}40">${z.zona}${km?` · ~${km}km`:''}</span>
       </div>
@@ -1515,7 +1527,7 @@ async function mostrarOTScaneada(sfId){
   // Primero buscar en sf_workorders (instalaciones Alleata)
   let ot=null, esSFWorkorder=false;
   const{data:sfOT,error:sfErr}=await sb.from('sf_workorders')
-    .select('id,sf_id,workorder_number,record_type,status,logistica,cuenta,nombre_comercio,propietario_cuenta,direccion_formula,direccion,localidad,ciudad,provincia,codigo_postal,contacto_celular,horario,horario_entrega,responsable')
+    .select('id,sf_id,workorder_number,record_type,status,logistica,cuenta,nombre_comercio,propietario_cuenta,direccion_formula,direccion,localidad,ciudad,provincia,codigo_postal,contacto_celular,horario,horario_entrega,responsable,perfil,rollout')
     .eq('sf_id',sfId).eq('logistica','ALLEATA').maybeSingle();
 
   if(sfErr) console.warn('[mostrarOTScaneada] sf_workorders error:', sfErr.message);
@@ -1535,6 +1547,9 @@ async function mostrarOTScaneada(sfId){
       provincia:     sfOT.provincia,
       contacto:      sfOT.contacto_celular,
       horario:       sfOT.horario||sfOT.horario_entrega,
+      perfil:        sfOT.perfil,
+      rollout:       sfOT.rollout,
+      logistica:     sfOT.logistica,
       _esSFWorkorder: true,
     };
     esSFWorkorder=true;
@@ -1573,7 +1588,7 @@ function mostrarCardOT(ot){
   const z=getZona(ot.ciudad,ot.provincia);
   const km=getDistKm(ot.ciudad);
   document.getElementById('otS-num').textContent=ot.ot_numero||'—';
-  document.getElementById('otS-tipo').textContent=ot.tipo||'';
+  document.getElementById('otS-tipo').innerHTML=(ot.tipo||'')+(esRolloutOT(ot)?' <span style="font-size:9px;font-weight:700;color:#8b5cf6;background:rgba(139,92,246,.15);border:1px solid rgba(139,92,246,.35);padding:1px 6px;border-radius:10px;display:inline-block;margin-left:4px">🔄 ROLLOUT</span>':'');
   document.getElementById('otS-zona').textContent=z.zona+(km?` · ~${km}km`:'');
   document.getElementById('otS-zona').style.cssText=`color:${z.color};background:${z.color}20;border:1px solid ${z.color}40`;
   document.getElementById('otS-comercio').textContent=ot.nombre_comercio||ot.cuenta||'—';
@@ -1623,7 +1638,7 @@ async function buscarOTManual(){
   msgEl.style.color='var(--text-muted)';
 
   const{data:sfOT,error}=await sb.from('sf_workorders')
-    .select('id,sf_id,workorder_number,record_type,status,logistica,cuenta,nombre_comercio,propietario_cuenta,direccion_formula,direccion,localidad,ciudad,provincia,codigo_postal,contacto_celular,horario,horario_entrega,responsable')
+    .select('id,sf_id,workorder_number,record_type,status,logistica,cuenta,nombre_comercio,propietario_cuenta,direccion_formula,direccion,localidad,ciudad,provincia,codigo_postal,contacto_celular,horario,horario_entrega,responsable,perfil,rollout')
     .eq('logistica','ALLEATA')
     .ilike('workorder_number','%'+numLimpio)
     .maybeSingle();
@@ -1658,6 +1673,9 @@ async function buscarOTManual(){
     provincia:          sfOT.provincia,
     contacto:           sfOT.contacto_celular,
     horario:            sfOT.horario||sfOT.horario_entrega,
+    perfil:             sfOT.perfil,
+    rollout:            sfOT.rollout,
+    logistica:          sfOT.logistica,
     _esSFWorkorder:     true,
   };
   mostrarCardOT(ot);
