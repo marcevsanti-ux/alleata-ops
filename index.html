@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.4.57</title>
+<title>Alleata · Operaciones v4.4.58</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -399,7 +399,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.4.57 · 21 jul 2026
+      v4.4.58 · 21 jul 2026
     </div>
   </div>
 </div>
@@ -479,7 +479,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.4.57 · 21 jul 2026
+      v4.4.58 · 21 jul 2026
     </div>
   </div>
 </nav>
@@ -519,7 +519,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.4.57</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.4.58</div>
   </div>
   <div class="content">
 
@@ -4331,7 +4331,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.4.57] OK');
+console.log('[Alleata v4.4.58] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -5459,13 +5459,15 @@ async function loadNapseDesinstPanel(){
   // Consulta EN VIVO a SF (vía Railway), no la caché sf_workorders — se
   // detectó que esa caché puede quedar temporalmente incompleta entre
   // sincronizaciones (ver hallazgo 21/07: mostraba 5 de 8 OTs reales).
-  let total=0, porEstado={}, fuente='vivo', errMsg=null;
+  let total=0, porEstado={}, porMotivo={}, motivoDetalle={}, fuente='vivo', errMsg=null;
   try{
     const r=await railwayFetch('/automations/sf-stats/desinstalaciones?perfil=NAPSE&todas=1');
     const j=await r.json();
     if(r.ok&&j.ok){
       total=j.totalGeneral;
       porEstado=j.totalPorEstado||{};
+      porMotivo=j.totalPorMotivo||{};
+      motivoDetalle=j.motivoDetalle||{};
     }else{
       errMsg=j.error||'Respuesta no OK';
     }
@@ -5475,7 +5477,8 @@ async function loadNapseDesinstPanel(){
 
   // Respaldo: si SF/Railway no respondió, cae a la caché de Supabase con
   // aviso explícito de que puede estar desactualizada — mejor mostrar algo
-  // aproximado que dejar el widget vacío.
+  // aproximado que dejar el widget vacío. (La caché no tiene motivo, así
+  // que esa sección queda vacía en modo respaldo.)
   if(errMsg){
     fuente='caché (SF no respondió: '+errMsg+')';
     const{data}=await sb.from('sf_workorders').select('status,perfil,record_type').ilike('record_type','%esinstala%');
@@ -5484,8 +5487,11 @@ async function loadNapseDesinstPanel(){
     napse.forEach(e=>{const s=e.status||'Sin estado';porEstado[s]=(porEstado[s]||0)+1;});
   }
 
+  window._napseMotivoDetalle=motivoDetalle; // leído por toggleNapseMotivo()
   const entries=Object.entries(porEstado).sort((a,b)=>b[1]-a[1]);
+  const entriesMotivo=Object.entries(porMotivo).sort((a,b)=>b[1]-a[1]);
   const avisoCache=fuente!=='vivo'?`<div style="font-size:10px;color:var(--yellow);margin-top:10px">⚠️ ${fuente} — puede estar desactualizado</div>`:'';
+  const MOTIVO_COLORS=['#1dbf8e','#1a9fd4','#f59e0b','#ef4444','#8b5cf6','#f97316','#6b7280','#a78bfa'];
 
   panel.innerHTML=`<div class="card" style="margin-top:16px">
     <div class="sec-title"><div class="sec-dot" style="background:#8b5cf6"></div>🔍 Desinstalaciones NAPSE</div>
@@ -5502,7 +5508,35 @@ async function loadNapseDesinstPanel(){
         </div>`;
       }).join('')||'<div style="font-size:12px;color:var(--text-muted)">Sin OTs NAPSE</div>'}
     </div>
+    ${entriesMotivo.length?`
+    <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em;margin:16px 0 8px">Ranking por motivo — click para ver las OT</div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px">
+      ${entriesMotivo.map(([motivo,cant],i)=>{
+        const color=MOTIVO_COLORS[i%MOTIVO_COLORS.length];
+        const mid='napse-motivo-'+i;
+        return`<div class="badge" style="background:${color}18;border:1px solid ${color}40;color:${color};cursor:pointer;padding:6px 12px;font-size:11px" onclick="toggleNapseMotivo('${mid}','${motivo.replace(/'/g,"\\'")}')">${motivo} · ${cant}</div>`;
+      }).join('')}
+    </div>
+    <div id="napseMotivoDetalle" style="margin-top:10px"></div>`:''}
     ${avisoCache}
+  </div>`;
+}
+
+// Despliega/oculta la lista de OT puntuales para el motivo clickeado
+function toggleNapseMotivo(mid,motivo){
+  const el=document.getElementById('napseMotivoDetalle');
+  if(!el)return;
+  if(el.dataset.actual===motivo){ el.innerHTML=''; el.dataset.actual=''; return; } // toggle: click de nuevo = cerrar
+  const lista=(window._napseMotivoDetalle||{})[motivo]||[];
+  el.dataset.actual=motivo;
+  el.innerHTML=`<div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:10px 12px">
+    <div style="font-size:11px;font-weight:700;color:var(--text-muted);margin-bottom:6px">${motivo} (${lista.length})</div>
+    <div style="display:flex;flex-direction:column;gap:4px">
+      ${lista.map(o=>`<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;border-bottom:1px solid var(--border)">
+        <span style="font-family:'JetBrains Mono',monospace">${o.ot}</span>
+        <span style="color:${ESTADO_COLORS_NAPSE[o.status]||'#6b7280'}">${o.status}</span>
+      </div>`).join('')}
+    </div>
   </div>`;
 }
 
