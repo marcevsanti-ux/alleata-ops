@@ -46,7 +46,7 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;min-h
 .topbar{background:var(--navy-800);border-bottom:1px solid var(--border);padding:0 16px;height:52px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:50;}
 .topbar img{height:28px;}
 .topbar-title{font-size:14px;font-weight:700;color:var(--text);flex:1;}
-.topbar-version{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--navy-400);}
+.topbar-version{font-family:'JetBrains Mono',monospace;font-size:12px;color:#fff;font-weight:600;}
 .topbar-avatar{width:32px;height:32px;border-radius:50%;background:var(--grad);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff;cursor:pointer;flex-shrink:0;}
 /* TABS */
 .tabs{display:flex;background:var(--navy-800);border-bottom:1px solid var(--border);position:sticky;top:52px;z-index:40;}
@@ -165,7 +165,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
       <div class="login-logo">
         <img id="loginLogo" src="" alt="Alleata">
         <div class="login-sub">Portal de Operaciones</div>
-        <div class="login-version">v2.14.13 · mobile</div>
+        <div class="login-version">v2.14.15 · mobile</div>
       </div>
       <div class="field"><label class="label">Email</label><input class="input" id="lEmail" type="email" placeholder="usuario@alleata.com" autocomplete="email"></div>
       <div class="field"><label class="label">Contraseña</label><input class="input" id="lPass" type="password" placeholder="••••••••" autocomplete="current-password"></div>
@@ -181,7 +181,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
   <div class="topbar">
     <img id="appLogo" src="" alt="Alleata">
     <div class="topbar-title" id="topbarTitle">Operaciones</div>
-    <div class="topbar-version">v2.14.13</div>
+    <div class="topbar-version">v2.14.15</div>
     <div class="topbar-avatar" id="topbarAvatar" onclick="openDrawer()">?</div>
   </div>
 
@@ -554,6 +554,17 @@ const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSI
 //     control" que ya tenía el lado de Supabase.
 //   - Resultado de SIM ahora muestra la fuente: "Confirmado en vivo con
 //     Salesforce" vs "Caché local — no se pudo confirmar"
+// Cambios v2.14.15:
+//   - Nuevo: buscarSIM() (tab Buscar manual) ahora consulta primero
+//     /automations/sims/duplicados (SF en vivo). Si el mismo chip está
+//     cargado 2 veces en SF (con y sin dígito de control), muestra ambas
+//     copias y permite borrar SOLO la que no tiene N° Línea asociado —
+//     el backend re-chequea esto antes de borrar, no confía en la UI.
+//   - Fallback a caché local de Supabase si SF/Railway no responde.
+// Cambios v2.14.14:
+//   - Fix: número de versión en topbar era gris oscuro (var(--navy-400))
+//     sobre fondo navy — prácticamente invisible. Ahora blanco, 12px,
+//     font-weight 600.
 // Cambios v2.14.13:
 //   - Fix: cerrar una desinstalación como "Retirada" solo actualizaba
 //     ordenes_trabajo en Supabase — nunca tocaba Salesforce. Ahora, al
@@ -2681,9 +2692,30 @@ async function buscarSIM(){
   const q=document.getElementById('buscarInput').value.trim();
   if(!q)return;
   const result=document.getElementById('buscarResult');
-  result.innerHTML='<div class="empty"><div class="empty-icon">⏳</div><p>Buscando...</p></div>';
+  result.innerHTML='<div class="empty"><div class="empty-icon">⏳</div><p>Buscando en Salesforce...</p></div>';
+
+  const qNum=q.replace(/\D/g,'');
+  if(qNum.length>=4){
+    try{
+      const resp=await railwayFetch('/automations/sims/duplicados?q='+encodeURIComponent(qNum));
+      const data=await resp.json();
+      if(resp.ok&&data.ok&&data.matches?.length){
+        result.innerHTML='';
+        if(data.matches.length>1){
+          renderSimDuplicados(result,data.matches);
+        }else{
+          const m=data.matches[0];
+          appendSimResult(result,{found:true,sf_id:m.sf_id,serie:m.serie,linea:m.linea,cuenta:m.cuenta,ubicacion:m.ubicacion,estado:m.estado,_source:'sf_live'},q);
+        }
+        return;
+      }
+    }catch(e){
+      console.warn('[buscarSIM] SF en vivo no respondió, cae a caché local:',e);
+    }
+  }
+
+  // Fallback: SF no respondió (sin conexión / Railway caído) — caché local
   let found=null;
-  // Try by serie
   const{data:bySerie}=await sb.from('sims').select('*').ilike('serie','%'+q+'%').limit(1);
   if(bySerie?.length)found=bySerie[0];
   if(!found){
@@ -2693,6 +2725,70 @@ async function buscarSIM(){
   result.innerHTML='';
   if(found){appendSimResult(result,{found:true,...found},q);}
   else{result.innerHTML='<div class="empty"><div class="empty-icon">🔍</div><p>Sin resultados para "'+q+'"</p></div>';}
+}
+
+// Muestra las dos (o más) copias de una SIM duplicada en SF, lado a lado.
+// Solo la que NO tiene línea asociada puede borrarse — el backend vuelve a
+// chequear esto antes de borrar (no confía en lo que arme esta UI).
+function renderSimDuplicados(container,matches){
+  const wrap=document.createElement('div');
+  wrap.style.cssText='padding:0 14px';
+  const aviso=document.createElement('div');
+  aviso.style.cssText='background:rgba(212,165,26,.12);border:1px solid rgba(212,165,26,.3);color:#d4a51a;font-size:12px;padding:10px 12px;border-radius:8px;margin-bottom:10px';
+  aviso.textContent='⚠️ Esta SIM está duplicada en Salesforce ('+matches.length+' copias). Elegí cuál borrar — solo se puede borrar la que NO tiene línea.';
+  wrap.appendChild(aviso);
+
+  matches.forEach(m=>{
+    const tieneLinea=!!m.linea;
+    const card=document.createElement('div');
+    card.className='sim-result';
+    card.style.cssText='border:1px solid '+(tieneLinea?'rgba(29,191,142,.4)':'var(--border)')+';border-radius:10px;margin-bottom:10px;overflow:hidden';
+    card.innerHTML=`<div class="sim-result-head" style="border-bottom:1px solid var(--border)">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-mid);word-break:break-all">${m.serie||'—'}</div>
+        <span class="badge" style="background:${tieneLinea?'#1dbf8e20':'#e5484d20'};color:${tieneLinea?'#1dbf8e':'#e5484d'};border:1px solid ${tieneLinea?'#1dbf8e40':'#e5484d40'}">${tieneLinea?'✅ TIENE LÍNEA':'⚠️ SIN LÍNEA'}</span>
+      </div>
+      <div class="sim-result-body">
+        ${m.linea?`<div class="sim-row"><span class="sim-key">Línea</span><span class="sim-val">${m.linea}</span></div>`:''}
+        ${m.cuenta?`<div class="sim-row"><span class="sim-key">Cuenta</span><span class="sim-val">${m.cuenta}</span></div>`:''}
+        ${m.ubicacion?`<div class="sim-row"><span class="sim-key">Ubicación</span><span class="sim-val">${m.ubicacion}</span></div>`:''}
+        ${m.estado?`<div class="sim-row"><span class="sim-key">Estado</span><span class="sim-val">${m.estado}</span></div>`:''}
+        <div style="font-size:9px;color:var(--text-muted);margin-top:6px">sf_id: ${m.sf_id}</div>
+      </div>`;
+    if(!tieneLinea){
+      const btnDel=document.createElement('button');
+      btnDel.className='btn-sm';
+      btnDel.style.cssText='margin:0 14px 14px;width:calc(100% - 28px);background:rgba(229,72,77,.12);color:#e5484d;border:1px solid rgba(229,72,77,.3)';
+      btnDel.textContent='🗑️ Borrar este duplicado (sin línea)';
+      btnDel.onclick=()=>confirmarEliminarDuplicadoSim(m.sf_id,m.serie,btnDel);
+      card.appendChild(btnDel);
+    }
+    wrap.appendChild(card);
+  });
+  container.appendChild(wrap);
+}
+
+async function confirmarEliminarDuplicadoSim(sfId,serie,btn){
+  if(!confirm('¿Borrar definitivamente la SIM '+serie+' de Salesforce?\n\nEsta acción no se puede deshacer.'))return;
+  btn.disabled=true;btn.textContent='⏳ Borrando...';
+  const actorNombre=(currentProfile?.nombre||currentUser?.email||'Operador').trim();
+  try{
+    const resp=await railwayFetch('/automations/sims/eliminar-duplicado',{
+      method:'POST',
+      body:JSON.stringify({sf_id:sfId,actor_nombre:actorNombre})
+    });
+    const data=await resp.json();
+    if(!resp.ok||!data.ok){
+      alert('⚠️ '+(data.error||'No se pudo borrar'));
+      btn.disabled=false;btn.textContent='🗑️ Borrar este duplicado (sin línea)';
+      return;
+    }
+    showScanFeedback('✅ Duplicado borrado de Salesforce','ok');
+    // Re-buscar para refrescar la vista (debería quedar solo 1 copia)
+    buscarSIM();
+  }catch(e){
+    alert('⚠️ Error de red al borrar: '+e.message);
+    btn.disabled=false;btn.textContent='🗑️ Borrar este duplicado (sin línea)';
+  }
 }
 
 // ── HISTORIAL ──
