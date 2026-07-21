@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.4.61</title>
+<title>Alleata · Operaciones v4.4.64</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -400,7 +400,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.4.61 · 21 jul 2026
+      v4.4.64 · 21 jul 2026
     </div>
   </div>
 </div>
@@ -484,7 +484,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.4.61 · 21 jul 2026
+      v4.4.64 · 21 jul 2026
     </div>
   </div>
 </nav>
@@ -524,7 +524,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.4.61</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.4.64</div>
   </div>
   <div class="content">
 
@@ -4377,7 +4377,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.4.61] OK');
+console.log('[Alleata v4.4.64] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -5371,25 +5371,54 @@ function renderRolloutPiloto(){
 // tocó a cada uno, no cargar OT una por una.
 // Si hay más de un match posible para el mismo cliente, NO vincula solo
 // (queda para hacerlo a mano con 🔗) — mejor no vincular que vincular mal.
+// Fecha de arranque del piloto — cualquier OT de Cambio de Terminal creada
+// ANTES de esto es historial viejo del cliente (cambios anteriores, nada
+// que ver con este piloto) y hay que ignorarla al matchear. Sin este filtro,
+// clientes con cambios de terminal previos (2023-2025) generaban falsos
+// positivos: parecía que ya tenían OT del piloto cuando en realidad no.
+const ROLLOUT_PILOTO_FECHA_INICIO='2026-07-20';
+
 async function detectarOTAutoPiloto(){
   const pendientes=_rpData.filter(r=>!r.ot_numero);
   if(!pendientes.length){alert('Todos los casos ya tienen OT vinculada.');return;}
+
+  // Una sola consulta batch (no una por cliente) — trae todas las OT de
+  // Cambio de Terminal CON el checkbox Rollout tildado (Rollout__c en SF,
+  // columna 'rollout' ya sincronizada) y CREADAS DESDE EL INICIO DEL PILOTO,
+  // y arma un mapa por CUIT normalizado (sin puntos, porque SF lo guarda
+  // con puntos y el Excel del piloto sin puntos). El filtro de Rollout
+  // evita traer un Cambio de Terminal normal (fuera del contexto del
+  // piloto) que por casualidad coincida en fecha y CUIT.
+  const cols='id,sf_id,workorder_number,status,logistica,cuenta,cuit,record_type,rollout,created_at';
+  const{data:todas,error}=await sb.from('sf_workorders').select(cols)
+    .ilike('record_type','%ambio%')
+    .eq('rollout',true)
+    .gte('created_at',ROLLOUT_PILOTO_FECHA_INICIO);
+  if(error){alert('Error consultando sf_workorders: '+error.message);return;}
+
+  const norm=v=>(v||'').replace(/\D/g,'');
+  const porCuit={};
+  const porCuenta={};
+  (todas||[]).forEach(ot=>{
+    const c=norm(ot.cuit);
+    if(c){(porCuit[c]=porCuit[c]||[]).push(ot);}
+    if(ot.cuenta){(porCuenta[ot.cuenta]=porCuenta[ot.cuenta]||[]).push(ot);}
+  });
+
   let encontrados=0,ambiguos=0,sinMatch=0;
   for(const r of pendientes){
-    const cols='id,sf_id,workorder_number,status,logistica,cuenta,record_type,created_at';
-    // 1) match exacto por el nombre de cuenta tal cual viene en el Excel
-    let{data}=await sb.from('sf_workorders').select(cols).ilike('record_type','%ambio%').eq('cuenta',r.cliente);
-    if(!data?.length){
-      // 2) fallback: nombre base del comercio, sin el sufijo "- SUC - 0001"
+    // 1) match por CUIT normalizado — más confiable que nombre de cuenta
+    let candidatos=porCuit[norm(r.cuit)]||[];
+    // 2) fallback: nombre exacto de cuenta tal cual viene en el Excel
+    if(!candidatos.length)candidatos=porCuenta[r.cliente]||[];
+    // 3) fallback: nombre base del comercio, sin el sufijo "- SUC - 0001"
+    if(!candidatos.length){
       const base=(r.cliente||'').split(' - SUC')[0].trim();
-      if(base){
-        const res2=await sb.from('sf_workorders').select(cols).ilike('record_type','%ambio%').ilike('cuenta','%'+base+'%');
-        data=res2.data;
-      }
+      if(base)candidatos=(todas||[]).filter(ot=>(ot.cuenta||'').includes(base));
     }
-    if(!data||!data.length){sinMatch++;continue;}
-    if(data.length>1){ambiguos++;continue;} // ambiguo → queda para vincular a mano
-    const ot=data[0];
+    if(!candidatos.length){sinMatch++;continue;}
+    if(candidatos.length>1){ambiguos++;continue;} // ambiguo → queda para vincular a mano
+    const ot=candidatos[0];
     const upd={
       sf_id:ot.sf_id||ot.id, ot_numero:ot.workorder_number, estado_ot:ot.status,
       etapa: ROLLOUT_PILOTO_ESTADOS_EXITOSOS.includes(ot.status)?'Cerrado':'OT creada',
