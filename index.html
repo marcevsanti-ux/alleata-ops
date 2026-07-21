@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.4.55</title>
+<title>Alleata · Operaciones v4.4.56</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -399,7 +399,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.4.55 · 14 jul 2026
+      v4.4.56 · 21 jul 2026
     </div>
   </div>
 </div>
@@ -479,7 +479,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.4.55 · 14 jul 2026
+      v4.4.56 · 21 jul 2026
     </div>
   </div>
 </nav>
@@ -519,7 +519,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.4.55</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.4.56</div>
   </div>
   <div class="content">
 
@@ -536,6 +536,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <iframe id="presupuestoBridgeFrame" style="display:none" src="about:blank"></iframe>
 
       <div class="dash-grid" id="dashGrid" style="margin-top:6px"></div>
+      <div id="napseDesinstPanel" style="display:none"></div>
     </div>
 
     <div class="module" id="mod-sims">
@@ -4330,7 +4331,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.4.55] OK');
+console.log('[Alleata v4.4.56] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -5440,6 +5441,51 @@ async function loadBadges(){
   if(document.getElementById('dc-desinstalaciones'))document.getElementById('dc-desinstalaciones').textContent=desCount+' activas';
 }
 
+// ── Widget Dashboard: Desinstalaciones con Perfil NAPSE (total + por estado) ──
+// Usa la caché sf_workorders (se sincroniza sola cada ~10min desde SF, ver
+// syncActiveOTs/syncIncrementalOTs en salesforce.js) — mismo criterio de tipo
+// y perfil que ya usa la card de Rollout más arriba en esta función.
+const ESTADO_COLORS_NAPSE={
+  'Pendiente':'#f59e0b','En Proceso':'#1a9fd4','Recuperada':'#1dbf8e',
+  'NO RESPONDE':'#ef4444','Reactivado':'#8b5cf6','Cancelado':'#6b7280',
+  'Extraviada':'#6b7280','Reprogramar':'#f97316',
+};
+async function loadNapseDesinstPanel(){
+  const panel=document.getElementById('napseDesinstPanel');
+  if(!panel)return;
+  panel.style.display='';
+  panel.innerHTML=`<div class="card" style="margin-top:16px"><div class="sec-title"><div class="sec-dot" style="background:#8b5cf6"></div>🔍 Desinstalaciones NAPSE</div><div style="padding:16px;color:var(--text-muted);font-size:12px">Cargando desde Salesforce...</div></div>`;
+
+  const{data,error}=await sb.from('sf_workorders').select('status,perfil,record_type').ilike('record_type','%esinstala%');
+  if(error){
+    panel.innerHTML=`<div class="card" style="margin-top:16px"><div class="sec-title"><div class="sec-dot" style="background:#8b5cf6"></div>🔍 Desinstalaciones NAPSE</div><div style="padding:16px;color:var(--red);font-size:12px">Error: ${error.message}</div></div>`;
+    return;
+  }
+
+  const napse=(data||[]).filter(e=>(e.perfil||'').trim().toUpperCase()==='NAPSE');
+  const total=napse.length;
+  const porEstado={};
+  napse.forEach(e=>{const s=e.status||'Sin estado';porEstado[s]=(porEstado[s]||0)+1;});
+  const entries=Object.entries(porEstado).sort((a,b)=>b[1]-a[1]);
+
+  panel.innerHTML=`<div class="card" style="margin-top:16px">
+    <div class="sec-title"><div class="sec-dot" style="background:#8b5cf6"></div>🔍 Desinstalaciones NAPSE</div>
+    <div style="display:flex;align-items:flex-end;gap:10px;margin:10px 0 14px">
+      <div style="font-size:34px;font-weight:800;color:#8b5cf6;line-height:1">${total}</div>
+      <div style="font-size:12px;color:var(--text-muted);padding-bottom:5px">total (Desinstalación · Perfil NAPSE)</div>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px">
+      ${entries.map(([estado,cant])=>{
+        const color=ESTADO_COLORS_NAPSE[estado]||'#6b7280';
+        return`<div style="background:${color}18;border:1px solid ${color}40;border-radius:10px;padding:8px 12px;min-width:100px">
+          <div style="font-size:20px;font-weight:800;color:${color}">${cant}</div>
+          <div style="font-size:10px;color:var(--text-muted);white-space:nowrap">${estado}</div>
+        </div>`;
+      }).join('')||'<div style="font-size:12px;color:var(--text-muted)">Sin OTs NAPSE</div>'}
+    </div>
+  </div>`;
+}
+
 // ── Vista CEO: KPIs de Gestión NAPSE directo en el Dashboard (fetch en vivo a Railway) ──
 function proximaCorridaSyncSF(){
   try{
@@ -5717,6 +5763,11 @@ async function loadOpsPanel(isAdmin){
 
   // ── GRÁFICOS — solo admin ──
   if(isAdmin){
+    loadNapseDesinstPanel();
+    // NOTA: la línea de abajo referencia 'chart-desins', un contenedor que ya
+    // no existe en el HTML actual (dashboard viejo con donas/gráficos, hoy
+    // reemplazado por dashGrid con cards). Tira excepción silenciosa y corta
+    // el resto de este bloque — por eso loadNapseDesinstPanel() va ANTES.
     document.getElementById('chart-desins').style.display='';
 
   // ── GRÁFICO 1: Instaladas hoy (KPI grande) ──
