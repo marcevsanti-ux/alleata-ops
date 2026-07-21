@@ -165,7 +165,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
       <div class="login-logo">
         <img id="loginLogo" src="" alt="Alleata">
         <div class="login-sub">Portal de Operaciones</div>
-        <div class="login-version">v2.14.18 · mobile</div>
+        <div class="login-version">v2.14.19 · mobile</div>
       </div>
       <div class="field"><label class="label">Email</label><input class="input" id="lEmail" type="email" placeholder="usuario@alleata.com" autocomplete="email"></div>
       <div class="field"><label class="label">Contraseña</label><input class="input" id="lPass" type="password" placeholder="••••••••" autocomplete="current-password"></div>
@@ -181,7 +181,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
   <div class="topbar">
     <img id="appLogo" src="" alt="Alleata">
     <div class="topbar-title" id="topbarTitle">Operaciones</div>
-    <div class="topbar-version">v2.14.18</div>
+    <div class="topbar-version">v2.14.19</div>
     <div class="topbar-avatar" id="topbarAvatar" onclick="openDrawer()">?</div>
   </div>
 
@@ -558,6 +558,11 @@ const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSI
 //     control" que ya tenía el lado de Supabase.
 //   - Resultado de SIM ahora muestra la fuente: "Confirmado en vivo con
 //     Salesforce" vs "Caché local — no se pudo confirmar"
+// Cambios v2.14.19:
+//   - Al cerrar la hoja de ruta del día (abrirResumenModal), si alguna OT
+//     entregada era Rollout, envía aviso aparte al grupo PILOTO NAPSE con
+//     solo esas OT (avisarRolloutCierreRuta) — separado del resumen
+//     general de logística de siempre.
 // Cambios v2.14.18:
 //   - Badge "🔄 ROLLOUT" visible en mobile — mismo criterio y estilo que ya
 //     usa desktop (esRolloutOT: Cambio de Terminal + Perfil NAPSE + checkbox
@@ -892,6 +897,7 @@ async function railwayFetch(path, options = {}) {
   });
 }
 const ALLY_GROUP_TEST='120363424299090366@g.us';
+const ALLY_GROUP_PILOTO_NAPSE='120363428888765775@g.us';
 
 // Mapa responsable → grupo WhatsApp
 // Completar con los Group IDs reales cuando Ally esté en los grupos
@@ -1003,6 +1009,33 @@ function abrirResumenModal(){
   }
   document.getElementById('resumenTexto').value=generarTextoResumen();
   document.getElementById('modalResumen').classList.add('show');
+  avisarRolloutCierreRuta(); // fire-and-forget, no bloquea la apertura del modal
+}
+
+// Cuando se cierra la hoja de ruta del día, si alguna de las OT entregadas
+// era Rollout (Cambio de Terminal + NAPSE + checkbox Rollout), le avisa
+// aparte al grupo PILOTO NAPSE — separado del resumen general de logística,
+// que va al grupo de siempre.
+let _avisoRolloutEnviadoHoy=false;
+async function avisarRolloutCierreRuta(){
+  if(_avisoRolloutEnviadoHoy)return; // no reabrir el modal 5 veces = 5 mensajes
+  const rolloutHoy=cierresHoy.filter(c=>c.tipo==='envio'&&c.rollout);
+  if(!rolloutHoy.length)return;
+  const tecnico=(currentProfile?.nombre||currentUser?.email||'').trim();
+  let txt=`🔄 *Rollout — Cierre de ruta*\n👷 ${tecnico}\n🕐 ${fechaLargaHoy()}\n\n`;
+  rolloutHoy.forEach(c=>{
+    txt+=`${c.resultado==='Entregado'?'✅':'❌'} ${c.ot_numero}${c.cuenta?` — ${c.cuenta}`:''}${c.motivo?` (${c.motivo})`:''}\n`;
+  });
+  txt+=`\n${rolloutHoy.length} OT Rollout gestionada(s) hoy`;
+  try{
+    await railwayFetch('/automations/send-message',{
+      method:'POST',
+      body:JSON.stringify({group_id:ALLY_GROUP_PILOTO_NAPSE,message:txt,context:'rollout_cierre_ruta'})
+    });
+    _avisoRolloutEnviadoHoy=true;
+  }catch(e){
+    console.warn('[avisarRolloutCierreRuta] no se pudo enviar:',e);
+  }
 }
 function cerrarResumenModal(){
   document.getElementById('modalResumen').classList.remove('show');
@@ -2129,6 +2162,7 @@ async function confirmarCierreOT(){
     cuenta:    _otCierreActual?.cuenta||'',
     resultado, // 'Entregado' | 'Fallido'
     motivo:    resultado==='Fallido' ? (datoEnvio||notas||'Sin detalle') : null,
+    rollout:   esRolloutOT(_otCierreActual),
   });
   await notificarAlly(_otCierreActual, resultado==='Entregado'?'entregado':'fallido', fotoUrl||null, notas||null);
   _otCierreActual=null;
