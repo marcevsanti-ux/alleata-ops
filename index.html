@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.4.58</title>
+<title>Alleata · Operaciones v4.4.61</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -225,6 +225,7 @@ tr:hover td{background:var(--surface2);}
 .stat-box.s-green .stat-num{color:var(--green);}
 .stat-box.s-red .stat-num{color:var(--red);}
 .stat-box.s-blue .stat-num{color:var(--blue);}
+.stat-box.s-purple .stat-num{color:#8b5cf6;}
 .stat-label{font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1.5px;margin-top:3px;font-weight:700;}
 .sim-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px;}
 .sim-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;transition:border-color .2s;}
@@ -399,7 +400,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.4.58 · 21 jul 2026
+      v4.4.61 · 21 jul 2026
     </div>
   </div>
 </div>
@@ -429,6 +430,10 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     <div class="nav-item" data-mod="rollout" id="nav-rollout" onclick="goTo('rollout')">
       <div class="active-bar"></div><span class="nav-icon-wrap">🔄</span> Rollout
       <span class="nav-badge" id="nb-rollout">0</span>
+    </div>
+    <div class="nav-item" data-mod="rollout-piloto" id="nav-rollout-piloto" onclick="goTo('rollout-piloto')">
+      <div class="active-bar"></div><span class="nav-icon-wrap">🧪</span> Rollout Piloto
+      <span class="nav-badge" id="nb-rollout-piloto">0</span>
     </div>
     <div class="nav-item" data-mod="desinstalaciones" id="nav-desinstalaciones" onclick="goTo('desinstalaciones')">
       <div class="active-bar"></div><span class="nav-icon-wrap">📦</span> Desinstalaciones
@@ -479,7 +484,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.4.58 · 21 jul 2026
+      v4.4.61 · 21 jul 2026
     </div>
   </div>
 </nav>
@@ -519,7 +524,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.4.58</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.4.61</div>
   </div>
   <div class="content">
 
@@ -1064,6 +1069,47 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
           <tr><td colspan="8" style="text-align:center;padding:30px;color:var(--text-muted)">Cargando...</td></tr>
         </tbody>
       </table>
+    </div>
+  </div>
+</div>
+
+<div class="module" id="mod-rollout-piloto">
+  <div class="stats-row" style="margin-bottom:16px">
+    <div class="stat-box s-purple"><div class="stat-num" id="rp-total">50</div><div class="stat-label">Total piloto</div></div>
+    <div class="stat-box s-teal"><div class="stat-num" id="rp-contactados">0</div><div class="stat-label">Contactados</div></div>
+    <div class="stat-box s-blue"><div class="stat-num" id="rp-ot">0</div><div class="stat-label">OT creada</div></div>
+    <div class="stat-box s-green"><div class="stat-num" id="rp-cerrados">0</div><div class="stat-label">Exitosas</div></div>
+    <div class="stat-box"><div class="stat-num" id="rp-sla">—</div><div class="stat-label">SLA promedio (días)</div></div>
+  </div>
+
+  <div class="row" style="margin-bottom:12px;gap:10px">
+    <button class="btn btn-sm" style="background:rgba(29,191,142,.12);color:var(--teal);border:1px solid rgba(29,191,142,.3)" onclick="detectarOTAutoPiloto()">🔍 Detectar OT automáticamente</button>
+    <button class="btn btn-sm" onclick="syncRolloutPiloto()">🔄 Sincronizar estados desde SF</button>
+    <button class="btn btn-sm" style="background:rgba(139,92,246,.12);color:#8b5cf6;border:1px solid rgba(139,92,246,.3)" onclick="actualizarVolumenTodosPiloto()">📊 Actualizar volumen (todos)</button>
+    <div class="field" style="max-width:260px">
+      <input class="input" id="rpFiltro" placeholder="Buscar cliente, CUIT, vendedor..." oninput="renderRolloutPiloto()">
+    </div>
+    <select class="input" id="rpFiltroEtapa" style="max-width:200px" onchange="renderRolloutPiloto()">
+      <option value="">Todas las etapas</option>
+      <option value="Sin contactar">Sin contactar</option>
+      <option value="Contactado">Contactado</option>
+      <option value="Coordinado">Coordinado</option>
+      <option value="OT creada">OT creada</option>
+      <option value="Cerrado">Cerrado</option>
+    </select>
+  </div>
+
+  <div class="card" style="padding:0;overflow-x:auto">
+    <div class="table-wrap">
+    <table class="table">
+      <thead><tr>
+        <th>Cliente</th><th>CUIT</th><th>Vendedor</th><th>Contacto</th><th>Etapa</th>
+        <th>OT</th><th>Estado OT</th><th>SLA (días)</th><th>Vol. Baseline 30D</th><th>Último Vol.</th><th></th>
+      </tr></thead>
+      <tbody id="rp-tbody">
+        <tr><td colspan="11" style="text-align:center;padding:30px;color:var(--text-muted)">Cargando...</td></tr>
+      </tbody>
+    </table>
     </div>
   </div>
 </div>
@@ -4331,7 +4377,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.4.58] OK');
+console.log('[Alleata v4.4.61] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -4726,7 +4772,7 @@ function buildDashCards(modulos,isAdmin,isCeo){
   loadOpsPanel(isAdmin);
 }
 
-const MOD_INFO={home:'Dashboard',sims:'Verificador SIMs',envios:'Envíos',rollout:'Rollout',desinstalaciones:'Desinstalaciones',napse:'NAPSE — Logs VTOL',instalaciones:'Instalaciones SF',retencion:'Retención de Cuentas',ajustes:'Ajustes',ally:'Configuración Ally',distri:'Distribuidores',terminales:'Terminales — Logicalis',store:'Bancos — Terminales disponibles',presupuesto:'Presupuesto de Operaciones'};
+const MOD_INFO={home:'Dashboard',sims:'Verificador SIMs',envios:'Envíos',rollout:'Rollout','rollout-piloto':'Rollout Piloto — Trazabilidad',desinstalaciones:'Desinstalaciones',napse:'NAPSE — Logs VTOL',instalaciones:'Instalaciones SF',retencion:'Retención de Cuentas',ajustes:'Ajustes',ally:'Configuración Ally',distri:'Distribuidores',terminales:'Terminales — Logicalis',store:'Bancos — Terminales disponibles',presupuesto:'Presupuesto de Operaciones'};
 
 function goTo(mod){
   const el=document.getElementById('nav-'+mod);
@@ -4764,6 +4810,7 @@ function goTo(mod){
   if(mod==='envios'){initEnvios();renderEnvios();}
   if(mod==='home'){setTimeout(()=>{if(window._drawQR)window._drawQR();},200);loadOpsPanel(currentProfile?.rol==='admin');}
   if(mod==='rollout')initRollout();
+  if(mod==='rollout-piloto')loadRolloutPiloto();
   if(mod==='desinstalaciones'){if(window.cargarDesinstalaciones&&!(window.DesinModule?.cargado))window.cargarDesinstalaciones();}
   if(mod==='sims')loadSimStats();
   if(mod==='napse')window.napseInitApp?.();
@@ -5237,6 +5284,245 @@ function esRollout(e){
   const perfil=(e.perfil||'').trim().toUpperCase();
   const logistica=(e.logistica||'').trim().toUpperCase();
   return tipo.includes('cambio') && perfil==='NAPSE' && e.rollout===true && logistica==='ALLEATA';
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ROLLOUT PILOTO — trazabilidad de los 50 casos piloto (sesión 21/07/2026)
+// Cliente → contacto → OT de Cambio (logística siempre ALLEATA) → estado
+// sincronizado desde sf_workorders → SLA → (a futuro) volumen post-cambio.
+//
+// NOTA IMPORTANTE — pendiente de confirmar con Marcelo:
+// ROLLOUT_PILOTO_ESTADOS_EXITOSOS abajo asume qué valores de Status en SF
+// significan "cambio completado exitosamente". Si el valor real es otro
+// (ver el pipeline de la OT en SF: Configurar Terminal → En Proceso →
+// Pre-Colecta → Despachado — no vi ahí un paso "Exitoso" explícito), hay
+// que ajustar esta lista para que el conteo de "Exitosas"/SLA sea correcto.
+// ═══════════════════════════════════════════════════════════════════════════
+const ROLLOUT_PILOTO_ESTADOS_EXITOSOS=['Exitoso','Exitosa','Entregado','Despachado'];
+let _rpData=[];
+
+async function loadRolloutPiloto(){
+  const tbody=document.getElementById('rp-tbody');
+  if(tbody)tbody.innerHTML='<tr><td colspan="11" style="text-align:center;padding:30px;color:var(--text-muted)">Cargando...</td></tr>';
+  const{data,error}=await sb.from('rollout_piloto').select('*').order('cliente',{ascending:true});
+  if(error){
+    if(tbody)tbody.innerHTML=`<tr><td colspan="11" style="text-align:center;padding:30px;color:var(--red)">Error: ${error.message}${error.message.includes('does not exist')?' — falta correr schema_rollout_piloto.sql en Supabase':''}</td></tr>`;
+    return;
+  }
+  _rpData=data||[];
+  renderRolloutPiloto();
+}
+
+function renderRolloutPiloto(){
+  const tbody=document.getElementById('rp-tbody');
+  if(!tbody)return;
+  const filtroTxt=(document.getElementById('rpFiltro')?.value||'').trim().toLowerCase();
+  const filtroEtapa=document.getElementById('rpFiltroEtapa')?.value||'';
+
+  let filtrados=_rpData;
+  if(filtroTxt)filtrados=filtrados.filter(r=>
+    (r.cliente||'').toLowerCase().includes(filtroTxt)||
+    (r.cuit||'').toLowerCase().includes(filtroTxt)||
+    (r.vendedor||'').toLowerCase().includes(filtroTxt)||
+    (r.ot_numero||'').toLowerCase().includes(filtroTxt)
+  );
+  if(filtroEtapa)filtrados=filtrados.filter(r=>r.etapa===filtroEtapa);
+
+  const ETAPA_COLORS={'Sin contactar':'#6b7280','Contactado':'#f59e0b','Coordinado':'#1a9fd4','OT creada':'#8b5cf6','Cerrado':'#1dbf8e'};
+  const fmtVol=v=>v==null?'—':'$'+Number(v).toLocaleString('es-AR');
+
+  tbody.innerHTML=filtrados.map(r=>{
+    const ec=ETAPA_COLORS[r.etapa]||'#6b7280';
+    return`<tr>
+      <td><div style="font-weight:600">${r.cliente||'—'}</div><div style="font-size:10px;color:var(--text-muted)">${r.localidad||''} ${r.zona?'· '+r.zona:''}</div></td>
+      <td style="font-family:'JetBrains Mono',monospace;font-size:11px">${r.cuit||'—'}</td>
+      <td>${r.vendedor||'—'}</td>
+      <td><div>${r.contacto||'—'}</div><div style="font-size:10px;color:var(--text-muted)">${r.telefono||''}</div></td>
+      <td><span class="badge" style="background:${ec}18;border:1px solid ${ec}40;color:${ec}">${r.etapa}</span></td>
+      <td>${r.ot_numero?`<span style="font-family:'JetBrains Mono',monospace;font-weight:700">${r.ot_numero}</span>`:`<button class="btn-sm" style="background:rgba(139,92,246,.12);color:#8b5cf6;border:1px solid rgba(139,92,246,.3)" onclick="vincularOTPiloto('${r.id}')">🔗 Vincular OT</button>`}</td>
+      <td>${r.estado_ot||'—'}</td>
+      <td>${r.sla_dias!=null?r.sla_dias+'d':'—'}</td>
+      <td style="font-size:11px">${fmtVol(r.vol_baseline_30d)}</td>
+      <td style="font-size:11px">${r.vol_ultimo_reportado!=null?fmtVol(r.vol_ultimo_reportado)+' <span style=\"color:var(--text-muted)\">('+(r.vol_ultimo_fecha||'')+')</span>':'<span style=\"color:var(--text-muted)\">sin dato post-cambio</span>'}</td>
+      <td><button class="btn-sm" style="background:none;border:1px solid var(--border2);color:var(--text-muted)" onclick="editarNotaPiloto('${r.id}')" title="Notas / etapa">✏️</button> <button class="btn-sm" style="background:none;border:1px solid var(--border2);color:#8b5cf6" onclick="actualizarVolumenPiloto('${r.id}')" title="Actualizar volumen desde SF">📊</button></td>
+    </tr>`;
+  }).join('')||'<tr><td colspan="11" style="text-align:center;padding:30px;color:var(--text-muted)">Sin resultados</td></tr>';
+
+  // Stats
+  const total=_rpData.length;
+  const contactados=_rpData.filter(r=>r.etapa!=='Sin contactar').length;
+  const conOT=_rpData.filter(r=>r.ot_numero).length;
+  const cerrados=_rpData.filter(r=>r.etapa==='Cerrado');
+  const slaVals=cerrados.map(r=>r.sla_dias).filter(v=>v!=null);
+  const slaProm=slaVals.length?Math.round(slaVals.reduce((a,b)=>a+b,0)/slaVals.length):null;
+  const setTxt=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v;};
+  setTxt('rp-total',total);
+  setTxt('rp-contactados',contactados);
+  setTxt('rp-ot',conOT);
+  setTxt('rp-cerrados',cerrados.length);
+  setTxt('rp-sla',slaProm!=null?slaProm:'—');
+  const nb=document.getElementById('nb-rollout-piloto');if(nb)nb.textContent=total-cerrados.length;
+}
+
+// Busca sola, para cada caso SIN OT vinculada todavía, si ya existe una OT
+// de Cambio de Terminal en SF cuya cuenta matchee el nombre del cliente del
+// Excel. No requiere que nadie tipee el número de OT a mano — así es como
+// lo pidió Marcelo: identificar los 50 por Cliente/CUIT y ver qué OT le
+// tocó a cada uno, no cargar OT una por una.
+// Si hay más de un match posible para el mismo cliente, NO vincula solo
+// (queda para hacerlo a mano con 🔗) — mejor no vincular que vincular mal.
+async function detectarOTAutoPiloto(){
+  const pendientes=_rpData.filter(r=>!r.ot_numero);
+  if(!pendientes.length){alert('Todos los casos ya tienen OT vinculada.');return;}
+  let encontrados=0,ambiguos=0,sinMatch=0;
+  for(const r of pendientes){
+    const cols='id,sf_id,workorder_number,status,logistica,cuenta,record_type,created_at';
+    // 1) match exacto por el nombre de cuenta tal cual viene en el Excel
+    let{data}=await sb.from('sf_workorders').select(cols).ilike('record_type','%ambio%').eq('cuenta',r.cliente);
+    if(!data?.length){
+      // 2) fallback: nombre base del comercio, sin el sufijo "- SUC - 0001"
+      const base=(r.cliente||'').split(' - SUC')[0].trim();
+      if(base){
+        const res2=await sb.from('sf_workorders').select(cols).ilike('record_type','%ambio%').ilike('cuenta','%'+base+'%');
+        data=res2.data;
+      }
+    }
+    if(!data||!data.length){sinMatch++;continue;}
+    if(data.length>1){ambiguos++;continue;} // ambiguo → queda para vincular a mano
+    const ot=data[0];
+    const upd={
+      sf_id:ot.sf_id||ot.id, ot_numero:ot.workorder_number, estado_ot:ot.status,
+      etapa: ROLLOUT_PILOTO_ESTADOS_EXITOSOS.includes(ot.status)?'Cerrado':'OT creada',
+      fecha_ot_creada:(ot.created_at||new Date().toISOString()).slice(0,10),
+      updated_at:new Date().toISOString(),
+    };
+    if(upd.etapa==='Cerrado')upd.fecha_exitosa=new Date().toISOString().slice(0,10);
+    await sb.from('rollout_piloto').update(upd).eq('id',r.id);
+    encontrados++;
+  }
+  await loadRolloutPiloto();
+  showToastPortal?.(`🔍 ${encontrados} OT detectadas · ${ambiguos} ambiguas (vincular a mano) · ${sinMatch} sin OT todavía en SF`);
+}
+
+// Vincula una OT real de SF a un caso del piloto — busca en la caché
+// sf_workorders (se sincroniza sola cada ~10min) por número de OT.
+async function vincularOTPiloto(id){
+  const otNum=prompt('Número de OT de Cambio (ej: 00022774):');
+  if(!otNum)return;
+  const otLimpio=otNum.trim();
+  const{data,error}=await sb.from('sf_workorders').select('id,sf_id,workorder_number,status,logistica,created_at').eq('workorder_number',otLimpio).limit(1);
+  if(error||!data?.length){
+    alert('No se encontró la OT '+otLimpio+' en la caché sincronizada de SF.\n\nSi la acabás de crear, esperá el próximo sync (cada ~10min) o hacé "Full Sync" desde el panel de arriba.');
+    return;
+  }
+  const ot=data[0];
+  if(ot.logistica&&ot.logistica.toUpperCase()!=='ALLEATA'){
+    if(!confirm(`Ojo: esta OT tiene logística "${ot.logistica}", no ALLEATA. ¿Vincular igual?`))return;
+  }
+  const upd={
+    sf_id:ot.sf_id||ot.id,
+    ot_numero:ot.workorder_number,
+    estado_ot:ot.status,
+    etapa: ROLLOUT_PILOTO_ESTADOS_EXITOSOS.includes(ot.status)?'Cerrado':'OT creada',
+    fecha_ot_creada:(ot.created_at||new Date().toISOString()).slice(0,10),
+    updated_at:new Date().toISOString(),
+  };
+  if(upd.etapa==='Cerrado')upd.fecha_exitosa=new Date().toISOString().slice(0,10);
+  const{error:updErr}=await sb.from('rollout_piloto').update(upd).eq('id',id);
+  if(updErr){alert('Error al vincular: '+updErr.message);return;}
+  await loadRolloutPiloto();
+}
+
+// Re-sincroniza el estado de todas las OT ya vinculadas contra sf_workorders,
+// recalcula SLA cuando detecta que pasó a un estado exitoso.
+async function syncRolloutPiloto(){
+  const conOT=_rpData.filter(r=>r.ot_numero&&r.etapa!=='Cerrado');
+  if(!conOT.length){alert('No hay OT vinculadas pendientes de sincronizar.');return;}
+  let actualizados=0;
+  for(const r of conOT){
+    const{data}=await sb.from('sf_workorders').select('status').eq('workorder_number',r.ot_numero).limit(1);
+    const nuevoEstado=data?.[0]?.status;
+    if(!nuevoEstado||nuevoEstado===r.estado_ot)continue;
+    const upd={estado_ot:nuevoEstado,updated_at:new Date().toISOString()};
+    if(ROLLOUT_PILOTO_ESTADOS_EXITOSOS.includes(nuevoEstado)&&r.etapa!=='Cerrado'){
+      upd.etapa='Cerrado';
+      upd.fecha_exitosa=new Date().toISOString().slice(0,10);
+      if(r.fecha_ot_creada){
+        const dias=Math.round((new Date(upd.fecha_exitosa)-new Date(r.fecha_ot_creada))/86400000);
+        upd.sla_dias=dias;
+      }
+    }
+    await sb.from('rollout_piloto').update(upd).eq('id',r.id);
+    actualizados++;
+  }
+  await loadRolloutPiloto();
+  showToastPortal?.(actualizados?`✅ ${actualizados} caso(s) actualizados`:'Sin cambios de estado');
+}
+
+// Trae volumen EN VIVO de Actividad__c (SF) por CUIT y lo guarda tanto en
+// rollout_piloto (último dato, para la tabla) como en el histórico (para
+// poder graficar la evolución real desde el día que se hizo el cambio).
+async function actualizarVolumenPiloto(id){
+  const r=_rpData.find(x=>x.id===id);
+  if(!r)return;
+  if(!r.cuit){alert('Este caso no tiene CUIT cargado.');return;}
+  try{
+    const resp=await railwayFetch('/automations/actividad/volumen?cuit='+encodeURIComponent(r.cuit));
+    const j=await resp.json();
+    if(!resp.ok||!j.ok){
+      alert('No se pudo traer volumen para '+r.cliente+': '+(j.error||'error desconocido'));
+      return;
+    }
+    const hoy=new Date().toISOString().slice(0,10);
+    await sb.from('rollout_piloto').update({
+      vol_ultimo_reportado:j.vol30d,
+      vol_ultimo_fecha:hoy,
+      updated_at:new Date().toISOString(),
+    }).eq('id',id);
+    await sb.from('rollout_piloto_volumen_historico').insert([{
+      piloto_id:id, fecha_corte:hoy, vol_mes:j.volMes, vol_30d:j.vol30d, vol_60d:j.vol60d, vol_90d:j.vol90d,
+    }]);
+    await loadRolloutPiloto();
+    showToastPortal?.(`✅ Volumen actualizado: ${r.cliente}`);
+  }catch(e){
+    alert('Error de red: '+e.message);
+  }
+}
+
+// Recorre TODOS los casos con CUIT y actualiza volumen uno por uno — pensado
+// para correr 1 vez por semana/mes y armar la serie histórica del piloto.
+async function actualizarVolumenTodosPiloto(){
+  const conCuit=_rpData.filter(r=>r.cuit);
+  if(!confirm(`Vas a consultar volumen en vivo para ${conCuit.length} cuentas. Puede tardar un rato. ¿Seguir?`))return;
+  let ok=0,fail=0;
+  for(const r of conCuit){
+    try{
+      const resp=await railwayFetch('/automations/actividad/volumen?cuit='+encodeURIComponent(r.cuit));
+      const j=await resp.json();
+      if(resp.ok&&j.ok){
+        const hoy=new Date().toISOString().slice(0,10);
+        await sb.from('rollout_piloto').update({vol_ultimo_reportado:j.vol30d,vol_ultimo_fecha:hoy,updated_at:new Date().toISOString()}).eq('id',r.id);
+        await sb.from('rollout_piloto_volumen_historico').insert([{piloto_id:r.id,fecha_corte:hoy,vol_mes:j.volMes,vol_30d:j.vol30d,vol_60d:j.vol60d,vol_90d:j.vol90d}]);
+        ok++;
+      }else fail++;
+    }catch(e){fail++;}
+  }
+  await loadRolloutPiloto();
+  showToastPortal?.(`✅ Volumen actualizado: ${ok} ok, ${fail} sin datos`);
+}
+
+async function editarNotaPiloto(id){
+  const r=_rpData.find(x=>x.id===id);
+  if(!r)return;
+  const etapas=['Sin contactar','Contactado','Coordinado','OT creada','Cerrado'];
+  const nuevaEtapa=prompt('Etapa ('+etapas.join(' / ')+'):',r.etapa||'Sin contactar');
+  if(nuevaEtapa===null)return;
+  const notas=prompt('Notas:',r.notas||'');
+  if(notas===null)return;
+  const upd={etapa:nuevaEtapa,notas,updated_at:new Date().toISOString()};
+  if(nuevaEtapa==='Contactado'&&!r.fecha_contacto)upd.fecha_contacto=new Date().toISOString().slice(0,10);
+  await sb.from('rollout_piloto').update(upd).eq('id',id);
+  await loadRolloutPiloto();
 }
 
 async function initRollout(){
