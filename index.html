@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.4.66</title>
+<title>Alleata · Operaciones v4.4.67</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -400,7 +400,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.4.66 · 21 jul 2026
+      v4.4.67 · 21 jul 2026
     </div>
   </div>
 </div>
@@ -484,7 +484,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.4.66 · 21 jul 2026
+      v4.4.67 · 21 jul 2026
     </div>
   </div>
 </nav>
@@ -524,7 +524,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.4.66</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.4.67</div>
   </div>
   <div class="content">
 
@@ -4377,7 +4377,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.4.66] OK');
+console.log('[Alleata v4.4.67] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -5661,8 +5661,19 @@ function rlRenderTabla(){
     return true;
   });
   if(!list.length){tbody.innerHTML='<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--text-muted)">Sin resultados</td></tr>';return;}
-  const estados=['Pre-Colecta','Despachado','En tránsito','En camino','En espera en sucursal','Entregado','Retirar Terminal','Fallido','Perdido','Devuelto'];
+  // Pipeline real de Cambio de Terminal en SF (ver breadcrumb de la OT):
+  // Configurar Terminal → En Proceso → Pre-Colecta → Despachado → Retirar Terminal → ...
+  // Antes faltaban 'Configurar Terminal' y 'En Proceso' — como ninguna
+  // <option> matcheaba, el navegador mostraba la PRIMERA opción de la lista
+  // por default (Pre-Colecta), mintiendo el estado real en pantalla aunque
+  // el dato guardado en sf_workorders.status estuviera correcto.
+  const estados=['Configurar Terminal','En Proceso','Pre-Colecta','Despachado','En tránsito','En camino','En espera en sucursal','Entregado','Retirar Terminal','Fallido','Perdido','Devuelto'];
+  // A prueba de futuro: si aparece un estado real que no está en la lista de
+  // arriba, se lo agrega dinámicamente por fila en vez de mostrar cualquier
+  // otra cosa como si fuera el estado real.
+  const estadosParaFila=e=>estados.includes(e.estado)?estados:[e.estado,...estados];
   tbody.innerHTML=list.map(e=>{
+    const estadosFila=estadosParaFila(e);
     const tieneRetorno=esOTConRetorno(e.tipo);
     const esCA=(e.logistica||'').toUpperCase()==='CORREO ARGENTINO';
     const rlBadge = esRollout(e)
@@ -5676,7 +5687,7 @@ function rlRenderTabla(){
         <td><div class="mono" style="font-size:10px;word-break:break-all">${e.track||'—'}</div>${e.track?`<a href="https://www.correoargentino.com.ar/formularios/e-commerce?id=${e.track}" target="_blank" style="font-size:10px;color:var(--blue);text-decoration:none;">🔗 Correo Arg.</a>`:''}
           ${tieneRetorno?`<div style="margin-top:5px;padding-top:5px;border-top:1px dashed rgba(245,158,11,.4)"><div style="font-size:9px;font-weight:700;color:#f59e0b;text-transform:uppercase;margin-bottom:2px">↩️ Retorno</div>${e.track_devolucion?`<div class="mono" style="font-size:10px;word-break:break-all;color:#f59e0b">${e.track_devolucion}</div><a href="https://www.correoargentino.com.ar/formularios/e-commerce?id=${e.track_devolucion}" target="_blank" style="font-size:10px;color:var(--blue);">🔗 Retorno CA</a>`:`<button onclick="openCargarTrackRetorno('${e.id}')" style="font-size:10px;color:#f59e0b;background:rgba(245,158,11,.1);border:1px dashed #f59e0b;border-radius:6px;padding:3px 7px;cursor:pointer">+ Cargar tracking</button>`}</div>`:''}
         </td>
-        <td><select class="select" style="width:150px;padding:4px 8px;font-size:11px" onchange="rlCambiarEstado('${e.id}',this.value,'${(e.estado||'').replace(/'/g,"\\'")}')">${estados.map(s=>`<option ${e.estado===s?'selected':''}>${s}</option>`).join('')}</select>${e.ultimo_evento_fecha?`<div style="font-size:10px;color:var(--text-muted);margin-top:3px;font-family:'JetBrains Mono',monospace">${formatFechaCA(e.ultimo_evento_fecha)}</div>`:''}
+        <td><select class="select" style="width:150px;padding:4px 8px;font-size:11px" onchange="rlCambiarEstado('${e.id}',this.value,'${(e.estado||'').replace(/'/g,"\\'")}')">${estadosFila.map(s=>`<option ${e.estado===s?'selected':''}>${s}</option>`).join('')}</select>${e.ultimo_evento_fecha?`<div style="font-size:10px;color:var(--text-muted);margin-top:3px;font-family:'JetBrains Mono',monospace">${formatFechaCA(e.ultimo_evento_fecha)}</div>`:''}
           ${tieneRetorno?`<select class="select" style="width:150px;padding:4px 8px;font-size:11px;margin-top:4px;border-color:rgba(245,158,11,.5)" onchange="updateEstadoDevolucion('${e.id}',this.value)">${['Pendiente rótulo','Rótulo generado','En camino retorno','Recibido ✅'].map(s=>`<option ${(e.estado_devolucion||'Pendiente rótulo')===s?'selected':''}>${s}</option>`).join('')}</select>`:''}
         </td>
         <td style="max-width:180px">${e.ultimo_evento&&e.ultimo_evento!=='Importado desde SF'?`<div style="font-size:10px;color:var(--teal);margin-top:2px">${e.ultimo_evento}</div>`:'—'}${e.foto_evidencia?`<a href="${e.foto_evidencia}" target="_blank"><img src="${e.foto_evidencia}" style="width:50px;height:38px;object-fit:cover;border-radius:5px;border:1px solid var(--border2);margin-top:4px"></a>`:''}</td>
@@ -5697,7 +5708,7 @@ function rlRenderTabla(){
       <td>${e.track?`<div style="font-size:10px;font-family:'JetBrains Mono',monospace">${e.track}</div>
           <button id="rl-track-btn-${e.id}" style="background:var(--surface2);border:1px solid var(--border2);color:var(--blue);font-size:10px;padding:2px 6px;border-radius:5px;cursor:pointer;margin-top:3px" onclick="consultarTracking('${e.id}','${e.track}')">🔍</button>`:'—'}</td>
       <td><select class="select" style="font-size:11px;padding:3px 6px" onchange="rlCambiarEstado('${e.id}',this.value,'${(e.estado||'').replace(/'/g,"\'")}')">
-          ${estados.map(s=>`<option ${e.estado===s?'selected':''}>${s}</option>`).join('')}</select>
+          ${estadosFila.map(s=>`<option ${e.estado===s?'selected':''}>${s}</option>`).join('')}</select>
           ${e.ultimo_evento_fecha?`<div style="font-size:10px;color:var(--text-muted);margin-top:2px;font-family:'JetBrains Mono',monospace">${formatFechaCA(e.ultimo_evento_fecha)}</div>`:''}</td>
       <td>${tieneRetorno?`<div style="font-size:10px;color:var(--text-muted)">${e.track_devolucion||'Sin tracking'}</div>
           <select class="select" style="font-size:10px;padding:2px 5px;margin-top:3px" onchange="updateEstadoDevolucion('${e.id}',this.value)">
@@ -7986,7 +7997,7 @@ async function renderEnviosTable(list){
       <td>
         <!-- SELECT ESTADO ENVÍO -->
         <select class="select" style="width:160px;padding:4px 8px;font-size:11px" onchange="updateEnvioEstado('${e.id}',this.value)">
-          ${['Pre-Colecta','Despachado','En tránsito','En camino','En espera en sucursal','Entregado','Retirar Terminal','Fallido','Perdido','Devuelto'].map(s=>`<option ${(e.estado||'Pre-Colecta')===s?'selected':''}>${s}</option>`).join('')}
+          ${(()=>{const base=['Configurar Terminal','En Proceso','Pre-Colecta','Despachado','En tránsito','En camino','En espera en sucursal','Entregado','Retirar Terminal','Fallido','Perdido','Devuelto'];const est=e.estado||'Pre-Colecta';const lista=base.includes(est)?base:[est,...base];return lista.map(s=>`<option ${est===s?'selected':''}>${s}</option>`).join('');})()}
         </select>
         ${e.ultimo_evento_fecha ? `<div style="font-size:10px;color:var(--text-muted);margin-top:4px;font-family:'JetBrains Mono',monospace;letter-spacing:0.3px">${formatFechaCA(e.ultimo_evento_fecha)}</div>` : ''}
         <!-- SELECT ESTADO RETORNO (solo si tiene retorno) -->
@@ -9677,8 +9688,9 @@ async function openUpdateEvento(id, current){
   let m=document.getElementById('modalDetalleOT');
   if(!m){ m=document.createElement('div'); m.id='modalDetalleOT'; m.className='modal-overlay'; m.onclick=ev=>{if(ev.target===m)m.classList.remove('show');}; document.body.appendChild(m); }
 
-  const estados=['Pre-Colecta','Despachado','En tránsito','En camino','En espera en sucursal','Entregado','Retirar Terminal','Fallido','Perdido','Devuelto'];
-  const estadoOpts=estados.map(s=>`<option value="${s}" ${e.estado===s?'selected':''}>${s}</option>`).join('');
+  const estados=['Configurar Terminal','En Proceso','Pre-Colecta','Despachado','En tránsito','En camino','En espera en sucursal','Entregado','Retirar Terminal','Fallido','Perdido','Devuelto'];
+  const estadosModal=estados.includes(e.estado)?estados:[e.estado,...estados];
+  const estadoOpts=estadosModal.map(s=>`<option value="${s}" ${e.estado===s?'selected':''}>${s}</option>`).join('');
 
   m.innerHTML=`<div class="modal-box" style="max-width:520px;width:100%">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
