@@ -5327,14 +5327,15 @@ function esRollout(e){
 // Cliente → contacto → OT de Cambio (logística siempre ALLEATA) → estado
 // sincronizado desde sf_workorders → SLA → (a futuro) volumen post-cambio.
 //
-// NOTA IMPORTANTE — pendiente de confirmar con Marcelo:
-// ROLLOUT_PILOTO_ESTADOS_EXITOSOS abajo asume qué valores de Status en SF
-// significan "cambio completado exitosamente". Si el valor real es otro
-// (ver el pipeline de la OT en SF: Configurar Terminal → En Proceso →
-// Pre-Colecta → Despachado — no vi ahí un paso "Exitoso" explícito), hay
-// que ajustar esta lista para que el conteo de "Exitosas"/SLA sea correcto.
+// FIX 22/07: confirmado con evidencia real (OT 00022779, historial SF) —
+// el pipeline es Pre-Colecta → Despachado → Exitoso. "Despachado" es
+// INTERMEDIO, no el cierre. Tenerlo en esta lista hacía que el sync
+// marcara etapa='Cerrado' apenas la OT se despachaba (sin haber llegado a
+// Exitoso), y como el sync de estado solo re-consulta filas con
+// etapa != 'Cerrado', esa OT quedaba pisada para siempre sin actualizarse
+// aunque en SF sí pasara a Exitoso después.
 // ═══════════════════════════════════════════════════════════════════════════
-const ROLLOUT_PILOTO_ESTADOS_EXITOSOS=['Exitoso','Exitosa','Entregado','Despachado'];
+const ROLLOUT_PILOTO_ESTADOS_EXITOSOS=['Exitoso','Exitosa','Entregado'];
 let _rpData=[];
 
 // Usuarios que ven Rollout Piloto en modo SOLO LECTURA — sin editar notas/etapa,
