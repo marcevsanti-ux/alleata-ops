@@ -165,7 +165,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
       <div class="login-logo">
         <img id="loginLogo" src="" alt="Alleata">
         <div class="login-sub">Portal de Operaciones</div>
-        <div class="login-version">v2.14.20 · mobile</div>
+        <div class="login-version">v2.14.21 · mobile</div>
       </div>
       <div class="field"><label class="label">Email</label><input class="input" id="lEmail" type="email" placeholder="usuario@alleata.com" autocomplete="email"></div>
       <div class="field"><label class="label">Contraseña</label><input class="input" id="lPass" type="password" placeholder="••••••••" autocomplete="current-password"></div>
@@ -181,7 +181,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
   <div class="topbar">
     <img id="appLogo" src="" alt="Alleata">
     <div class="topbar-title" id="topbarTitle">Operaciones</div>
-    <div class="topbar-version">v2.14.20</div>
+    <div class="topbar-version">v2.14.21</div>
     <div class="topbar-avatar" id="topbarAvatar" onclick="openDrawer()">?</div>
   </div>
 
@@ -438,6 +438,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
       <label class="label" style="margin-bottom:6px;display:block">
         📶 SIM nueva (Rollout) <span style="color:var(--red)">*requerido</span>
       </label>
+      <img id="rolloutSimImg" style="width:100%;border-radius:10px;max-height:160px;object-fit:cover;display:none;margin-bottom:8px" src="">
       <div id="rolloutSimResult" style="font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--teal);margin-bottom:8px"></div>
       <label style="display:flex;align-items:center;gap:8px;background:var(--surface2);border:1px dashed var(--border2);border-radius:10px;padding:12px;cursor:pointer" id="rolloutSimLabel">
         <span style="font-size:20px">📷</span>
@@ -558,6 +559,13 @@ const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSI
 //     control" que ya tenía el lado de Supabase.
 //   - Resultado de SIM ahora muestra la fuente: "Confirmado en vivo con
 //     Salesforce" vs "Caché local — no se pudo confirmar"
+// Cambios v2.14.21:
+//   - FIX Rollout: el paso "leer chip SIM nuevo" no mostraba la foto
+//     capturada ni validaba el número contra Salesforce (solo hacía OCR y
+//     lo guardaba para recién validar al confirmar la entrega) — reportado
+//     como "la cámara se habilita pero no se ve la imagen y no busca
+//     contra SF". Ahora muestra el preview de la foto y valida en vivo con
+//     simLookupLiveSF(), igual que el resto de la app.
 // Cambios v2.14.20:
 //   - Reporte de cierre de ruta (generarTextoResumen) ahora incluye "🛣️
 //     Kmts Recorridos: X km" — total del día calculado por calcKmRuta()
@@ -1963,6 +1971,8 @@ function openCierreModal(id,resultado){
   document.getElementById('rolloutSimStatus').textContent='';
   document.getElementById('rolloutSimLabelText').textContent='Tocar para leer el chip nuevo';
   document.getElementById('rolloutSimInput').value='';
+  document.getElementById('rolloutSimImg').style.display='none';
+  document.getElementById('rolloutSimImg').src='';
 
   document.getElementById('modalCierre').classList.add('show');
 }
@@ -2323,37 +2333,74 @@ async function procesarFotoSIM(e){
 
 // Lectura de chip para el paso obligatorio de Rollout (dentro del modal de
 // cierre) — reusa el mismo motor de OCR (callVision + parseVisionSIM) que
-// ya usa el Verificador SIMs, pero acá solo detecta la serie y la deja
-// lista para mandar al backend al confirmar el cierre; no hace lookup en
-// la base ni permite editar estado/ubicación (eso lo hace el backend).
+// ya usa el Verificador SIMs.
+// FIX 22/07: esta función solo hacía OCR y guardaba el número, sin mostrar
+// la foto capturada ni validar nada contra SF — el operador no tenía forma
+// de saber si lo que leyó era correcto (justo lo que reportaron: "la
+// cámara se habilita pero no se ve la imagen y no busca contra SF").
+// Ahora: 1) muestra la foto tomada (mismo patrón que "Foto de evidencia"),
+// 2) además del OCR, valida el número en vivo contra Salesforce con
+// simLookupLiveSF() — igual que hace el resto de la app — y avisa si la
+// SIM no se encontró, para que el operador pueda volver a leerla antes de
+// confirmar la entrega.
 async function procesarFotoSimRollout(e){
   const file=e.target.files[0];
   if(!file)return;
   e.target.value='';
   const status=document.getElementById('rolloutSimStatus');
   const result=document.getElementById('rolloutSimResult');
+  const img=document.getElementById('rolloutSimImg');
   _rolloutSimSerie=null;
+
+  // Mostrar la foto tomada de entrada, sin esperar al OCR — así el
+  // operador ve que la captura sí funcionó, aunque el análisis falle.
+  try{
+    const reader=new FileReader();
+    reader.onload=ev=>{ img.src=ev.target.result; img.style.display='block'; };
+    reader.readAsDataURL(file);
+  }catch(e2){ /* no bloquea el resto del flujo */ }
+
   status.textContent='🧠 Analizando foto con IA...';
   result.textContent='';
   try{
     const b64=await fileToB64(file);
     const res=await callVision(b64,file.type);
     const{serie,sufijo,prefijo}=parseVisionSIM(res);
-    if(serie){
-      _rolloutSimSerie=serie;
-      result.textContent='✅ '+serie;
-      status.textContent='Chip leído correctamente';
-      document.getElementById('rolloutSimLabelText').textContent='Volver a leer';
-      if(navigator.vibrate)navigator.vibrate([100,50,100]);
-    }else if(sufijo||prefijo){
-      status.textContent='⚠️ Solo se detectó parte del número — probá de nuevo, más cerca';
-      result.textContent='';
+    if(serie||sufijo||prefijo){
+      status.textContent='🔎 Validando contra Salesforce...';
+      const queryLive=serie||(prefijo&&sufijo?(prefijo+sufijo).replace(/\s/g,''):null)||sufijo;
+      const live=queryLive?await simLookupLiveSF(queryLive):null;
+      const serieFinal=serie||live?.serie||queryLive;
+      if(live){
+        _rolloutSimSerie=live.serie||serieFinal;
+        result.textContent='✅ '+_rolloutSimSerie;
+        status.textContent='Chip confirmado en vivo con Salesforce'+(live.cuenta?' — antes en: '+live.cuenta:'');
+        status.style.color='var(--teal)';
+      }else if(serie){
+        // OCR leyó una serie completa pero SF no la encontró — dejamos
+        // seguir (puede ser un chip nuevo sin cargar todavía en SF) pero
+        // avisamos, para que el operador decida si vuelve a leer.
+        _rolloutSimSerie=serie;
+        result.textContent='✅ '+serie;
+        status.textContent='⚠️ Leído, pero no se encontró en Salesforce — revisá que sea el chip correcto';
+        status.style.color='var(--yellow)';
+      }else{
+        status.textContent='⚠️ Solo se detectó parte del número y no se pudo confirmar contra SF — probá de nuevo, más cerca';
+        status.style.color='var(--yellow)';
+        result.textContent='';
+      }
+      if(_rolloutSimSerie){
+        document.getElementById('rolloutSimLabelText').textContent='Volver a leer';
+        if(navigator.vibrate)navigator.vibrate([100,50,100]);
+      }
     }else{
       status.textContent='❌ No se pudo leer el chip — probá de nuevo';
+      status.style.color='';
       result.textContent='';
     }
   }catch(err){
     status.textContent='❌ Error: '+err.message;
+    status.style.color='var(--red)';
   }
 }
 
