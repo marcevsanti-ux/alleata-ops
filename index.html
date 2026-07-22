@@ -1162,6 +1162,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div style="font-size:18px;font-weight:800;color:#8b5cf6;font-family:'JetBrains Mono',monospace" id="ds-sub-n-rotulo">—</div>
         <div style="font-size:10px;font-weight:700;color:var(--text-muted);margin-top:2px">🏷️ RÓTULO ENVIADO</div>
         <div style="font-size:9px;color:var(--text-muted);margin-top:1px">CORREO ARGENTINO</div>
+        <div id="ds-sub-rotulo-sla" style="font-size:10px;font-weight:700;margin-top:4px;font-family:'JetBrains Mono',monospace"></div>
       </div>
       <div id="ds-sub-otros" onclick="dsFiltrarSubestado('otros')" style="cursor:pointer;background:var(--navy-800);border:1px solid var(--border2);border-left:3px solid var(--text-muted);border-radius:8px;padding:8px 14px;min-width:130px;transition:all .15s" onmouseover="this.style.background='rgba(128,128,128,.08)'" onmouseout="this.style.background='var(--navy-800)'">
         <div style="font-size:18px;font-weight:800;color:var(--text-muted);font-family:'JetBrains Mono',monospace" id="ds-sub-n-otros">—</div>
@@ -1196,19 +1197,40 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
   function dsActualizarSubestados(){
     const d = (window.DesinModule?.datos || []).filter(o => (o.estado||'') === 'En Proceso');
     let visita=0, despachado=0, rotulo=0, otros=0;
+    const rotuloSla={verde:0,alerta:0,critico:0};
     d.forEach(o => {
       const log = (o.logistica||'').toUpperCase();
       const sg  = (o.status_gestion_retiros||o.status_gestion||'');
+      const esRotulo = sg === 'Rótulo enviado' && log.includes('CORREO');
       if(sg === 'Visita presencial' && log === 'ALLEATA') visita++;
       else if(sg === 'Despachado' && log.includes('CORREO')) despachado++;
-      else if(sg === 'Rótulo enviado' && log.includes('CORREO')) rotulo++;
+      else if(esRotulo) rotulo++;
       else otros++;
+      // Reglas de SLA para "Rótulo enviado" — reusa el sla_estado_calc que ya
+      // trae v_ordenes_con_sla por fila (mismos cortes que el resto de
+      // Desinstalaciones: verde <3 días, alerta 3-6, crítico ≥7). Es visual
+      // únicamente — sin avisos por WhatsApp, solo para que Angel identifique
+      // de un vistazo a quién tiene que apurarle el despacho del rótulo.
+      if(esRotulo){
+        const sla=o.sla_estado_calc;
+        if(sla==='critico') rotuloSla.critico++;
+        else if(sla==='alerta') rotuloSla.alerta++;
+        else rotuloSla.verde++; // mismo criterio que dsRenderTabla: todo lo que no es alerta/crítico cuenta como verde
+      }
     });
     const s = (id,v) => { const el=document.getElementById(id); if(el) el.textContent=v; };
     s('ds-sub-n-visita', visita);
     s('ds-sub-n-despachado', despachado);
     s('ds-sub-n-rotulo', rotulo);
     s('ds-sub-n-otros', otros);
+    const slaEl=document.getElementById('ds-sub-rotulo-sla');
+    if(slaEl){
+      const partes=[];
+      if(rotuloSla.verde)    partes.push(`<span style="color:#10b981">🟢${rotuloSla.verde}</span>`);
+      if(rotuloSla.alerta)   partes.push(`<span style="color:#f59e0b">🟡${rotuloSla.alerta}</span>`);
+      if(rotuloSla.critico)  partes.push(`<span style="color:#ef4444">🔴${rotuloSla.critico}</span>`);
+      slaEl.innerHTML=partes.join(' ');
+    }
   }
 
   function dsFiltrarSubestado(tipo){
@@ -5315,6 +5337,14 @@ function esRollout(e){
 const ROLLOUT_PILOTO_ESTADOS_EXITOSOS=['Exitoso','Exitosa','Entregado','Despachado'];
 let _rpData=[];
 
+// Usuarios que ven Rollout Piloto en modo SOLO LECTURA — sin editar notas/etapa,
+// sin actualizar volumen ni imprimir rótulos. Pidieron sacarles esas acciones.
+const ROLLOUT_PILOTO_SOLO_LECTURA=['napse@alleata.com.ar','diego@alleata.com.ar'];
+function rolloutPilotoEsSoloLectura(){
+  const email=(currentProfile?.email||currentUser?.email||'').trim().toLowerCase();
+  return ROLLOUT_PILOTO_SOLO_LECTURA.includes(email);
+}
+
 async function loadRolloutPiloto(){
   const tbody=document.getElementById('rp-tbody');
   if(tbody)tbody.innerHTML='<tr><td colspan="11" style="text-align:center;padding:30px;color:var(--text-muted)">Cargando...</td></tr>';
@@ -5344,6 +5374,7 @@ function renderRolloutPiloto(){
 
   const ETAPA_COLORS={'Sin contactar':'#6b7280','Contactado':'#f59e0b','Coordinado':'#1a9fd4','OT creada':'#8b5cf6','Cerrado':'#1dbf8e'};
   const fmtVol=v=>v==null?'—':'$'+Number(v).toLocaleString('es-AR');
+  const soloLectura=rolloutPilotoEsSoloLectura();
 
   tbody.innerHTML=filtrados.map(r=>{
     const ec=ETAPA_COLORS[r.etapa]||'#6b7280';
@@ -5352,12 +5383,12 @@ function renderRolloutPiloto(){
       <td style="font-family:'JetBrains Mono',monospace;font-size:11px">${r.cuit||'—'}</td>
       <td><div>${r.contacto||'—'}</div><div style="font-size:10px;color:var(--text-muted)">${r.telefono||''}</div></td>
       <td><span class="badge" style="background:${ec}18;border:1px solid ${ec}40;color:${ec}">${r.etapa}</span></td>
-      <td>${r.ot_numero?`<span style="font-family:'JetBrains Mono',monospace;font-weight:700">${r.ot_numero}</span>`:`<button class="btn-sm" style="background:rgba(139,92,246,.12);color:#8b5cf6;border:1px solid rgba(139,92,246,.3)" onclick="vincularOTPiloto('${r.id}')">🔗 Vincular OT</button>`}</td>
+      <td>${r.ot_numero?`<span style="font-family:'JetBrains Mono',monospace;font-weight:700">${r.ot_numero}</span>`:(soloLectura?'—':`<button class="btn-sm" style="background:rgba(139,92,246,.12);color:#8b5cf6;border:1px solid rgba(139,92,246,.3)" onclick="vincularOTPiloto('${r.id}')">🔗 Vincular OT</button>`)}</td>
       <td>${r.estado_ot||'—'}</td>
       <td>${r.sla_dias!=null?r.sla_dias+'d':'—'}</td>
       <td style="font-size:11px">${fmtVol(r.vol_baseline_30d)}</td>
       <td style="font-size:11px">${r.vol_ultimo_reportado!=null?fmtVol(r.vol_ultimo_reportado)+' <span style=\"color:var(--text-muted)\">('+(r.vol_ultimo_fecha||'')+')</span>':'<span style=\"color:var(--text-muted)\">sin dato post-cambio</span>'}</td>
-      <td><button class="btn-sm" style="background:none;border:1px solid var(--border2);color:var(--text-muted)" onclick="editarNotaPiloto('${r.id}')" title="Notas / etapa">✏️</button> <button class="btn-sm" style="background:none;border:1px solid var(--border2);color:#8b5cf6" onclick="actualizarVolumenPiloto('${r.id}')" title="Actualizar volumen desde SF">📊</button> ${r.ot_numero?`<button class="btn-sm" style="background:none;border:1px solid var(--border2);color:var(--teal)" onclick="printRotuloPiloto('${r.ot_numero}')" title="Imprimir rótulo (QR para escanear en mobile)">🖨️</button>`:''}</td>
+      <td>${soloLectura?'':`<button class="btn-sm" style="background:none;border:1px solid var(--border2);color:var(--text-muted)" onclick="editarNotaPiloto('${r.id}')" title="Notas / etapa">✏️</button> <button class="btn-sm" style="background:none;border:1px solid var(--border2);color:#8b5cf6" onclick="actualizarVolumenPiloto('${r.id}')" title="Actualizar volumen desde SF">📊</button> ${r.ot_numero?`<button class="btn-sm" style="background:none;border:1px solid var(--border2);color:var(--teal)" onclick="printRotuloPiloto('${r.ot_numero}')" title="Imprimir rótulo (QR para escanear en mobile)">🖨️</button>`:''}`}</td>
     </tr>`;
   }).join('')||'<tr><td colspan="11" style="text-align:center;padding:30px;color:var(--text-muted)">Sin resultados</td></tr>';
 
