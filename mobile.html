@@ -165,7 +165,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
       <div class="login-logo">
         <img id="loginLogo" src="" alt="Alleata">
         <div class="login-sub">Portal de Operaciones</div>
-        <div class="login-version">v2.14.21 · mobile</div>
+        <div class="login-version">v2.14.22 · mobile</div>
       </div>
       <div class="field"><label class="label">Email</label><input class="input" id="lEmail" type="email" placeholder="usuario@alleata.com" autocomplete="email"></div>
       <div class="field"><label class="label">Contraseña</label><input class="input" id="lPass" type="password" placeholder="••••••••" autocomplete="current-password"></div>
@@ -181,7 +181,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
   <div class="topbar">
     <img id="appLogo" src="" alt="Alleata">
     <div class="topbar-title" id="topbarTitle">Operaciones</div>
-    <div class="topbar-version">v2.14.21</div>
+    <div class="topbar-version">v2.14.22</div>
     <div class="topbar-avatar" id="topbarAvatar" onclick="openDrawer()">?</div>
   </div>
 
@@ -436,7 +436,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
     <!-- SIM NUEVA — solo para Rollout real (obligatorio antes de poder confirmar) -->
     <div id="rolloutSimWrap" style="display:none;margin-bottom:14px">
       <label class="label" style="margin-bottom:6px;display:block">
-        📶 SIM nueva (Rollout) <span style="color:var(--red)">*requerido</span>
+        📶 SIM nueva (Rollout) <span style="color:var(--yellow)">*recomendado</span>
       </label>
       <img id="rolloutSimImg" style="width:100%;border-radius:10px;max-height:160px;object-fit:cover;display:none;margin-bottom:8px" src="">
       <div id="rolloutSimResult" style="font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--teal);margin-bottom:8px"></div>
@@ -559,6 +559,11 @@ const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSI
 //     control" que ya tenía el lado de Supabase.
 //   - Resultado de SIM ahora muestra la fuente: "Confirmado en vivo con
 //     Salesforce" vs "Caché local — no se pudo confirmar"
+// Cambios v2.14.22:
+//   - Rollout: leer el chip SIM nuevo pasa a ser RECOMENDADO, no obligatorio
+//     — pedido de Marcelo el 22/07 porque el bloqueo trababa el cierre de
+//     OTs en el campo. Si no se leyó, se avisa pero se puede confirmar
+//     igual (con warning para cargar la SIM a mano después).
 // Cambios v2.14.21:
 //   - FIX Rollout: el paso "leer chip SIM nuevo" no mostraba la foto
 //     capturada ni validaba el número contra Salesforce (solo hacía OCR y
@@ -2023,11 +2028,13 @@ async function confirmarCierreOT(){
     return;
   }
 
-  // Rollout: no se puede confirmar la entrega sin leer el chip nuevo
+  // Rollout: leer el chip nuevo ya NO bloquea la confirmación — pedido
+  // explícito de Marcelo el 22/07 porque estaba trabando el cierre de OTs.
+  // Se sigue mostrando el paso y avisando si no se leyó, pero solo como
+  // advertencia — no impide tocar "Confirmar" de nuevo.
   if(esRolloutOT(_otCierreActual)&&resultado==='Entregado'&&!_rolloutSimSerie){
-    document.getElementById('rolloutSimStatus').textContent='⚠️ Falta leer el chip nuevo — es obligatorio para Rollout';
-    document.getElementById('rolloutSimStatus').style.color='var(--red)';
-    return;
+    document.getElementById('rolloutSimStatus').textContent='⚠️ No se leyó el chip nuevo — la OT se va a cerrar igual, pero avisale a Marcelo para cargar la SIM a mano en SF';
+    document.getElementById('rolloutSimStatus').style.color='var(--yellow)';
   }
 
   const btn=document.getElementById('modalCierre-confirm');
