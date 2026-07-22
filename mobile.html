@@ -610,6 +610,7 @@ const sb=createClient(SUPABASE_URL,SUPABASE_KEY);
 let currentUser=null,currentProfile=null;
 let rutaActiva=[];
 let rutaDelDia=[];  // OTs aceptadas hoy en orden
+let _kmRutaHoyTotal=0; // último km_total calculado (ida a cada OT + regreso a Barracas) — usado en el reporte de cierre
 let cierresHoy=[];  // OTs cerradas hoy (entregado/fallido/desinstalación) — para el resumen de ruta
 let _otCierreActual=null; // OT activa en modal de cierre (para notif Ally)
 let _dsmCierreCtx=null; // {otId,otNum} de la desinstalación activa en el modal de cierre
@@ -854,6 +855,7 @@ async function guardarRutaDiaria(){
 }
 
 function renderKmIndicador(kmTotal,detalle){
+  _kmRutaHoyTotal=kmTotal||0; // usado luego en generarTextoResumen()
   const el=document.getElementById('kmIndicador');
   if(!el)return;
   el.style.display='block';
@@ -980,7 +982,7 @@ function generarTextoResumen(){
   const desFallidas=desinst.filter(c=>c.resultado==='Fallido');
 
   const tecnico=(currentProfile?.nombre||currentUser?.email||'').trim();
-  let txt=`📦 *Reporte Log. Alleata*\n👷 ${tecnico}\n🕐 ${fechaLargaHoy()}\n`;
+  let txt=`📦 *Reporte Log. Alleata*\n👷 ${tecnico}\n🕐 ${fechaLargaHoy()}\n🛣️ Kmts Recorridos: ${_kmRutaHoyTotal||0} km\n`;
 
   if(exitosos.length){
     txt+=`\n*OT Exitosas (${exitosos.length}):*\n`;
@@ -1103,6 +1105,20 @@ async function loadRuta(){
     .select('*').eq('fecha',fecha).eq('user_id',currentUser.id).maybeSingle();
   if(rutaHoy?.km_total){
     renderKmIndicador(rutaHoy.km_total,rutaHoy.km_detalle||[]);
+  }
+  // Restaurar rutaDelDia si la app se recargó a mitad del día — si no, la
+  // próxima OT aceptada recalcularía el km desde cero (perdiendo lo ya
+  // recorrido) en vez de sumar sobre lo que ya hizo el operador hoy.
+  if(rutaHoy?.ots_ids?.length&&!rutaDelDia.length){
+    const{data:otsPrevias}=await sb.from('sf_workorders')
+      .select('id,workorder_number,ciudad').in('id',rutaHoy.ots_ids);
+    if(otsPrevias?.length){
+      const porId={};otsPrevias.forEach(o=>{porId[o.id]=o;});
+      rutaDelDia=rutaHoy.ots_ids.map(id=>{
+        const o=porId[id];
+        return o?{id:o.id,ot_numero:o.workorder_number,ciudad:o.ciudad}:null;
+      }).filter(Boolean);
+    }
   }
   cargarCierresLocal();
   await loadEnTransito();
