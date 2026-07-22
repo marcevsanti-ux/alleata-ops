@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.4.71</title>
+<title>Alleata · Operaciones v4.4.73</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -400,7 +400,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.4.71 · 21 jul 2026
+      v4.4.73 · 22 jul 2026
     </div>
   </div>
 </div>
@@ -484,7 +484,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.4.71 · 21 jul 2026
+      v4.4.73 · 22 jul 2026
     </div>
   </div>
 </nav>
@@ -524,7 +524,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.4.71</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.4.73</div>
   </div>
   <div class="content">
 
@@ -1098,7 +1098,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <option value="Contactado">Contactado</option>
       <option value="Coordinado">Coordinado</option>
       <option value="OT creada">OT creada</option>
-      <option value="Cerrado">Cerrado</option>
+      <option value="Cerrado">Exitoso</option>
     </select>
   </div>
 
@@ -4402,7 +4402,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.4.71] OK');
+console.log('[Alleata v4.4.73] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -5383,7 +5383,7 @@ function renderRolloutPiloto(){
       <td><div style="font-weight:600">${r.cliente||'—'}</div><div style="font-size:10px;color:var(--text-muted)">${r.localidad||''} ${r.zona?'· '+r.zona:''}</div></td>
       <td style="font-family:'JetBrains Mono',monospace;font-size:11px">${r.cuit||'—'}</td>
       <td><div>${r.contacto||'—'}</div><div style="font-size:10px;color:var(--text-muted)">${r.telefono||''}</div></td>
-      <td><span class="badge" style="background:${ec}18;border:1px solid ${ec}40;color:${ec}">${r.etapa}</span></td>
+      <td><span class="badge" style="background:${ec}18;border:1px solid ${ec}40;color:${ec}">${r.etapa==='Cerrado'?'Exitoso':r.etapa}</span></td>
       <td>${r.ot_numero?`<span style="font-family:'JetBrains Mono',monospace;font-weight:700">${r.ot_numero}</span>`:(soloLectura?'—':`<button class="btn-sm" style="background:rgba(139,92,246,.12);color:#8b5cf6;border:1px solid rgba(139,92,246,.3)" onclick="vincularOTPiloto('${r.id}')">🔗 Vincular OT</button>`)}</td>
       <td>${r.estado_ot||'—'}</td>
       <td>${r.sla_dias!=null?r.sla_dias+'d':'—'}</td>
@@ -5597,9 +5597,14 @@ async function printRotuloPiloto(otNumero){
 async function editarNotaPiloto(id){
   const r=_rpData.find(x=>x.id===id);
   if(!r)return;
-  const etapas=['Sin contactar','Contactado','Coordinado','OT creada','Cerrado'];
-  const nuevaEtapa=prompt('Etapa ('+etapas.join(' / ')+'):',r.etapa||'Sin contactar');
-  if(nuevaEtapa===null)return;
+  // La lista se muestra como "Exitoso" (mismo criterio que el resto de la
+  // UI) pero internamente se sigue guardando 'Cerrado' — es el valor del
+  // que dependen el filtro, los colores y el conteo de "Exitosas".
+  const etapas=['Sin contactar','Contactado','Coordinado','OT creada','Exitoso'];
+  const etapaActualDisplay=r.etapa==='Cerrado'?'Exitoso':r.etapa;
+  const nuevaEtapaInput=prompt('Etapa ('+etapas.join(' / ')+'):',etapaActualDisplay||'Sin contactar');
+  if(nuevaEtapaInput===null)return;
+  const nuevaEtapa=nuevaEtapaInput==='Exitoso'?'Cerrado':nuevaEtapaInput;
   const notas=prompt('Notas:',r.notas||'');
   if(notas===null)return;
   const upd={etapa:nuevaEtapa,notas,updated_at:new Date().toISOString()};
