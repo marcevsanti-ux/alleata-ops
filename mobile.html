@@ -165,7 +165,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
       <div class="login-logo">
         <img id="loginLogo" src="" alt="Alleata">
         <div class="login-sub">Portal de Operaciones</div>
-        <div class="login-version">v2.14.25 · mobile</div>
+        <div class="login-version">v2.14.26 · mobile</div>
       </div>
       <div class="field"><label class="label">Email</label><input class="input" id="lEmail" type="email" placeholder="usuario@alleata.com" autocomplete="email"></div>
       <div class="field"><label class="label">Contraseña</label><input class="input" id="lPass" type="password" placeholder="••••••••" autocomplete="current-password"></div>
@@ -181,8 +181,27 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
   <div class="topbar">
     <img id="appLogo" src="" alt="Alleata">
     <div class="topbar-title" id="topbarTitle">Operaciones</div>
-    <div class="topbar-version">v2.14.25</div>
+    <div class="topbar-version" onclick="_tocarVersion()">v2.14.26</div>
     <div class="topbar-avatar" id="topbarAvatar" onclick="openDrawer()">?</div>
+  </div>
+
+  <!-- PANEL DE DEBUG — oculto, se abre tocando 5 veces el número de versión.
+       Pensado para mandar por WhatsApp el paso a paso de un error en vez de
+       una captura del alert genérico. -->
+  <div id="debugPanel" style="display:none;position:fixed;inset:0;z-index:5000;background:rgba(10,14,20,.97);color:#e8edf2;font-family:'JetBrains Mono',monospace;font-size:11px;padding:14px;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <div style="font-weight:700;font-size:14px">🐞 Debug — pasos de la app</div>
+      <button onclick="document.getElementById('debugPanel').style.display='none'" style="background:none;border:1px solid #444;color:#e8edf2;padding:6px 10px;border-radius:6px;font-size:16px">✕</button>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+      <button onclick="_copiarDebugLog()" style="background:#1dbf8e;border:none;color:#fff;padding:8px 12px;border-radius:6px;font-family:'Inter',sans-serif;font-size:12px;font-weight:600">📋 Copiar log</button>
+      <button onclick="_simularOTPrueba()" style="background:#8b5cf6;border:none;color:#fff;padding:8px 12px;border-radius:6px;font-family:'Inter',sans-serif;font-size:12px;font-weight:600">🧪 Simular OT de prueba</button>
+      <button onclick="_debugLog=[];_renderDebugLog();" style="background:none;border:1px solid #444;color:#e8edf2;padding:8px 12px;border-radius:6px;font-family:'Inter',sans-serif;font-size:12px">🗑️ Limpiar</button>
+    </div>
+    <div style="font-size:10px;color:#8a97a8;margin-bottom:10px">
+      "Simular OT" arma una tarjeta de prueba (número TEST-####) que podés aceptar y cerrar como cualquier OT real, pero <b>nunca llama a Salesforce ni a Railway</b> — todo queda registrado abajo como pasos simulados, para probar la pantalla sin tocar nada productivo.
+    </div>
+    <div id="debugLogList" style="display:flex;flex-direction:column;gap:4px"></div>
   </div>
 
   <!-- TABS -->
@@ -559,6 +578,19 @@ const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSI
 //     control" que ya tenía el lado de Supabase.
 //   - Resultado de SIM ahora muestra la fuente: "Confirmado en vivo con
 //     Salesforce" vs "Caché local — no se pudo confirmar"
+// Cambios v2.14.26:
+//   - FIX GRANDE: el fallback de sf_id en confirmarCierreOT pedía la
+//     columna 'tipo', que no existe en sf_workorders (es 'record_type') —
+//     rompía la consulta ENTERA, no solo ese campo, así que el fallback
+//     fallaba SIEMPRE. Muy probablemente la causa real de "No pude
+//     identificar la OT" repitiéndose con Ignacio incluso después del
+//     fix de ot_numero de v2.14.25.
+//   - Panel de debug (tocar 5 veces el número de versión): log paso a
+//     paso de aceptar/cerrar OT, con botón "Copiar" para mandar por
+//     WhatsApp en vez de una foto del alert genérico.
+//   - "🧪 Simular OT de prueba": arma una OT de prueba (TEST-####) para
+//     probar toda la pantalla (aceptar → confirmar entrega) sin llamar
+//     nunca a Salesforce/Railway ni guardar nada en Supabase.
 // Cambios v2.14.25:
 //   - FIX cierre de OT: "No pude identificar la OT en Salesforce (sf_id)"
 //     podía repetirse incluso después de "Actualizar" — el Full Sync borra
@@ -649,6 +681,60 @@ let currentUser=null,currentProfile=null;
 let rutaActiva=[];
 let rutaDelDia=[];  // OTs aceptadas hoy en orden
 let _kmRutaHoyTotal=0; // último km_total calculado (ida a cada OT + regreso a Barracas) — usado en el reporte de cierre
+
+// ── Debug log — pasos de la app, para mandar por WhatsApp cuando algo falla
+// en el campo en vez de solo una foto del alert genérico. Se abre tocando
+// 5 veces el número de versión en el topbar.
+let _debugLog=[];
+let _tapsVersion=0,_tapsVersionTimer=null;
+function _tocarVersion(){
+  _tapsVersion++;
+  clearTimeout(_tapsVersionTimer);
+  _tapsVersionTimer=setTimeout(()=>{_tapsVersion=0;},1200);
+  if(_tapsVersion>=5){
+    _tapsVersion=0;
+    document.getElementById('debugPanel').style.display='block';
+    _renderDebugLog();
+  }
+}
+function dlog(msg,data){
+  const linea={t:new Date().toLocaleTimeString('es-AR'),msg,data:data!==undefined?JSON.stringify(data):null};
+  _debugLog.push(linea);
+  if(_debugLog.length>200)_debugLog.shift(); // no dejar crecer sin límite
+  console.log('[dlog]',msg,data??'');
+  if(document.getElementById('debugPanel')?.style.display==='block')_renderDebugLog();
+}
+function _renderDebugLog(){
+  const cont=document.getElementById('debugLogList');
+  if(!cont)return;
+  cont.innerHTML=_debugLog.slice().reverse().map(l=>
+    `<div style="border-bottom:1px solid #222;padding:4px 0"><span style="color:#5a6a7d">${l.t}</span> ${l.msg}${l.data?`<div style="color:#f0b429;word-break:break-all">${l.data}</div>`:''}</div>`
+  ).join('')||'<div style="color:#5a6a7d">Sin registros todavía — usá la app normalmente o tocá "Simular OT de prueba".</div>';
+}
+async function _copiarDebugLog(){
+  const texto=_debugLog.map(l=>`${l.t}  ${l.msg}${l.data?'  '+l.data:''}`).join('\n')||'(vacío)';
+  try{
+    await navigator.clipboard.writeText(texto);
+    alert('Log copiado — pegalo en el chat de WhatsApp.');
+  }catch(e){
+    prompt('No se pudo copiar automático — seleccioná y copiá manual:',texto);
+  }
+}
+// Arma una OT 100% de prueba (nunca toca Supabase/SF/Railway) para poder
+// probar la pantalla de "OT Escaneada" → "Aceptar" → "Confirmar entrega"
+// de punta a punta sin arriesgar datos productivos.
+function _simularOTPrueba(){
+  const n='TEST-'+String(Math.floor(Math.random()*9000+1000));
+  dlog('🧪 Simulación iniciada',{ot_numero:n});
+  otScaneadaActual={
+    id:'test-'+Date.now(), sf_id:null, ot_numero:n, tipo:'Cambio de Terminal (PRUEBA)',
+    cuenta:'Cliente de Prueba', nombre_comercio:'—', direccion_completa:'Dirección de prueba 123',
+    ciudad:'CABA', contacto:'+5491100000000', perfil:'NAPSE', rollout:true, logistica:'ALLEATA',
+    _esSFWorkorder:true, _esPrueba:true,
+  };
+  document.getElementById('debugPanel').style.display='none';
+  mostrarCardOT(otScaneadaActual);
+}
 let cierresHoy=[];  // OTs cerradas hoy (entregado/fallido/desinstalación) — para el resumen de ruta
 let _otCierreActual=null; // OT activa en modal de cierre (para notif Ally)
 let _dsmCierreCtx=null; // {otId,otNum} de la desinstalación activa en el modal de cierre
@@ -869,10 +955,15 @@ function calcKmRuta(ots){
 
 async function guardarRutaDiaria(){
   if(!currentUser||!rutaDelDia.length)return;
+  // FIX 23/07: filtra las OTs de "🧪 Simular OT de prueba" (modo debug) —
+  // esas viven solo en memoria para probar la pantalla, nunca deben llegar
+  // a la base real. Si en la sesión solo hay OTs de prueba, no guarda nada.
+  const rutaReal=rutaDelDia.filter(o=>!o._esPrueba);
+  if(!rutaReal.length)return;
   const fecha=new Date().toISOString().slice(0,10);
-  const{kmTotal,detalle}=calcKmRuta(rutaDelDia);
-  const ots_ids=rutaDelDia.map(o=>o.id);
-  const ots_numeros=rutaDelDia.map(o=>o.ot_numero||o.id);
+  const{kmTotal,detalle}=calcKmRuta(rutaReal);
+  const ots_ids=rutaReal.map(o=>o.id);
+  const ots_numeros=rutaReal.map(o=>o.ot_numero||o.id);
 
   // Upsert por fecha + user_id
   const{data:existing}=await sb.from('rutas_diarias')
@@ -1190,8 +1281,9 @@ async function loadEnTransito(){
   // había escaneado/aceptado otro (ej. Marcelo). Ahora solo se muestran
   // las que ESTE usuario aceptó hoy en su propia ruta (rutaDelDia, que ya
   // se restaura desde rutas_diarias.ots_ids al abrir la app).
-  const misIds=[...new Set(rutaDelDia.map(o=>o.id).filter(Boolean))];
-  if(!misIds.length){
+  const misIds=[...new Set(rutaDelDia.filter(o=>!o._esPrueba).map(o=>o.id).filter(Boolean))];
+  const otsPrueba=rutaDelDia.filter(o=>o._esPrueba);
+  if(!misIds.length&&!otsPrueba.length){
     _otsEnTransitoMap={};
     count.textContent='0';
     el.innerHTML='<div class="empty"><div class="empty-icon">🚚</div><p>Todavía no aceptaste ninguna OT hoy<br><span style="font-size:12px;opacity:.8">Escaneá el QR del rótulo para agregarla a tu ruta</span></p></div>';
@@ -1200,11 +1292,15 @@ async function loadEnTransito(){
   // FIX: antes leía de 'envios' (tabla legacy, desconectada del sync de SF).
   // El flujo de aceptar/despachar OT (aceptarOT → /despachar-ot) escribe en
   // sf_workorders, así que la lista de "en tránsito" tiene que leer de ahí.
-  const{data:otsRaw}=await sb.from('sf_workorders').select('*')
-    .in('id',misIds)
-    .in('status',['En Tránsito','En tránsito','Despachado'])
-    .order('fecha_despacho',{ascending:true});
-  const list=(otsRaw||[]).map(r=>({
+  let otsRaw=[];
+  if(misIds.length){
+    const{data}=await sb.from('sf_workorders').select('*')
+      .in('id',misIds)
+      .in('status',['En Tránsito','En tránsito','Despachado'])
+      .order('fecha_despacho',{ascending:true});
+    otsRaw=data||[];
+  }
+  const list=otsRaw.map(r=>({
     id:                 r.id,
     sf_id:              r.sf_id,
     ot_numero:          r.workorder_number,
@@ -1222,6 +1318,9 @@ async function loadEnTransito(){
     rollout:            r.rollout,
     logistica:          r.logistica,
   }));
+  // OTs de "🧪 Simular OT de prueba" — nunca vienen de Supabase, se agregan
+  // acá directo desde la memoria para poder probar también el cierre.
+  otsPrueba.forEach(o=>list.push({...o,estado:'Despachado (prueba)'}));
   // Guardar por id para poder resolver sf_id al cerrar la OT (Entregado/Fallido)
   // sin depender de rutaDelDia, que solo tiene lo aceptado en la sesión actual.
   _otsEnTransitoMap={};
@@ -1787,6 +1886,26 @@ async function aceptarOT(){
   const btn=document.querySelector('#otScaneadaCard button');
   btn.disabled=true;btn.textContent='⏳ Despachando...';
 
+  // ── Modo prueba: nunca toca SF/Railway/Supabase. Solo simula los pasos
+  // y los deja en el log de debug, para poder ver la pantalla funcionando
+  // sin arriesgar nada productivo.
+  if(otScaneadaActual._esPrueba){
+    dlog('🧪 aceptarOT() — modo prueba, sin llamadas reales',{ot:otScaneadaActual.ot_numero});
+    await new Promise(r=>setTimeout(r,500)); // simula latencia real
+    dlog('🧪 Simulado: OT despachada (no se llamó a Railway)');
+    showScanFeedback('🧪 [PRUEBA] OT '+otScaneadaActual.ot_numero+' "despachada" (simulado, nada real)','ok');
+    rutaDelDia.push({...otScaneadaActual}); // solo en memoria de esta sesión — NO se guarda en rutas_diarias
+    dlog('🧪 Agregada a rutaDelDia en memoria (no se persiste en Supabase)');
+    otScaneadaActual=null;
+    cancelarOTScaneada();
+    rutaScannerActive=true;
+    if(!_scannerInterval)_scannerInterval=setInterval(_doScan,350);
+    document.getElementById('rutaScanStatus').textContent='📷 Cámara activa — apuntá al QR del rótulo';
+    return;
+  }
+
+  dlog('aceptarOT() — inicio',{ot:otScaneadaActual.ot_numero,sf_id:otScaneadaActual.sf_id,esSFWorkorder:!!otScaneadaActual._esSFWorkorder});
+
   try{
     if(otScaneadaActual._esSFWorkorder){
       // OT de instalaciones Alleata — usar endpoint Railway que actualiza SF + Supabase
@@ -1794,16 +1913,19 @@ async function aceptarOT(){
       const sfId = otScaneadaActual.sf_id;
       const tecnicoNombre = (currentProfile?.nombre||currentUser?.email||'Operador').trim();
       console.log('[despachar-ot] sf_id='+sfId+' tecnico='+tecnicoNombre);
-      if(!sfId) throw new Error('OT sin SF ID — no se puede despachar');
+      dlog('Llamando /automations/despachar-ot',{sfId,tecnicoNombre});
+      if(!sfId){dlog('❌ Sin sf_id — no se puede despachar');throw new Error('OT sin SF ID — no se puede despachar');}
       const res=await railwayFetch('/automations/despachar-ot',{
         method:'POST',
         body:JSON.stringify({ sf_id:sfId, tecnico:tecnicoNombre })
       });
       const data=await res.json();
+      dlog('Respuesta despachar-ot',{status:res.status,ok:data.ok,error:data.error||null});
       if(!data.ok) throw new Error(data.error||'Error '+res.status);
       showScanFeedback('✅ OT '+otScaneadaActual.ot_numero+' despachada en SF','ok');
     } else {
       // OT de Correo Argentino — actualizar tabla envios como antes
+      dlog('Actualizando tabla envios (logística CA)',{id:otScaneadaActual.id});
       const{error}=await sb.from('envios').update({
         estado:'Despachado',
         ultimo_evento:'Despachado por logística Alleata',
@@ -1816,6 +1938,7 @@ async function aceptarOT(){
     // Agregar a ruta del día
     rutaDelDia.push({...otScaneadaActual});
     await guardarRutaDiaria();
+    dlog('✅ aceptarOT() completo',{ot:otScaneadaActual.ot_numero});
 
     const otParaNotif={...otScaneadaActual};
     otScaneadaActual=null;
@@ -1829,6 +1952,7 @@ async function aceptarOT(){
     document.getElementById('rutaScanStatus').textContent='📷 Cámara activa — apuntá al QR del rótulo';
 
   }catch(err){
+    dlog('❌ aceptarOT() error',{message:err.message});
     btn.disabled=false;
     btn.textContent='✅ Aceptar OT';
     // FIX 23/07: "Failed to fetch" es un error del navegador (el pedido ni
@@ -2006,6 +2130,12 @@ function openCierreModal(id,resultado){
   document.getElementById('modalFotoInput').value='';
   _fotoBlob=null;_fotoBase64=null;
   _otCierreActual=rutaDelDia.find(o=>o.id===id)||_otsEnTransitoMap[id]||null;
+  dlog('openCierreModal()',{
+    id, resultado,
+    encontradaEn: rutaDelDia.find(o=>o.id===id)?'rutaDelDia':(_otsEnTransitoMap[id]?'_otsEnTransitoMap':'NINGUNA — null'),
+    ot_numero: _otCierreActual?.ot_numero||null,
+    sf_id: _otCierreActual?.sf_id||null,
+  });
 
   // Rollout: mostrar el paso obligatorio de leer el chip nuevo, solo
   // cuando se está confirmando la entrega (no aplica a "Fallido").
@@ -2080,6 +2210,20 @@ async function confirmarCierreOT(){
 
   const btn=document.getElementById('modalCierre-confirm');
   btn.disabled=true;btn.textContent='⏳ Guardando...';
+
+  // ── Modo prueba: simula el cierre completo sin tocar SF/Railway/Supabase.
+  if(_otCierreActual?._esPrueba){
+    dlog('🧪 confirmarCierreOT() — modo prueba',{ot:_otCierreActual.ot_numero,resultado,datoEnvio,notas});
+    await new Promise(r=>setTimeout(r,500));
+    dlog('🧪 Simulado: OT cerrada (no se llamó a Railway/SF)');
+    btn.disabled=false;btn.textContent='Confirmar';
+    closeModalCierre();
+    showScanFeedback('🧪 [PRUEBA] OT '+_otCierreActual.ot_numero+' "'+resultado+'" (simulado, nada real)',resultado==='Entregado'?'ok':'warn');
+    rutaDelDia=rutaDelDia.filter(o=>o.id!==_otCierreActual.id); // sacarla de la ruta en memoria
+    _otCierreActual=null;
+    await loadEnTransito();
+    return;
+  }
 
   // Cierre especial para Desinstalaciones: usa el mismo modal con cámara/evidencia
   if(String(resultado||'').startsWith('DESINST_')){
@@ -2182,10 +2326,20 @@ async function confirmarCierreOT(){
   // que ya no existe → el fallback por 'id' no encuentra nada. Ahora, si eso
   // pasa, se intenta una segunda vez por 'ot_numero' (workorder_number), que
   // no cambia nunca aunque el id interno sí.
+  //
+  // FIX 23/07 (2): las dos consultas de acá abajo pedían una columna
+  // 'tipo' que NO EXISTE en sf_workorders (es 'record_type') — el mismo
+  // error que encontramos en el portal ("column sf_workorders.tipo does
+  // not exist"). Eso rompía la consulta ENTERA (no solo ese campo), así
+  // que el fallback fallaba siempre, incluso cuando el id/ot_numero eran
+  // correctos. Es muy probablemente la causa real de que a Ignacio le
+  // siguiera apareciendo "No pude identificar la OT" una y otra vez.
   if(!_otCierreActual||!_otCierreActual.sf_id){
+    dlog('Fallback sf_id por id',{id});
     const{data:otData,error:otErr}=await sb.from('sf_workorders')
-      .select('sf_id,workorder_number,tipo,cuenta').eq('id',id).maybeSingle();
-    if(otErr) console.warn('[confirmarCierreOT] fallback sf_id lookup error:',otErr.message);
+      .select('sf_id,workorder_number,record_type,cuenta').eq('id',id).maybeSingle();
+    if(otErr){console.warn('[confirmarCierreOT] fallback sf_id lookup error:',otErr.message);dlog('❌ Fallback por id falló',{error:otErr.message});}
+    else dlog('Fallback por id',{encontrada:!!otData,sf_id:otData?.sf_id||null});
     _otCierreActual={
       ..._otCierreActual,
       sf_id:      otData?.sf_id||_otCierreActual?.sf_id,
@@ -2194,9 +2348,11 @@ async function confirmarCierreOT(){
     };
   }
   if(!_otCierreActual?.sf_id&&_otCierreActual?.ot_numero){
+    dlog('Fallback sf_id por ot_numero',{ot_numero:_otCierreActual.ot_numero});
     const{data:otData2,error:otErr2}=await sb.from('sf_workorders')
-      .select('id,sf_id,workorder_number,tipo,cuenta').eq('workorder_number',_otCierreActual.ot_numero).maybeSingle();
-    if(otErr2) console.warn('[confirmarCierreOT] fallback por ot_numero error:',otErr2.message);
+      .select('id,sf_id,workorder_number,record_type,cuenta').eq('workorder_number',_otCierreActual.ot_numero).maybeSingle();
+    if(otErr2){console.warn('[confirmarCierreOT] fallback por ot_numero error:',otErr2.message);dlog('❌ Fallback por ot_numero falló',{error:otErr2.message});}
+    else dlog('Fallback por ot_numero',{encontrada:!!otData2,sf_id:otData2?.sf_id||null});
     if(otData2?.sf_id){
       _otCierreActual={..._otCierreActual, sf_id:otData2.sf_id, cuenta:otData2.cuenta||_otCierreActual.cuenta};
       // Actualiza también el id local por si hace falta más adelante en el cierre
@@ -2205,6 +2361,7 @@ async function confirmarCierreOT(){
   }
   if(!_otCierreActual?.sf_id){
     btn.disabled=false;btn.textContent='Confirmar';
+    dlog('❌ sf_id NO resuelto — mostrando alert al usuario',{id,_otCierreActual});
     alert('No pude identificar la OT en Salesforce (sf_id). Cerrá este cuadro, tocá "Actualizar" en la lista de En Ruta Hoy y volvé a intentar.');
     console.error('[confirmarCierreOT] sf_id no resuelto para id=',id,_otCierreActual);
     return;
