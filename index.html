@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.4.82</title>
+<title>Alleata · Operaciones v4.4.83</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -400,7 +400,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.4.82 · 22 jul 2026
+      v4.4.83 · 22 jul 2026
     </div>
   </div>
 </div>
@@ -488,7 +488,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.4.82 · 22 jul 2026
+      v4.4.83 · 22 jul 2026
     </div>
   </div>
 </nav>
@@ -528,7 +528,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.4.82</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.4.83</div>
   </div>
   <div class="content">
 
@@ -1093,7 +1093,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
   <div class="row" style="margin-bottom:12px;gap:10px">
     <button class="btn btn-sm" style="background:rgba(29,191,142,.12);color:var(--teal);border:1px solid rgba(29,191,142,.3)" onclick="detectarOTAutoPiloto()">🔍 Detectar OT automáticamente</button>
     <button class="btn btn-sm" onclick="syncRolloutPiloto()">🔄 Sincronizar estados desde SF</button>
-    <button class="btn btn-sm" style="background:rgba(139,92,246,.12);color:#8b5cf6;border:1px solid rgba(139,92,246,.3)" onclick="actualizarVolumenTodosPiloto()">📊 Actualizar volumen (todos)</button>
+    <button class="btn btn-sm" style="background:rgba(139,92,246,.12);color:#8b5cf6;border:1px solid rgba(139,92,246,.3)" onclick="actualizarVolumenTodosPiloto()" title="Solo consulta las cuentas ya Exitosas — no tiene sentido pedir volumen post-cambio de una que todavía no cambió de terminal">📊 Actualizar volumen (Exitosas)</button>
     <div class="field" style="max-width:260px">
       <input class="input" id="rpFiltro" placeholder="Buscar cliente, CUIT, vendedor..." oninput="renderRolloutPiloto()">
     </div>
@@ -4474,7 +4474,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.4.82] OK');
+console.log('[Alleata v4.4.83] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -5851,8 +5851,13 @@ async function actualizarVolumenPiloto(id){
 // Recorre TODOS los casos con CUIT y actualiza volumen uno por uno — pensado
 // para correr 1 vez por semana/mes y armar la serie histórica del piloto.
 async function actualizarVolumenTodosPiloto(){
-  const conCuit=_rpData.filter(r=>r.cuit);
-  if(!confirm(`Vas a consultar volumen en vivo para ${conCuit.length} cuentas. Puede tardar un rato. ¿Seguir?`))return;
+  // FIX 23/07: antes corría para las 100 cuentas del piloto (cualquiera con
+  // CUIT), sin importar si ya cambiaron de terminal o no — no tiene sentido
+  // pedir volumen "post-cambio" de una cuenta que todavía está en "Sin
+  // contactar". Ahora solo consulta las que ya están Exitoso (etapa='Cerrado').
+  const conCuit=_rpData.filter(r=>r.cuit&&r.etapa==='Cerrado');
+  if(!conCuit.length){alert('No hay casos Exitosos con CUIT para actualizar todavía.');return;}
+  if(!confirm(`Vas a consultar volumen en vivo para ${conCuit.length} cuenta(s) Exitosa(s). Puede tardar un rato. ¿Seguir?`))return;
   let ok=0,fail=0;
   for(const r of conCuit){
     try{
