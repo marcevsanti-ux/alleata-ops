@@ -165,7 +165,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
       <div class="login-logo">
         <img id="loginLogo" src="" alt="Alleata">
         <div class="login-sub">Portal de Operaciones</div>
-        <div class="login-version">v2.14.26 · mobile</div>
+        <div class="login-version">v2.14.27 · mobile</div>
       </div>
       <div class="field"><label class="label">Email</label><input class="input" id="lEmail" type="email" placeholder="usuario@alleata.com" autocomplete="email"></div>
       <div class="field"><label class="label">Contraseña</label><input class="input" id="lPass" type="password" placeholder="••••••••" autocomplete="current-password"></div>
@@ -181,7 +181,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
   <div class="topbar">
     <img id="appLogo" src="" alt="Alleata">
     <div class="topbar-title" id="topbarTitle">Operaciones</div>
-    <div class="topbar-version" onclick="_tocarVersion()">v2.14.26</div>
+    <div class="topbar-version" onclick="_tocarVersion()">v2.14.27</div>
     <div class="topbar-avatar" id="topbarAvatar" onclick="openDrawer()">?</div>
   </div>
 
@@ -578,6 +578,12 @@ const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSI
 //     control" que ya tenía el lado de Supabase.
 //   - Resultado de SIM ahora muestra la fuente: "Confirmado en vivo con
 //     Salesforce" vs "Caché local — no se pudo confirmar"
+// Cambios v2.14.27:
+//   - FIX reporte de cierre: cuando una desinstalación no tenía número de
+//     OT cargado, el resumen de WhatsApp mostraba el id interno de
+//     Supabase completo (un UUID largo, caso real: Marcelo hoy con
+//     "491ae0e5-..."). Ahora en ese caso queda explícito ("SIN-OT-xxxxxxxx")
+//     en vez de parecer un número de OT más.
 // Cambios v2.14.26:
 //   - FIX GRANDE: el fallback de sf_id en confirmarCierreOT pedía la
 //     columna 'tipo', que no existe en sf_workorders (es 'record_type') —
@@ -2254,7 +2260,12 @@ async function confirmarCierreOT(){
     if(error){alert('Error: '+error.message);return;}
     closeModalCierre();
     showScanFeedback(retirado?'✅ Terminal retirada':'⚠️ Fallido registrado',retirado?'ok':'warn');
-    const otNumResuelto=_dsmCierreCtx?.otNum||id;
+    // FIX 23/07: si el registro no tenía número de OT cargado, antes caía
+    // directo al id interno de Supabase — un UUID larguísimo que en el
+    // reporte de WhatsApp parece un número de OT más (como le pasó a
+    // Marcelo con la 491ae0e5-...). Ahora queda explícito que falta el dato,
+    // conservando los primeros caracteres del id por si hay que rastrearla.
+    const otNumResuelto=_dsmCierreCtx?.otNum||('SIN-OT-'+id.slice(0,8));
     registrarCierreResumen({
       tipo:      'desinst',
       ot_numero: otNumResuelto,
