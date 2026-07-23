@@ -165,7 +165,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
       <div class="login-logo">
         <img id="loginLogo" src="" alt="Alleata">
         <div class="login-sub">Portal de Operaciones</div>
-        <div class="login-version">v2.14.22 · mobile</div>
+        <div class="login-version">v2.14.23 · mobile</div>
       </div>
       <div class="field"><label class="label">Email</label><input class="input" id="lEmail" type="email" placeholder="usuario@alleata.com" autocomplete="email"></div>
       <div class="field"><label class="label">Contraseña</label><input class="input" id="lPass" type="password" placeholder="••••••••" autocomplete="current-password"></div>
@@ -181,7 +181,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
   <div class="topbar">
     <img id="appLogo" src="" alt="Alleata">
     <div class="topbar-title" id="topbarTitle">Operaciones</div>
-    <div class="topbar-version">v2.14.22</div>
+    <div class="topbar-version">v2.14.23</div>
     <div class="topbar-avatar" id="topbarAvatar" onclick="openDrawer()">?</div>
   </div>
 
@@ -559,6 +559,12 @@ const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSI
 //     control" que ya tenía el lado de Supabase.
 //   - Resultado de SIM ahora muestra la fuente: "Confirmado en vivo con
 //     Salesforce" vs "Caché local — no se pudo confirmar"
+// Cambios v2.14.23:
+//   - FIX Ruta: "En Ruta Hoy" mostraba TODAS las OTs de logística ALLEATA
+//     en tránsito/despachado, sin importar quién las aceptó — a cualquier
+//     operador le aparecían OTs de otro compañero (reportado por Marcelo:
+//     "aparecen OT que Marcelo tiene asignada"). Ahora solo muestra las
+//     que el usuario logueado aceptó hoy en su propia ruta.
 // Cambios v2.14.22:
 //   - Rollout: leer el chip SIM nuevo pasa a ser RECOMENDADO, no obligatorio
 //     — pedido de Marcelo el 22/07 porque el bloqueo trababa el cierre de
@@ -1166,11 +1172,24 @@ async function loadEnTransito(){
   const el=document.getElementById('rutaActivaList');
   const count=document.getElementById('transitoCount');
   el.innerHTML='<div class="empty"><div class="empty-icon">⏳</div><p>Cargando...</p></div>';
+  // FIX 22/07: esta lista mostraba TODAS las OTs con logistica=ALLEATA en
+  // tránsito/despachado, sin importar quién las aceptó — por eso a
+  // cualquier operador (ej. Ignacio) le aparecían OTs que en realidad
+  // había escaneado/aceptado otro (ej. Marcelo). Ahora solo se muestran
+  // las que ESTE usuario aceptó hoy en su propia ruta (rutaDelDia, que ya
+  // se restaura desde rutas_diarias.ots_ids al abrir la app).
+  const misIds=[...new Set(rutaDelDia.map(o=>o.id).filter(Boolean))];
+  if(!misIds.length){
+    _otsEnTransitoMap={};
+    count.textContent='0';
+    el.innerHTML='<div class="empty"><div class="empty-icon">🚚</div><p>Todavía no aceptaste ninguna OT hoy<br><span style="font-size:12px;opacity:.8">Escaneá el QR del rótulo para agregarla a tu ruta</span></p></div>';
+    return;
+  }
   // FIX: antes leía de 'envios' (tabla legacy, desconectada del sync de SF).
   // El flujo de aceptar/despachar OT (aceptarOT → /despachar-ot) escribe en
   // sf_workorders, así que la lista de "en tránsito" tiene que leer de ahí.
   const{data:otsRaw}=await sb.from('sf_workorders').select('*')
-    .eq('logistica','ALLEATA')
+    .in('id',misIds)
     .in('status',['En Tránsito','En tránsito','Despachado'])
     .order('fecha_despacho',{ascending:true});
   const list=(otsRaw||[]).map(r=>({
