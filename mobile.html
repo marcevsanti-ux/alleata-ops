@@ -165,7 +165,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
       <div class="login-logo">
         <img id="loginLogo" src="" alt="Alleata">
         <div class="login-sub">Portal de Operaciones</div>
-        <div class="login-version">v2.14.24 · mobile</div>
+        <div class="login-version">v2.14.25 · mobile</div>
       </div>
       <div class="field"><label class="label">Email</label><input class="input" id="lEmail" type="email" placeholder="usuario@alleata.com" autocomplete="email"></div>
       <div class="field"><label class="label">Contraseña</label><input class="input" id="lPass" type="password" placeholder="••••••••" autocomplete="current-password"></div>
@@ -181,7 +181,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
   <div class="topbar">
     <img id="appLogo" src="" alt="Alleata">
     <div class="topbar-title" id="topbarTitle">Operaciones</div>
-    <div class="topbar-version">v2.14.24</div>
+    <div class="topbar-version">v2.14.25</div>
     <div class="topbar-avatar" id="topbarAvatar" onclick="openDrawer()">?</div>
   </div>
 
@@ -559,6 +559,13 @@ const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSI
 //     control" que ya tenía el lado de Supabase.
 //   - Resultado de SIM ahora muestra la fuente: "Confirmado en vivo con
 //     Salesforce" vs "Caché local — no se pudo confirmar"
+// Cambios v2.14.25:
+//   - FIX cierre de OT: "No pude identificar la OT en Salesforce (sf_id)"
+//     podía repetirse incluso después de "Actualizar" — el Full Sync borra
+//     y reinserta OTs que salen y vuelven a entrar al SOQL, así que el id
+//     interno de Supabase puede cambiar aunque la OT sea la misma (caso
+//     real: OT 00022804 con Ignacio). Ahora, si falla la búsqueda por id,
+//     reintenta por ot_numero (workorder_number), que no cambia nunca.
 // Cambios v2.14.24:
 //   - "Aceptar OT" distingue error de red ("Failed to fetch", señal débil)
 //     de un error real del servidor — antes mostraba el mismo mensaje
@@ -2050,7 +2057,7 @@ function quitarFoto(){
 }
 
 async function confirmarCierreOT(){
-  const id=document.getElementById('modalCierre-id').value;
+  let id=document.getElementById('modalCierre-id').value;
   const resultado=document.getElementById('modalCierre-resultado').value;
   const notas=document.getElementById('modalCierre-notas').value.trim();
   const datoEnvio=document.getElementById('modalCierre-datoEnvio').value;
@@ -2165,6 +2172,16 @@ async function confirmarCierreOT(){
 
   // Resolver sf_id: si lo tenemos en memoria (viene de mostrarOTScaneada/rutaDelDia/_otsEnTransitoMap) lo usamos,
   // sino lo buscamos en sf_workorders (ya no en 'envios' — tabla legacy desconectada del sync).
+  //
+  // FIX 23/07: el fallback buscaba solo por 'id' (uuid interno de Supabase).
+  // Pero cada Full Sync SF→Supabase borra las OTs que en ese momento no
+  // matchean el SOQL y las vuelve a insertar cuando reaparecen — como es un
+  // upsert por sf_id, si la fila fue borrada y reinsertada, le toca un id
+  // NUEVO. Si la OT se aceptó/restauró en la ruta ANTES de ese resync (caso
+  // real: 00022804), el id guardado en rutaDelDia queda apuntando a una fila
+  // que ya no existe → el fallback por 'id' no encuentra nada. Ahora, si eso
+  // pasa, se intenta una segunda vez por 'ot_numero' (workorder_number), que
+  // no cambia nunca aunque el id interno sí.
   if(!_otCierreActual||!_otCierreActual.sf_id){
     const{data:otData,error:otErr}=await sb.from('sf_workorders')
       .select('sf_id,workorder_number,tipo,cuenta').eq('id',id).maybeSingle();
@@ -2175,6 +2192,16 @@ async function confirmarCierreOT(){
       ot_numero:  otData?.workorder_number||_otCierreActual?.ot_numero,
       cuenta:     otData?.cuenta||_otCierreActual?.cuenta,
     };
+  }
+  if(!_otCierreActual?.sf_id&&_otCierreActual?.ot_numero){
+    const{data:otData2,error:otErr2}=await sb.from('sf_workorders')
+      .select('id,sf_id,workorder_number,tipo,cuenta').eq('workorder_number',_otCierreActual.ot_numero).maybeSingle();
+    if(otErr2) console.warn('[confirmarCierreOT] fallback por ot_numero error:',otErr2.message);
+    if(otData2?.sf_id){
+      _otCierreActual={..._otCierreActual, sf_id:otData2.sf_id, cuenta:otData2.cuenta||_otCierreActual.cuenta};
+      // Actualiza también el id local por si hace falta más adelante en el cierre
+      id=otData2.id;
+    }
   }
   if(!_otCierreActual?.sf_id){
     btn.disabled=false;btn.textContent='Confirmar';
