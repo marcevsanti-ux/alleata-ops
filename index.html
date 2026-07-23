@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.4.80</title>
+<title>Alleata · Operaciones v4.4.81</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -400,7 +400,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.4.80 · 22 jul 2026
+      v4.4.81 · 22 jul 2026
     </div>
   </div>
 </div>
@@ -488,7 +488,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.4.80 · 22 jul 2026
+      v4.4.81 · 22 jul 2026
     </div>
   </div>
 </nav>
@@ -528,7 +528,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.4.80</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.4.81</div>
   </div>
   <div class="content">
 
@@ -1126,7 +1126,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
      depender de que ande bien la app mobile de cada chofer. Pedido de
      marcelos el 23/07 mientras se resuelve el bug del sf_id en mobile. -->
 <div class="module" id="mod-hoja-ruta">
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+  <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:12px">
     <div>
       <div style="font-size:19px;font-weight:700">🗺️ Hoja de Ruta — por chofer (hoy)</div>
       <div style="font-size:12px;color:var(--text-muted);margin-top:2px">
@@ -1135,6 +1135,25 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="btn btn-sm" onclick="loadHojaRuta()">↺ Actualizar</button>
   </div>
+
+  <!-- Asignar OT a un chofer — solo admin. Mismo efecto que los scripts SQL
+       manuales que veníamos corriendo (agrega la OT a rutas_diarias de
+       hoy), pero desde acá directo, sin ir a Supabase. -->
+  <div id="hr-asignar-box" style="display:none;background:var(--navy-800);border:1px solid var(--border2);border-radius:10px;padding:12px 16px;margin-bottom:18px;align-items:flex-end;gap:10px;flex-wrap:wrap">
+    <div>
+      <label class="label">N° de OT</label>
+      <input class="input" id="hr-asignar-ot" placeholder="00022742" style="width:150px;font-family:'JetBrains Mono',monospace">
+    </div>
+    <div>
+      <label class="label">Chofer</label>
+      <select class="select" id="hr-asignar-chofer" style="width:220px">
+        <option value="">Cargando choferes...</option>
+      </select>
+    </div>
+    <button class="btn btn-sm" onclick="asignarOTAChofer()" id="hr-asignar-btn">➕ Asignar a su ruta de hoy</button>
+    <div id="hr-asignar-msg" style="font-size:12px;width:100%"></div>
+  </div>
+
   <div id="hr-content" style="display:flex;flex-direction:column;gap:18px">
     <div style="text-align:center;padding:30px;color:var(--text-muted)">Cargando...</div>
   </div>
@@ -4455,7 +4474,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.4.80] OK');
+console.log('[Alleata v4.4.81] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -5429,6 +5448,15 @@ async function loadHojaRuta(){
   const cont=document.getElementById('hr-content');
   if(!cont)return;
   cont.innerHTML='<div style="text-align:center;padding:30px;color:var(--text-muted)">Cargando...</div>';
+
+  // Caja de "Asignar OT a chofer" — solo admin (pedido explícito de marcelos).
+  const asignarBox=document.getElementById('hr-asignar-box');
+  if(asignarBox){
+    const esAdmin=currentProfile?.rol==='admin';
+    asignarBox.style.display=esAdmin?'flex':'none';
+    if(esAdmin)_poblarChoferesAsignar();
+  }
+
   const hoy=new Date().toISOString().slice(0,10);
   const{data:rutas,error}=await sb.from('rutas_diarias')
     .select('id,user_id,fecha,ots_numeros,km_total')
@@ -5499,6 +5527,74 @@ async function loadHojaRuta(){
   }).join('<div style="height:1px;background:var(--border2);margin:4px 0"></div>');
 
   const nb=document.getElementById('nb-hoja-ruta');if(nb)nb.textContent=totalAbiertas;
+}
+
+// Puebla el <select> de choferes para "Asignar OT" — solo se llama si es admin.
+let _hrChoferesCache=null;
+async function _poblarChoferesAsignar(){
+  const sel=document.getElementById('hr-asignar-chofer');
+  if(!sel)return;
+  if(!_hrChoferesCache){
+    const{data,error}=await sb.from('profiles').select('id,nombre,email').order('nombre',{ascending:true});
+    if(error){sel.innerHTML=`<option value="">Error: ${error.message}</option>`;return;}
+    _hrChoferesCache=data||[];
+  }
+  sel.innerHTML=_hrChoferesCache
+    .map(p=>`<option value="${p.id}">${(p.nombre||p.email||'—').trim()}</option>`)
+    .join('')||'<option value="">Sin usuarios</option>';
+}
+
+// Asigna una OT (por número) a la ruta de HOY de un chofer — mismo efecto
+// que los scripts SQL manuales que veníamos corriendo a mano, pero directo
+// desde el portal. Si la OT ya estaba en su ruta, la refresca (evita
+// duplicados y le actualiza el id interno, por si había quedado viejo).
+async function asignarOTAChofer(){
+  if(currentProfile?.rol!=='admin'){alert('Solo un admin puede asignar OTs desde acá.');return;}
+  const otNum=(document.getElementById('hr-asignar-ot').value||'').trim();
+  const choferId=document.getElementById('hr-asignar-chofer').value;
+  const msg=document.getElementById('hr-asignar-msg');
+  msg.style.color='var(--text-muted)';msg.textContent='';
+  if(!otNum){msg.style.color='var(--red)';msg.textContent='Ingresá el número de OT.';return;}
+  if(!choferId){msg.style.color='var(--red)';msg.textContent='Elegí un chofer.';return;}
+
+  const btn=document.getElementById('hr-asignar-btn');
+  btn.disabled=true;btn.textContent='Asignando...';
+  try{
+    const{data:ot,error:errOt}=await sb.from('sf_workorders').select('id,workorder_number,cuenta,status').eq('workorder_number',otNum).maybeSingle();
+    if(errOt)throw new Error(errOt.message);
+    if(!ot)throw new Error(`No se encontró la OT ${otNum} en sf_workorders (probá "↺ Full Sync" arriba si es muy reciente).`);
+
+    const hoy=new Date().toISOString().slice(0,10);
+    const{data:ruta}=await sb.from('rutas_diarias').select('id,ots_ids,ots_numeros').eq('user_id',choferId).eq('fecha',hoy).maybeSingle();
+
+    if(!ruta){
+      const{error:errIns}=await sb.from('rutas_diarias').insert({
+        user_id:choferId, fecha:hoy, ots_ids:[ot.id], ots_numeros:[ot.workorder_number], confirmada_at:new Date().toISOString()
+      });
+      if(errIns)throw new Error(errIns.message);
+    }else{
+      // Sacar cualquier entrada previa de esta misma OT (por si tenía un id viejo) y agregarla fresca
+      const pares=(ruta.ots_ids||[]).map((id,i)=>({id,num:ruta.ots_numeros?.[i]}))
+        .filter(p=>p.num!==ot.workorder_number);
+      const nuevosIds=[...pares.map(p=>p.id), ot.id];
+      const nuevosNums=[...pares.map(p=>p.num), ot.workorder_number];
+      const{error:errUpd}=await sb.from('rutas_diarias').update({ots_ids:nuevosIds,ots_numeros:nuevosNums}).eq('id',ruta.id);
+      if(errUpd)throw new Error(errUpd.message);
+    }
+
+    msg.style.color='var(--teal)';
+    msg.textContent=`✅ OT ${ot.workorder_number} (${ot.cuenta||'—'}) asignada. Estado actual en SF: ${ot.status}.`;
+    document.getElementById('hr-asignar-ot').value='';
+    await loadHojaRuta();
+    // loadHojaRuta vuelve a poblar y ocultar/mostrar la caja — restaurar el mensaje
+    const msg2=document.getElementById('hr-asignar-msg');
+    if(msg2){msg2.style.color='var(--teal)';msg2.textContent=`✅ OT ${ot.workorder_number} (${ot.cuenta||'—'}) asignada. Estado actual en SF: ${ot.status}.`;}
+  }catch(err){
+    msg.style.color='var(--red)';
+    msg.textContent='❌ '+err.message;
+  }finally{
+    btn.disabled=false;btn.textContent='➕ Asignar a su ruta de hoy';
+  }
 }
 
 async function cerrarOTHojaRuta(sfId,tecnico,btn,resultado){
