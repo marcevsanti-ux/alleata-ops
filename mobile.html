@@ -165,7 +165,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
       <div class="login-logo">
         <img id="loginLogo" src="" alt="Alleata">
         <div class="login-sub">Portal de Operaciones</div>
-        <div class="login-version">v2.14.23 · mobile</div>
+        <div class="login-version">v2.14.24 · mobile</div>
       </div>
       <div class="field"><label class="label">Email</label><input class="input" id="lEmail" type="email" placeholder="usuario@alleata.com" autocomplete="email"></div>
       <div class="field"><label class="label">Contraseña</label><input class="input" id="lPass" type="password" placeholder="••••••••" autocomplete="current-password"></div>
@@ -181,7 +181,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
   <div class="topbar">
     <img id="appLogo" src="" alt="Alleata">
     <div class="topbar-title" id="topbarTitle">Operaciones</div>
-    <div class="topbar-version">v2.14.23</div>
+    <div class="topbar-version">v2.14.24</div>
     <div class="topbar-avatar" id="topbarAvatar" onclick="openDrawer()">?</div>
   </div>
 
@@ -559,6 +559,11 @@ const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSI
 //     control" que ya tenía el lado de Supabase.
 //   - Resultado de SIM ahora muestra la fuente: "Confirmado en vivo con
 //     Salesforce" vs "Caché local — no se pudo confirmar"
+// Cambios v2.14.24:
+//   - "Aceptar OT" distingue error de red ("Failed to fetch", señal débil)
+//     de un error real del servidor — antes mostraba el mismo mensaje
+//     genérico y alarmante para los dos casos. La OT escaneada queda en
+//     pantalla lista para reintentar sin volver a escanear el QR.
 // Cambios v2.14.23:
 //   - FIX Ruta: "En Ruta Hoy" mostraba TODAS las OTs de logística ALLEATA
 //     en tránsito/despachado, sin importar quién las aceptó — a cualquier
@@ -1819,7 +1824,17 @@ async function aceptarOT(){
   }catch(err){
     btn.disabled=false;
     btn.textContent='✅ Aceptar OT';
-    showScanFeedback('⚠️ Error: '+err.message,'error');
+    // FIX 23/07: "Failed to fetch" es un error del navegador (el pedido ni
+    // llegó a tener respuesta — típico de señal débil en la calle), muy
+    // distinto de un error que sí devolvió el servidor. El mensaje genérico
+    // asustaba sin dar contexto — ahora se distingue y avisa qué hacer.
+    // La OT sigue mostrada en la tarjeta: no hace falta volver a escanear,
+    // solo tocar "Aceptar OT" de nuevo cuando vuelva la señal.
+    const esErrorDeRed=/failed to fetch/i.test(err.message||'');
+    const msg=esErrorDeRed
+      ? '📶 Sin conexión en este momento — esperá a que vuelva la señal y tocá "Aceptar OT" de nuevo (no hace falta re-escanear).'
+      : '⚠️ Error: '+err.message;
+    showScanFeedback(msg,'error');
     // Reiniciar scanner también en caso de error
     rutaScannerActive=true;
     if(!_scannerInterval)_scannerInterval=setInterval(_doScan,350);
