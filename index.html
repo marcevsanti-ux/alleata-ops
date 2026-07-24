@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.4.83</title>
+<title>Alleata · Operaciones v4.4.84</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -400,7 +400,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.4.83 · 22 jul 2026
+      v4.4.84 · 24 jul 2026
     </div>
   </div>
 </div>
@@ -488,7 +488,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.4.83 · 22 jul 2026
+      v4.4.84 · 24 jul 2026
     </div>
   </div>
 </nav>
@@ -528,7 +528,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.4.83</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.4.84</div>
   </div>
   <div class="content">
 
@@ -4474,7 +4474,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.4.83] OK');
+console.log('[Alleata v4.4.84] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -5444,6 +5444,9 @@ function rolloutPilotoPuedeEditarEtapa(){
 // todos los ids en rutas_diarias.ots_ids ya estaban viejos → "sin datos en
 // caché" en TODAS las OTs. Ahora busca por ots_numeros (workorder_number),
 // que es estable y nunca cambia — mismo criterio que ya usa mobile.html.
+// v4.4.84 (24/07): ahora también trae y muestra desinstalaciones/retiros de
+// ordenes_trabajo, agrupadas por chofer junto con los envíos — ver detalle
+// más abajo.
 async function loadHojaRuta(){
   const cont=document.getElementById('hr-content');
   if(!cont)return;
@@ -5465,16 +5468,29 @@ async function loadHojaRuta(){
     cont.innerHTML=`<div style="text-align:center;padding:30px;color:var(--red)">Error: ${error.message}</div>`;
     return;
   }
-  if(!rutas?.length){
+
+  // ── AMPLIACIÓN (2026-07): esta pantalla antes SOLO leía rutas_diarias, así
+  // que las desinstalaciones/retiros de terminal (que viven en
+  // ordenes_trabajo.hoja_ruta_activa) nunca se veían acá, sin importar cómo
+  // se hubieran asignado. Ahora se traen también y se agrupan por chofer
+  // (match por nombre contra ordenes_trabajo.operador_id, que es texto
+  // libre — no hay FK a profiles en esa tabla).
+  const{data:desinstHoy,error:errDesinst}=await sb.from('ordenes_trabajo')
+    .select('id,sf_id,ot,comercio,cuenta,estado,ciudad,direccion,calle,operador_id,subtipo')
+    .eq('tipo','desinstalacion').eq('hoja_ruta_activa',true).eq('hoja_ruta_fecha',hoy);
+  if(errDesinst) console.warn('[loadHojaRuta] Error trayendo desinstalaciones/retiros de hoy:',errDesinst.message);
+
+  if(!rutas?.length && !desinstHoy?.length){
     cont.innerHTML='<div style="text-align:center;padding:30px;color:var(--text-muted)">Nadie confirmó una ruta hoy todavía.</div>';
     const nb=document.getElementById('nb-hoja-ruta');if(nb)nb.textContent='0';
     return;
   }
-  const userIds=[...new Set(rutas.map(r=>r.user_id).filter(Boolean))];
+
+  const userIds=[...new Set((rutas||[]).map(r=>r.user_id).filter(Boolean))];
   const{data:perfiles}=await sb.from('profiles').select('id,nombre,email').in('id',userIds);
   const porUser={};(perfiles||[]).forEach(p=>{porUser[p.id]=p;});
 
-  const todosNumeros=[...new Set(rutas.flatMap(r=>r.ots_numeros||[]).filter(Boolean))];
+  const todosNumeros=[...new Set((rutas||[]).flatMap(r=>r.ots_numeros||[]).filter(Boolean))];
   let otsMap={};
   if(todosNumeros.length){
     const{data:ots,error:errOts}=await sb.from('sf_workorders')
@@ -5488,13 +5504,43 @@ async function loadHojaRuta(){
     (ots||[]).forEach(o=>{otsMap[o.workorder_number]=o;});
   }
 
+  // Agrupar desinstalaciones/retiros por nombre de operador, normalizado
+  // para poder matchear contra el nombre del chofer de rutas_diarias.
+  const norm=s=>(s||'').trim().toLowerCase();
+  const desinstPorNombre={};
+  const desinstSinChofer=[];
+  (desinstHoy||[]).forEach(d=>{
+    const key=norm(d.operador_id);
+    if(!key){ desinstSinChofer.push(d); return; }
+    (desinstPorNombre[key]=desinstPorNombre[key]||[]).push(d);
+  });
+
   const ESTADOS_CERRADOS=['Exitoso','Exitosa','Entregado','Fallido'];
   let totalAbiertas=0;
-  cont.innerHTML=rutas.map(r=>{
+
+  // Las desinstalaciones/retiros que llegan acá ya vienen filtradas por
+  // hoja_ruta_activa=true — por definición siguen "abiertas" (al cerrarlas,
+  // el flujo existente en mobile pone hoja_ruta_activa=false y dejan de
+  // aparecer en esta misma consulta).
+  function renderDesinstItem(d){
+    totalAbiertas++;
+    const dir=d.direccion||d.calle||'';
+    const esRetiroCT=d.subtipo==='retiro_cambio_terminal';
+    return `<div style="background:var(--navy-800);border:1px solid rgba(239,68,68,.3);border-left:4px solid #ef4444;border-radius:10px;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+      <div>
+        <div style="font-weight:700;font-family:'JetBrains Mono',monospace;font-size:13px;color:#ef4444">${d.ot||'—'}<span style="font-weight:400;color:var(--text-muted);margin-left:8px">${esRetiroCT?'🔁 Retiro terminal fallada':'📦 Desinstalación'}</span></div>
+        <div style="font-size:13px;margin-top:2px">${d.comercio||d.cuenta||'—'}</div>
+        <div style="font-size:11px;color:var(--text-muted)">${dir}${d.ciudad?' · '+d.ciudad:''}</div>
+      </div>
+      <span class="badge" style="background:rgba(239,68,68,.12);color:#ef4444;border:1px solid rgba(239,68,68,.3)">${d.estado||'—'}</span>
+    </div>`;
+  }
+
+  const bloquesRutas=(rutas||[]).map(r=>{
     const perfil=porUser[r.user_id];
     const chofer=(perfil?.nombre||perfil?.email||'Chofer desconocido').trim();
     const choferJs=chofer.replace(/'/g,"\\'");
-    const items=(r.ots_numeros||[]).map(num=>{
+    const itemsEnvios=(r.ots_numeros||[]).map(num=>{
       const ot=otsMap[num];
       if(!ot){
         return `<div style="background:var(--navy-900);border:1px dashed var(--border2);border-radius:10px;padding:10px 14px;font-size:12px;color:var(--text-muted)">OT ${num} — no está en la caché de <code>sf_workorders</code> (o cambió de número en SF). Probá "↺ Full Sync" arriba y actualizá esta pantalla.</div>`;
@@ -5516,15 +5562,52 @@ async function loadHojaRuta(){
           `}
         </div>
       </div>`;
-    }).join('')||'<div style="font-size:12px;color:var(--text-muted)">Sin OTs en su ruta.</div>';
+    }).join('');
+
+    // Sumar al mismo bloque las desinstalaciones/retiros de este chofer
+    // (match por nombre) y marcarlas como consumidas del pool general.
+    const key=norm(chofer);
+    const desinstDeEste=desinstPorNombre[key]||[];
+    delete desinstPorNombre[key];
+    const itemsDesinst=desinstDeEste.map(renderDesinstItem).join('');
+
+    const items=[itemsEnvios,itemsDesinst].filter(Boolean).join('')||'<div style="font-size:12px;color:var(--text-muted)">Sin OTs en su ruta.</div>';
+    const totalCount=(r.ots_numeros||[]).length+desinstDeEste.length;
 
     return `<div>
       <div style="font-size:14px;font-weight:700;margin-bottom:8px;display:flex;align-items:center;gap:8px">
-        👤 ${chofer} <span style="font-size:11px;font-weight:400;color:var(--text-muted)">${(r.ots_numeros||[]).length} OT(s)${r.km_total?' · ~'+Math.round(r.km_total)+' km':''}</span>
+        👤 ${chofer} <span style="font-size:11px;font-weight:400;color:var(--text-muted)">${totalCount} OT(s)${r.km_total?' · ~'+Math.round(r.km_total)+' km':''}</span>
       </div>
       <div style="display:flex;flex-direction:column;gap:8px">${items}</div>
     </div>`;
-  }).join('<div style="height:1px;background:var(--border2);margin:4px 0"></div>');
+  });
+
+  // Choferes que hoy SOLO tienen desinstalaciones/retiros (sin ruta de
+  // envíos confirmada en rutas_diarias) — antes quedaban totalmente
+  // invisibles en esta pantalla.
+  const bloquesSoloDesinst=Object.values(desinstPorNombre).map(items=>{
+    const nombreOriginal=items[0]?.operador_id||'—';
+    return `<div>
+      <div style="font-size:14px;font-weight:700;margin-bottom:8px;display:flex;align-items:center;gap:8px">
+        👤 ${nombreOriginal} <span style="font-size:11px;font-weight:400;color:var(--text-muted)">${items.length} OT(s) · solo desinstalaciones/retiros</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px">${items.map(renderDesinstItem).join('')}</div>
+    </div>`;
+  });
+
+  // Desinstalaciones/retiros sin operador_id (ej: generadas desde el módulo
+  // de checkboxes del desktop, que no setea operador_id) — así no quedan
+  // huérfanas y sin ningún lugar donde verlas.
+  const bloqueSinChofer=desinstSinChofer.length?[`<div>
+      <div style="font-size:14px;font-weight:700;margin-bottom:8px;display:flex;align-items:center;gap:8px;color:var(--text-muted)">
+        📋 Sin operador asignado <span style="font-size:11px;font-weight:400">${desinstSinChofer.length} OT(s)</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px">${desinstSinChofer.map(renderDesinstItem).join('')}</div>
+    </div>`]:[];
+
+  const todosBloques=[...bloquesRutas,...bloquesSoloDesinst,...bloqueSinChofer];
+  cont.innerHTML=todosBloques.join('<div style="height:1px;background:var(--border2);margin:4px 0"></div>')
+    || '<div style="text-align:center;padding:30px;color:var(--text-muted)">Nadie confirmó una ruta hoy todavía.</div>';
 
   const nb=document.getElementById('nb-hoja-ruta');if(nb)nb.textContent=totalAbiertas;
 }

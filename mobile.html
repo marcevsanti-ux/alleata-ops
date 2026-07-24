@@ -165,7 +165,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
       <div class="login-logo">
         <img id="loginLogo" src="" alt="Alleata">
         <div class="login-sub">Portal de Operaciones</div>
-        <div class="login-version">v2.14.27 · mobile</div>
+        <div class="login-version">v2.14.28 · mobile</div>
       </div>
       <div class="field"><label class="label">Email</label><input class="input" id="lEmail" type="email" placeholder="usuario@alleata.com" autocomplete="email"></div>
       <div class="field"><label class="label">Contraseña</label><input class="input" id="lPass" type="password" placeholder="••••••••" autocomplete="current-password"></div>
@@ -181,7 +181,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
   <div class="topbar">
     <img id="appLogo" src="" alt="Alleata">
     <div class="topbar-title" id="topbarTitle">Operaciones</div>
-    <div class="topbar-version" onclick="_tocarVersion()">v2.14.27</div>
+    <div class="topbar-version" onclick="_tocarVersion()">v2.14.28</div>
     <div class="topbar-avatar" id="topbarAvatar" onclick="openDrawer()">?</div>
   </div>
 
@@ -578,6 +578,13 @@ const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSI
 //     control" que ya tenía el lado de Supabase.
 //   - Resultado de SIM ahora muestra la fuente: "Confirmado en vivo con
 //     Salesforce" vs "Caché local — no se pudo confirmar"
+// Cambios v2.14.28 (24/07):
+//   - FIX "OT viejas": rutaDelDia ahora persiste en localStorage (no atado
+//     a fecha) y loadRuta()/loadEnTransito() reconcilian siempre contra SF
+//     en vez de restaurar una sola vez. Una OT sin cerrar sigue apareciendo
+//     día tras día hasta que se cierra; una ya cerrada por otro medio se
+//     saca sola de la lista. Badge "⏳ Pendiente hace Nd" para diferenciar
+//     lo de hoy de lo arrastrado. "Finalizar ruta" fuerza la reconciliación.
 // Cambios v2.14.27:
 //   - FIX reporte de cierre: cuando una desinstalación no tenía número de
 //     OT cargado, el resumen de WhatsApp mostraba el id interno de
@@ -685,8 +692,30 @@ const sb=createClient(SUPABASE_URL,SUPABASE_KEY);
 
 let currentUser=null,currentProfile=null;
 let rutaActiva=[];
-let rutaDelDia=[];  // OTs aceptadas hoy en orden
+let rutaDelDia=[];  // OTs aceptadas y AÚN NO cerradas, en orden
 let _kmRutaHoyTotal=0; // último km_total calculado (ida a cada OT + regreso a Barracas) — usado en el reporte de cierre
+
+// ── PERSISTENCIA LOCAL DE rutaDelDia (fix "OT viejas" — 2026-07) ──────────
+// Antes rutaDelDia solo se restauraba desde rutas_diarias.ots_ids (que es
+// POR FECHA) y solo si estaba vacía en memoria. Si la app quedaba abierta
+// de un día para el otro sin recargar, rutaDelDia nunca se refrescaba y
+// arrastraba ids viejos para siempre. Y si el celu SÍ se reiniciaba, una OT
+// que había quedado sin cerrar (ej: cliente ausente) simplemente se perdía,
+// porque el día siguiente ya no está en rutas_diarias de HOY.
+// Ahora se guarda también en localStorage, sin atarlo a una fecha — así una
+// OT pendiente de cerrar sigue apareciendo día tras día hasta que alguien
+// la marca Entregada/Fallida, sobreviva o no a un reinicio del celu.
+function _rutaPendienteKey(){ return 'alleata_ruta_pendiente_'+(currentUser?.id||''); }
+function guardarRutaPendienteLocal(){
+  try{
+    const soloReales=rutaDelDia.filter(o=>!o._esPrueba);
+    localStorage.setItem(_rutaPendienteKey(),JSON.stringify(soloReales));
+  }catch(e){ console.warn('[rutaPendiente] no se pudo guardar local:',e); }
+}
+function cargarRutaPendienteLocal(){
+  try{ return JSON.parse(localStorage.getItem(_rutaPendienteKey())||'[]'); }
+  catch(e){ return []; }
+}
 
 // ── Debug log — pasos de la app, para mandar por WhatsApp cuando algo falla
 // en el campo en vez de solo una foto del alert genérico. Se abre tocando
@@ -1139,11 +1168,19 @@ function generarTextoResumen(){
   return txt;
 }
 
-function abrirResumenModal(){
+async function abrirResumenModal(){
   if(!cierresHoy.length){
     showScanFeedback('Todavía no cerraste ninguna OT hoy','warn');
     return;
   }
+  // FIX "OT viejas" (2026-07): "Finalizar ruta" es el momento explícito en
+  // que el operador dice "terminé por hoy" — aprovechamos ese gatillo para
+  // forzar una reconciliación fresca de rutaDelDia contra SF (loadEnTransito
+  // ya se encarga de sacar cualquier OT que haya quedado cerrada por otro
+  // medio y no debería seguir figurando como pendiente). Esto NO borra
+  // ninguna OT que siga genuinamente sin cerrar — esas tienen que seguir
+  // apareciendo mañana hasta que alguien las cierre.
+  await loadEnTransito();
   document.getElementById('resumenTexto').value=generarTextoResumen();
   document.getElementById('modalResumen').classList.add('show');
   avisarRolloutCierreRuta(); // fire-and-forget, no bloquea la apertura del modal
@@ -1234,27 +1271,38 @@ let otScaneadaActual=null; // OT mostrada en el card de confirmación
 async function loadRuta(){
   if(!currentUser)return;
   cargarRadioSugerencia();
-  // Cargar ruta del día guardada (para restaurar km si recarga la app)
   const fecha=new Date().toISOString().slice(0,10);
   const{data:rutaHoy}=await sb.from('rutas_diarias')
     .select('*').eq('fecha',fecha).eq('user_id',currentUser.id).maybeSingle();
   if(rutaHoy?.km_total){
     renderKmIndicador(rutaHoy.km_total,rutaHoy.km_detalle||[]);
   }
-  // Restaurar rutaDelDia si la app se recargó a mitad del día — si no, la
-  // próxima OT aceptada recalcularía el km desde cero (perdiendo lo ya
-  // recorrido) en vez de sumar sobre lo que ya hizo el operador hoy.
-  if(rutaHoy?.ots_ids?.length&&!rutaDelDia.length){
+
+  // FIX "OT viejas" (2026-07): antes esto solo corría si rutaDelDia estaba
+  // vacía en memoria, así que si la app quedaba abierta cruzando la
+  // medianoche nunca se refrescaba. Ahora SIEMPRE reconcilia dos fuentes:
+  //   1) lo guardado en localStorage (pendientes reales, no atado a fecha
+  //      — sobrevive a que el celu se reinicie sin perder lo que quedó sin
+  //      cerrar)
+  //   2) lo confirmado en rutas_diarias de HOY en Supabase
+  // y las une por id, en vez de que una pise a la otra. loadEnTransito()
+  // más abajo se encarga de sacar de acá cualquier OT que ya no siga
+  // Despachada/En Tránsito en SF (se cerró por otro medio).
+  const pendientesLocal=cargarRutaPendienteLocal();
+  let otsHoyDeSupabase=[];
+  if(rutaHoy?.ots_ids?.length){
     const{data:otsPrevias}=await sb.from('sf_workorders')
       .select('id,workorder_number,ciudad').in('id',rutaHoy.ots_ids);
     if(otsPrevias?.length){
-      const porId={};otsPrevias.forEach(o=>{porId[o.id]=o;});
-      rutaDelDia=rutaHoy.ots_ids.map(id=>{
-        const o=porId[id];
-        return o?{id:o.id,ot_numero:o.workorder_number,ciudad:o.ciudad}:null;
-      }).filter(Boolean);
+      otsHoyDeSupabase=otsPrevias.map(o=>({id:o.id,ot_numero:o.workorder_number,ciudad:o.ciudad}));
     }
   }
+  const otsPrueba=rutaDelDia.filter(o=>o._esPrueba); // conservar las de prueba de la sesión actual, nunca van a Supabase/localStorage
+  const combinadas={};
+  [...pendientesLocal,...otsHoyDeSupabase].forEach(o=>{ if(o?.id) combinadas[o.id]=o; });
+  rutaDelDia=[...Object.values(combinadas),...otsPrueba];
+  guardarRutaPendienteLocal();
+
   cargarCierresLocal();
   await loadEnTransito();
 }
@@ -1305,6 +1353,15 @@ async function loadEnTransito(){
       .in('status',['En Tránsito','En tránsito','Despachado'])
       .order('fecha_despacho',{ascending:true});
     otsRaw=data||[];
+
+    // FIX "OT viejas" (2026-07): si una OT ya no vino en esta consulta es
+    // porque dejó de estar Despachada/En Tránsito en SF (se cerró por otro
+    // medio, ej. desde el desktop) — sacarla de rutaDelDia y de la
+    // persistencia local para que no se siga arrastrando como pendiente.
+    const idsQueSiguenAbiertas=new Set(otsRaw.map(o=>o.id));
+    const antesCount=rutaDelDia.length;
+    rutaDelDia=rutaDelDia.filter(o=>o._esPrueba||idsQueSiguenAbiertas.has(o.id));
+    if(rutaDelDia.length!==antesCount) guardarRutaPendienteLocal();
   }
   const list=otsRaw.map(r=>({
     id:                 r.id,
@@ -1323,6 +1380,7 @@ async function loadEnTransito(){
     perfil:             r.perfil,
     rollout:            r.rollout,
     logistica:          r.logistica,
+    fecha_despacho:     r.fecha_despacho,
   }));
   // OTs de "🧪 Simular OT de prueba" — nunca vienen de Supabase, se agregan
   // acá directo desde la memoria para poder probar también el cierre.
@@ -1342,10 +1400,24 @@ async function loadEnTransito(){
     const mapsUrl='https://www.google.com/maps/search/?api=1&query='+encodeURIComponent((e.direccion_completa||'')+' '+(e.ciudad||'')+' Argentina');
     const telE=String(e.contacto||'').replace(/\D/g,'');
     const waE=telE?`https://wa.me/${telE.startsWith('54')?telE:'54'+telE}?text=${encodeURIComponent('Hola'+(e.nombre_comercio?' '+e.nombre_comercio:'')+'👋\nTe contactamos de Alleata por la OT '+(e.ot_numero||'')+'.')}`:'';
+    // Badge de antigüedad: distingue lo aceptado hoy de un pendiente que
+    // viene arrastrándose de días anteriores (sin cerrar todavía) — así no
+    // parece un bug/"OT vieja" fantasma, sino que se ve claro que sigue
+    // pendiente de gestionar.
+    let badgeAntiguedad='';
+    if(e.fecha_despacho){
+      const fechaD=new Date(e.fecha_despacho);
+      const hoy0=new Date();hoy0.setHours(0,0,0,0);
+      const fechaD0=new Date(fechaD);fechaD0.setHours(0,0,0,0);
+      const dias=Math.round((hoy0-fechaD0)/86400000);
+      if(dias>=1){
+        badgeAntiguedad=`<span style="font-size:9px;font-weight:700;color:#f59e0b;background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.35);padding:1px 6px;border-radius:10px;display:inline-block;margin-left:6px">⏳ Pendiente hace ${dias}d</span>`;
+      }
+    }
     return`<div class="ot-card en-transito" style="margin-bottom:10px">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px">
         <div>
-          <div class="ot-num">${e.ot_numero||'—'}</div>
+          <div class="ot-num">${e.ot_numero||'—'}${badgeAntiguedad}</div>
           <div class="ot-tipo">${e.tipo||''}${esRolloutOT(e)?' <span style="font-size:9px;font-weight:700;color:#8b5cf6;background:rgba(139,92,246,.15);border:1px solid rgba(139,92,246,.35);padding:1px 6px;border-radius:10px;display:inline-block;margin-left:2px">🔄 ROLLOUT</span>':''}</div>
         </div>
         <span class="zona-badge" style="color:${z.color};background:${z.color}20;border:1px solid ${z.color}40">${z.zona}${km?` · ~${km}km`:''}</span>
@@ -1943,6 +2015,7 @@ async function aceptarOT(){
 
     // Agregar a ruta del día
     rutaDelDia.push({...otScaneadaActual});
+    guardarRutaPendienteLocal();
     await guardarRutaDiaria();
     dlog('✅ aceptarOT() completo',{ot:otScaneadaActual.ot_numero});
 
@@ -2226,6 +2299,7 @@ async function confirmarCierreOT(){
     closeModalCierre();
     showScanFeedback('🧪 [PRUEBA] OT '+_otCierreActual.ot_numero+' "'+resultado+'" (simulado, nada real)',resultado==='Entregado'?'ok':'warn');
     rutaDelDia=rutaDelDia.filter(o=>o.id!==_otCierreActual.id); // sacarla de la ruta en memoria
+    guardarRutaPendienteLocal();
     _otCierreActual=null;
     await loadEnTransito();
     return;
