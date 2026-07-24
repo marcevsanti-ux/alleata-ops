@@ -165,7 +165,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
       <div class="login-logo">
         <img id="loginLogo" src="" alt="Alleata">
         <div class="login-sub">Portal de Operaciones</div>
-        <div class="login-version">v2.14.28 · mobile</div>
+        <div class="login-version">v2.14.29 · mobile</div>
       </div>
       <div class="field"><label class="label">Email</label><input class="input" id="lEmail" type="email" placeholder="usuario@alleata.com" autocomplete="email"></div>
       <div class="field"><label class="label">Contraseña</label><input class="input" id="lPass" type="password" placeholder="••••••••" autocomplete="current-password"></div>
@@ -181,7 +181,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
   <div class="topbar">
     <img id="appLogo" src="" alt="Alleata">
     <div class="topbar-title" id="topbarTitle">Operaciones</div>
-    <div class="topbar-version" onclick="_tocarVersion()">v2.14.28</div>
+    <div class="topbar-version" onclick="_tocarVersion()">v2.14.29</div>
     <div class="topbar-avatar" id="topbarAvatar" onclick="openDrawer()">?</div>
   </div>
 
@@ -280,8 +280,9 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
           <div class="ot-row" id="otS-horario-row"><span>🕐</span><span id="otS-horario"></span></div>
           <div class="ot-row" id="otS-contacto-row"><span>📞</span><a id="otS-contacto" href="#" style="color:var(--blue)"></a></div>
         </div>
+        <div id="otS-alerta-terminal" style="display:none;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.35);border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:12px;color:#ef4444;line-height:1.4"></div>
         <div style="display:flex;gap:8px">
-          <button onclick="aceptarOT()" style="flex:1;background:var(--grad);color:#fff;border:none;padding:13px;font-size:15px;font-weight:700;border-radius:10px;cursor:pointer;font-family:'Inter',sans-serif">
+          <button id="otS-btn-aceptar" onclick="aceptarOT()" style="flex:1;background:var(--grad);color:#fff;border:none;padding:13px;font-size:15px;font-weight:700;border-radius:10px;cursor:pointer;font-family:'Inter',sans-serif">
             ✅ Aceptar OT
           </button>
           <button onclick="cancelarOTScaneada()" style="background:var(--surface2);border:1px solid var(--border2);color:var(--text-muted);padding:13px 16px;border-radius:10px;cursor:pointer;font-family:'Inter',sans-serif;font-size:13px">
@@ -578,6 +579,13 @@ const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSI
 //     control" que ya tenía el lado de Supabase.
 //   - Resultado de SIM ahora muestra la fuente: "Confirmado en vivo con
 //     Salesforce" vs "Caché local — no se pudo confirmar"
+// Cambios v2.14.29 (24/07):
+//   - Validación preventiva antes de aceptar una OT Cambio de Terminal +
+//     NAPSE: consulta (solo lectura, nunca escribe en SF) si la terminal
+//     nueva está Ubicacion=BARRACAS + Estado=DISPONIBLE. Si no, muestra
+//     alerta y bloquea "Aceptar OT" — evita que el Flow "Work Order -
+//     Before Insert - Alleata" rebote el guardado (caso real: Marcelo,
+//     OT 00022786, terminal en SPP/IRRUPTION).
 // Cambios v2.14.28 (24/07):
 //   - FIX "OT viejas": rutaDelDia ahora persiste en localStorage (no atado
 //     a fecha) y loadRuta()/loadEnTransito() reconcilian siempre contra SF
@@ -1804,7 +1812,7 @@ async function mostrarOTScaneada(sfId){
   // Primero buscar en sf_workorders (instalaciones Alleata)
   let ot=null, esSFWorkorder=false;
   const{data:sfOT,error:sfErr}=await sb.from('sf_workorders')
-    .select('id,sf_id,workorder_number,record_type,status,logistica,cuenta,nombre_comercio,propietario_cuenta,direccion_formula,direccion,localidad,ciudad,provincia,codigo_postal,contacto_celular,horario,horario_entrega,responsable,perfil,rollout')
+    .select('id,sf_id,workorder_number,record_type,status,logistica,cuenta,nombre_comercio,propietario_cuenta,direccion_formula,direccion,localidad,ciudad,provincia,codigo_postal,contacto_celular,horario,horario_entrega,responsable,perfil,rollout,n_terminal_nueva')
     .eq('sf_id',sfId).eq('logistica','ALLEATA').maybeSingle();
 
   if(sfErr) console.warn('[mostrarOTScaneada] sf_workorders error:', sfErr.message);
@@ -1827,6 +1835,7 @@ async function mostrarOTScaneada(sfId){
       perfil:        sfOT.perfil,
       rollout:       sfOT.rollout,
       logistica:     sfOT.logistica,
+      n_terminal_nueva: sfOT.n_terminal_nueva,
       _esSFWorkorder: true,
     };
     esSFWorkorder=true;
@@ -1884,6 +1893,46 @@ function mostrarCardOT(ot){
   document.getElementById('otScaneadaCard').style.display='block';
   if(navigator.vibrate)navigator.vibrate([80,40,80]);
   document.getElementById('rutaScanStatus').textContent='✅ OT encontrada — aceptá o escaneá otro rótulo';
+
+  // Validación preventiva terminal nueva (24/07) — ver validarTerminalNuevaOT()
+  validarTerminalNuevaOT(ot);
+}
+
+// ── VALIDACIÓN PREVENTIVA — terminal nueva lista para asignar (24/07) ──────
+// Solo lectura, nunca escribe en Salesforce. Antes de dejar aceptar una OT
+// de Cambio de Terminal + NAPSE, chequea que la terminal nueva (Product2)
+// esté Ubicacion=BARRACAS + Estado=DISPONIBLE — si no, el Flow "Work Order -
+// Before Insert - Alleata" de SF rebota el guardado al aceptar (visto real
+// con Marcelo, OT 00022786). Avisamos ACÁ antes, para no hacerle perder el
+// viaje al operador, y bloqueamos "Aceptar OT" hasta que se corrija en SF.
+async function validarTerminalNuevaOT(ot){
+  const alertaEl=document.getElementById('otS-alerta-terminal');
+  const btnEl=document.getElementById('otS-btn-aceptar');
+  alertaEl.style.display='none';
+  if(btnEl){ btnEl.disabled=false; btnEl.style.opacity='1'; btnEl.style.cursor='pointer'; }
+
+  // Solo aplica a Cambio de Terminal + NAPSE con serial de terminal nueva cargado
+  const esCambioNapse=(ot.tipo==='Cambio de Terminal')&&(ot.perfil==='NAPSE');
+  if(!esCambioNapse||!ot.n_terminal_nueva) return;
+
+  try{
+    const res=await railwayFetch('/automations/validar-terminal-nueva?serie='+encodeURIComponent(ot.n_terminal_nueva));
+    const data=await res.json();
+    if(!data.ok) return; // si falla la validación en sí, no bloqueamos por las dudas
+
+    if(!data.encontrada){
+      alertaEl.innerHTML='⚠️ No encontramos la terminal nueva ('+ot.n_terminal_nueva+') en Salesforce. Avisá antes de aceptar.';
+      alertaEl.style.display='block';
+      return;
+    }
+    if(!data.cumple){
+      alertaEl.innerHTML='⚠️ Terminal nueva no está lista para asignar — Ubicación: <b>'+(data.ubicacion||'—')+'</b> · Estado: <b>'+(data.estado||'—')+'</b><br>Tiene que estar en BARRACAS y DISPONIBLE. Avisá para corregirlo en Salesforce antes de aceptar — si no, el guardado va a rebotar.';
+      alertaEl.style.display='block';
+      if(btnEl){ btnEl.disabled=true; btnEl.style.opacity='.5'; btnEl.style.cursor='not-allowed'; }
+    }
+  }catch(e){
+    console.warn('[validarTerminalNuevaOT] error (no bloquea):',e.message);
+  }
 }
 
 // ── CARGA MANUAL DE OT ──
@@ -1915,7 +1964,7 @@ async function buscarOTManual(){
   msgEl.style.color='var(--text-muted)';
 
   const{data:sfOT,error}=await sb.from('sf_workorders')
-    .select('id,sf_id,workorder_number,record_type,status,logistica,cuenta,nombre_comercio,propietario_cuenta,direccion_formula,direccion,localidad,ciudad,provincia,codigo_postal,contacto_celular,horario,horario_entrega,responsable,perfil,rollout')
+    .select('id,sf_id,workorder_number,record_type,status,logistica,cuenta,nombre_comercio,propietario_cuenta,direccion_formula,direccion,localidad,ciudad,provincia,codigo_postal,contacto_celular,horario,horario_entrega,responsable,perfil,rollout,n_terminal_nueva')
     .eq('logistica','ALLEATA')
     .ilike('workorder_number','%'+numLimpio)
     .maybeSingle();
@@ -1953,6 +2002,7 @@ async function buscarOTManual(){
     perfil:             sfOT.perfil,
     rollout:            sfOT.rollout,
     logistica:          sfOT.logistica,
+    n_terminal_nueva:   sfOT.n_terminal_nueva,
     _esSFWorkorder:     true,
   };
   mostrarCardOT(ot);
@@ -1962,6 +2012,7 @@ async function buscarOTManual(){
 async function aceptarOT(){
   if(!otScaneadaActual)return;
   const btn=document.querySelector('#otScaneadaCard button');
+  if(btn?.disabled)return; // bloqueada por validarTerminalNuevaOT() — terminal nueva no está lista en SF
   btn.disabled=true;btn.textContent='⏳ Despachando...';
 
   // ── Modo prueba: nunca toca SF/Railway/Supabase. Solo simula los pasos
