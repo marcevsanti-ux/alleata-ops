@@ -165,7 +165,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
       <div class="login-logo">
         <img id="loginLogo" src="" alt="Alleata">
         <div class="login-sub">Portal de Operaciones</div>
-        <div class="login-version">v2.14.29 · mobile</div>
+        <div class="login-version">v2.14.30 · mobile</div>
       </div>
       <div class="field"><label class="label">Email</label><input class="input" id="lEmail" type="email" placeholder="usuario@alleata.com" autocomplete="email"></div>
       <div class="field"><label class="label">Contraseña</label><input class="input" id="lPass" type="password" placeholder="••••••••" autocomplete="current-password"></div>
@@ -181,7 +181,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
   <div class="topbar">
     <img id="appLogo" src="" alt="Alleata">
     <div class="topbar-title" id="topbarTitle">Operaciones</div>
-    <div class="topbar-version" onclick="_tocarVersion()">v2.14.29</div>
+    <div class="topbar-version" onclick="_tocarVersion()">v2.14.30</div>
     <div class="topbar-avatar" id="topbarAvatar" onclick="openDrawer()">?</div>
   </div>
 
@@ -579,6 +579,11 @@ const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSI
 //     control" que ya tenía el lado de Supabase.
 //   - Resultado de SIM ahora muestra la fuente: "Confirmado en vivo con
 //     Salesforce" vs "Caché local — no se pudo confirmar"
+// Cambios v2.14.30 (24/07):
+//   - Validación terminal nueva: se agrega Perfil__c=NAPSE del Product2
+//     (campo propio del producto, confirmado contra el describe real de
+//     SF — no es el Perfil__c de la OT). Ahora exige BARRACAS + DISPONIBLE
+//     + NAPSE los 3 juntos.
 // Cambios v2.14.29 (24/07):
 //   - Validación preventiva antes de aceptar una OT Cambio de Terminal +
 //     NAPSE: consulta (solo lectura, nunca escribe en SF) si la terminal
@@ -1926,7 +1931,7 @@ async function validarTerminalNuevaOT(ot){
       return;
     }
     if(!data.cumple){
-      alertaEl.innerHTML='⚠️ Terminal nueva no está lista para asignar — Ubicación: <b>'+(data.ubicacion||'—')+'</b> · Estado: <b>'+(data.estado||'—')+'</b><br>Tiene que estar en BARRACAS y DISPONIBLE. Avisá para corregirlo en Salesforce antes de aceptar — si no, el guardado va a rebotar.';
+      alertaEl.innerHTML='⚠️ Terminal nueva no está lista para asignar — Ubicación: <b>'+(data.ubicacion||'—')+'</b> · Estado: <b>'+(data.estado||'—')+'</b> · Perfil: <b>'+(data.perfil||'—')+'</b><br>Tiene que estar en BARRACAS, DISPONIBLE y Perfil NAPSE. Avisá para corregirlo en Salesforce antes de aceptar — si no, el guardado va a rebotar.';
       alertaEl.style.display='block';
       if(btnEl){ btnEl.disabled=true; btnEl.style.opacity='.5'; btnEl.style.cursor='not-allowed'; }
     }
