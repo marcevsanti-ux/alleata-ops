@@ -539,6 +539,21 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="ops-timestamp" style="font-size:11px;color:var(--text-muted);margin-top:2px"></div>
       </div>
 
+      <!-- 🎯 Próxima OT a hacer — para Andres/Gonzalo, en el Dashboard (no
+           dentro de Envíos). Prioridad: 1) Cambio de Terminal + Rollout,
+           2) Instalación ALLEATA con +24hs desde terminal_id_fecha,
+           3) EPSA solo miércoles/viernes. Todo filtrado a estado
+           "Configurar Terminal" y responsable = el operador logueado.
+           Se muestra/oculta y se carga desde loadOpsPanel(). -->
+      <div class="card" id="opProximaOTCard" style="display:none;margin-bottom:14px;border-left:4px solid var(--teal)">
+        <div style="font-size:13px;font-weight:700;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between">
+          <span>🎯 Próxima OT a hacer</span>
+          <button class="btn-ghost btn-sm" onclick="cargarProximaOT(currentProfile?.nombre||'')">↺</button>
+        </div>
+        <div id="opProximaOTTop" style="margin-bottom:6px;font-size:12px;color:var(--text-muted)">Cargando...</div>
+        <div id="opProximaOTNotas" style="margin-top:8px;font-size:10px;color:var(--text-muted);line-height:1.6"></div>
+      </div>
+
       <!-- Vista CEO: KPIs de Gestión NAPSE, en vivo, directo acá — sin sección aparte -->
       <div id="ceoDashKpis"></div>
       <div id="ceoPresupuestoKpis"></div>
@@ -614,25 +629,6 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
           <div class="stat-num" style="color:var(--text-muted);font-size:22px" id="z-total">0</div>
           <div class="stat-label">📋 Todas</div>
         </div>
-      </div>
-
-      <!-- 🎯 Próxima OT a hacer — cola de prioridad para operadores (Andres,
-           Gonzalo). Pedido de marcelos 27/07: que el operador sepa qué OT
-           encarar primero sin tener que scrollear/filtrar. Prioridad:
-             1) Cambio de Terminal + Rollout
-             2) Instalación Equipo + Simcard, logística ALLEATA, y ya pasaron
-                24hs desde que se cargó el Terminal ID (terminal_id_fecha)
-             3) Logística EPSA — solo cuenta miércoles y viernes
-           Todas filtradas a estado = "Configurar Terminal" y responsable =
-           el operador logueado. Solo visible para rol operador con módulo
-           rollout/envios habilitado — ver cargarProximaOT(). -->
-      <div class="card" id="opProximaOTCard" style="display:none;margin-bottom:14px;border-left:4px solid var(--teal)">
-        <div style="font-size:13px;font-weight:700;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between">
-          <span>🎯 Próxima OT a hacer</span>
-          <button class="btn-ghost btn-sm" onclick="cargarProximaOT(currentProfile?.nombre||'')">↺</button>
-        </div>
-        <div id="opProximaOTTop" style="margin-bottom:6px;font-size:12px;color:var(--text-muted)">Cargando...</div>
-        <div id="opProximaOTNotas" style="margin-top:8px;font-size:10px;color:var(--text-muted);line-height:1.6"></div>
       </div>
 
       <!-- SELECTOR DE LOGÍSTICA (pills) -->
@@ -6607,6 +6603,19 @@ async function loadOpsPanel(isAdmin, modulos){
   if(!isAdmin && opCard){ opCard.style.display='block'; loadStatsOperador(); }
   else if(opCard){ opCard.style.display='none'; }
 
+  // 🎯 Próxima OT a hacer — solo para operadores que hacen Rollout/Instalaciones
+  // (Andres, Gonzalo). Angel (solo desinstalaciones) no la ve.
+  const proxCard = document.getElementById('opProximaOTCard');
+  if(proxCard){
+    const haceEnviosProxima = !isAdmin && (modulos.includes('rollout') || modulos.includes('envios'));
+    if(haceEnviosProxima){
+      proxCard.style.display='block';
+      cargarProximaOT(nombre);
+    } else {
+      proxCard.style.display='none';
+    }
+  }
+
   // QUERIES — admin ve todo, operador filtra por su nombre
   let envQ=sb.from('sf_workorders').select('id,workorder_number,record_type,perfil,responsable,status,fecha_despacho,created_at,tracking_envio,logistica').not('status','eq','null');
   if(!isAdmin) envQ=envQ.ilike('responsable','%'+primerNombre+'%');
@@ -7183,20 +7192,6 @@ async function initEnvios(){
     const lbl = document.getElementById('opNombreLabel');
     if(lbl) lbl.textContent = '— ' + (currentProfile?.nombre||'');
     await loadStatsOperador();
-
-    // Próxima OT a hacer — solo para quienes hacen Rollout/Instalaciones
-    // (Andres, Gonzalo). Angel (solo desinstalaciones) no la ve.
-    const modulos = currentProfile?.modulos||[];
-    const haceEnviosProxima = modulos.includes('rollout') || modulos.includes('envios');
-    const proxCard = document.getElementById('opProximaOTCard');
-    if(proxCard){
-      if(haceEnviosProxima){
-        proxCard.style.display='block';
-        await cargarProximaOT(currentProfile?.nombre||'');
-      } else {
-        proxCard.style.display='none';
-      }
-    }
   }
 }
 
