@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.4.85</title>
+<title>Alleata · Operaciones v4.4.87</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -400,7 +400,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.4.85 · 27 jul 2026
+      v4.4.87 · 27 jul 2026
     </div>
   </div>
 </div>
@@ -488,7 +488,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.4.85 · 27 jul 2026
+      v4.4.87 · 27 jul 2026
     </div>
   </div>
 </nav>
@@ -528,7 +528,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.4.85</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.4.87</div>
   </div>
   <div class="content">
 
@@ -4488,7 +4488,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.4.85] OK');
+console.log('[Alleata v4.4.87] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -4952,6 +4952,7 @@ function refreshCurrentModule(){
   if(btn){btn.textContent='↻';btn.style.color='var(--teal)';}
   setTimeout(()=>{if(btn){btn.textContent='↺';btn.style.color='var(--text-muted)';}},600);
   if(mod==='envios'){renderEnvios();loadBadges();}
+  else if(mod==='home'){loadOpsPanel(currentProfile?.rol==='admin',currentProfile?.modulos);loadBadges();}
   else if(mod==='desinstalaciones'){if(window.cargarDesinstalaciones)window.cargarDesinstalaciones();}
   else if(mod==='sims'){loadSimsDbStats();}
   else if(mod==='presupuesto'){
@@ -6580,7 +6581,7 @@ async function loadCeoDashKpis(){
 
 
 async function loadOpsPanel(isAdmin, modulos){
-  modulos = modulos || [];
+  modulos = modulos || currentProfile?.modulos || [];
   const nombre=currentProfile?.nombre||'';
   const primerNombre=nombre.split(' ')[0];
   const today=new Date().toISOString().slice(0,10);
@@ -7194,20 +7195,22 @@ async function initEnvios(){
   }
 }
 
-// ── Paso 1 (27/07): lista simple, sin prioridad todavía. Trae TODAS las
-// OTs en estado "Configurar Terminal" para el responsable logueado, tal
-// como saldrían filtrando por Responsable + Estado en SF, ordenadas por
-// fecha de creación (la más vieja primero). La lógica de prioridad
-// (Rollout > ALLEATA/CABIFY +24hs o FACTURADOR > EPSA mié/vie) se vuelve
-// a agregar sobre esta base una vez que Gonzalo/Andres confirmen que la
-// lista de acá coincide con lo que tienen pendiente en SF.
+// ── Paso 2 (27/07, confirmado con Gonzalo en vivo): sobre la lista simple
+// del paso 1, ahora resalta arriba las que cumplen prioridad HOY:
+//  1) Cambio de Terminal + Rollout
+//  2) Instalación Equipo + Simcard, logística ALLEATA/CABIFY/Correo
+//     Argentino, y (Terminal ID literal "FACTURADOR" → no espera) o
+//     (terminal_id_fecha con +24hs)
+//  3) EPSA — solo si hoy es miércoles o viernes
+// El resto de las OTs de "Configurar Terminal" se listan abajo, sin
+// resaltar, para no ocultar nada (así se puede seguir comparando contra SF).
 async function cargarProximaOT(nombre){
   const top=document.getElementById('opProximaOTTop');
   if(!top)return;
   top.textContent='Cargando...';
 
   const{data,error}=await sb.from('sf_workorders')
-    .select('id,workorder_number,cuenta,record_type,logistica,terminal_id,created_at')
+    .select('id,workorder_number,cuenta,record_type,rollout,logistica,terminal_id,terminal_id_fecha,created_at')
     .eq('status','Configurar Terminal')
     .ilike('responsable',`%${nombre}%`)
     .order('created_at',{ascending:true});
@@ -7220,14 +7223,40 @@ async function cargarProximaOT(nombre){
     return;
   }
 
-  top.innerHTML = `<div style="font-size:11px;color:var(--text-muted);margin-bottom:8px">${rows.length} OT(s) en "Configurar Terminal"</div>` +
-    rows.map(r=>`
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;background:var(--navy-800);border-radius:8px;padding:8px 12px;margin-bottom:6px;font-size:11px">
+  const hoy=new Date().getDay(); // 0=dom...3=miércoles,5=viernes
+  const esDiaEPSA = (hoy===3 || hoy===5);
+  const LOG_TIER2 = ['ALLEATA','CABIFY','CORREO ARGENTINO','CA'];
+  const HORAS_24 = 24*60*60*1000;
+  const esFacturador = r => String(r.terminal_id||'').trim().toUpperCase()==='FACTURADOR';
+  const pasaron24h = r => r.terminal_id_fecha && (Date.now()-new Date(r.terminal_id_fecha).getTime())>=HORAS_24;
+
+  const conMotivo = rows.map(r=>{
+    let motivo=null;
+    if(r.record_type==='Cambio de Terminal' && r.rollout===true) motivo='Rollout';
+    else if(r.record_type==='Instalación Equipo + Simcard' && LOG_TIER2.includes(String(r.logistica||'').toUpperCase()) && (esFacturador(r)||pasaron24h(r))) motivo=esFacturador(r)?'FACTURADOR':'Terminal ID +24hs';
+    else if(r.logistica==='EPSA' && esDiaEPSA) motivo='EPSA · hoy pasa';
+    return {...r,_motivo:motivo};
+  });
+  const prioritarias = conMotivo.filter(r=>r._motivo);
+  const resto = conMotivo.filter(r=>!r._motivo);
+
+  const fila = (r,destacada) => `
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;background:${destacada?'var(--navy-800)':'transparent'};border:1px solid ${destacada?'rgba(29,191,142,.3)':'transparent'};border-radius:8px;padding:8px 12px;margin-bottom:6px;font-size:11px">
         <span style="font-family:'JetBrains Mono',monospace;font-weight:700">${escapeHtmlLocal(r.workorder_number||'—')}</span>
         <span style="color:var(--text-muted);flex:1;margin:0 8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtmlLocal(r.cuenta||'—')}</span>
-        <span style="color:var(--text-muted);font-size:9px;white-space:nowrap">${escapeHtmlLocal(r.record_type||'—')} · ${escapeHtmlLocal(r.logistica||'—')}</span>
+        <span style="color:${destacada?'var(--teal)':'var(--text-muted)'};font-size:9px;white-space:nowrap;font-weight:${destacada?'700':'400'}">${destacada?'👉 '+escapeHtmlLocal(r._motivo)+' · ':''}${escapeHtmlLocal(r.record_type||'—')} · ${escapeHtmlLocal(r.logistica||'—')}</span>
         <span style="color:var(--text-muted);font-size:9px;white-space:nowrap">${r.created_at?new Date(r.created_at).toLocaleDateString('es-AR'):'—'}</span>
-      </div>`).join('');
+      </div>`;
+
+  let html = `<div style="font-size:11px;color:var(--text-muted);margin-bottom:8px">${rows.length} OT(s) en "Configurar Terminal"${prioritarias.length?` · ${prioritarias.length} con prioridad hoy`:''}</div>`;
+  if(prioritarias.length){
+    html += prioritarias.map(r=>fila(r,true)).join('');
+    if(resto.length) html += `<div style="font-size:9px;color:var(--text-muted);margin:8px 0 6px;text-transform:uppercase;letter-spacing:.05em">Resto (sin prioridad hoy)</div>`;
+  } else {
+    html += `<div style="font-size:11px;color:var(--orange);margin-bottom:6px">Ninguna cumple la prioridad hoy — ver lista completa abajo.</div>`;
+  }
+  html += resto.map(r=>fila(r,false)).join('');
+  top.innerHTML = html;
 }
 function escapeHtmlLocal(v){return String(v??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;');}
 
