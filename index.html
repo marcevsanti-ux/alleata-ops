@@ -631,9 +631,8 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
           <span>🎯 Próxima OT a hacer</span>
           <button class="btn-ghost btn-sm" onclick="cargarProximaOT(currentProfile?.nombre||'')">↺</button>
         </div>
-        <div id="opProximaOTTop" style="margin-bottom:10px;font-size:12px;color:var(--text-muted)">Cargando...</div>
-        <div id="opProximaOTCola" style="display:flex;flex-direction:column;gap:6px"></div>
-        <div id="opProximaOTNotas" style="margin-top:10px;font-size:10px;color:var(--text-muted);line-height:1.6"></div>
+        <div id="opProximaOTTop" style="margin-bottom:6px;font-size:12px;color:var(--text-muted)">Cargando...</div>
+        <div id="opProximaOTNotas" style="margin-top:8px;font-size:10px;color:var(--text-muted);line-height:1.6"></div>
       </div>
 
       <!-- SELECTOR DE LOGÍSTICA (pills) -->
@@ -7214,10 +7213,9 @@ async function initEnvios(){
 //    igual pero sin el corte de 24hs.
 async function cargarProximaOT(nombre){
   const top=document.getElementById('opProximaOTTop');
-  const cola=document.getElementById('opProximaOTCola');
   const notas=document.getElementById('opProximaOTNotas');
-  if(!top||!cola)return;
-  top.textContent='Cargando...'; cola.innerHTML=''; notas.innerHTML='';
+  if(!top)return;
+  top.textContent='Cargando...'; notas.innerHTML='';
 
   const{data,error}=await sb.from('sf_workorders')
     .select('id,workorder_number,cuenta,record_type,rollout,logistica,status,terminal_id,terminal_id_fecha')
@@ -7230,7 +7228,6 @@ async function cargarProximaOT(nombre){
   const esDiaEPSA = (hoy===3 || hoy===5);
   const HORAS_24 = 24*60*60*1000;
   const ahora = Date.now();
-  const horasDesde = f => f ? (ahora-new Date(f).getTime())/(60*60*1000) : null;
 
   const rows = data||[];
   const tier1 = rows.filter(r=>r.record_type==='Cambio de Terminal' && r.rollout===true);
@@ -7245,38 +7242,28 @@ async function cargarProximaOT(nombre){
     return fa-fb;
   });
 
-  const cola_ordenada = [
+  // Solo nos interesa el primero de la cola — esto muestra 1 sola OT.
+  const candidata = [
     ...tier1.map(r=>({...r,_motivo:'Cambio de Terminal · Rollout'})),
     ...ordenarPorTerminalId(tier2Listas).map(r=>({...r,_motivo:'Instalación ALLEATA · Terminal ID +24hs'})),
     ...tier3Listas.map(r=>({...r,_motivo:'Logística EPSA · hoy pasa'})),
-  ];
+  ][0];
 
-  const contabilizadas = new Set([...tier1,...tier2Listas,...tier3Listas].map(r=>r.id));
-  const otrosSinTurno = rows.filter(r=>!contabilizadas.has(r.id) && !tier2Esperando.includes(r) && !tier3FueraDeHorario.includes(r));
-
-  if(!cola_ordenada.length){
+  if(!candidata){
     top.innerHTML = rows.length
       ? `<span style="color:var(--orange)">Sin OTs listas ahora mismo — ${rows.length} en "Configurar Terminal" pero ninguna cumple la prioridad todavía (ver notas abajo).</span>`
       : `<span style="color:var(--text-muted)">No tenés OTs en estado "Configurar Terminal" ahora mismo. 🎉</span>`;
   } else {
-    const p = cola_ordenada[0];
     top.innerHTML = `<div style="background:var(--navy-800);border:1px solid rgba(29,191,142,.3);border-radius:10px;padding:12px 14px">
-      <div style="font-size:10px;color:var(--teal);font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">👉 ${escapeHtmlLocal(p._motivo)}</div>
-      <div style="font-size:16px;font-weight:800;font-family:'JetBrains Mono',monospace">${escapeHtmlLocal(p.workorder_number||'—')}</div>
-      <div style="font-size:12px;color:var(--text-muted);margin-top:2px">${escapeHtmlLocal(p.cuenta||'—')}</div>
+      <div style="font-size:10px;color:var(--teal);font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">👉 ${escapeHtmlLocal(candidata._motivo)}</div>
+      <div style="font-size:16px;font-weight:800;font-family:'JetBrains Mono',monospace">${escapeHtmlLocal(candidata.workorder_number||'—')}</div>
+      <div style="font-size:12px;color:var(--text-muted);margin-top:2px">${escapeHtmlLocal(candidata.cuenta||'—')}</div>
     </div>`;
-    cola.innerHTML = cola_ordenada.slice(1,6).map(r=>`
-      <div style="display:flex;justify-content:space-between;align-items:center;background:var(--navy-700);border-radius:8px;padding:6px 10px;font-size:11px">
-        <span style="font-family:'JetBrains Mono',monospace;font-weight:700">${escapeHtmlLocal(r.workorder_number||'—')}</span>
-        <span style="color:var(--text-muted);flex:1;margin:0 8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtmlLocal(r.cuenta||'—')}</span>
-        <span style="color:var(--text-muted);font-size:9px">${escapeHtmlLocal(r._motivo)}</span>
-      </div>`).join('');
   }
 
   const notasArr=[];
   if(tier2Esperando.length) notasArr.push(`⏳ ${tier2Esperando.length} de Instalación ALLEATA esperando las 24hs desde el Terminal ID.`);
   if(tier3FueraDeHorario.length) notasArr.push(`📅 ${tier3FueraDeHorario.length} de EPSA — hoy no toca (solo miércoles y viernes).`);
-  if(otrosSinTurno.length) notasArr.push(`ℹ️ ${otrosSinTurno.length} OT(s) en "Configurar Terminal" que no matchean ningún criterio de prioridad (revisar tipo/logística).`);
   notas.innerHTML = notasArr.join('<br>');
 }
 function escapeHtmlLocal(v){return String(v??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;');}
