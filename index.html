@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.4.88</title>
+<title>Alleata · Operaciones v4.4.89</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -400,7 +400,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.4.88 · 27 jul 2026
+      v4.4.89 · 27 jul 2026
     </div>
   </div>
 </div>
@@ -488,7 +488,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.4.88 · 27 jul 2026
+      v4.4.89 · 27 jul 2026
     </div>
   </div>
 </nav>
@@ -528,7 +528,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.4.88</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.4.89</div>
   </div>
   <div class="content">
 
@@ -4488,7 +4488,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.4.88] OK');
+console.log('[Alleata v4.4.89] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -7230,71 +7230,105 @@ async function cargarProximaOT(nombre){
   const hoy=new Date().getDay(); // 0=dom...3=miércoles,5=viernes
   const esDiaEPSA = (hoy===3 || hoy===5);
   const LOG_TIER2 = ['ALLEATA','CABIFY','CORREO ARGENTINO','CA'];
-  const HORAS_24 = 24*60*60*1000;
   const esFacturador = r => String(r.terminal_id||'').trim().toUpperCase()==='FACTURADOR';
-  const pasaron24h = r => r.terminal_id_fecha && (Date.now()-new Date(r.terminal_id_fecha).getTime())>=HORAS_24;
+  const horasTranscurridas = r => r.terminal_id_fecha ? (Date.now()-new Date(r.terminal_id_fecha).getTime())/(60*60*1000) : null;
+  const pasaron24h = r => { const h=horasTranscurridas(r); return h!==null && h>=24; };
+  const esCandidataTier2 = r => r.record_type==='Instalación Equipo + Simcard' && LOG_TIER2.includes(String(r.logistica||'').toUpperCase());
 
   const conMotivo = rows.map(r=>{
-    let tier=null, motivo=null;
+    let tier=null, motivo=null, esperando=false;
     if(r.record_type==='Cambio de Terminal' && r.rollout===true){ tier=1; motivo='Rollout'; }
-    else if(r.record_type==='Instalación Equipo + Simcard' && LOG_TIER2.includes(String(r.logistica||'').toUpperCase()) && (esFacturador(r)||pasaron24h(r))){ tier=2; motivo=esFacturador(r)?'FACTURADOR':'Terminal ID +24hs'; }
+    else if(esCandidataTier2(r) && (esFacturador(r)||pasaron24h(r))){ tier=2; motivo=esFacturador(r)?'FACTURADOR':'Terminal ID +24hs'; }
     else if(r.logistica==='EPSA' && esDiaEPSA){ tier=3; motivo='EPSA · hoy pasa'; }
-    return {...r,_tier:tier,_motivo:motivo};
+    else if(esCandidataTier2(r) && !esFacturador(r)) esperando=true; // ALLEATA/CABIFY/CA, todavía no llega a 24hs
+    return {...r,_tier:tier,_motivo:motivo,_esperando:esperando};
   });
 
   // Prioridad real: primero por tier (1=Rollout > 2 > 3), después por
   // antigüedad dentro del mismo tier. Antes esto no se ordenaba por tier
   // y salía primero la más vieja sin importar el motivo — quedaba mal.
   const prioritarias = conMotivo.filter(r=>r._tier).sort((a,b)=> a._tier-b._tier || new Date(a.created_at||0)-new Date(b.created_at||0));
-  const resto = conMotivo.filter(r=>!r._tier);
+  const esperando = conMotivo.filter(r=>!r._tier && r._esperando).sort((a,b)=> new Date(a.created_at||0)-new Date(b.created_at||0));
+  const resto = conMotivo.filter(r=>!r._tier && !r._esperando);
 
   const TOPE = 10;
   const prioritariasVisibles = prioritarias.slice(0,TOPE);
-  const restoVisibles = resto.slice(0, Math.max(0,TOPE-prioritariasVisibles.length));
-  const ocultas = rows.length - prioritariasVisibles.length - restoVisibles.length;
+  const espacio1 = Math.max(0,TOPE-prioritariasVisibles.length);
+  const esperandoVisibles = esperando.slice(0,espacio1);
+  const espacio2 = Math.max(0,espacio1-esperandoVisibles.length);
+  const restoVisibles = resto.slice(0,espacio2);
+  const ocultas = rows.length - prioritariasVisibles.length - esperandoVisibles.length - restoVisibles.length;
 
-  const filaInfo = (label,val) => val ? `<span style="background:var(--navy-700);border-radius:5px;padding:2px 7px;color:var(--text-muted)"><b style="color:var(--text)">${label}:</b> ${escapeHtmlLocal(val)}</span>` : '';
+  const filaInfo = (label,val) => val ? `<span style="background:var(--navy-700);border-radius:6px;padding:4px 10px;color:var(--text-muted)"><b style="color:var(--text)">${label}:</b> ${escapeHtmlLocal(val)}</span>` : '';
 
   const filaPrioridad = r => {
     const st = TIER_STYLE[r._tier];
     const credenciales = (r.usuario_cajero||r.contrasena_cajero) ? `${r.usuario_cajero||'—'} / ${r.contrasena_cajero||'—'}` : '';
     const infoBits = [
-      filaInfo('Terminal', r.terminal_id),
+      filaInfo('Terminal', r.n_terminal_nueva),
       filaInfo('Credenciales', credenciales),
       filaInfo('Nodo', r.wo_node_code),
       filaInfo('Store', r.wo_store_code),
     ].filter(Boolean).join(' ');
     return `
-      <div style="background:var(--navy-800);border:1px solid ${st.color}55;border-left:3px solid ${st.color};border-radius:8px;padding:9px 12px;margin-bottom:6px">
+      <div style="background:var(--navy-800);border:1px solid ${st.color}55;border-left:3px solid ${st.color};border-radius:8px;padding:10px 14px;margin-bottom:8px">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
-          <div style="display:flex;align-items:center;gap:6px;min-width:0">
-            <span style="font-size:14px">${st.icon}</span>
+          <div style="display:flex;align-items:center;gap:7px;min-width:0">
+            <span style="font-size:16px">${st.icon}</span>
+            <span style="font-family:'JetBrains Mono',monospace;font-weight:700;font-size:13px">${escapeHtmlLocal(r.workorder_number||'—')}</span>
+            <span style="color:var(--text-muted);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtmlLocal(r.cuenta||'—')}</span>
+          </div>
+          <span style="background:${st.color}22;color:${st.color};font-size:10px;font-weight:700;letter-spacing:.04em;padding:3px 9px;border-radius:20px;white-space:nowrap">${escapeHtmlLocal(st.label||r._motivo)}</span>
+        </div>
+        ${infoBits?`<div style="display:flex;flex-wrap:wrap;gap:7px;margin-top:8px;font-size:11px">${infoBits}</div>`:''}
+      </div>`;
+  };
+
+  // Casi listas: ALLEATA/CABIFY/CA de Instalación pero el Terminal ID
+  // todavía no llega a las 24hs — se muestran aparte, con las horas exactas,
+  // para poder responder "por qué esta OT no está arriba" sin adivinar.
+  const filaEsperando = r => {
+    const h = horasTranscurridas(r);
+    const detalle = h===null
+      ? 'sin fecha de Terminal ID registrada — corré Full Sync / revisá el trigger SQL'
+      : `${h.toFixed(1)}hs desde el Terminal ID · faltan ${Math.max(0,24-h).toFixed(1)}hs`;
+    return `
+      <div style="background:var(--navy-800);border:1px dashed rgba(245,158,11,.4);border-radius:8px;padding:9px 14px;margin-bottom:6px">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+          <div style="display:flex;align-items:center;gap:7px;min-width:0">
+            <span style="font-size:14px">⏳</span>
             <span style="font-family:'JetBrains Mono',monospace;font-weight:700;font-size:12px">${escapeHtmlLocal(r.workorder_number||'—')}</span>
             <span style="color:var(--text-muted);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtmlLocal(r.cuenta||'—')}</span>
           </div>
-          <span style="background:${st.color}22;color:${st.color};font-size:9px;font-weight:700;letter-spacing:.04em;padding:2px 8px;border-radius:20px;white-space:nowrap">${escapeHtmlLocal(st.label||r._motivo)}</span>
+          <span style="color:var(--text-muted);font-size:10px;white-space:nowrap">${escapeHtmlLocal(r.logistica||'—')}</span>
         </div>
-        ${infoBits?`<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:7px;font-size:9px">${infoBits}</div>`:''}
+        <div style="font-size:11px;color:var(--orange);margin-top:5px">${detalle}</div>
       </div>`;
   };
 
   const filaSimple = r => `
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 12px;margin-bottom:4px;font-size:11px">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:7px 14px;margin-bottom:4px;font-size:12px">
         <span style="font-family:'JetBrains Mono',monospace;font-weight:700">${escapeHtmlLocal(r.workorder_number||'—')}</span>
         <span style="color:var(--text-muted);flex:1;margin:0 8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtmlLocal(r.cuenta||'—')}</span>
-        <span style="color:var(--text-muted);font-size:9px;white-space:nowrap">${escapeHtmlLocal(r.record_type||'—')} · ${escapeHtmlLocal(r.logistica||'—')}</span>
-        <span style="color:var(--text-muted);font-size:9px;white-space:nowrap">${r.created_at?new Date(r.created_at).toLocaleDateString('es-AR'):'—'}</span>
+        <span style="color:var(--text-muted);font-size:10px;white-space:nowrap">${escapeHtmlLocal(r.record_type||'—')} · ${escapeHtmlLocal(r.logistica||'—')}</span>
+        <span style="color:var(--text-muted);font-size:10px;white-space:nowrap">${r.created_at?new Date(r.created_at).toLocaleDateString('es-AR'):'—'}</span>
       </div>`;
 
-  let html = `<div style="font-size:11px;color:var(--text-muted);margin-bottom:8px">${rows.length} OT(s) en "Configurar Terminal"${prioritarias.length?` · ${prioritarias.length} con prioridad hoy`:''}</div>`;
+  let html = `<div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">${rows.length} OT(s) en "Configurar Terminal"${prioritarias.length?` · ${prioritarias.length} con prioridad hoy`:''}</div>`;
   if(prioritariasVisibles.length){
     html += prioritariasVisibles.map(filaPrioridad).join('');
-    if(restoVisibles.length) html += `<div style="font-size:9px;color:var(--text-muted);margin:8px 0 6px;text-transform:uppercase;letter-spacing:.05em">Resto (sin prioridad hoy)</div>`;
   } else {
-    html += `<div style="font-size:11px;color:var(--orange);margin-bottom:6px">Ninguna cumple la prioridad hoy — ver lista completa abajo.</div>`;
+    html += `<div style="font-size:12px;color:var(--orange);margin-bottom:6px">Ninguna cumple la prioridad hoy — ver lista completa abajo.</div>`;
   }
-  html += restoVisibles.map(filaSimple).join('');
-  if(ocultas>0) html += `<div style="font-size:10px;color:var(--text-muted);text-align:center;margin-top:4px">+${ocultas} OT(s) más — mostrando las ${TOPE} más urgentes</div>`;
+  if(esperandoVisibles.length){
+    html += `<div style="font-size:10px;color:var(--text-muted);margin:8px 0 6px;text-transform:uppercase;letter-spacing:.05em">Esperando las 24hs</div>`;
+    html += esperandoVisibles.map(filaEsperando).join('');
+  }
+  if(restoVisibles.length){
+    html += `<div style="font-size:10px;color:var(--text-muted);margin:8px 0 6px;text-transform:uppercase;letter-spacing:.05em">Resto (sin prioridad hoy)</div>`;
+    html += restoVisibles.map(filaSimple).join('');
+  }
+  if(ocultas>0) html += `<div style="font-size:11px;color:var(--text-muted);text-align:center;margin-top:4px">+${ocultas} OT(s) más — mostrando las ${TOPE} más urgentes</div>`;
   top.innerHTML = html;
 }
 function escapeHtmlLocal(v){return String(v??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;');}
