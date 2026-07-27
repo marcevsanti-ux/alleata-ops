@@ -7196,16 +7196,19 @@ async function initEnvios(){
 }
 
 // ── Próxima OT a hacer — cola de prioridad (ver comentario en el HTML de
-// opProximaOTCard para la lógica completa). ASUNCIONES a confirmar con
-// marcelos antes de confiar en esto operativamente:
-//  - "Cambio de Terminal Rollout" = record_type 'Cambio de Terminal' AND
-//    rollout = true (columna boolean ya sincronizada desde Rollout__c).
-//  - "24hs desde la creación del Terminal ID" se mide con la columna
-//    terminal_id_fecha, que HOY NO EXISTE en sf_workorders — hay que
-//    agregarla con el trigger SQL que armamos aparte (se stampea sola la
-//    primera vez que terminal_id deja de estar vacío). Hasta que se corra
-//    ese SQL, esas OTs no van a poder priorizarse por tiempo y van a listarse
-//    igual pero sin el corte de 24hs.
+// opProximaOTCard para la lógica completa). Ajustada 27/07 con Gonzalo
+// mirando la pantalla en vivo:
+//  1) Cambio de Terminal + Rollout
+//  2) Instalación Equipo + Simcard, logística ALLEATA o CABIFY, y
+//     (terminal_id === "FACTURADOR" literal → no espera 24hs) o
+//     (terminal_id_fecha con +24hs)
+//  3) Logística EPSA, solo si hoy es miércoles o viernes
+//  4) Fallback: si ninguna de las anteriores tiene nada, se muestra como
+//     último recurso una OT de EPSA aunque no sea su día — para que Gonzalo
+//     siempre tenga algo para hacer — aclarando que no era su turno.
+// ASUNCIÓN pendiente de confirmar: terminal_id_fecha depende del trigger SQL
+// (sql_terminal_id_fecha.sql) — si todavía no corriste ese SQL en Supabase,
+// esas OTs no van a poder priorizarse por tiempo (solo por FACTURADOR).
 async function cargarProximaOT(nombre){
   const top=document.getElementById('opProximaOTTop');
   const notas=document.getElementById('opProximaOTNotas');
@@ -7223,42 +7226,61 @@ async function cargarProximaOT(nombre){
   const esDiaEPSA = (hoy===3 || hoy===5);
   const HORAS_24 = 24*60*60*1000;
   const ahora = Date.now();
+  const LOG_TIER2 = ['ALLEATA','CABIFY'];
+  const esFacturador = r => String(r.terminal_id||'').trim().toUpperCase()==='FACTURADOR';
+  const pasaron24h = r => r.terminal_id_fecha && (ahora-new Date(r.terminal_id_fecha).getTime())>=HORAS_24;
 
   const rows = data||[];
   const tier1 = rows.filter(r=>r.record_type==='Cambio de Terminal' && r.rollout===true);
-  const tier2Listas = rows.filter(r=>r.record_type==='Instalación Equipo + Simcard' && r.logistica==='ALLEATA' && r.terminal_id_fecha && (ahora-new Date(r.terminal_id_fecha).getTime())>=HORAS_24);
-  const tier2Esperando = rows.filter(r=>r.record_type==='Instalación Equipo + Simcard' && r.logistica==='ALLEATA' && (!r.terminal_id_fecha || (ahora-new Date(r.terminal_id_fecha).getTime())<HORAS_24));
-  const tier3Listas = esDiaEPSA ? rows.filter(r=>r.logistica==='EPSA') : [];
-  const tier3FueraDeHorario = !esDiaEPSA ? rows.filter(r=>r.logistica==='EPSA') : [];
 
-  const ordenarPorTerminalId = arr => [...arr].sort((a,b)=>{
+  const esInstalacionTier2 = r => r.record_type==='Instalación Equipo + Simcard' && LOG_TIER2.includes(r.logistica);
+  const tier2Listas    = rows.filter(r=>esInstalacionTier2(r) && (esFacturador(r) || pasaron24h(r)));
+  const tier2Esperando = rows.filter(r=>esInstalacionTier2(r) && !esFacturador(r) && !pasaron24h(r));
+
+  const tier3Listas       = rows.filter(r=>r.logistica==='EPSA' && esDiaEPSA);
+  const tier3FueraDeDia   = rows.filter(r=>r.logistica==='EPSA' && !esDiaEPSA);
+
+  // FACTURADOR primero (siempre listo), después por antigüedad del Terminal ID
+  const ordenarTier2 = arr => [...arr].sort((a,b)=>{
+    if(esFacturador(a)!==esFacturador(b)) return esFacturador(a)?-1:1;
     const fa=a.terminal_id_fecha?new Date(a.terminal_id_fecha).getTime():Infinity;
     const fb=b.terminal_id_fecha?new Date(b.terminal_id_fecha).getTime():Infinity;
     return fa-fb;
   });
 
-  // Solo nos interesa el primero de la cola — esto muestra 1 sola OT.
-  const candidata = [
+  const colaPrioridad = [
     ...tier1.map(r=>({...r,_motivo:'Cambio de Terminal · Rollout'})),
-    ...ordenarPorTerminalId(tier2Listas).map(r=>({...r,_motivo:'Instalación ALLEATA · Terminal ID +24hs'})),
+    ...ordenarTier2(tier2Listas).map(r=>({...r,_motivo: esFacturador(r) ? 'Instalación ALLEATA/CABIFY · Terminal ID FACTURADOR' : 'Instalación ALLEATA/CABIFY · Terminal ID +24hs'})),
     ...tier3Listas.map(r=>({...r,_motivo:'Logística EPSA · hoy pasa'})),
-  ][0];
+  ];
+
+  // Fallback: si no hay nada prioritario, mostrar igual una de EPSA fuera de
+  // día para que no quede la pantalla vacía — aclarado como último recurso.
+  let candidata = colaPrioridad[0];
+  let esFallback = false;
+  if(!candidata && tier3FueraDeDia.length){
+    candidata = {...tier3FueraDeDia[0], _motivo:'Logística EPSA · fuera de día (no había otra prioridad)'};
+    esFallback = true;
+  }
 
   if(!candidata){
     top.innerHTML = rows.length
       ? `<span style="color:var(--orange)">Sin OTs listas ahora mismo — ${rows.length} en "Configurar Terminal" pero ninguna cumple la prioridad todavía (ver notas abajo).</span>`
       : `<span style="color:var(--text-muted)">No tenés OTs en estado "Configurar Terminal" ahora mismo. 🎉</span>`;
   } else {
-    top.innerHTML = `<div style="background:var(--navy-800);border:1px solid rgba(29,191,142,.3);border-radius:10px;padding:12px 14px">
-      <div style="font-size:10px;color:var(--teal);font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">👉 ${escapeHtmlLocal(candidata._motivo)}</div>
+    const borde = esFallback ? 'rgba(245,158,11,.35)' : 'rgba(29,191,142,.3)';
+    const colorMotivo = esFallback ? 'var(--orange)' : 'var(--teal)';
+    top.innerHTML = `<div style="background:var(--navy-800);border:1px solid ${borde};border-radius:10px;padding:12px 14px">
+      <div style="font-size:10px;color:${colorMotivo};font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">👉 ${escapeHtmlLocal(candidata._motivo)}</div>
       <div style="font-size:16px;font-weight:800;font-family:'JetBrains Mono',monospace">${escapeHtmlLocal(candidata.workorder_number||'—')}</div>
       <div style="font-size:12px;color:var(--text-muted);margin-top:2px">${escapeHtmlLocal(candidata.cuenta||'—')}</div>
     </div>`;
   }
 
   const notasArr=[];
-  if(tier2Esperando.length) notasArr.push(`⏳ ${tier2Esperando.length} de Instalación ALLEATA esperando las 24hs desde el Terminal ID.`);
-  if(tier3FueraDeHorario.length) notasArr.push(`📅 ${tier3FueraDeHorario.length} de EPSA — hoy no toca (solo miércoles y viernes).`);
+  if(tier2Esperando.length) notasArr.push(`⏳ ${tier2Esperando.length} de Instalación ALLEATA/CABIFY esperando las 24hs desde el Terminal ID (no son FACTURADOR).`);
+  const epsaFueraRestantes = esFallback ? tier3FueraDeDia.length-1 : tier3FueraDeDia.length;
+  if(epsaFueraRestantes>0) notasArr.push(`📅 ${epsaFueraRestantes} de EPSA — hoy no toca (solo miércoles y viernes).`);
   notas.innerHTML = notasArr.join('<br>');
 }
 function escapeHtmlLocal(v){return String(v??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;');}
