@@ -165,7 +165,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
       <div class="login-logo">
         <img id="loginLogo" src="" alt="Alleata">
         <div class="login-sub">Portal de Operaciones</div>
-        <div class="login-version">v2.14.33 · mobile</div>
+        <div class="login-version">v2.14.34 · mobile</div>
       </div>
       <div class="field"><label class="label">Email</label><input class="input" id="lEmail" type="email" placeholder="usuario@alleata.com" autocomplete="email"></div>
       <div class="field"><label class="label">Contraseña</label><input class="input" id="lPass" type="password" placeholder="••••••••" autocomplete="current-password"></div>
@@ -181,7 +181,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
   <div class="topbar">
     <img id="appLogo" src="" alt="Alleata">
     <div class="topbar-title" id="topbarTitle">Operaciones</div>
-    <div class="topbar-version" onclick="_tocarVersion()">v2.14.33</div>
+    <div class="topbar-version" onclick="_tocarVersion()">v2.14.34</div>
     <div class="topbar-avatar" id="topbarAvatar" onclick="openDrawer()">?</div>
   </div>
 
@@ -579,7 +579,7 @@ const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSI
 //     control" que ya tenía el lado de Supabase.
 //   - Resultado de SIM ahora muestra la fuente: "Confirmado en vivo con
 //     Salesforce" vs "Caché local — no se pudo confirmar"
-// Cambios v2.14.33 (24/07):
+// Cambios v2.14.34 (24/07):
 //   - Renombrado botón "Cerrar hoja de ruta..." a "🚀 Salir a ruta..." — el
 //     nombre viejo confundía porque suena a acción de fin de día, cuando en
 //     realidad dispara el aviso de "Salida de ruta" pensado para el arranque
@@ -3585,12 +3585,17 @@ async function allyDesinst_enviarMensaje(mensaje, contexto) {
 
 async function allyDesinst_terminalRecuperada(ot) {
   const fecha = new Date().toLocaleDateString('es-AR', {day:'2-digit',month:'2-digit'});
+  // FIX 28/07: "Marcelo" estaba hardcodeado acá — el mensaje decía siempre
+  // lo mismo sin importar quién cerró la OT (pasó de verdad con la OT
+  // 00022888, cerrada por Ignacio y avisada como "Marcelo"). Mismo patrón
+  // que tecnicoDesinst más arriba en el archivo.
+  const operador = (currentProfile?.nombre||currentUser?.email||'Operador').trim();
   const msg = `✅ Terminal recuperada — Desinstalaciones
 
 📦 OT: ${ot.ot||ot}
 🏢 Comercio: ${ot.comercio||ot.cuenta||'—'}
 📍 ${ot.ciudad||'—'}
-👤 Operador: Marcelo
+👤 Operador: ${operador}
 📅 ${fecha}`;
   return allyDesinst_enviarMensaje(msg, 'terminal_recuperada');
 }
