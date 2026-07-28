@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.5.7</title>
+<title>Alleata · Operaciones v4.5.9</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -400,7 +400,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.5.7 · 27 jul 2026
+      v4.5.9 · 27 jul 2026
     </div>
   </div>
 </div>
@@ -488,7 +488,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.5.7 · 27 jul 2026
+      v4.5.9 · 27 jul 2026
     </div>
   </div>
 </nav>
@@ -528,7 +528,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.5.7</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.5.9</div>
   </div>
   <div class="content">
 
@@ -1125,6 +1125,14 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <option value="Confirmado">Confirmado</option>
       <option value="OT creada">OT creada</option>
       <option value="Cerrado">Exitoso</option>
+    </select>
+    <select class="input" id="rpFiltroZona" style="max-width:180px" onchange="renderRolloutPiloto()">
+      <option value="">Todas las zonas</option>
+      <option value="CABA">🏙️ CABA</option>
+      <option value="GBA Norte">🔵 GBA Norte</option>
+      <option value="GBA Sur">🟡 GBA Sur</option>
+      <option value="GBA Oeste">🟣 GBA Oeste</option>
+      <option value="__fuera">📦 Fuera AMBA</option>
     </select>
   </div>
 
@@ -4501,7 +4509,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.5.7] OK');
+console.log('[Alleata v4.5.9] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -6029,6 +6037,7 @@ function renderRolloutPiloto(){
   if(!tbody)return;
   const filtroTxt=(document.getElementById('rpFiltro')?.value||'').trim().toLowerCase();
   const filtroEtapa=document.getElementById('rpFiltroEtapa')?.value||'';
+  const filtroZona=document.getElementById('rpFiltroZona')?.value||'';
 
   let filtrados=_rpData;
   if(filtroTxt)filtrados=filtrados.filter(r=>
@@ -6038,16 +6047,33 @@ function renderRolloutPiloto(){
     (r.ot_numero||'').toLowerCase().includes(filtroTxt)
   );
   if(filtroEtapa)filtrados=filtrados.filter(r=>r.etapa===filtroEtapa);
+  if(filtroZona==='__fuera')filtrados=filtrados.filter(r=>!['CABA','GBA Norte','GBA Sur','GBA Oeste'].includes(r.zona));
+  else if(filtroZona)filtrados=filtrados.filter(r=>r.zona===filtroZona);
+
+  // Mismos colores que ya usan Envíos/Desinstalaciones para las zonas AMBA —
+  // pedido de marcelos 28/07: identificar de un vistazo la zona logística
+  // de cada cuenta del piloto (empezaron a entrar cuentas de GBA, no solo
+  // CABA, con la Etapa 3).
+  const ZONA_COLORS={'CABA':'#1a9fd4','GBA Norte':'#10b981','GBA Sur':'#f59e0b','GBA Oeste':'#8b5cf6'};
+  const zonaColorDe=z=>ZONA_COLORS[z]||'#ef4444'; // fuera de AMBA / sin dato → rojo
 
   const ETAPA_COLORS={'Sin contactar':'#6b7280','Contactado':'#f59e0b','Confirmado':'#1a9fd4','OT creada':'#8b5cf6','Cerrado':'#1dbf8e'};
   const fmtVol=v=>v==null?'—':'$'+Number(v).toLocaleString('es-AR');
   const soloLectura=rolloutPilotoEsSoloLectura();
   const puedeEditarEtapa=rolloutPilotoPuedeEditarEtapa();
 
-  tbody.innerHTML=filtrados.map(r=>{
+  // Agrupar por zona en vez de listar mezclado — pedido de marcelos 28/07:
+  // "hacen llamados de una vez a toda la zona". Orden fijo CABA → Norte →
+  // Sur → Oeste → resto/fuera AMBA, con un separador de color antes de
+  // cada bloque para que salte a la vista dónde empieza cada zona.
+  const ORDEN_ZONA=['CABA','GBA Norte','GBA Sur','GBA Oeste'];
+  const rankZona=z=>{ const i=ORDEN_ZONA.indexOf(z); return i===-1?99:i; };
+  const filtradosOrdenados=[...filtrados].sort((a,b)=> rankZona(a.zona)-rankZona(b.zona) || (a.cliente||'').localeCompare(b.cliente||''));
+
+  const filaOT=r=>{
     const ec=ETAPA_COLORS[r.etapa]||'#6b7280';
     return`<tr>
-      <td><div style="font-weight:600">${r.cliente||'—'}</div><div style="font-size:10px;color:var(--text-muted)">${r.localidad||''} ${r.zona?'· '+r.zona:''}</div></td>
+      <td><div style="font-weight:600">${r.cliente||'—'}</div><div style="display:flex;align-items:center;gap:5px;margin-top:2px"><span style="font-size:10px;color:var(--text-muted)">${r.localidad||''}</span>${r.zona?`<span style="font-size:9px;font-weight:700;padding:1px 6px;border-radius:10px;color:${zonaColorDe(r.zona)};background:${zonaColorDe(r.zona)}18;border:1px solid ${zonaColorDe(r.zona)}40">${r.zona}</span>`:''}</div></td>
       <td style="font-family:'JetBrains Mono',monospace;font-size:11px">${r.cuit||'—'}</td>
       <td><div>${r.contacto||'—'}</div><div style="display:flex;align-items:center;gap:5px;margin-top:2px">
         <span style="font-size:10px;color:var(--text-muted)">${r.telefono||''}</span>
@@ -6061,7 +6087,21 @@ function renderRolloutPiloto(){
       <td style="font-size:11px">${r.vol_ultimo_reportado!=null?fmtVol(r.vol_ultimo_reportado)+' <span style=\"color:var(--text-muted)\">('+(r.vol_ultimo_fecha||'')+')</span>':'<span style=\"color:var(--text-muted)\">sin dato post-cambio</span>'}</td>
       <td>${soloLectura?'':`<button class="btn-sm" style="background:none;border:1px solid var(--border2);color:#8b5cf6" onclick="actualizarVolumenPiloto('${r.id}')" title="Actualizar volumen desde SF">📊</button> ${r.ot_numero?`<button class="btn-sm" style="background:none;border:1px solid var(--border2);color:var(--teal)" onclick="printRotuloPiloto('${r.ot_numero}')" title="Imprimir rótulo (QR para escanear en mobile)">🖨️</button>`:''}`}</td>
     </tr>`;
-  }).join('')||'<tr><td colspan="11" style="text-align:center;padding:30px;color:var(--text-muted)">Sin resultados</td></tr>';
+  };
+
+  let html='';
+  let zonaActual=undefined;
+  filtradosOrdenados.forEach(r=>{
+    const z=r.zona||'Sin zona';
+    if(z!==zonaActual){
+      zonaActual=z;
+      const col=zonaColorDe(r.zona);
+      const cant=filtradosOrdenados.filter(x=>(x.zona||'Sin zona')===z).length;
+      html+=`<tr><td colspan="10" style="background:${col}12;border-left:3px solid ${col};padding:8px 14px;font-size:11px;font-weight:700;color:${col};text-transform:uppercase;letter-spacing:.04em">${z} · ${cant}</td></tr>`;
+    }
+    html+=filaOT(r);
+  });
+  tbody.innerHTML=html||'<tr><td colspan="11" style="text-align:center;padding:30px;color:var(--text-muted)">Sin resultados</td></tr>';
 
   // Stats
   const total=_rpData.length;
