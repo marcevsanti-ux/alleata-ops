@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.4.98</title>
+<title>Alleata · Operaciones v4.5.1</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -400,7 +400,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.4.98 · 27 jul 2026
+      v4.5.1 · 27 jul 2026
     </div>
   </div>
 </div>
@@ -488,7 +488,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.4.98 · 27 jul 2026
+      v4.5.1 · 27 jul 2026
     </div>
   </div>
 </nav>
@@ -528,7 +528,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.4.98</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.5.1</div>
   </div>
   <div class="content">
 
@@ -1151,7 +1151,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     <div>
       <div style="font-size:19px;font-weight:700">🗺️ Hoja de Ruta — por chofer (hoy)</div>
       <div style="font-size:12px;color:var(--text-muted);margin-top:2px">
-        La lista de abajo es SOLO lo que Marcelo/Ignacio confirmaron ellos mismos desde la app mobile.
+        Acá está lo que cada chofer tiene asignado hoy (confirmado desde su app, o asignado directo por un admin abajo).
         Desde acá se puede cerrar una OT (✅ Entregado / ❌ Fallido) sin pasar por el celular — usa el mismo endpoint (<code>entregar-ot</code>) que el botón de la app.
       </div>
     </div>
@@ -4501,7 +4501,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.4.98] OK');
+console.log('[Alleata v4.5.1] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -5538,7 +5538,10 @@ async function loadHojaRuta(){
         </div>`;
       }).join('');
       resumenCola.innerHTML=`<div style="background:var(--navy-800);border:1px dashed rgba(245,158,11,.4);border-radius:10px;padding:10px 14px">
-        <div style="font-size:12px;color:var(--orange);font-weight:700">🕓 ${colaHoy.length} OT(s) en cola — el chofer todavía no las confirmó desde su app</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+          <div style="font-size:12px;color:var(--orange);font-weight:700">🕓 ${colaHoy.length} OT(s) en cola — quedaron de cuando esto se probó con cola. La opción de dejar en cola está en pausa: "Asignar a su ruta de hoy" ahora asigna directo de nuevo.</div>
+          <button class="btn-sm" style="background:var(--teal);border:1px solid var(--teal);color:#04342c;font-size:10px;white-space:nowrap;font-weight:700" onclick="moverTodaLaColaARuta(this)">→ Mover TODO a la ruta ya</button>
+        </div>
         ${filasCola}
       </div>`;
     }
@@ -5693,12 +5696,14 @@ async function _poblarChoferesAsignar(){
     .join('')||'<option value="">Sin usuarios</option>';
 }
 
-// Deja una OT "en cola" para que un chofer la vea pendiente — YA NO la mete
-// directo en rutas_diarias (eso quedó reservado exclusivamente para cuando
-// el chofer confirma desde la app mobile). Evita duplicados: si la misma
-// OT ya está en cola para ese chofer hoy, no inserta de nuevo.
+// REVERTIDO 28/07 (urgente, marcelos): la cola (hoja_ruta_cola) causaba
+// que la app mobile no reflejara lo asignado hasta que alguien la
+// promoviera a mano, OT por OT — mucha fricción para sacar las chatas ya.
+// Vuelve al comportamiento directo: asigna a rutas_diarias al toque, igual
+// que antes de la versión con cola. hoja_ruta_cola queda en pausa (no se
+// borra la tabla, simplemente no se vuelve a escribir ahí desde acá).
 async function asignarOTAChofer(){
-  if(currentProfile?.rol!=='admin'){alert('Solo un admin puede dejar OTs en cola desde acá.');return;}
+  if(currentProfile?.rol!=='admin'){alert('Solo un admin puede asignar OTs desde acá.');return;}
   const otNum=(document.getElementById('hr-asignar-ot').value||'').trim();
   const otNumBusqueda=/^\d+$/.test(otNum)?otNum.padStart(8,'0'):otNum;
   const choferId=document.getElementById('hr-asignar-chofer').value;
@@ -5708,26 +5713,31 @@ async function asignarOTAChofer(){
   if(!choferId){msg.style.color='var(--red)';msg.textContent='Elegí un chofer.';return;}
 
   const btn=document.getElementById('hr-asignar-btn');
-  btn.disabled=true;btn.textContent='Guardando...';
+  btn.disabled=true;btn.textContent='Asignando...';
   try{
     const{data:ot,error:errOt}=await sb.from('sf_workorders').select('id,workorder_number,cuenta,status').eq('workorder_number',otNumBusqueda).maybeSingle();
     if(errOt)throw new Error(errOt.message);
     if(!ot)throw new Error(`No se encontró la OT ${otNumBusqueda} en sf_workorders (probá "↺ Full Sync" arriba si es muy reciente).`);
 
     const hoy=new Date().toISOString().slice(0,10);
-    const{data:existe}=await sb.from('hoja_ruta_cola').select('id').eq('chofer_id',choferId).eq('ot_numero',ot.workorder_number).eq('fecha',hoy).maybeSingle();
-    if(existe){
-      msg.style.color='var(--orange)';
-      msg.textContent=`La OT ${ot.workorder_number} ya estaba en la cola de ese chofer.`;
-    }else{
-      const{error:errIns}=await sb.from('hoja_ruta_cola').insert({
-        chofer_id:choferId, ot_numero:ot.workorder_number, cuenta:ot.cuenta||null,
-        status_al_asignar:ot.status, fecha:hoy, asignado_por:currentProfile?.nombre||null,
+    const{data:ruta}=await sb.from('rutas_diarias').select('id,ots_ids,ots_numeros').eq('user_id',choferId).eq('fecha',hoy).maybeSingle();
+
+    if(!ruta){
+      const{error:errIns}=await sb.from('rutas_diarias').insert({
+        user_id:choferId, fecha:hoy, ots_ids:[ot.id], ots_numeros:[ot.workorder_number], confirmada_at:new Date().toISOString()
       });
       if(errIns)throw new Error(errIns.message);
-      msg.style.color='var(--teal)';
-      msg.textContent=`🕓 OT ${ot.workorder_number} (${ot.cuenta||'—'}) queda en cola. Estado actual en SF: ${ot.status}. El chofer todavía tiene que confirmarla desde su app.`;
+    }else{
+      const pares=(ruta.ots_ids||[]).map((id,i)=>({id,num:ruta.ots_numeros?.[i]}))
+        .filter(p=>p.num!==ot.workorder_number);
+      const nuevosIds=[...pares.map(p=>p.id), ot.id];
+      const nuevosNums=[...pares.map(p=>p.num), ot.workorder_number];
+      const{error:errUpd}=await sb.from('rutas_diarias').update({ots_ids:nuevosIds,ots_numeros:nuevosNums}).eq('id',ruta.id);
+      if(errUpd)throw new Error(errUpd.message);
     }
+
+    msg.style.color='var(--teal)';
+    msg.textContent=`✅ OT ${ot.workorder_number} (${ot.cuenta||'—'}) asignada. Estado actual en SF: ${ot.status}. Ya la tiene que ver en su app.`;
     document.getElementById('hr-asignar-ot').value='';
     await loadHojaRuta();
     const msg2=document.getElementById('hr-asignar-msg');
@@ -5735,7 +5745,7 @@ async function asignarOTAChofer(){
   }catch(e){
     msg.style.color='var(--red)';msg.textContent='Error: '+e.message;
   }finally{
-    btn.disabled=false;btn.textContent='🕓 Dejar en cola para el chofer';
+    btn.disabled=false;btn.textContent='➕ Asignar a su ruta de hoy';
   }
 }
 
@@ -5743,8 +5753,17 @@ async function asignarOTAChofer(){
 // (rutas_diarias) — para cuando el admin ya sabe que la OT tiene que estar
 // en la ruta de hoy sin esperar a que el chofer la confirme desde la app.
 // Pedido de marcelos 28/07 sobre un caso puntual.
+//
+// FIX 28/07: si se clickeaban varios "Sumar a su ruta ya" seguidos y rápido
+// (caso real: 5 OTs de una), cada click hacía su propio read-modify-write
+// sobre el mismo registro de rutas_diarias — si dos se solapaban, el
+// segundo podía leer ANTES de que el primero terminara de guardar y pisar
+// esa OT sin avisar. _colaEnCurso serializa los clicks: uno a la vez.
+let _colaEnCurso=false;
 async function moverColaARuta(colaId,choferId,otNumero,btn){
   if(currentProfile?.rol!=='admin')return;
+  if(_colaEnCurso){alert('Esperá que termine el anterior antes de sumar otra (para no pisar datos).');return;}
+  _colaEnCurso=true;
   if(btn){btn.disabled=true;btn.textContent='Moviendo...';}
   try{
     const{data:ot,error:errOt}=await sb.from('sf_workorders').select('id,workorder_number').eq('workorder_number',otNumero).maybeSingle();
@@ -5775,6 +5794,65 @@ async function moverColaARuta(colaId,choferId,otNumero,btn){
   }catch(e){
     alert('Error moviendo a la ruta: '+e.message);
     if(btn){btn.disabled=false;btn.textContent='→ Sumar a su ruta ya';}
+  }finally{
+    _colaEnCurso=false;
+  }
+}
+
+// Vacía TODA la cola de una — reusa moverColaARuta uno por uno, en serie
+// (nunca en paralelo, por el mismo motivo que el lock de _colaEnCurso).
+// Pedido urgente 28/07: sacar las chatas ya, sin ir OT por OT a mano.
+async function moverTodaLaColaARuta(btn){
+  if(currentProfile?.rol!=='admin')return;
+  const{data:cola,error}=await sb.from('hoja_ruta_cola').select('id,chofer_id,ot_numero').eq('fecha',new Date().toISOString().slice(0,10));
+  if(error){alert('Error leyendo la cola: '+error.message);return;}
+  if(!cola?.length)return;
+  if(btn){btn.disabled=true;btn.textContent=`Moviendo 0/${cola.length}...`;}
+  let ok=0,fallidas=[];
+  for(let i=0;i<cola.length;i++){
+    const c=cola[i];
+    if(btn)btn.textContent=`Moviendo ${i+1}/${cola.length}...`;
+    try{
+      await moverColaARutaSilencioso(c.id,c.chofer_id,c.ot_numero);
+      ok++;
+    }catch(e){
+      fallidas.push(`${c.ot_numero} (${e.message})`);
+    }
+  }
+  await loadHojaRuta();
+  if(fallidas.length) alert(`Se movieron ${ok} de ${cola.length}. Fallaron: ${fallidas.join(', ')}`);
+}
+
+// Misma lógica que moverColaARuta pero sin tocar botones de UI ni mostrar
+// alert individual — pensada para usarse en loop desde moverTodaLaColaARuta.
+async function moverColaARutaSilencioso(colaId,choferId,otNumero){
+  while(_colaEnCurso) await new Promise(r=>setTimeout(r,150));
+  _colaEnCurso=true;
+  try{
+    const{data:ot,error:errOt}=await sb.from('sf_workorders').select('id,workorder_number').eq('workorder_number',otNumero).maybeSingle();
+    if(errOt)throw new Error(errOt.message);
+    if(!ot)throw new Error('OT no encontrada en sf_workorders');
+
+    const hoy=new Date().toISOString().slice(0,10);
+    const{data:ruta}=await sb.from('rutas_diarias').select('id,ots_ids,ots_numeros').eq('user_id',choferId).eq('fecha',hoy).maybeSingle();
+
+    if(!ruta){
+      const{error:errIns}=await sb.from('rutas_diarias').insert({
+        user_id:choferId, fecha:hoy, ots_ids:[ot.id], ots_numeros:[ot.workorder_number], confirmada_at:new Date().toISOString()
+      });
+      if(errIns)throw new Error(errIns.message);
+    }else{
+      const yaEsta=(ruta.ots_numeros||[]).includes(ot.workorder_number);
+      if(!yaEsta){
+        const{error:errUpd}=await sb.from('rutas_diarias').update({
+          ots_ids:[...(ruta.ots_ids||[]),ot.id], ots_numeros:[...(ruta.ots_numeros||[]),ot.workorder_number]
+        }).eq('id',ruta.id);
+        if(errUpd)throw new Error(errUpd.message);
+      }
+    }
+    await sb.from('hoja_ruta_cola').delete().eq('id',colaId);
+  }finally{
+    _colaEnCurso=false;
   }
 }
 
@@ -6172,11 +6250,17 @@ async function initRollout(){
   // hacer todavía del lado de envíos/logística — mostrarlas acá solo
   // llena la tabla de OTs "sin sentido" para este módulo. Esas etapas SÍ
   // se ven completas en Rollout Piloto (trazabilidad desde el minuto cero).
+  //
+  // FIX 28/07: el filtro de perfil era `.eq('perfil','NAPSE')` — exacto,
+  // sensible a mayúsculas/espacios. La OT 00022896 tiene Perfil=NAPSE
+  // confirmado en SF y no aparecía acá; lo más probable es un espacio o
+  // diferencia de mayúsculas en el valor sincronizado a Supabase. Se saca
+  // el filtro de perfil de la consulta y se hace en JS con trim+uppercase,
+  // mucho más tolerante.
   const ESTADOS_CERRADOS_RL = ['Exitoso','Cancelado','Cancelado por Error','Fallido','Fallido-Dirección Inválida'];
   const ESTADOS_SIN_LOGISTICA_RL = ['Configurar Terminal','En Proceso'];
   const{data,error}=await sb.from('sf_workorders').select('*')
     .eq('record_type','Cambio de Terminal')
-    .eq('perfil','NAPSE')
     .not('status','in','("Exitoso","Cancelado","Cancelado por Error","Fallido","Fallido-Dirección Inválida","Configurar Terminal","En Proceso")')
     .order('sf_last_modified',{ascending:false});
   if(error){
@@ -6188,8 +6272,9 @@ async function initRollout(){
     </td></tr>`;
     return;
   }
+  const esNapse=v=>String(v||'').trim().toUpperCase()==='NAPSE';
   // Normalizar columnas para compatibilidad con el render existente
-  _rlData=(data||[]).map(r=>({...r,
+  _rlData=(data||[]).filter(r=>esNapse(r.perfil)).map(r=>({...r,
     ot_numero: r.workorder_number,
     tipo: r.record_type,
     estado: r.status,
