@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.4.97</title>
+<title>Alleata · Operaciones v4.4.98</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -400,7 +400,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.4.97 · 27 jul 2026
+      v4.4.98 · 27 jul 2026
     </div>
   </div>
 </div>
@@ -488,7 +488,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.4.97 · 27 jul 2026
+      v4.4.98 · 27 jul 2026
     </div>
   </div>
 </nav>
@@ -528,7 +528,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.4.97</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.4.98</div>
   </div>
   <div class="content">
 
@@ -4501,7 +4501,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.4.97] OK');
+console.log('[Alleata v4.4.98] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -5527,14 +5527,19 @@ async function loadHojaRuta(){
     if(!colaHoy?.length){
       resumenCola.innerHTML='';
     }else{
-      const chips=Object.entries(porChoferCola).map(([cid,items])=>{
-        const nombre=(perfilesCola[cid]?.nombre||perfilesCola[cid]?.email||'—').trim();
-        return `<span style="background:var(--navy-700);border:1px solid rgba(245,158,11,.35);border-radius:20px;padding:5px 12px;font-size:11px;color:var(--text)">👤 ${nombre}: <b style="color:var(--orange)">${items.length}</b></span>`;
+      const filasCola=colaHoy.map(c=>{
+        const nombre=(perfilesCola[c.chofer_id]?.nombre||perfilesCola[c.chofer_id]?.email||'—').trim();
+        return `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:6px 0;border-top:1px solid rgba(245,158,11,.15)">
+          <span style="font-size:11px">
+            <span style="font-family:'JetBrains Mono',monospace;font-weight:700">${c.ot_numero}</span>
+            <span style="color:var(--text-muted)"> ${c.cuenta||''} · 👤 ${nombre}${c.status_al_asignar?` · ${c.status_al_asignar}`:''}</span>
+          </span>
+          <button class="btn-sm" style="background:none;border:1px solid var(--teal);color:var(--teal);font-size:10px;white-space:nowrap" onclick="moverColaARuta('${c.id}','${c.chofer_id}','${c.ot_numero}',this)">→ Sumar a su ruta ya</button>
+        </div>`;
       }).join('');
-      resumenCola.innerHTML=`<div style="background:var(--navy-800);border:1px dashed rgba(245,158,11,.4);border-radius:10px;padding:10px 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-        <span style="font-size:12px;color:var(--orange);font-weight:700">🕓 ${colaHoy.length} OT(s) en cola</span>
-        <span style="font-size:11px;color:var(--text-muted)">— dejadas por un admin, el chofer todavía no las confirmó desde su app</span>
-        ${chips}
+      resumenCola.innerHTML=`<div style="background:var(--navy-800);border:1px dashed rgba(245,158,11,.4);border-radius:10px;padding:10px 14px">
+        <div style="font-size:12px;color:var(--orange);font-weight:700">🕓 ${colaHoy.length} OT(s) en cola — el chofer todavía no las confirmó desde su app</div>
+        ${filasCola}
       </div>`;
     }
   }
@@ -5731,6 +5736,45 @@ async function asignarOTAChofer(){
     msg.style.color='var(--red)';msg.textContent='Error: '+e.message;
   }finally{
     btn.disabled=false;btn.textContent='🕓 Dejar en cola para el chofer';
+  }
+}
+
+// Pasa una OT de la cola (hoja_ruta_cola) directo a la ruta real del chofer
+// (rutas_diarias) — para cuando el admin ya sabe que la OT tiene que estar
+// en la ruta de hoy sin esperar a que el chofer la confirme desde la app.
+// Pedido de marcelos 28/07 sobre un caso puntual.
+async function moverColaARuta(colaId,choferId,otNumero,btn){
+  if(currentProfile?.rol!=='admin')return;
+  if(btn){btn.disabled=true;btn.textContent='Moviendo...';}
+  try{
+    const{data:ot,error:errOt}=await sb.from('sf_workorders').select('id,workorder_number').eq('workorder_number',otNumero).maybeSingle();
+    if(errOt)throw new Error(errOt.message);
+    if(!ot)throw new Error(`No se encontró la OT ${otNumero} en sf_workorders.`);
+
+    const hoy=new Date().toISOString().slice(0,10);
+    const{data:ruta}=await sb.from('rutas_diarias').select('id,ots_ids,ots_numeros').eq('user_id',choferId).eq('fecha',hoy).maybeSingle();
+
+    if(!ruta){
+      const{error:errIns}=await sb.from('rutas_diarias').insert({
+        user_id:choferId, fecha:hoy, ots_ids:[ot.id], ots_numeros:[ot.workorder_number], confirmada_at:new Date().toISOString()
+      });
+      if(errIns)throw new Error(errIns.message);
+    }else{
+      const yaEsta=(ruta.ots_numeros||[]).includes(ot.workorder_number);
+      if(!yaEsta){
+        const{error:errUpd}=await sb.from('rutas_diarias').update({
+          ots_ids:[...(ruta.ots_ids||[]),ot.id], ots_numeros:[...(ruta.ots_numeros||[]),ot.workorder_number]
+        }).eq('id',ruta.id);
+        if(errUpd)throw new Error(errUpd.message);
+      }
+    }
+
+    // Ya está en la ruta real — sale de la cola
+    await sb.from('hoja_ruta_cola').delete().eq('id',colaId);
+    await loadHojaRuta();
+  }catch(e){
+    alert('Error moviendo a la ruta: '+e.message);
+    if(btn){btn.disabled=false;btn.textContent='→ Sumar a su ruta ya';}
   }
 }
 
