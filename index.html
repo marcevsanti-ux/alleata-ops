@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.5.1</title>
+<title>Alleata · Operaciones v4.5.2</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -400,7 +400,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.5.1 · 27 jul 2026
+      v4.5.2 · 27 jul 2026
     </div>
   </div>
 </div>
@@ -488,7 +488,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.5.1 · 27 jul 2026
+      v4.5.2 · 27 jul 2026
     </div>
   </div>
 </nav>
@@ -528,7 +528,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.5.1</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.5.2</div>
   </div>
   <div class="content">
 
@@ -4501,7 +4501,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.5.1] OK');
+console.log('[Alleata v4.5.2] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -5702,11 +5702,22 @@ async function _poblarChoferesAsignar(){
 // Vuelve al comportamiento directo: asigna a rutas_diarias al toque, igual
 // que antes de la versión con cola. hoja_ruta_cola queda en pausa (no se
 // borra la tabla, simplemente no se vuelve a escribir ahí desde acá).
+//
+// FIX 28/07 (2): estar en rutas_diarias NO alcanza para que la OT aparezca
+// en "En Ruta Hoy" del mobile — esa lista filtra por status Despachado/En
+// Tránsito (ver loadEnTransito en mobile.html). Antes, para que una OT
+// asignada a mano apareciera, marcelos tenía que ir a SF y a mano poner
+// Costo_de_envio__c=1 + N_de_seguimiento__c=<chofer> + Status=Despachado.
+// Ya existe el endpoint que hace exactamente eso (/despachar-ot, usado por
+// el flujo normal de escanear QR) — ahora se llama automáticamente acá
+// también, para no depender de un paso manual en Salesforce.
 async function asignarOTAChofer(){
   if(currentProfile?.rol!=='admin'){alert('Solo un admin puede asignar OTs desde acá.');return;}
   const otNum=(document.getElementById('hr-asignar-ot').value||'').trim();
   const otNumBusqueda=/^\d+$/.test(otNum)?otNum.padStart(8,'0'):otNum;
   const choferId=document.getElementById('hr-asignar-chofer').value;
+  const choferNombre=(_hrChoferesCache||[]).find(p=>p.id===choferId)?.nombre
+    || document.getElementById('hr-asignar-chofer').selectedOptions?.[0]?.textContent || '';
   const msg=document.getElementById('hr-asignar-msg');
   msg.style.color='var(--text-muted)';msg.textContent='';
   if(!otNum){msg.style.color='var(--red)';msg.textContent='Ingresá el número de OT.';return;}
@@ -5715,7 +5726,7 @@ async function asignarOTAChofer(){
   const btn=document.getElementById('hr-asignar-btn');
   btn.disabled=true;btn.textContent='Asignando...';
   try{
-    const{data:ot,error:errOt}=await sb.from('sf_workorders').select('id,workorder_number,cuenta,status').eq('workorder_number',otNumBusqueda).maybeSingle();
+    const{data:ot,error:errOt}=await sb.from('sf_workorders').select('id,sf_id,workorder_number,cuenta,status,logistica').eq('workorder_number',otNumBusqueda).maybeSingle();
     if(errOt)throw new Error(errOt.message);
     if(!ot)throw new Error(`No se encontró la OT ${otNumBusqueda} en sf_workorders (probá "↺ Full Sync" arriba si es muy reciente).`);
 
@@ -5736,8 +5747,30 @@ async function asignarOTAChofer(){
       if(errUpd)throw new Error(errUpd.message);
     }
 
+    // Despachar de verdad (SF + Supabase) — solo si hace falta y es ALLEATA
+    // (el endpoint rechaza otras logísticas o si ya estaba Despachado).
+    let avisoDespacho='';
+    if(ot.status==='Despachado'){
+      avisoDespacho=' Ya estaba Despachada — visible en su app.';
+    }else if((ot.logistica||'').toUpperCase()!=='ALLEATA'){
+      avisoDespacho=` ⚠️ Logística es "${ot.logistica||'—'}" (no ALLEATA) — no se pudo despachar automáticamente, va a seguir sin verse en "En Ruta Hoy" hasta que se resuelva a mano.`;
+    }else{
+      try{
+        const resp=await fetch(`${ALLY_RAILWAY_BASE}/automations/despachar-ot`,{
+          method:'POST',
+          headers:{'Content-Type':'application/json','x-automation-secret':'123456'},
+          body:JSON.stringify({sf_id:ot.sf_id, tecnico:choferNombre})
+        });
+        const j=await resp.json();
+        if(j.ok) avisoDespacho=' Despachada en SF (Costo $1 + seguimiento) — ya la tiene que ver en "En Ruta Hoy".';
+        else avisoDespacho=` ⚠️ No se pudo despachar automáticamente (${j.error||'error desconocido'}) — quedó asignada pero puede no verse en "En Ruta Hoy" todavía.`;
+      }catch(eDesp){
+        avisoDespacho=` ⚠️ No se pudo despachar automáticamente (${eDesp.message}) — quedó asignada pero puede no verse en "En Ruta Hoy" todavía.`;
+      }
+    }
+
     msg.style.color='var(--teal)';
-    msg.textContent=`✅ OT ${ot.workorder_number} (${ot.cuenta||'—'}) asignada. Estado actual en SF: ${ot.status}. Ya la tiene que ver en su app.`;
+    msg.textContent=`✅ OT ${ot.workorder_number} (${ot.cuenta||'—'}) asignada a ${choferNombre}.${avisoDespacho}`;
     document.getElementById('hr-asignar-ot').value='';
     await loadHojaRuta();
     const msg2=document.getElementById('hr-asignar-msg');
