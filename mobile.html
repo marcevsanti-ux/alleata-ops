@@ -165,7 +165,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
       <div class="login-logo">
         <img id="loginLogo" src="" alt="Alleata">
         <div class="login-sub">Portal de Operaciones</div>
-        <div class="login-version">v2.14.31 · mobile</div>
+        <div class="login-version">v2.14.32 · mobile</div>
       </div>
       <div class="field"><label class="label">Email</label><input class="input" id="lEmail" type="email" placeholder="usuario@alleata.com" autocomplete="email"></div>
       <div class="field"><label class="label">Contraseña</label><input class="input" id="lPass" type="password" placeholder="••••••••" autocomplete="current-password"></div>
@@ -181,7 +181,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
   <div class="topbar">
     <img id="appLogo" src="" alt="Alleata">
     <div class="topbar-title" id="topbarTitle">Operaciones</div>
-    <div class="topbar-version" onclick="_tocarVersion()">v2.14.31</div>
+    <div class="topbar-version" onclick="_tocarVersion()">v2.14.32</div>
     <div class="topbar-avatar" id="topbarAvatar" onclick="openDrawer()">?</div>
   </div>
 
@@ -579,7 +579,7 @@ const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSI
 //     control" que ya tenía el lado de Supabase.
 //   - Resultado de SIM ahora muestra la fuente: "Confirmado en vivo con
 //     Salesforce" vs "Caché local — no se pudo confirmar"
-// Cambios v2.14.31 (24/07):
+// Cambios v2.14.32 (24/07):
 //   - Renombrado botón "Cerrar hoja de ruta..." a "🚀 Salir a ruta..." — el
 //     nombre viejo confundía porque suena a acción de fin de día, cuando en
 //     realidad dispara el aviso de "Salida de ruta" pensado para el arranque
@@ -707,6 +707,15 @@ const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSI
 //     cierre local igual queda guardado y se avisa con un warning.
 const{createClient}=supabase;
 const sb=createClient(SUPABASE_URL,SUPABASE_KEY);
+
+// FIX 28/07: new Date().toISOString().slice(0,10) da la fecha en UTC, no en
+// hora de Argentina (UTC-3) — pasadas las 21:00 ART ya es "mañana" en UTC,
+// y loadRuta() (más abajo) dejaba de encontrar la ruta de hoy porque
+// buscaba con la fecha de mañana. Mismo bug que se encontró y arregló en
+// el portal desktop — acá es la causa real de "la app mobile no actualiza".
+function hoyArgentina(){
+  return new Date().toLocaleDateString('en-CA',{timeZone:'America/Argentina/Buenos_Aires'});
+}
 
 let currentUser=null,currentProfile=null;
 let rutaActiva=[];
@@ -1013,7 +1022,7 @@ async function guardarRutaDiaria(){
   // a la base real. Si en la sesión solo hay OTs de prueba, no guarda nada.
   const rutaReal=rutaDelDia.filter(o=>!o._esPrueba);
   if(!rutaReal.length)return;
-  const fecha=new Date().toISOString().slice(0,10);
+  const fecha=hoyArgentina();
   const{kmTotal,detalle}=calcKmRuta(rutaReal);
   const ots_ids=rutaReal.map(o=>o.id);
   const ots_numeros=rutaReal.map(o=>o.ot_numero||o.id);
@@ -1289,7 +1298,7 @@ let otScaneadaActual=null; // OT mostrada en el card de confirmación
 async function loadRuta(){
   if(!currentUser)return;
   cargarRadioSugerencia();
-  const fecha=new Date().toISOString().slice(0,10);
+  const fecha=hoyArgentina();
   const{data:rutaHoy}=await sb.from('rutas_diarias')
     .select('*').eq('fecha',fecha).eq('user_id',currentUser.id).maybeSingle();
   if(rutaHoy?.km_total){
@@ -1327,7 +1336,7 @@ async function loadRuta(){
 
 // ── RESUMEN DE RUTA — persistencia local de cierres del día (localStorage) ──
 function _cierresKey(){
-  return 'alleata_cierres_'+new Date().toISOString().slice(0,10)+'_'+(currentUser?.id||'');
+  return 'alleata_cierres_'+hoyArgentina()+'_'+(currentUser?.id||'');
 }
 function cargarCierresLocal(){
   try{ cierresHoy=JSON.parse(localStorage.getItem(_cierresKey())||'[]'); }
@@ -1687,7 +1696,7 @@ async function asignarDesinstalacionAOperador(ot){
   const yaAsignada=ot.operador_id&&ot.operador_id.trim()&&ot.operador_id.trim()!==miNombre;
   if(yaAsignada && !confirm('Esta OT ya estaba asignada a "'+ot.operador_id+'". ¿Confirmás que la tomás vos igual?')) return false;
 
-  const fecha=new Date().toISOString().slice(0,10);
+  const fecha=hoyArgentina();
   const{error}=await sb.from('ordenes_trabajo').update({
     hoja_ruta_activa:true,
     hoja_ruta_fecha:fecha,
@@ -3529,7 +3538,7 @@ function dsm_marcarNoRetiro(otId,otNum){ dsm_openCierre(otId,otNum,'DESINST_FALL
 
 async function dsm_checkRutaHoy(){
   try{
-    const fecha=new Date().toISOString().slice(0,10);
+    const fecha=hoyArgentina();
     const{count}=await sb.from('ordenes_trabajo')
       .select('id',{count:'exact',head:true})
       .eq('tipo','desinstalacion').eq('hoja_ruta_activa',true).eq('hoja_ruta_fecha',fecha);
