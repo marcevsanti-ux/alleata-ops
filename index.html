@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.5.4</title>
+<title>Alleata · Operaciones v4.5.5</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -400,7 +400,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.5.4 · 27 jul 2026
+      v4.5.5 · 27 jul 2026
     </div>
   </div>
 </div>
@@ -488,7 +488,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.5.4 · 27 jul 2026
+      v4.5.5 · 27 jul 2026
     </div>
   </div>
 </nav>
@@ -528,7 +528,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.5.4</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.5.5</div>
   </div>
   <div class="content">
 
@@ -4501,7 +4501,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.5.4] OK');
+console.log('[Alleata v4.5.5] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -5743,6 +5743,21 @@ async function asignarOTAChofer(){
     if(!ot)throw new Error(`No se encontró la OT ${otNumBusqueda} en sf_workorders (probá "↺ Full Sync" arriba si es muy reciente).`);
 
     const hoy=hoyArgentina();
+
+    // FIX 28/07: si esta OT ya estaba en la ruta de OTRO chofer hoy, sacarla
+    // de ahí primero — antes se quedaba duplicada en las dos rutas (pasó
+    // de verdad con la 00022895: se movió a Nacho por SQL y después alguien
+    // la volvió a asignar a Marcelo desde acá, y quedó en ambas).
+    const{data:otrasRutas}=await sb.from('rutas_diarias').select('id,user_id,ots_ids,ots_numeros').eq('fecha',hoy).neq('user_id',choferId);
+    let sacadaDe=null;
+    for(const otraRuta of (otrasRutas||[])){
+      if((otraRuta.ots_numeros||[]).includes(ot.workorder_number)){
+        const pares=(otraRuta.ots_ids||[]).map((id,i)=>({id,num:otraRuta.ots_numeros?.[i]})).filter(p=>p.num!==ot.workorder_number);
+        await sb.from('rutas_diarias').update({ots_ids:pares.map(p=>p.id),ots_numeros:pares.map(p=>p.num)}).eq('id',otraRuta.id);
+        sacadaDe=otraRuta.user_id;
+      }
+    }
+
     const{data:ruta}=await sb.from('rutas_diarias').select('id,ots_ids,ots_numeros').eq('user_id',choferId).eq('fecha',hoy).maybeSingle();
 
     if(!ruta){
@@ -5761,11 +5776,12 @@ async function asignarOTAChofer(){
 
     // Despachar de verdad (SF + Supabase) — solo si hace falta y es ALLEATA
     // (el endpoint rechaza otras logísticas o si ya estaba Despachado).
-    let avisoDespacho='';
+    const notaSacada=sacadaDe?' (se sacó de la ruta de otro chofer que la tenía).':'';
+    let avisoDespacho=notaSacada;
     if(ot.status==='Despachado'){
-      avisoDespacho=' Ya estaba Despachada — visible en su app.';
+      avisoDespacho=notaSacada+' Ya estaba Despachada — visible en su app.';
     }else if((ot.logistica||'').toUpperCase()!=='ALLEATA'){
-      avisoDespacho=` ⚠️ Logística es "${ot.logistica||'—'}" (no ALLEATA) — no se pudo despachar automáticamente, va a seguir sin verse en "En Ruta Hoy" hasta que se resuelva a mano.`;
+      avisoDespacho=notaSacada+` ⚠️ Logística es "${ot.logistica||'—'}" (no ALLEATA) — no se pudo despachar automáticamente, va a seguir sin verse en "En Ruta Hoy" hasta que se resuelva a mano.`;
     }else{
       try{
         const resp=await fetch(`${ALLY_RAILWAY_BASE}/automations/despachar-ot`,{
@@ -5774,10 +5790,10 @@ async function asignarOTAChofer(){
           body:JSON.stringify({sf_id:ot.sf_id, tecnico:choferNombre})
         });
         const j=await resp.json();
-        if(j.ok) avisoDespacho=' Despachada en SF (Costo $1 + seguimiento) — ya la tiene que ver en "En Ruta Hoy".';
-        else avisoDespacho=` ⚠️ No se pudo despachar automáticamente (${j.error||'error desconocido'}) — quedó asignada pero puede no verse en "En Ruta Hoy" todavía.`;
+        if(j.ok) avisoDespacho=notaSacada+' Despachada en SF (Costo $1 + seguimiento) — ya la tiene que ver en "En Ruta Hoy".';
+        else avisoDespacho=notaSacada+` ⚠️ No se pudo despachar automáticamente (${j.error||'error desconocido'}) — quedó asignada pero puede no verse en "En Ruta Hoy" todavía.`;
       }catch(eDesp){
-        avisoDespacho=` ⚠️ No se pudo despachar automáticamente (${eDesp.message}) — quedó asignada pero puede no verse en "En Ruta Hoy" todavía.`;
+        avisoDespacho=notaSacada+` ⚠️ No se pudo despachar automáticamente (${eDesp.message}) — quedó asignada pero puede no verse en "En Ruta Hoy" todavía.`;
       }
     }
 
