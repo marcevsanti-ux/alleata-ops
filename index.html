@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.4.95</title>
+<title>Alleata · Operaciones v4.4.97</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -400,7 +400,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.4.95 · 27 jul 2026
+      v4.4.97 · 27 jul 2026
     </div>
   </div>
 </div>
@@ -488,7 +488,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.4.95 · 27 jul 2026
+      v4.4.97 · 27 jul 2026
     </div>
   </div>
 </nav>
@@ -528,7 +528,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.4.95</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.4.97</div>
   </div>
   <div class="content">
 
@@ -538,6 +538,12 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="welcomeMsg" style="font-size:18px;font-weight:800;color:var(--text)">Hola 👋</div>
         <div id="ops-timestamp" style="font-size:11px;color:var(--text-muted);margin-top:2px"></div>
       </div>
+
+      <!-- 🎯 Objetivo semanal del equipo (Rollout) — SOLO visible para
+           marcelos (ver cargarObjetivoSemanalRollout()). No es un módulo
+           compartido: total agregado del equipo, sin desglose por chofer,
+           a propósito. -->
+      <div id="objSemanalCard" style="display:none"></div>
 
       <!-- Paso 1 (vamos por partes, pedido 27/07): antes de meter prioridad,
            mostrar simplemente TODAS las OTs en estado "Configurar Terminal"
@@ -4495,7 +4501,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.4.95] OK');
+console.log('[Alleata v4.4.97] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -5765,6 +5771,44 @@ async function loadRolloutPiloto(){
   renderRolloutPiloto();
 }
 
+// ── Objetivo semanal del equipo (Rollout) — SOLO en el dashboard de
+// marcelos, pedido 28/07: "somos un equipo, objetivo 75/80 por semana" y
+// explícitamente NO quiere el desglose por chofer visible en Rollout Piloto
+// (lo tenía Diego mirando esa pantalla). Total agregado nomás, sin nombres.
+// Semana = lunes a domingo, calculado con la fecha local del navegador.
+const OBJETIVO_SEMANAL_MIN=75, OBJETIVO_SEMANAL_MAX=80;
+async function cargarObjetivoSemanalRollout(){
+  const cont=document.getElementById('objSemanalCard');
+  if(!cont)return;
+  const hoy=new Date();
+  const diaSemana=(hoy.getDay()+6)%7; // 0=lunes...6=domingo
+  const lunes=new Date(hoy);lunes.setDate(hoy.getDate()-diaSemana);
+  const lunesStr=lunes.toISOString().slice(0,10);
+
+  const{data,error}=await sb.from('rollout_piloto').select('fecha_exitosa').eq('etapa','Cerrado').gte('fecha_exitosa',lunesStr);
+  if(error){cont.innerHTML=`<div style="font-size:11px;color:var(--red)">No se pudo cargar el objetivo semanal: ${error.message}</div>`;return;}
+
+  const total=(data||[]).length;
+  const pct=Math.min(100,Math.round(total/OBJETIVO_SEMANAL_MIN*100));
+  const llego=total>=OBJETIVO_SEMANAL_MIN;
+  const color=llego?'var(--teal)':(pct>=60?'#f59e0b':'#ef4444');
+  const fmtCorto=d=>new Date(d).toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit'});
+
+  cont.innerHTML=`<div class="card" style="margin-bottom:14px;border-left:4px solid ${color}">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <div style="font-size:13px;font-weight:700">🎯 Objetivo semanal del equipo — Rollout</div>
+      <span style="font-size:10px;color:var(--text-muted)">semana del ${fmtCorto(lunesStr)}</span>
+    </div>
+    <div style="display:flex;align-items:baseline;gap:6px;margin-bottom:8px">
+      <span style="font-size:22px;font-weight:800;color:${color}">${total}</span>
+      <span style="font-size:12px;color:var(--text-muted)">/ ${OBJETIVO_SEMANAL_MIN}–${OBJETIVO_SEMANAL_MAX} entregas</span>
+    </div>
+    <div style="background:var(--navy-700);border-radius:20px;height:8px;overflow:hidden">
+      <div style="background:${color};height:100%;width:${pct}%;transition:width .3s"></div>
+    </div>
+  </div>`;
+}
+
 function renderRolloutPiloto(){
   const tbody=document.getElementById('rp-tbody');
   if(!tbody)return;
@@ -6662,6 +6706,20 @@ async function loadOpsPanel(isAdmin, modulos){
       cargarProximaOT(nombre);
     } else {
       proxCard.style.display='none';
+    }
+  }
+
+  // 🎯 Objetivo semanal del equipo (Rollout) — SOLO marcelos. Pedido
+  // explícito 28/07: no lo quiere en Rollout Piloto (Diego mira esa
+  // pantalla) y sin desglose por chofer, esto es aparte, privado, agregado.
+  const objCard = document.getElementById('objSemanalCard');
+  if(objCard){
+    const esMarcelos = (currentProfile?.email||currentUser?.email||'').trim().toLowerCase()==='marcelos@moretti.com.ar';
+    if(esMarcelos){
+      objCard.style.display='block';
+      cargarObjetivoSemanalRollout();
+    } else {
+      objCard.style.display='none';
     }
   }
 
