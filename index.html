@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.5.3</title>
+<title>Alleata · Operaciones v4.5.4</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -400,7 +400,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.5.3 · 27 jul 2026
+      v4.5.4 · 27 jul 2026
     </div>
   </div>
 </div>
@@ -488,7 +488,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.5.3 · 27 jul 2026
+      v4.5.4 · 27 jul 2026
     </div>
   </div>
 </nav>
@@ -528,7 +528,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.5.3</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.5.4</div>
   </div>
   <div class="content">
 
@@ -4501,7 +4501,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.5.3] OK');
+console.log('[Alleata v4.5.4] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -5475,6 +5475,18 @@ function rolloutPilotoPuedeEditarEtapa(){
 // v4.4.84 (24/07): ahora también trae y muestra desinstalaciones/retiros de
 // ordenes_trabajo, agrupadas por chofer junto con los envíos — ver detalle
 // más abajo.
+// FIX 28/07: new Date().toISOString().slice(0,10) da la fecha en UTC, no en
+// hora de Argentina (UTC-3). Pasadas las 21:00 ART ya es "mañana" en UTC —
+// el filtro `fecha = hoy` de Hoja de Ruta dejaba de matchear filas guardadas
+// unas horas antes en el mismo día real, y mostraba "Nadie confirmó una
+// ruta hoy todavía" con datos que sí estaban. hoyArgentina() usa la zona
+// horaria real en vez de UTC. Se usa acá y en el objetivo semanal — el
+// resto del archivo tiene el mismo patrón viejo en más lugares (quedó como
+// estaba, cambio de alcance más grande, fuera de esto).
+function hoyArgentina(){
+  return new Date().toLocaleDateString('en-CA',{timeZone:'America/Argentina/Buenos_Aires'});
+}
+
 async function loadHojaRuta(){
   const cont=document.getElementById('hr-content');
   if(!cont)return;
@@ -5488,7 +5500,7 @@ async function loadHojaRuta(){
     if(esAdmin)_poblarChoferesAsignar();
   }
 
-  const hoy=new Date().toISOString().slice(0,10);
+  const hoy=hoyArgentina();
   const{data:rutas,error}=await sb.from('rutas_diarias')
     .select('id,user_id,fecha,ots_numeros,km_total')
     .eq('fecha',hoy);
@@ -5730,7 +5742,7 @@ async function asignarOTAChofer(){
     if(errOt)throw new Error(errOt.message);
     if(!ot)throw new Error(`No se encontró la OT ${otNumBusqueda} en sf_workorders (probá "↺ Full Sync" arriba si es muy reciente).`);
 
-    const hoy=new Date().toISOString().slice(0,10);
+    const hoy=hoyArgentina();
     const{data:ruta}=await sb.from('rutas_diarias').select('id,ots_ids,ots_numeros').eq('user_id',choferId).eq('fecha',hoy).maybeSingle();
 
     if(!ruta){
@@ -5803,7 +5815,7 @@ async function moverColaARuta(colaId,choferId,otNumero,btn){
     if(errOt)throw new Error(errOt.message);
     if(!ot)throw new Error(`No se encontró la OT ${otNumero} en sf_workorders.`);
 
-    const hoy=new Date().toISOString().slice(0,10);
+    const hoy=hoyArgentina();
     const{data:ruta}=await sb.from('rutas_diarias').select('id,ots_ids,ots_numeros').eq('user_id',choferId).eq('fecha',hoy).maybeSingle();
 
     if(!ruta){
@@ -5837,7 +5849,7 @@ async function moverColaARuta(colaId,choferId,otNumero,btn){
 // Pedido urgente 28/07: sacar las chatas ya, sin ir OT por OT a mano.
 async function moverTodaLaColaARuta(btn){
   if(currentProfile?.rol!=='admin')return;
-  const{data:cola,error}=await sb.from('hoja_ruta_cola').select('id,chofer_id,ot_numero').eq('fecha',new Date().toISOString().slice(0,10));
+  const{data:cola,error}=await sb.from('hoja_ruta_cola').select('id,chofer_id,ot_numero').eq('fecha',hoyArgentina());
   if(error){alert('Error leyendo la cola: '+error.message);return;}
   if(!cola?.length)return;
   if(btn){btn.disabled=true;btn.textContent=`Moviendo 0/${cola.length}...`;}
@@ -5866,7 +5878,7 @@ async function moverColaARutaSilencioso(colaId,choferId,otNumero){
     if(errOt)throw new Error(errOt.message);
     if(!ot)throw new Error('OT no encontrada en sf_workorders');
 
-    const hoy=new Date().toISOString().slice(0,10);
+    const hoy=hoyArgentina();
     const{data:ruta}=await sb.from('rutas_diarias').select('id,ots_ids,ots_numeros').eq('user_id',choferId).eq('fecha',hoy).maybeSingle();
 
     if(!ruta){
@@ -5935,10 +5947,14 @@ const OBJETIVO_SEMANAL_MIN=75, OBJETIVO_SEMANAL_MAX=80;
 async function cargarObjetivoSemanalRollout(){
   const cont=document.getElementById('objSemanalCard');
   if(!cont)return;
-  const hoy=new Date();
+  // FIX 28/07: usar hoyArgentina() como base (no new Date() crudo, que
+  // corre en huso UTC del server/browser) para que "lunes de esta semana"
+  // no se calcule mal cerca de la medianoche ART.
+  const hoyStr=hoyArgentina(); // 'YYYY-MM-DD' en hora Argentina
+  const hoy=new Date(hoyStr+'T12:00:00'); // mediodía local, evita corrimientos de día por TZ del navegador
   const diaSemana=(hoy.getDay()+6)%7; // 0=lunes...6=domingo
   const lunes=new Date(hoy);lunes.setDate(hoy.getDate()-diaSemana);
-  const lunesStr=lunes.toISOString().slice(0,10);
+  const lunesStr=lunes.toLocaleDateString('en-CA');
 
   const{data,error}=await sb.from('rollout_piloto').select('fecha_exitosa').eq('etapa','Cerrado').gte('fecha_exitosa',lunesStr);
   if(error){cont.innerHTML=`<div style="font-size:11px;color:var(--red)">No se pudo cargar el objetivo semanal: ${error.message}</div>`;return;}
