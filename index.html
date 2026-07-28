@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.5.6</title>
+<title>Alleata · Operaciones v4.5.7</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -400,7 +400,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.5.6 · 27 jul 2026
+      v4.5.7 · 27 jul 2026
     </div>
   </div>
 </div>
@@ -488,7 +488,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.5.6 · 27 jul 2026
+      v4.5.7 · 27 jul 2026
     </div>
   </div>
 </nav>
@@ -528,7 +528,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.5.6</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.5.7</div>
   </div>
   <div class="content">
 
@@ -4501,7 +4501,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.5.6] OK');
+console.log('[Alleata v4.5.7] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -5821,13 +5821,35 @@ async function asignarOTAChofer(){
 // segundo podía leer ANTES de que el primero terminara de guardar y pisar
 // esa OT sin avisar. _colaEnCurso serializa los clicks: uno a la vez.
 let _colaEnCurso=false;
+// Compartido entre asignarOTAChofer / moverColaARuta / moverColaARutaSilencioso.
+// FIX 28/07: las dos últimas nunca llamaban a /despachar-ot — por eso las
+// OT movidas por "cola" (Sumar a su ruta ya / Mover TODO) se quedaban en
+// Pre-Colecta para siempre y no aparecían en "En Ruta Hoy" del mobile,
+// aunque estuvieran bien en rutas_diarias. Mismo chequeo que ya usaba
+// asignarOTAChofer (logística ALLEATA + no despachada todavía).
+async function _despacharSiCorresponde(ot,choferNombre){
+  if(ot.status==='Despachado') return ' Ya estaba Despachada.';
+  if((ot.logistica||'').toUpperCase()!=='ALLEATA') return ` ⚠️ Logística "${ot.logistica||'—'}" (no ALLEATA) — no se despachó automático.`;
+  try{
+    const resp=await fetch(`${ALLY_RAILWAY_BASE}/automations/despachar-ot`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-automation-secret':'123456'},
+      body:JSON.stringify({sf_id:ot.sf_id, tecnico:choferNombre})
+    });
+    const j=await resp.json();
+    return j.ok?' Despachada en SF — ya la tiene que ver en su app.':` ⚠️ No se pudo despachar (${j.error||'error desconocido'}).`;
+  }catch(e){
+    return ` ⚠️ No se pudo despachar (${e.message}).`;
+  }
+}
+
 async function moverColaARuta(colaId,choferId,otNumero,btn){
   if(currentProfile?.rol!=='admin')return;
   if(_colaEnCurso){alert('Esperá que termine el anterior antes de sumar otra (para no pisar datos).');return;}
   _colaEnCurso=true;
   if(btn){btn.disabled=true;btn.textContent='Moviendo...';}
   try{
-    const{data:ot,error:errOt}=await sb.from('sf_workorders').select('id,workorder_number').eq('workorder_number',otNumero).maybeSingle();
+    const{data:ot,error:errOt}=await sb.from('sf_workorders').select('id,sf_id,workorder_number,status,logistica').eq('workorder_number',otNumero).maybeSingle();
     if(errOt)throw new Error(errOt.message);
     if(!ot)throw new Error(`No se encontró la OT ${otNumero} en sf_workorders.`);
 
@@ -5849,9 +5871,13 @@ async function moverColaARuta(colaId,choferId,otNumero,btn){
       }
     }
 
+    const choferNombre=(_hrChoferesCache||[]).find(p=>p.id===choferId)?.nombre||'';
+    const notaDespacho=await _despacharSiCorresponde(ot,choferNombre);
+
     // Ya está en la ruta real — sale de la cola
     await sb.from('hoja_ruta_cola').delete().eq('id',colaId);
     await loadHojaRuta();
+    if(notaDespacho.includes('⚠️')) alert(`OT ${ot.workorder_number}:${notaDespacho}`);
   }catch(e){
     alert('Error moviendo a la ruta: '+e.message);
     if(btn){btn.disabled=false;btn.textContent='→ Sumar a su ruta ya';}
@@ -5890,7 +5916,7 @@ async function moverColaARutaSilencioso(colaId,choferId,otNumero){
   while(_colaEnCurso) await new Promise(r=>setTimeout(r,150));
   _colaEnCurso=true;
   try{
-    const{data:ot,error:errOt}=await sb.from('sf_workorders').select('id,workorder_number').eq('workorder_number',otNumero).maybeSingle();
+    const{data:ot,error:errOt}=await sb.from('sf_workorders').select('id,sf_id,workorder_number,status,logistica').eq('workorder_number',otNumero).maybeSingle();
     if(errOt)throw new Error(errOt.message);
     if(!ot)throw new Error('OT no encontrada en sf_workorders');
 
@@ -5911,6 +5937,8 @@ async function moverColaARutaSilencioso(colaId,choferId,otNumero){
         if(errUpd)throw new Error(errUpd.message);
       }
     }
+    const choferNombre=(_hrChoferesCache||[]).find(p=>p.id===choferId)?.nombre||'';
+    await _despacharSiCorresponde(ot,choferNombre);
     await sb.from('hoja_ruta_cola').delete().eq('id',colaId);
   }finally{
     _colaEnCurso=false;
