@@ -165,7 +165,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
       <div class="login-logo">
         <img id="loginLogo" src="" alt="Alleata">
         <div class="login-sub">Portal de Operaciones</div>
-        <div class="login-version">v2.14.32 · mobile</div>
+        <div class="login-version">v2.14.33 · mobile</div>
       </div>
       <div class="field"><label class="label">Email</label><input class="input" id="lEmail" type="email" placeholder="usuario@alleata.com" autocomplete="email"></div>
       <div class="field"><label class="label">Contraseña</label><input class="input" id="lPass" type="password" placeholder="••••••••" autocomplete="current-password"></div>
@@ -181,7 +181,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
   <div class="topbar">
     <img id="appLogo" src="" alt="Alleata">
     <div class="topbar-title" id="topbarTitle">Operaciones</div>
-    <div class="topbar-version" onclick="_tocarVersion()">v2.14.32</div>
+    <div class="topbar-version" onclick="_tocarVersion()">v2.14.33</div>
     <div class="topbar-avatar" id="topbarAvatar" onclick="openDrawer()">?</div>
   </div>
 
@@ -579,7 +579,7 @@ const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSI
 //     control" que ya tenía el lado de Supabase.
 //   - Resultado de SIM ahora muestra la fuente: "Confirmado en vivo con
 //     Salesforce" vs "Caché local — no se pudo confirmar"
-// Cambios v2.14.32 (24/07):
+// Cambios v2.14.33 (24/07):
 //   - Renombrado botón "Cerrar hoja de ruta..." a "🚀 Salir a ruta..." — el
 //     nombre viejo confundía porque suena a acción de fin de día, cuando en
 //     realidad dispara el aviso de "Salida de ruta" pensado para el arranque
@@ -1305,16 +1305,16 @@ async function loadRuta(){
     renderKmIndicador(rutaHoy.km_total,rutaHoy.km_detalle||[]);
   }
 
-  // FIX "OT viejas" (2026-07): antes esto solo corría si rutaDelDia estaba
-  // vacía en memoria, así que si la app quedaba abierta cruzando la
-  // medianoche nunca se refrescaba. Ahora SIEMPRE reconcilia dos fuentes:
-  //   1) lo guardado en localStorage (pendientes reales, no atado a fecha
-  //      — sobrevive a que el celu se reinicie sin perder lo que quedó sin
-  //      cerrar)
-  //   2) lo confirmado en rutas_diarias de HOY en Supabase
-  // y las une por id, en vez de que una pise a la otra. loadEnTransito()
-  // más abajo se encarga de sacar de acá cualquier OT que ya no siga
-  // Despachada/En Tránsito en SF (se cerró por otro medio).
+  // FIX "OT viejas" (2026-07) + FIX 28/07 (reconciliación real): antes esto
+  // solo UNÍA localStorage + Supabase, nunca sacaba nada — si una OT se
+  // removía de rutas_diarias desde el desktop/SQL, el celu la seguía
+  // mostrando para siempre porque quedaba en el caché local. Pasó de
+  // verdad con la OT 00022895. Ahora: si HAY fila en rutas_diarias para
+  // hoy, esa lista es la verdad — se descarta cualquier pendiente local
+  // que ya no esté ahí. El localStorage solo se usa como red de
+  // seguridad cuando NO hay fila todavía (recién escaneada, sin sync, o
+  // sin conexión) — loadEnTransito() más abajo sigue sacando cualquier OT
+  // que ya no siga Despachada/En Tránsito en SF.
   const pendientesLocal=cargarRutaPendienteLocal();
   let otsHoyDeSupabase=[];
   if(rutaHoy?.ots_ids?.length){
@@ -1325,8 +1325,18 @@ async function loadRuta(){
     }
   }
   const otsPrueba=rutaDelDia.filter(o=>o._esPrueba); // conservar las de prueba de la sesión actual, nunca van a Supabase/localStorage
+  let listaBase;
+  if(rutaHoy){
+    // Supabase manda: lo local que no esté acá se descarta (por eso se
+    // resuelve el caso de OTs sacadas a mano de la ruta).
+    listaBase=otsHoyDeSupabase;
+  }else{
+    // Sin fila en Supabase todavía (recién escaneada / sin conexión) —
+    // usar el caché local como red de seguridad, como antes.
+    listaBase=pendientesLocal;
+  }
   const combinadas={};
-  [...pendientesLocal,...otsHoyDeSupabase].forEach(o=>{ if(o?.id) combinadas[o.id]=o; });
+  listaBase.forEach(o=>{ if(o?.id) combinadas[o.id]=o; });
   rutaDelDia=[...Object.values(combinadas),...otsPrueba];
   guardarRutaPendienteLocal();
 
