@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.6.0</title>
+<title>Alleata · Operaciones v4.6.1</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -400,7 +400,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.0 · 27 jul 2026
+      v4.6.1 · 27 jul 2026
     </div>
   </div>
 </div>
@@ -488,7 +488,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.0 · 27 jul 2026
+      v4.6.1 · 27 jul 2026
     </div>
   </div>
 </nav>
@@ -528,7 +528,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.0</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.1</div>
   </div>
   <div class="content">
 
@@ -1348,10 +1348,11 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <div id="ds-op-pills" style="display:none"></div>
     </div>
 
-    <!-- Tabs: Listado / Distribución Geográfica -->
+    <!-- Tabs: Listado / Distribución Geográfica / Gestión OPS -->
     <div style="display:flex;gap:0;margin-bottom:14px;border-bottom:1px solid var(--border)">
       <button id="ds-tab-listado" onclick="dsTabSwitch('listado')" style="background:none;border:none;border-bottom:2px solid var(--teal);color:var(--text);font-size:12px;font-weight:600;padding:7px 18px;cursor:pointer;margin-bottom:-1px;transition:all .15s">📋 Listado OTs</button>
       <button id="ds-tab-geo" onclick="dsTabSwitch('geo')" style="display:none">📍 Distribución Geográfica</button>
+      <button id="ds-tab-gestionops" onclick="dsTabSwitch('gestionops')" style="background:none;border:none;border-bottom:2px solid transparent;color:var(--text-muted);font-size:12px;font-weight:600;padding:7px 18px;cursor:pointer;margin-bottom:-1px;transition:all .15s">🗂️ Gestión OPS (desde 1/4)</button>
     </div>
 
 
@@ -1415,7 +1416,23 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       </div>
     </div>
 
-    <!-- Import Desinstalaciones SF -->
+    <!-- Panel Gestión OPS — hidden by default, shown via tab. OTs creadas
+         desde 1/4/2026, consultadas EN VIVO a SF (mismo endpoint que ya
+         usa el widget NAPSE del Dashboard, /sf-stats/desinstalaciones) —
+         NO sale de ordenes_trabajo en Supabase porque esa tabla solo
+         guarda las "activas" (el sync de SF a ordenes_trabajo excluye las
+         ya cerradas), y acá justamente hace falta ver también Recuperada/
+         Reactivado para el seguimiento exhaustivo. Pedido 28/07: separar
+         por estado, igual que el reporte que armaron a mano en SF. -->
+    <div id="ds-gestionops-panel" style="margin-bottom:16px;display:none">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+        <div style="font-size:12px;color:var(--text-muted)">OTs de Desinstalación creadas desde el <b style="color:var(--text)">1/4/2026</b> — en vivo desde Salesforce, agrupadas por estado.</div>
+        <button class="btn btn-sm" onclick="dsGestionOpsCargar()">↺ Actualizar</button>
+      </div>
+      <div id="ds-gestionops-resumen" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px"></div>
+      <div id="ds-gestionops-grupos"><div style="text-align:center;padding:30px;color:var(--text-muted)">Cargando...</div></div>
+    </div>
+
     <div id="dsImportArea" style="margin-bottom:14px;background:var(--navy-700);border-radius:10px;padding:14px 18px;">
       <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
         <!-- Importar desde SF y Reporte SF eliminados — datos vienen de sf_workorders -->
@@ -3248,22 +3265,40 @@ function toggleSidebar(){
 // ── Desinstalaciones tabs ─────────────────────────────────────────────
 function dsTabSwitch(tab){
   const geoPanel=document.getElementById('ds-geo-panel');
+  const gestionOpsPanel=document.getElementById('ds-gestionops-panel');
   const tableWrap=document.querySelector('#mod-desinstalaciones .table-wrap');
   const importBar=document.getElementById('dsImportArea');
+  const zonaRow=document.getElementById('dsZonaRow');
+  const rutaBar=document.getElementById('dsRutaBar');
   const btnListado=document.getElementById('ds-tab-listado');
   const btnGeo=document.getElementById('ds-tab-geo');
+  const btnGestionOps=document.getElementById('ds-tab-gestionops');
+  const setBtnOff=b=>{if(b){b.style.borderBottomColor='transparent';b.style.color='var(--text-muted)';}};
+  const setBtnOn=b=>{if(b){b.style.borderBottomColor='var(--teal)';b.style.color='var(--text)';}};
+  [btnListado,btnGeo,btnGestionOps].forEach(setBtnOff);
   if(tab==='geo'){
     geoPanel.style.display='grid';
+    if(gestionOpsPanel)gestionOpsPanel.style.display='none';
     if(tableWrap)tableWrap.style.display='none';
     if(importBar)importBar.style.display='none';
-    btnListado.style.borderBottomColor='transparent';btnListado.style.color='var(--text-muted)';
-    btnGeo.style.borderBottomColor='var(--teal)';btnGeo.style.color='var(--text)';
+    setBtnOn(btnGeo);
+  } else if(tab==='gestionops'){
+    geoPanel.style.display='none';
+    if(tableWrap)tableWrap.style.display='none';
+    if(importBar)importBar.style.display='none';
+    if(zonaRow)zonaRow.style.display='none';
+    if(rutaBar)rutaBar.style.display='none';
+    if(gestionOpsPanel){
+      gestionOpsPanel.style.display='block';
+      if(!gestionOpsPanel.dataset.cargado){ gestionOpsPanel.dataset.cargado='1'; dsGestionOpsCargar(); }
+    }
+    setBtnOn(btnGestionOps);
   } else {
     geoPanel.style.display='none';
+    if(gestionOpsPanel)gestionOpsPanel.style.display='none';
     if(tableWrap)tableWrap.style.display='';
     if(importBar)importBar.style.display='block';
-    btnGeo.style.borderBottomColor='transparent';btnGeo.style.color='var(--text-muted)';
-    btnListado.style.borderBottomColor='var(--teal)';btnListado.style.color='var(--text)';
+    setBtnOn(btnListado);
   }
 }
 
@@ -4509,7 +4544,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.6.0] OK');
+console.log('[Alleata v4.6.1] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -6704,7 +6739,6 @@ function toggleNapseMotivo(mid,motivo){
         <th style="padding:4px 8px">Cuenta</th>
         <th style="padding:4px 8px">CUIT</th>
         <th style="padding:4px 8px">Comercio</th>
-        <th style="padding:4px 8px">Responsable</th>
         <th style="padding:4px 8px">Propietario cta.</th>
         <th style="padding:4px 8px">Contacto</th>
         <th style="padding:4px 8px">Terminal ID</th>
@@ -6717,12 +6751,91 @@ function toggleNapseMotivo(mid,motivo){
           <td style="padding:5px 8px">${celda(o.cuenta)}</td>
           <td style="padding:5px 8px;font-family:'JetBrains Mono',monospace">${celda(o.cuit)}</td>
           <td style="padding:5px 8px">${celda(o.comercio)}</td>
-          <td style="padding:5px 8px">${celda(o.responsable)}</td>
           <td style="padding:5px 8px">${celda(o.propietario)}</td>
           <td style="padding:5px 8px">${celda(o.contacto)}</td>
           <td style="padding:5px 8px">${celda(o.terminal_id)}</td>
           <td style="padding:5px 8px">${celda(o.ciudad)}</td>
           <td style="padding:5px 0;color:${ESTADO_COLORS_NAPSE[o.status]||'#6b7280'};font-weight:600">${o.status}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>
+  </div>`;
+}
+
+// ── Gestión OPS — Desinstalaciones (pedido 28/07, seguimiento exhaustivo
+// desde 1/4/2026) ──────────────────────────────────────────────────────
+// Mismo endpoint que ya usa el widget NAPSE del Dashboard
+// (/sf-stats/desinstalaciones), consultado EN VIVO a SF — a propósito no
+// sale de ordenes_trabajo en Supabase, porque esa tabla solo tiene las
+// desinstalaciones "activas" (el sync excluye las ya cerradas como
+// Recuperada/Reactivado), y acá el pedido es ver TODO desde esa fecha,
+// estado por estado, para poder decidir qué hacer con cada grupo.
+const ORDEN_ESTADOS_GESTIONOPS=['Pendiente','NO RESPONDE','En Proceso','Reprogramar','Extraviada','Reactivado','Recuperada'];
+async function dsGestionOpsCargar(){
+  const resumenEl=document.getElementById('ds-gestionops-resumen');
+  const gruposEl=document.getElementById('ds-gestionops-grupos');
+  if(!gruposEl)return;
+  gruposEl.innerHTML='<div style="text-align:center;padding:30px;color:var(--text-muted)">Consultando Salesforce en vivo (puede tardar unos segundos, son ~1000 OTs)...</div>';
+  if(resumenEl)resumenEl.innerHTML='';
+  try{
+    const r=await railwayFetch('/automations/sf-stats/desinstalaciones?fechaInicio=2026-04-01');
+    const j=await r.json();
+    if(!r.ok||!j.ok) throw new Error(j.error||'Respuesta no OK');
+
+    window._gestionOpsEstadoDetalle=j.estadoDetalle||{};
+    const entries=Object.entries(j.totalPorEstado||{})
+      .sort((a,b)=> ORDEN_ESTADOS_GESTIONOPS.indexOf(a[0]) - ORDEN_ESTADOS_GESTIONOPS.indexOf(b[0]) || b[1]-a[1]);
+
+    if(resumenEl){
+      resumenEl.innerHTML=`<div style="font-size:22px;font-weight:800;color:var(--teal);margin-right:6px">${j.totalGeneral}</div>`+
+        `<div style="font-size:11px;color:var(--text-muted);align-self:center;margin-right:10px">total desde 1/4/2026</div>`+
+        entries.map(([estado,cant])=>{
+          const color=ESTADO_COLORS_NAPSE[estado]||'#6b7280';
+          return `<div class="badge" style="background:${color}18;border:1px solid ${color}40;color:${color};cursor:pointer;padding:6px 12px;font-size:11px" onclick="dsGestionOpsToggleEstado('${estado.replace(/'/g,"\\'")}')">${estado} · ${cant}</div>`;
+        }).join('');
+    }
+
+    gruposEl.innerHTML=`<div id="ds-gestionops-detalle"></div>`;
+  }catch(e){
+    gruposEl.innerHTML=`<div style="text-align:center;padding:30px;color:var(--red)">⚠️ Error consultando SF: ${e.message}</div>`;
+  }
+}
+
+function dsGestionOpsToggleEstado(estado){
+  const el=document.getElementById('ds-gestionops-detalle');
+  if(!el)return;
+  if(el.dataset.actual===estado){ el.innerHTML=''; el.dataset.actual=''; return; }
+  const lista=(window._gestionOpsEstadoDetalle||{})[estado]||[];
+  el.dataset.actual=estado;
+  const celda=v=>v?`<span>${v}</span>`:`<span style="color:var(--text-muted)">—</span>`;
+  const color=ESTADO_COLORS_NAPSE[estado]||'#6b7280';
+  el.innerHTML=`<div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:10px 12px;overflow-x:auto;margin-top:12px">
+    <div style="font-size:12px;font-weight:700;color:${color};margin-bottom:8px">${estado} (${lista.length})</div>
+    <table style="width:100%;border-collapse:collapse;font-size:11px;white-space:nowrap">
+      <thead><tr style="text-align:left;color:var(--text-muted);text-transform:uppercase;font-size:9px;letter-spacing:.03em">
+        <th style="padding:4px 8px 4px 0">OT</th>
+        <th style="padding:4px 8px">Fecha creación</th>
+        <th style="padding:4px 8px">Cuenta</th>
+        <th style="padding:4px 8px">CUIT</th>
+        <th style="padding:4px 8px">Comercio</th>
+        <th style="padding:4px 8px">Motivo</th>
+        <th style="padding:4px 8px">Propietario cta.</th>
+        <th style="padding:4px 8px">Contacto</th>
+        <th style="padding:4px 8px">Terminal ID</th>
+        <th style="padding:4px 0">Ciudad</th>
+      </tr></thead>
+      <tbody>
+        ${lista.map(o=>`<tr style="border-top:1px solid var(--border)">
+          <td style="padding:5px 8px 5px 0;font-family:'JetBrains Mono',monospace;font-weight:700">${o.ot}</td>
+          <td style="padding:5px 8px;font-size:10px;color:var(--text-muted)">${o.fecha_creacion?new Date(o.fecha_creacion).toLocaleDateString('es-AR'):'—'}</td>
+          <td style="padding:5px 8px">${celda(o.cuenta)}</td>
+          <td style="padding:5px 8px;font-family:'JetBrains Mono',monospace">${celda(o.cuit)}</td>
+          <td style="padding:5px 8px">${celda(o.comercio)}</td>
+          <td style="padding:5px 8px">${celda(o.motivo)}</td>
+          <td style="padding:5px 8px">${celda(o.propietario)}</td>
+          <td style="padding:5px 8px">${celda(o.contacto)}</td>
+          <td style="padding:5px 8px">${celda(o.terminal_id)}</td>
+          <td style="padding:5px 0">${celda(o.ciudad)}</td>
         </tr>`).join('')}
       </tbody>
     </table>
