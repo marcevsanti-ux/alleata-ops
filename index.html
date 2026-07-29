@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.6.6</title>
+<title>Alleata · Operaciones v4.6.7</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -400,7 +400,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.6 · 28 jul 2026
+      v4.6.7 · 29 jul 2026
     </div>
   </div>
 </div>
@@ -488,7 +488,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.6 · 28 jul 2026
+      v4.6.7 · 29 jul 2026
     </div>
   </div>
 </nav>
@@ -528,7 +528,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.6</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.7</div>
   </div>
   <div class="content">
 
@@ -4620,7 +4620,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.6.6] OK');
+console.log('[Alleata v4.6.7] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -7030,8 +7030,9 @@ async function dsEnProcesoRenderTracking(lista, el){
   el.innerHTML='<div style="text-align:center;padding:20px;color:var(--text-muted)">Cargando tracking de guías CA...</div>';
 
   const caList=lista.filter(o=>(o.logistica||'').toUpperCase().includes('CORREO ARGENTINO') && o.tracking);
+  const caSinGuia=lista.filter(o=>(o.logistica||'').toUpperCase().includes('CORREO ARGENTINO') && !o.tracking);
   const alleataList=lista.filter(o=>(o.logistica||'').toUpperCase().includes('ALLEATA'));
-  const sinLogistica=lista.filter(o=>!caList.includes(o) && !alleataList.includes(o));
+  const otrosList=lista.filter(o=>!caList.includes(o) && !caSinGuia.includes(o) && !alleataList.includes(o));
 
   // Traer guías ya registradas
   let guiasPorTracking={};
@@ -7058,7 +7059,9 @@ async function dsEnProcesoRenderTracking(lista, el){
   }
 
   window._dsEnProcesoCaList=caList;
+  window._dsEnProcesoCaSinGuia=caSinGuia;
   window._dsEnProcesoAlleataList=alleataList;
+  window._dsEnProcesoOtrosList=otrosList;
   window._dsEnProcesoGuias=guiasPorTracking;
 
   dsEnProcesoRenderFiltrado('todas', el);
@@ -7066,7 +7069,9 @@ async function dsEnProcesoRenderTracking(lista, el){
 
 function dsEnProcesoRenderFiltrado(filtro, el){
   const caList=window._dsEnProcesoCaList||[];
+  const caSinGuia=window._dsEnProcesoCaSinGuia||[];
   const alleataList=window._dsEnProcesoAlleataList||[];
+  const otrosList=window._dsEnProcesoOtrosList||[];
   const guiasPorTracking=window._dsEnProcesoGuias||{};
   el.dataset.filtroCa=filtro;
 
@@ -7152,10 +7157,54 @@ function dsEnProcesoRenderFiltrado(filtro, el){
 
   const notaAlleata = alleataList.length ? `<div style="margin-top:14px;font-size:11px;color:var(--text-muted);padding:8px 12px;background:var(--surface2);border-radius:8px">🚗 ${alleataList.length} OT(s) en AMBA con logística Alleata — gestionadas desde la app mobile, sin tracking acá.</div>` : '';
 
+  const seccionCaSinGuia = caSinGuia.length ? `<div style="margin-top:14px;background:#f59e0b12;border:1px solid #f59e0b40;border-radius:10px;padding:10px 14px">
+    <div style="font-size:11px;font-weight:700;color:#d97706;margin-bottom:6px">⚠️ ${caSinGuia.length} OT(s) con logística Correo Argentino sin guía cargada todavía — Angel tiene que generarla y pegarla en N° de seguimiento</div>
+    <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11px;white-space:nowrap">
+      <thead><tr style="text-align:left;color:var(--text-muted);text-transform:uppercase;font-size:9px;letter-spacing:.03em">
+        <th style="padding:4px 8px 4px 0">OT</th><th style="padding:4px 8px">Cuenta</th><th style="padding:4px 8px">Contacto</th><th style="padding:4px 8px">Provincia</th><th style="padding:4px 0">Ciudad</th>
+      </tr></thead>
+      <tbody>${caSinGuia.map(o=>`<tr style="border-top:1px solid var(--border)">
+        <td style="padding:5px 8px 5px 0;font-family:'JetBrains Mono',monospace;font-weight:700">${o.ot}</td>
+        <td style="padding:5px 8px">${celda(o.comercio||o.cuenta)}</td>
+        <td style="padding:5px 8px">${celda(o.contacto)}</td>
+        <td style="padding:5px 8px">${celda(o.provincia)}</td>
+        <td style="padding:5px 0">${celda(o.ciudad)}</td>
+      </tr>`).join('')}</tbody>
+    </table></div>
+  </div>` : '';
+
+  const seccionOtros = otrosList.length ? `<div style="margin-top:14px;background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:10px 14px">
+    <div style="font-size:11px;font-weight:700;color:var(--text-muted);margin-bottom:6px">📋 ${otrosList.length} OT(s) sin logística CA/Alleata clara (revisar Logistica__c en SF — puede ser EPSA u otro caso)</div>
+    <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11px;white-space:nowrap">
+      <thead><tr style="text-align:left;color:var(--text-muted);text-transform:uppercase;font-size:9px;letter-spacing:.03em">
+        <th style="padding:4px 8px 4px 0">OT</th><th style="padding:4px 8px">Cuenta</th><th style="padding:4px 8px">Logística</th><th style="padding:4px 8px">Provincia</th><th style="padding:4px 0">Ciudad</th>
+      </tr></thead>
+      <tbody>${otrosList.map(o=>`<tr style="border-top:1px solid var(--border)">
+        <td style="padding:5px 8px 5px 0;font-family:'JetBrains Mono',monospace;font-weight:700">${o.ot}</td>
+        <td style="padding:5px 8px">${celda(o.comercio||o.cuenta)}</td>
+        <td style="padding:5px 8px">${celda(o.logistica)}</td>
+        <td style="padding:5px 8px">${celda(o.provincia)}</td>
+        <td style="padding:5px 0">${celda(o.ciudad)}</td>
+      </tr>`).join('')}</tbody>
+    </table></div>
+  </div>` : '';
+
+  const totalTodas = caList.length + caSinGuia.length + alleataList.length + otrosList.length;
+  const resumenTop = `<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:10px;font-size:11px;color:var(--text-muted)">
+    <span><b style="color:var(--text)">${totalTodas}</b> OTs en En Proceso</span>
+    <span>· Con guía CA: <b style="color:var(--text)">${caList.length}</b></span>
+    <span>· CA sin guía: <b style="color:#d97706">${caSinGuia.length}</b></span>
+    <span>· Alleata: <b style="color:var(--text)">${alleataList.length}</b></span>
+    <span>· Otros: <b style="color:var(--text)">${otrosList.length}</b></span>
+  </div>`;
+
   el.innerHTML=`<div style="margin-top:12px">
+    ${resumenTop}
     <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px">${chipsHtml}</div>
     ${gruposHtml || '<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:12px">Sin guías en este filtro</div>'}
     ${notaAlleata}
+    ${seccionCaSinGuia}
+    ${seccionOtros}
   </div>`;
 }
 
