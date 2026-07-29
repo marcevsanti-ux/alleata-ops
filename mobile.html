@@ -165,7 +165,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
       <div class="login-logo">
         <img id="loginLogo" src="" alt="Alleata">
         <div class="login-sub">Portal de Operaciones</div>
-        <div class="login-version">v2.14.34 · mobile</div>
+        <div class="login-version">v2.14.35 · mobile</div>
       </div>
       <div class="field"><label class="label">Email</label><input class="input" id="lEmail" type="email" placeholder="usuario@alleata.com" autocomplete="email"></div>
       <div class="field"><label class="label">Contraseña</label><input class="input" id="lPass" type="password" placeholder="••••••••" autocomplete="current-password"></div>
@@ -181,7 +181,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
   <div class="topbar">
     <img id="appLogo" src="" alt="Alleata">
     <div class="topbar-title" id="topbarTitle">Operaciones</div>
-    <div class="topbar-version" onclick="_tocarVersion()">v2.14.34</div>
+    <div class="topbar-version" onclick="_tocarVersion()">v2.14.35</div>
     <div class="topbar-avatar" id="topbarAvatar" onclick="openDrawer()">?</div>
   </div>
 
@@ -300,6 +300,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
         <span onclick="loadEnTransito()" style="margin-left:auto;cursor:pointer;color:var(--teal);font-size:11px;text-transform:none;letter-spacing:0;font-weight:600">🔄 Actualizar</span>
       </div>
       <div id="kmIndicador" style="display:none;background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--teal);border-radius:12px;padding:12px 14px;margin-bottom:12px"></div>
+      <button onclick="abrirModalParadaManual()" style="width:100%;margin-bottom:12px;background:none;border:1px dashed var(--border2);color:var(--text-muted);padding:10px;font-size:12px;font-weight:600;border-radius:10px;cursor:pointer;font-family:'Inter',sans-serif">📦 + Retiro en proveedor</button>
       <div id="rutaActivaList">
         <div class="empty"><div class="empty-icon">🚚</div><p>Sin OTs en tránsito hoy</p></div>
       </div>
@@ -539,6 +540,41 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
     <div class="modal-btns">
       <button class="btn btn-cancel" onclick="cerrarModalActualizarSim()">Cancelar</button>
       <button class="btn" id="actualizarSim-confirm" onclick="confirmarActualizarSim()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL PARADA MANUAL — retiro en proveedor, se mezcla con las OTs en la Hoja de Ruta -->
+<div class="modal-overlay" id="modalParadaManual">
+  <div class="modal">
+    <div class="modal-title">📦 Retiro en proveedor</div>
+    <div style="font-size:11px;color:var(--text-muted);margin-bottom:14px">Se agrega como una parada más de tu hoja de ruta de hoy.</div>
+
+    <label class="label" style="margin-bottom:6px;display:block">Proveedor / a quién vas a ver</label>
+    <input class="input" id="pm-proveedor" placeholder="Ej: Newsan, depósito Vicente López..." style="margin-bottom:12px">
+
+    <label class="label" style="margin-bottom:6px;display:block">Dirección</label>
+    <input class="input" id="pm-direccion" placeholder="Calle, altura, ciudad" style="margin-bottom:12px">
+
+    <label class="label" style="margin-bottom:6px;display:block">Contacto</label>
+    <input class="input" id="pm-contacto" placeholder="Nombre de quién recibe" style="margin-bottom:12px">
+
+    <label class="label" style="margin-bottom:6px;display:block">Teléfono</label>
+    <input class="input" id="pm-telefono" placeholder="Opcional" style="margin-bottom:12px">
+
+    <label class="label" style="margin-bottom:6px;display:block">Qué vas a retirar</label>
+    <input class="input" id="pm-queretirar" placeholder="Ej: 5 terminales POS, cambio de equipo..." style="margin-bottom:12px">
+
+    <label class="label" style="margin-bottom:6px;display:block">OT relacionada (opcional)</label>
+    <input class="input" id="pm-ot" placeholder="Si aplica" style="margin-bottom:12px">
+
+    <textarea class="input" id="pm-notas" rows="2" placeholder="Notas opcionales..." style="resize:vertical;font-family:'Inter',sans-serif;margin-bottom:14px"></textarea>
+
+    <div id="pm-msg" style="font-size:12px;margin-bottom:10px"></div>
+
+    <div class="modal-btns">
+      <button class="btn btn-cancel" onclick="cerrarModalParadaManual()">Cancelar</button>
+      <button class="btn" id="pm-confirm" onclick="confirmarParadaManual()">Agregar a mi ruta</button>
     </div>
   </div>
 </div>
@@ -1342,6 +1378,99 @@ async function loadRuta(){
 
   cargarCierresLocal();
   await loadEnTransito();
+  await renderParadasManuales();
+}
+
+// ── PARADAS MANUALES — retiro en proveedor (tabla paralela, no toca sf_workorders) ──
+async function abrirModalParadaManual(){
+  ['pm-proveedor','pm-direccion','pm-contacto','pm-telefono','pm-queretirar','pm-ot','pm-notas'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  document.getElementById('pm-msg').textContent='';
+  document.getElementById('modalParadaManual').classList.add('show');
+}
+function cerrarModalParadaManual(){
+  document.getElementById('modalParadaManual').classList.remove('show');
+}
+async function confirmarParadaManual(){
+  const proveedor=document.getElementById('pm-proveedor').value.trim();
+  const direccion=document.getElementById('pm-direccion').value.trim();
+  if(!proveedor && !direccion){
+    document.getElementById('pm-msg').innerHTML='<span style="color:var(--red)">Cargá al menos el proveedor o la dirección.</span>';
+    return;
+  }
+  const btn=document.getElementById('pm-confirm');
+  btn.disabled=true;btn.textContent='Guardando...';
+  const fecha=hoyArgentina();
+  const row={
+    fecha,
+    chofer_user_id: currentUser?.id||null,
+    chofer_nombre: (currentProfile?.nombre||currentProfile?.email||'—').trim(),
+    tipo:'retiro_proveedor',
+    proveedor_nombre: proveedor||null,
+    direccion: direccion||null,
+    contacto: document.getElementById('pm-contacto').value.trim()||null,
+    telefono: document.getElementById('pm-telefono').value.trim()||null,
+    que_retirar: document.getElementById('pm-queretirar').value.trim()||null,
+    ot_numero: document.getElementById('pm-ot').value.trim()||null,
+    notas: document.getElementById('pm-notas').value.trim()||null,
+    creado_por: (currentProfile?.nombre||currentProfile?.email||'—').trim(),
+  };
+  const{error}=await sb.from('hoja_ruta_paradas_manuales').insert(row);
+  btn.disabled=false;btn.textContent='Agregar a mi ruta';
+  if(error){
+    document.getElementById('pm-msg').innerHTML=`<span style="color:var(--red)">Error: ${error.message}</span>`;
+    return;
+  }
+  cerrarModalParadaManual();
+  showScanFeedback('📦 Parada agregada a tu ruta','ok');
+  await renderParadasManuales();
+}
+
+// Se agregan DESPUÉS de las OT cards, dentro del mismo contenedor
+// #rutaActivaList — quedan mezcladas en la misma lista visual, con un
+// borde/ícono propio para distinguirlas de un vistazo.
+async function renderParadasManuales(){
+  if(!currentUser)return;
+  const fecha=hoyArgentina();
+  const{data,error}=await sb.from('hoja_ruta_paradas_manuales')
+    .select('*').eq('fecha',fecha).eq('chofer_user_id',currentUser.id).eq('completado',false)
+    .order('created_at',{ascending:true});
+  if(error){console.warn('[renderParadasManuales] Error:',error.message);return;}
+  const cont=document.getElementById('rutaActivaList');
+  if(!cont)return;
+  // Sacar el bloque anterior de paradas (si existía) para no duplicar al re-renderizar
+  const previo=document.getElementById('paradasManualesBlock');
+  if(previo)previo.remove();
+  if(!data?.length)return;
+  const html=data.map(p=>{
+    const mapsUrl=p.direccion?'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(p.direccion):'';
+    const telP=String(p.telefono||'').replace(/\D/g,'');
+    return `<div class="ot-card" style="margin-bottom:10px;border:1px dashed #f59e0b;background:rgba(245,158,11,.06)">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px">
+        <div>
+          <div class="ot-num" style="color:#f59e0b">📦 Retiro en proveedor</div>
+          <div class="ot-tipo">${p.ot_numero?'OT '+p.ot_numero:'Sin OT asociada'}</div>
+        </div>
+      </div>
+      <div class="ot-comercio">${p.proveedor_nombre||'—'}</div>
+      <div style="display:flex;flex-direction:column;gap:4px;margin:8px 0">
+        ${p.direccion?`<div class="ot-row"><span>📍</span>${p.direccion}</div>`:''}
+        ${p.que_retirar?`<div class="ot-row"><span>📋</span>${p.que_retirar}</div>`:''}
+        ${p.contacto?`<div class="ot-row"><span>👤</span>${p.contacto}</div>`:''}
+        ${p.telefono?`<div class="ot-row"><span>📞</span><a href="tel:${p.telefono}" style="color:var(--blue);text-decoration:none">${p.telefono}</a></div>`:''}
+      </div>
+      <div class="ot-actions">
+        <button class="btn-sm btn-entregar" style="flex:1" onclick="marcarParadaRetirada('${p.id}')">✅ Retirado</button>
+        ${mapsUrl?`<a href="${mapsUrl}" target="_blank" class="btn-sm btn-maps" title="Abrir en Maps">${ICON_MAPS}</a>`:''}
+      </div>
+    </div>`;
+  }).join('');
+  cont.insertAdjacentHTML('beforeend',`<div id="paradasManualesBlock">${html}</div>`);
+}
+
+async function marcarParadaRetirada(id){
+  await sb.from('hoja_ruta_paradas_manuales').update({completado:true,completado_at:new Date().toISOString()}).eq('id',id);
+  showScanFeedback('✅ Retiro marcado','ok');
+  await renderParadasManuales();
 }
 
 // ── RESUMEN DE RUTA — persistencia local de cierres del día (localStorage) ──
