@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.6.7</title>
+<title>Alleata · Operaciones v4.6.9</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -400,7 +400,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.7 · 29 jul 2026
+      v4.6.9 · 29 jul 2026
     </div>
   </div>
 </div>
@@ -488,7 +488,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.7 · 29 jul 2026
+      v4.6.9 · 29 jul 2026
     </div>
   </div>
 </nav>
@@ -528,7 +528,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.7</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.9</div>
   </div>
   <div class="content">
 
@@ -1185,6 +1185,41 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="btn btn-sm" onclick="asignarOTAChofer()" id="hr-asignar-btn">➕ Asignar a su ruta de hoy</button>
     <div id="hr-asignar-msg" style="font-size:12px;width:100%"></div>
+  </div>
+
+  <!-- Parada manual (retiro en proveedor) — mismo permiso que "Asignar OT".
+       Tabla paralela hoja_ruta_paradas_manuales, se mezcla con las OTs solo
+       al renderizar. El chofer también puede cargar la suya propia desde
+       la app mobile (tab Ruta → 📦 + Retiro en proveedor). -->
+  <div id="hr-parada-box" style="display:none;background:var(--navy-800);border:1px dashed #f59e0b;border-radius:10px;padding:12px 16px;margin-bottom:18px;align-items:flex-end;gap:10px;flex-wrap:wrap">
+    <div>
+      <label class="label">Chofer</label>
+      <select class="select" id="hr-parada-chofer" style="width:200px">
+        <option value="">Cargando choferes...</option>
+      </select>
+    </div>
+    <div>
+      <label class="label">Proveedor</label>
+      <input class="input" id="hr-parada-proveedor" placeholder="A quién va a ver" style="width:180px">
+    </div>
+    <div>
+      <label class="label">Dirección</label>
+      <input class="input" id="hr-parada-direccion" placeholder="Calle, altura, ciudad" style="width:220px">
+    </div>
+    <div>
+      <label class="label">Qué retira</label>
+      <input class="input" id="hr-parada-queretirar" placeholder="Ej: 5 terminales" style="width:180px">
+    </div>
+    <div>
+      <label class="label">Contacto</label>
+      <input class="input" id="hr-parada-contacto" placeholder="Opcional" style="width:150px">
+    </div>
+    <div>
+      <label class="label">Teléfono</label>
+      <input class="input" id="hr-parada-telefono" placeholder="Opcional" style="width:130px">
+    </div>
+    <button class="btn btn-sm" style="background:#f59e0b;border:1px solid #f59e0b;color:#1a1200" onclick="agregarParadaManualDesktop()" id="hr-parada-btn">📦 Agregar parada</button>
+    <div id="hr-parada-msg" style="font-size:12px;width:100%"></div>
   </div>
 
   <div id="hr-cola-resumen" style="margin-bottom:14px"></div>
@@ -4620,7 +4655,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.6.7] OK');
+console.log('[Alleata v4.6.9] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -5613,9 +5648,11 @@ async function loadHojaRuta(){
 
   // Caja de "Asignar OT a chofer" — solo admin (pedido explícito de marcelos).
   const asignarBox=document.getElementById('hr-asignar-box');
+  const paradaBox=document.getElementById('hr-parada-box');
   if(asignarBox){
     const esAdmin=currentProfile?.rol==='admin';
     asignarBox.style.display=esAdmin?'flex':'none';
+    if(paradaBox)paradaBox.style.display=esAdmin?'flex':'none';
     if(esAdmin)_poblarChoferesAsignar();
   }
 
@@ -5638,6 +5675,14 @@ async function loadHojaRuta(){
     .select('id,sf_id,ot,comercio,cuenta,estado,ciudad,direccion,calle,operador_id,subtipo')
     .eq('tipo','desinstalacion').eq('hoja_ruta_activa',true).eq('hoja_ruta_fecha',hoy);
   if(errDesinst) console.warn('[loadHojaRuta] Error trayendo desinstalaciones/retiros de hoy:',errDesinst.message);
+
+  // Paradas manuales de retiro en proveedor (hoja_ruta_paradas_manuales) —
+  // tabla paralela, se mezcla acá igual que las desinstalaciones, por
+  // nombre de chofer. Solo las no completadas (las retiradas ya no
+  // aparecen en la ruta activa).
+  const{data:paradasHoy,error:errParadas}=await sb.from('hoja_ruta_paradas_manuales')
+    .select('*').eq('fecha',hoy).eq('completado',false);
+  if(errParadas) console.warn('[loadHojaRuta] Error trayendo paradas manuales:',errParadas.message);
 
   // Cola de OTs dejadas por un admin, todavía sin confirmar por el chofer
   // desde la app — se muestra aparte, nunca mezclada con la ruta confirmada.
@@ -5713,6 +5758,14 @@ async function loadHojaRuta(){
     (desinstPorNombre[key]=desinstPorNombre[key]||[]).push(d);
   });
 
+  const paradasPorNombre={};
+  const paradasSinChofer=[];
+  (paradasHoy||[]).forEach(p=>{
+    const key=norm(p.chofer_nombre);
+    if(!key){ paradasSinChofer.push(p); return; }
+    (paradasPorNombre[key]=paradasPorNombre[key]||[]).push(p);
+  });
+
   const ESTADOS_CERRADOS=['Exitoso','Exitosa','Entregado','Fallido'];
   let totalAbiertas=0;
 
@@ -5731,6 +5784,21 @@ async function loadHojaRuta(){
         <div style="font-size:11px;color:var(--text-muted)">${dir}${d.ciudad?' · '+d.ciudad:''}</div>
       </div>
       <span class="badge" style="background:rgba(239,68,68,.12);color:#ef4444;border:1px solid rgba(239,68,68,.3)">${d.estado||'—'}</span>
+    </div>`;
+  }
+
+  // Parada manual de retiro en proveedor — mismo estilo visual que las
+  // desinstalaciones (misma columna), pero borde ámbar y acción propia de
+  // "Retirado" en vez de Entregado/Fallido.
+  function renderParadaItem(p){
+    totalAbiertas++;
+    return `<div style="background:var(--navy-800);border:1px solid rgba(245,158,11,.35);border-left:4px solid #f59e0b;border-radius:10px;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+      <div>
+        <div style="font-weight:700;font-size:13px;color:#f59e0b">📦 Retiro en proveedor${p.ot_numero?` <span style="font-weight:400;color:var(--text-muted);font-family:'JetBrains Mono',monospace">· OT ${p.ot_numero}</span>`:''}</div>
+        <div style="font-size:13px;margin-top:2px">${p.proveedor_nombre||'—'}</div>
+        <div style="font-size:11px;color:var(--text-muted)">${p.direccion||''}${p.que_retirar?' · '+p.que_retirar:''}</div>
+      </div>
+      <button class="btn-sm" style="background:#f59e0b;border:1px solid #f59e0b;color:#1a1200" onclick="marcarParadaRetiradaDesktop('${p.id}',this)">✅ Retirado</button>
     </div>`;
   }
 
@@ -5769,8 +5837,12 @@ async function loadHojaRuta(){
     delete desinstPorNombre[key];
     const itemsDesinst=desinstDeEste.map(renderDesinstItem).join('');
 
-    const items=[itemsEnvios,itemsDesinst].filter(Boolean).join('')||'<div style="font-size:12px;color:var(--text-muted)">Sin OTs en su ruta.</div>';
-    const totalCount=(r.ots_numeros||[]).length+desinstDeEste.length;
+    const paradasDeEste=paradasPorNombre[key]||[];
+    delete paradasPorNombre[key];
+    const itemsParadas=paradasDeEste.map(renderParadaItem).join('');
+
+    const items=[itemsEnvios,itemsDesinst,itemsParadas].filter(Boolean).join('')||'<div style="font-size:12px;color:var(--text-muted)">Sin OTs en su ruta.</div>';
+    const totalCount=(r.ots_numeros||[]).length+desinstDeEste.length+paradasDeEste.length;
     const enColaEste=(porChoferCola[r.user_id]||[]).length;
 
     return `<div>
@@ -5798,14 +5870,26 @@ async function loadHojaRuta(){
   // Desinstalaciones/retiros sin operador_id (ej: generadas desde el módulo
   // de checkboxes del desktop, que no setea operador_id) — así no quedan
   // huérfanas y sin ningún lugar donde verlas.
-  const bloqueSinChofer=desinstSinChofer.length?[`<div>
+  const bloqueSinChofer=(desinstSinChofer.length||paradasSinChofer.length)?[`<div>
       <div style="font-size:14px;font-weight:700;margin-bottom:8px;display:flex;align-items:center;gap:8px;color:var(--text-muted)">
-        📋 Sin operador asignado <span style="font-size:11px;font-weight:400">${desinstSinChofer.length} OT(s)</span>
+        📋 Sin operador asignado <span style="font-size:11px;font-weight:400">${desinstSinChofer.length+paradasSinChofer.length} OT(s)</span>
       </div>
-      <div style="display:flex;flex-direction:column;gap:8px">${desinstSinChofer.map(renderDesinstItem).join('')}</div>
+      <div style="display:flex;flex-direction:column;gap:8px">${desinstSinChofer.map(renderDesinstItem).join('')}${paradasSinChofer.map(renderParadaItem).join('')}</div>
     </div>`]:[];
 
-  const todosBloques=[...bloquesRutas,...bloquesSoloDesinst,...bloqueSinChofer];
+  // Choferes que hoy SOLO tienen paradas manuales (retiro en proveedor,
+  // sin ruta de envíos ni desinstalaciones asignadas todavía).
+  const bloquesSoloParadas=Object.values(paradasPorNombre).map(items=>{
+    const nombreOriginal=items[0]?.chofer_nombre||'—';
+    return `<div>
+      <div style="font-size:14px;font-weight:700;margin-bottom:8px;display:flex;align-items:center;gap:8px">
+        👤 ${nombreOriginal} <span style="font-size:11px;font-weight:400;color:var(--text-muted)">${items.length} parada(s) · solo retiros en proveedor</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px">${items.map(renderParadaItem).join('')}</div>
+    </div>`;
+  });
+
+  const todosBloques=[...bloquesRutas,...bloquesSoloDesinst,...bloquesSoloParadas,...bloqueSinChofer];
   cont.innerHTML=todosBloques.join('<div style="height:1px;background:var(--border2);margin:4px 0"></div>')
     || '<div style="text-align:center;padding:30px;color:var(--text-muted)">Nadie confirmó una ruta hoy todavía.</div>';
 
@@ -5814,17 +5898,58 @@ async function loadHojaRuta(){
 
 // Puebla el <select> de choferes para "Asignar OT" — solo se llama si es admin.
 let _hrChoferesCache=null;
+async function marcarParadaRetiradaDesktop(id,btn){
+  if(btn){btn.disabled=true;btn.textContent='...';}
+  await sb.from('hoja_ruta_paradas_manuales').update({completado:true,completado_at:new Date().toISOString()}).eq('id',id);
+  await loadHojaRuta();
+}
+
 async function _poblarChoferesAsignar(){
   const sel=document.getElementById('hr-asignar-chofer');
-  if(!sel)return;
+  const sel2=document.getElementById('hr-parada-chofer');
+  if(!sel&&!sel2)return;
   if(!_hrChoferesCache){
     const{data,error}=await sb.from('profiles').select('id,nombre,email').eq('rol','logistica').order('nombre',{ascending:true});
-    if(error){sel.innerHTML=`<option value="">Error: ${error.message}</option>`;return;}
+    if(error){if(sel)sel.innerHTML=`<option value="">Error: ${error.message}</option>`;return;}
     _hrChoferesCache=data||[];
   }
-  sel.innerHTML=_hrChoferesCache
+  const opts=_hrChoferesCache
     .map(p=>`<option value="${p.id}">${(p.nombre||p.email||'—').trim()}</option>`)
     .join('')||'<option value="">Sin usuarios</option>';
+  if(sel)sel.innerHTML=opts;
+  if(sel2)sel2.innerHTML=opts;
+}
+
+// Alta manual de una parada de retiro en proveedor, para un chofer elegido
+// por el admin — misma tabla que la app mobile usa cuando lo carga el
+// propio chofer (hoja_ruta_paradas_manuales).
+async function agregarParadaManualDesktop(){
+  const choferId=document.getElementById('hr-parada-chofer').value;
+  const proveedor=document.getElementById('hr-parada-proveedor').value.trim();
+  const direccion=document.getElementById('hr-parada-direccion').value.trim();
+  const msg=document.getElementById('hr-parada-msg');
+  if(!choferId){msg.innerHTML='<span style="color:var(--red)">Elegí un chofer.</span>';return;}
+  if(!proveedor&&!direccion){msg.innerHTML='<span style="color:var(--red)">Cargá al menos proveedor o dirección.</span>';return;}
+  const chofer=_hrChoferesCache?.find(c=>c.id===choferId);
+  const btn=document.getElementById('hr-parada-btn');
+  btn.disabled=true;btn.textContent='Guardando...';
+  const{error}=await sb.from('hoja_ruta_paradas_manuales').insert({
+    fecha:hoyArgentina(),
+    chofer_user_id:choferId,
+    chofer_nombre:(chofer?.nombre||chofer?.email||'—').trim(),
+    tipo:'retiro_proveedor',
+    proveedor_nombre:proveedor||null,
+    direccion:direccion||null,
+    contacto:document.getElementById('hr-parada-contacto').value.trim()||null,
+    telefono:document.getElementById('hr-parada-telefono').value.trim()||null,
+    que_retirar:document.getElementById('hr-parada-queretirar').value.trim()||null,
+    creado_por:(currentProfile?.nombre||currentProfile?.email||'admin').trim(),
+  });
+  btn.disabled=false;btn.textContent='📦 Agregar parada';
+  if(error){msg.innerHTML=`<span style="color:var(--red)">Error: ${error.message}</span>`;return;}
+  msg.innerHTML='<span style="color:var(--teal)">✅ Agregada a su ruta.</span>';
+  ['hr-parada-proveedor','hr-parada-direccion','hr-parada-queretirar','hr-parada-contacto','hr-parada-telefono'].forEach(id=>{document.getElementById(id).value='';});
+  await loadHojaRuta();
 }
 
 // REVERTIDO 28/07 (urgente, marcelos): la cola (hoja_ruta_cola) causaba
@@ -6151,12 +6276,16 @@ function renderRolloutPiloto(){
   const filtroZona=document.getElementById('rpFiltroZona')?.value||'';
 
   let filtrados=_rpData;
-  if(filtroTxt)filtrados=filtrados.filter(r=>
-    (r.cliente||'').toLowerCase().includes(filtroTxt)||
-    (r.cuit||'').toLowerCase().includes(filtroTxt)||
-    (r.vendedor||'').toLowerCase().includes(filtroTxt)||
-    (r.ot_numero||'').toLowerCase().includes(filtroTxt)
-  );
+  if(filtroTxt){
+    const filtroDigitos=filtroTxt.replace(/\D/g,'');
+    filtrados=filtrados.filter(r=>
+      (r.cliente||'').toLowerCase().includes(filtroTxt)||
+      (r.cuit||'').toLowerCase().includes(filtroTxt)||
+      (r.vendedor||'').toLowerCase().includes(filtroTxt)||
+      (r.ot_numero||'').toLowerCase().includes(filtroTxt)||
+      (filtroDigitos.length>=3 && (r.telefono||'').replace(/\D/g,'').includes(filtroDigitos))
+    );
+  }
   if(filtroEtapa)filtrados=filtrados.filter(r=>r.etapa===filtroEtapa);
   if(filtroZona==='__fuera')filtrados=filtrados.filter(r=>!['CABA','GBA Norte','GBA Sur','GBA Oeste'].includes(r.zona));
   else if(filtroZona)filtrados=filtrados.filter(r=>r.zona===filtroZona);
@@ -6196,7 +6325,7 @@ function renderRolloutPiloto(){
       <td>${r.sla_dias!=null?r.sla_dias+'d':'—'}</td>
       <td style="font-size:11px">${fmtVol(r.vol_baseline_30d)}</td>
       <td style="font-size:11px">${r.vol_ultimo_reportado!=null?fmtVol(r.vol_ultimo_reportado)+' <span style=\"color:var(--text-muted)\">('+(r.vol_ultimo_fecha||'')+')</span>':'<span style=\"color:var(--text-muted)\">sin dato post-cambio</span>'}</td>
-      <td>${soloLectura?'':`<button class="btn-sm" style="background:none;border:1px solid var(--border2);color:#8b5cf6" onclick="actualizarVolumenPiloto('${r.id}')" title="Actualizar volumen desde SF">📊</button> ${r.ot_numero?`<button class="btn-sm" style="background:none;border:1px solid var(--border2);color:var(--teal)" onclick="printRotuloPiloto('${r.ot_numero}')" title="Imprimir rótulo (QR para escanear en mobile)">🖨️</button>`:''}`}</td>
+      <td>${soloLectura?'':`${puedeEditarEtapa?`<button class="btn-sm" style="background:none;border:1px solid var(--border2);color:#f59e0b" onclick="editarNotaPiloto('${r.id}')" title="Cambiar estado">✏️</button> `:''}${r.ot_numero?`<button class="btn-sm" style="background:none;border:1px solid var(--border2);color:var(--teal)" onclick="printRotuloPiloto('${r.ot_numero}')" title="Imprimir rótulo (QR para escanear en mobile)">🖨️</button>`:''}`}</td>
     </tr>`;
   };
 
