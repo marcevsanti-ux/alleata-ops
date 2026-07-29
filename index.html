@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.6.3</title>
+<title>Alleata · Operaciones v4.6.4</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -400,7 +400,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.3 · 27 jul 2026
+      v4.6.4 · 27 jul 2026
     </div>
   </div>
 </div>
@@ -488,7 +488,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.3 · 27 jul 2026
+      v4.6.4 · 27 jul 2026
     </div>
   </div>
 </nav>
@@ -528,7 +528,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.3</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.4</div>
   </div>
   <div class="content">
 
@@ -3274,9 +3274,12 @@ async function printRotuloInstalacion(id) {
 
     <!-- Paso 3: Street View -->
     <div style="background:var(--navy-800);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;margin-bottom:10px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:6px">
         <div style="font-size:12px;font-weight:700">3️⃣ Google Street View</div>
-        <a id="dsInv-btn-sv" href="#" target="_blank" rel="noopener" class="btn-sm" style="background:rgba(26,159,212,.15);border:1px solid rgba(26,159,212,.4);color:#1a9fd4;text-decoration:none;padding:5px 12px;border-radius:6px;font-weight:600">📍 Ver dirección</a>
+        <div style="display:flex;gap:6px">
+          <a id="dsInv-btn-sv-comercio" href="#" target="_blank" rel="noopener" class="btn-sm" style="background:rgba(26,159,212,.15);border:1px solid rgba(26,159,212,.4);color:#1a9fd4;text-decoration:none;padding:5px 10px;border-radius:6px;font-weight:600;font-size:11px">🔎 Buscar comercio</a>
+          <a id="dsInv-btn-sv" href="#" target="_blank" rel="noopener" class="btn-sm" style="background:rgba(26,159,212,.15);border:1px solid rgba(26,159,212,.4);color:#1a9fd4;text-decoration:none;padding:5px 10px;border-radius:6px;font-weight:600;font-size:11px">📍 Ver dirección</a>
+        </div>
       </div>
       <input class="input" id="dsInv-sv-notas" placeholder="Qué se ve (local cerrado, sin cobertura, sigue activo...)" style="font-size:12px">
     </div>
@@ -4615,7 +4618,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.6.3] OK');
+console.log('[Alleata v4.6.4] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -7040,10 +7043,18 @@ async function dsInvAbrir(ot){
   document.getElementById('dsInv-tel-contador').textContent=(inv.tel_intentos||0)+' intento'+(inv.tel_intentos===1?'':'s');
   document.getElementById('dsInv-tel-resultado').value=inv.tel_resultado||'';
 
-  // Paso 3 — Street View (dirección armada con lo que tengamos, Google
-  // resuelve el geocoding solo con el texto — no hace falta lat/lng)
+  // Paso 3 — Street View. FIX 28/07: google.com/maps/search/... abre una
+  // lista de resultados de negocios cercanos (poco útil), no una tarjeta
+  // con foto de Street View. Un google.com/search normal con la dirección
+  // sí arma esa tarjeta directo (probado a mano por marcelos). También se
+  // agrega la búsqueda por Nombre_del_comercio__c — a veces encuentra el
+  // local real (con fotos/reseñas) mejor que la dirección cruda de SF, que
+  // puede traer ruido tipo "Timbre 1" mezclado con la calle.
   const direccion=[o.calle,o.ciudad,o.provincia,'Argentina'].filter(Boolean).join(', ')||o.ciudad||'';
-  document.getElementById('dsInv-btn-sv').href='https://www.google.com/maps?q='+encodeURIComponent(direccion);
+  document.getElementById('dsInv-btn-sv').href='https://www.google.com/search?q='+encodeURIComponent(direccion);
+  const btnSvComercio=document.getElementById('dsInv-btn-sv-comercio');
+  if(o.comercio){ btnSvComercio.href='https://www.google.com/search?q='+encodeURIComponent(o.comercio+' '+(o.ciudad||'')); btnSvComercio.style.opacity='1'; }
+  else { btnSvComercio.href='#'; btnSvComercio.style.opacity='.4'; }
   document.getElementById('dsInv-sv-notas').value=inv.street_view_notas||'';
 
   // Paso 4 — Instagram (comercio y titular de cuenta, búsquedas separadas)
