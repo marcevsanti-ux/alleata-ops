@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.6.5</title>
+<title>Alleata · Operaciones v4.6.6</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -400,7 +400,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.5 · 27 jul 2026
+      v4.6.6 · 28 jul 2026
     </div>
   </div>
 </div>
@@ -488,7 +488,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.5 · 27 jul 2026
+      v4.6.6 · 28 jul 2026
     </div>
   </div>
 </nav>
@@ -528,7 +528,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.5</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.6</div>
   </div>
   <div class="content">
 
@@ -4620,7 +4620,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.6.5] OK');
+console.log('[Alleata v4.6.6] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -6889,6 +6889,7 @@ function dsGestionOpsToggleEstado(estado){
   // los estados sigue con la tabla plana genérica de siempre — no replicar
   // esto a otros estados todavía.
   if(estado==='Pendiente'){ dsPendienteRenderInvestigacion(lista, el); return; }
+  if(estado==='En Proceso'){ dsEnProcesoRenderTracking(lista, el); return; }
 
   const celda=v=>v?`<span>${v}</span>`:`<span style="color:var(--text-muted)">—</span>`;
   const color=ESTADO_COLORS_NAPSE[estado]||'#6b7280';
@@ -7011,6 +7012,150 @@ async function dsPendienteRenderInvestigacion(lista, el){
   el.innerHTML=`<div style="margin-top:12px">
     <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px">${chips}</div>
     ${gruposHtml}
+  </div>`;
+}
+
+// ── Tracking CA — "En Proceso" (pedido 28/07) ──────────────────────────
+// SOLO para el estado En Proceso. Angel ya acordó la devolución con el
+// cliente: AMBA → Logística Alleata (gestionado desde la app mobile, acá
+// no se muestra tracking). Fuera de AMBA → Correo Argentino, con guía
+// generada a mano por Angel en N_de_seguimiento__c — esto es lo que se
+// trackea acá. Agrupado Provincia → Localidad, ordenado por SLA
+// descendente (la guía más vieja/crítica arriba). No escribe nada en SF.
+const FASE_CA_LABEL={preimposicion:'Preimposición',en_sucursal:'En sucursal',ingresado:'Ingresado',en_transito:'En tránsito',en_camino:'En camino',recuperado:'Recuperado',caduco:'Caduco'};
+const FASE_CA_COLOR={preimposicion:'#6b7280',en_sucursal:'#1dbf8e',ingresado:'#1a9fd4',en_transito:'#1a9fd4',en_camino:'#8b5cf6',recuperado:'#1a9fd4',caduco:'#ef4444'};
+const FASE_CA_CHIPS=[['todas','Todas'],['en_sucursal','En sucursal'],['en_transito','En tránsito'],['caduco','Caducas'],['recuperado','Recuperadas']];
+
+async function dsEnProcesoRenderTracking(lista, el){
+  el.innerHTML='<div style="text-align:center;padding:20px;color:var(--text-muted)">Cargando tracking de guías CA...</div>';
+
+  const caList=lista.filter(o=>(o.logistica||'').toUpperCase().includes('CORREO ARGENTINO') && o.tracking);
+  const alleataList=lista.filter(o=>(o.logistica||'').toUpperCase().includes('ALLEATA'));
+  const sinLogistica=lista.filter(o=>!caList.includes(o) && !alleataList.includes(o));
+
+  // Traer guías ya registradas
+  let guiasPorTracking={};
+  try{
+    const r=await railwayFetch('/automations/desinst-ca-tracking');
+    const j=await r.json();
+    (j.guias||[]).forEach(g=>{guiasPorTracking[g.tracking_guide]=g;});
+  }catch(e){}
+
+  // Registrar guías nuevas que todavía no están en la tabla (alta perezosa,
+  // igual que se hace con desinst_investigacion en Pendiente)
+  const nuevas=caList.filter(o=>!guiasPorTracking[o.tracking]);
+  if(nuevas.length){
+    el.innerHTML=`<div style="text-align:center;padding:20px;color:var(--text-muted)">Registrando ${nuevas.length} guía(s) nueva(s) contra Correo Argentino...</div>`;
+    await Promise.all(nuevas.map(async o=>{
+      try{
+        const r=await railwayFetch('/automations/desinst-ca-tracking/upsert',{method:'POST',body:JSON.stringify({
+          ot_numero:o.ot, sf_id:o.sf_id||null, tracking_guide:o.tracking, provincia:o.provincia||null, localidad:o.ciudad||null
+        })});
+        const j=await r.json();
+        if(j.ok && j.guia) guiasPorTracking[j.guia.tracking_guide]=j.guia;
+      }catch(e){}
+    }));
+  }
+
+  window._dsEnProcesoCaList=caList;
+  window._dsEnProcesoAlleataList=alleataList;
+  window._dsEnProcesoGuias=guiasPorTracking;
+
+  dsEnProcesoRenderFiltrado('todas', el);
+}
+
+function dsEnProcesoRenderFiltrado(filtro, el){
+  const caList=window._dsEnProcesoCaList||[];
+  const alleataList=window._dsEnProcesoAlleataList||[];
+  const guiasPorTracking=window._dsEnProcesoGuias||{};
+  el.dataset.filtroCa=filtro;
+
+  const celda=v=>v?`<span>${v}</span>`:`<span style="color:var(--text-muted)">—</span>`;
+
+  const items=caList.map(o=>{
+    const g=guiasPorTracking[o.tracking]||{};
+    return {o, g, fase:g.fase||'preimposicion', sla:g.sla_dias??0};
+  }).filter(it=> filtro==='todas' ? true : it.fase===filtro);
+
+  const chipsHtml=FASE_CA_CHIPS.map(([key,label])=>{
+    const cant = key==='todas' ? caList.length : caList.filter(o=>(guiasPorTracking[o.tracking]?.fase||'preimposicion')===key).length;
+    const activo = filtro===key;
+    const color = key==='todas' ? '#6b7280' : FASE_CA_COLOR[key];
+    return `<span class="badge" style="background:${color}${activo?'30':'18'};border:1px solid ${color}${activo?'70':'40'};color:${color};cursor:pointer;padding:5px 10px;font-size:10px;font-weight:${activo?700:400}" onclick="dsEnProcesoRenderFiltrado('${key}', document.getElementById('ds-gestionops-detalle'))">${label} · ${cant}</span>`;
+  }).join('');
+
+  // Agrupar por provincia → localidad
+  const porProvincia={};
+  items.forEach(it=>{
+    const prov=(it.o.provincia||'Sin provincia').trim()||'Sin provincia';
+    const loc=(it.o.ciudad||'Sin localidad').trim()||'Sin localidad';
+    porProvincia[prov]=porProvincia[prov]||{};
+    porProvincia[prov][loc]=porProvincia[prov][loc]||[];
+    porProvincia[prov][loc].push(it);
+  });
+  const provinciasOrdenadas=Object.entries(porProvincia)
+    .map(([prov,locs])=>[prov,locs,Object.values(locs).reduce((a,arr)=>a+arr.length,0)])
+    .sort((a,b)=>b[2]-a[2]);
+
+  const COLORES_PROV=['#1a9fd4','#1dbf8e','#f59e0b','#8b5cf6','#ef4444','#10b981','#f97316','#6b7280','#a78bfa','#ec4899'];
+
+  const gruposHtml=provinciasOrdenadas.map(([prov,locs],i)=>{
+    const c=COLORES_PROV[i%COLORES_PROV.length];
+    const localidadesOrdenadas=Object.entries(locs).sort((a,b)=>a[0].localeCompare(b[0]));
+    const bloquesLocalidad=localidadesOrdenadas.map(([loc,its])=>{
+      const ordenadas=its.slice().sort((a,b)=>(b.sla??0)-(a.sla??0));
+      const cards=ordenadas.map(({o,g,fase,sla})=>{
+        const fc=FASE_CA_COLOR[fase]||'#6b7280';
+        const fl=FASE_CA_LABEL[fase]||fase;
+        const idAcordeon=`caev-${(g.id||o.tracking).replace(/[^a-zA-Z0-9]/g,'')}`;
+        const eventos=g.eventos_ca||[];
+        const filasEventos=eventos.map(ev=>`<tr style="border-top:1px solid var(--border)">
+            <td style="padding:4px 8px 4px 0;font-size:10px;color:var(--text-muted);white-space:nowrap">${celda(ev.fecha)}</td>
+            <td style="padding:4px 8px;font-size:10px">${celda(ev.planta)}</td>
+            <td style="padding:4px 8px;font-size:10px;font-weight:600">${celda(ev.historia)}</td>
+            <td style="padding:4px 0;font-size:10px">${celda(ev.estadoCA)}</td>
+          </tr>`).join('');
+        return `<div style="background:var(--surface2);border:1px solid ${fase==='caduco'?'#ef444470':'var(--border2)'};border-radius:10px;padding:10px 14px;margin-bottom:8px">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+            <div>
+              <div style="font-weight:700;font-size:13px">${celda(o.comercio||o.cuenta)}</div>
+              <div style="font-size:10px;color:var(--text-muted);margin-top:1px">OT ${o.ot} · ${celda(o.cuenta)}</div>
+            </div>
+            <div style="text-align:right">
+              <span style="font-size:9px;font-weight:700;padding:2px 8px;border-radius:10px;color:${fc};background:${fc}18;border:1px solid ${fc}40">${fl}</span>
+              <div style="font-size:18px;font-weight:800;color:${fc};margin-top:4px">${sla} día${sla===1?'':'s'}</div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;font-size:10px;color:var(--text-muted);margin-top:8px;font-family:'JetBrains Mono',monospace">🚚 ${o.tracking}</div>
+          <div style="border-top:1px solid var(--border);margin-top:8px;padding-top:6px;display:flex;justify-content:space-between;align-items:center">
+            <span style="font-size:10px;color:var(--text-muted)">${celda(g.historia_actual)}</span>
+            <button class="btn btn-sm" style="font-size:10px;padding:4px 10px" onclick="document.getElementById('${idAcordeon}').style.display=document.getElementById('${idAcordeon}').style.display==='none'?'block':'none'">Ver historial</button>
+          </div>
+          <div id="${idAcordeon}" style="display:none;margin-top:8px;overflow-x:auto">
+            <table style="width:100%;border-collapse:collapse;font-size:10px;white-space:nowrap">
+              <thead><tr style="text-align:left;color:var(--text-muted);text-transform:uppercase;font-size:9px;letter-spacing:.03em">
+                <th style="padding:4px 8px 4px 0">Fecha</th><th style="padding:4px 8px">Planta</th><th style="padding:4px 8px">Historia</th><th style="padding:4px 0">Estado</th>
+              </tr></thead>
+              <tbody>${filasEventos || '<tr><td colspan="4" style="padding:8px;color:var(--text-muted)">Sin eventos todavía</td></tr>'}</tbody>
+            </table>
+          </div>
+        </div>`;
+      }).join('');
+      return `<div style="margin-top:10px"><div style="font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em;margin-bottom:6px">📍 ${loc} · ${its.length}</div>${cards}</div>`;
+    }).join('');
+
+    return `<div style="margin-top:16px;background:var(--surface2);border:1px solid var(--border2);border-radius:10px;overflow:hidden">
+      <div style="background:${c}15;border-left:3px solid ${c};padding:10px 14px;font-size:12px;font-weight:700;color:${c}">${prov} · ${Object.values(locs).reduce((a,arr)=>a+arr.length,0)}</div>
+      <div style="padding:6px 12px 10px">${bloquesLocalidad}</div>
+    </div>`;
+  }).join('');
+
+  const notaAlleata = alleataList.length ? `<div style="margin-top:14px;font-size:11px;color:var(--text-muted);padding:8px 12px;background:var(--surface2);border-radius:8px">🚗 ${alleataList.length} OT(s) en AMBA con logística Alleata — gestionadas desde la app mobile, sin tracking acá.</div>` : '';
+
+  el.innerHTML=`<div style="margin-top:12px">
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px">${chipsHtml}</div>
+    ${gruposHtml || '<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:12px">Sin guías en este filtro</div>'}
+    ${notaAlleata}
   </div>`;
 }
 
