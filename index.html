@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.6.18</title>
+<title>Alleata · Operaciones v4.6.19</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -400,7 +400,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.18 · 30 jul 2026
+      v4.6.19 · 30 jul 2026
     </div>
   </div>
 </div>
@@ -488,7 +488,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.18 · 30 jul 2026
+      v4.6.19 · 30 jul 2026
     </div>
   </div>
 </nav>
@@ -528,7 +528,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.18</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.19</div>
   </div>
   <div class="content">
 
@@ -4659,7 +4659,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.6.18] OK');
+console.log('[Alleata v4.6.19] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -7279,14 +7279,20 @@ function dsEnProcesoRenderFiltrado(filtro, el){
     porProvincia[prov][loc].push(it);
   });
   const provinciasOrdenadas=Object.entries(porProvincia)
-    .map(([prov,locs])=>[prov,locs,Object.values(locs).reduce((a,arr)=>a+arr.length,0)])
-    .sort((a,b)=>b[2]-a[2]);
+    .map(([prov,locs])=>{
+      const cant=Object.values(locs).reduce((a,arr)=>a+arr.length,0);
+      const maxSla=Math.max(0,...Object.values(locs).flat().map(it=>it.sla??0));
+      return [prov,locs,cant,maxSla];
+    })
+    .sort((a,b)=>b[3]-a[3]); // provincia con la guía más vieja (más días) arriba de todo
 
   const COLORES_PROV=['#1a9fd4','#1dbf8e','#f59e0b','#8b5cf6','#ef4444','#10b981','#f97316','#6b7280','#a78bfa','#ec4899'];
 
   const gruposHtml=provinciasOrdenadas.map(([prov,locs],i)=>{
     const c=COLORES_PROV[i%COLORES_PROV.length];
-    const localidadesOrdenadas=Object.entries(locs).sort((a,b)=>a[0].localeCompare(b[0]));
+    const localidadesOrdenadas=Object.entries(locs)
+      .map(([loc,its])=>[loc,its,Math.max(0,...its.map(it=>it.sla??0))])
+      .sort((a,b)=>b[2]-a[2]); // localidad con la guía más vieja arriba
     const bloquesLocalidad=localidadesOrdenadas.map(([loc,its])=>{
       const ordenadas=its.slice().sort((a,b)=>(b.sla??0)-(a.sla??0));
       const cards=ordenadas.map(({o,g,fase,sla})=>{
