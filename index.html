@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.6.11</title>
+<title>Alleata · Operaciones v4.6.12</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -400,7 +400,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.11 · 29 jul 2026
+      v4.6.12 · 29 jul 2026
     </div>
   </div>
 </div>
@@ -488,7 +488,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.11 · 29 jul 2026
+      v4.6.12 · 29 jul 2026
     </div>
   </div>
 </nav>
@@ -528,7 +528,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.11</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.12</div>
   </div>
   <div class="content">
 
@@ -4655,7 +4655,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.6.11] OK');
+console.log('[Alleata v4.6.12] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -6862,7 +6862,7 @@ async function loadNapseDesinstPanel(){
   // Consulta EN VIVO a SF (vía Railway), no la caché sf_workorders — se
   // detectó que esa caché puede quedar temporalmente incompleta entre
   // sincronizaciones (ver hallazgo 21/07: mostraba 5 de 8 OTs reales).
-  let total=0, porEstado={}, porMotivo={}, motivoDetalle={}, fuente='vivo', errMsg=null;
+  let total=0, porEstado={}, porMotivo={}, motivoDetalle={}, estadoDetalle={}, fuente='vivo', errMsg=null;
   try{
     const r=await railwayFetch('/automations/sf-stats/desinstalaciones?perfil=NAPSE&todas=1');
     const j=await r.json();
@@ -6871,6 +6871,7 @@ async function loadNapseDesinstPanel(){
       porEstado=j.totalPorEstado||{};
       porMotivo=j.totalPorMotivo||{};
       motivoDetalle=j.motivoDetalle||{};
+      estadoDetalle=j.estadoDetalle||{};
     }else{
       errMsg=j.error||'Respuesta no OK';
     }
@@ -6891,6 +6892,7 @@ async function loadNapseDesinstPanel(){
   }
 
   window._napseMotivoDetalle=motivoDetalle; // leído por toggleNapseMotivo()
+  window._napseEstadoDetalle=estadoDetalle; // leído por toggleNapseEstado()
   const entries=Object.entries(porEstado).sort((a,b)=>b[1]-a[1]);
   const entriesMotivo=Object.entries(porMotivo).sort((a,b)=>b[1]-a[1]);
   const avisoCache=fuente!=='vivo'?`<div style="font-size:10px;color:var(--yellow);margin-top:10px">⚠️ ${fuente} — puede estar desactualizado</div>`:'';
@@ -6905,12 +6907,14 @@ async function loadNapseDesinstPanel(){
     <div style="display:flex;flex-wrap:wrap;gap:8px">
       ${entries.map(([estado,cant])=>{
         const color=ESTADO_COLORS_NAPSE[estado]||'#6b7280';
-        return`<div style="background:${color}18;border:1px solid ${color}40;border-radius:10px;padding:8px 12px;min-width:100px">
+        const eid='napse-estado-'+estado.replace(/[^a-zA-Z0-9]/g,'');
+        return`<button onclick="toggleNapseEstado('${eid}','${estado.replace(/'/g,"\\'")}')" style="background:${color}18;border:1px solid ${color}40;border-radius:10px;padding:8px 12px;min-width:100px;cursor:pointer;text-align:left;font-family:'Inter',sans-serif">
           <div style="font-size:20px;font-weight:800;color:${color}">${cant}</div>
           <div style="font-size:10px;color:var(--text-muted);white-space:nowrap">${estado}</div>
-        </div>`;
+        </button>`;
       }).join('')||'<div style="font-size:12px;color:var(--text-muted)">Sin OTs NAPSE</div>'}
     </div>
+    <div id="napseEstadoDetalle" style="margin-top:10px"></div>
     ${entriesMotivo.length?`
     <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em;margin:16px 0 8px">Ranking por motivo — click para ver las OT</div>
     <div style="display:flex;flex-wrap:wrap;gap:8px">
@@ -6922,6 +6926,47 @@ async function loadNapseDesinstPanel(){
     </div>
     <div id="napseMotivoDetalle" style="margin-top:10px"></div>`:''}
     ${avisoCache}
+  </div>`;
+}
+
+// Despliega/oculta la lista de OT puntuales para el estado clickeado (cards
+// de arriba: Recuperada/En Proceso/Reactivado/etc) — mismo patrón y misma
+// tabla que ya usa toggleNapseMotivo() para el ranking por motivo.
+function toggleNapseEstado(eid,estado){
+  const el=document.getElementById('napseEstadoDetalle');
+  if(!el)return;
+  if(el.dataset.actual===estado){ el.innerHTML=''; el.dataset.actual=''; return; } // toggle: click de nuevo = cerrar
+  const lista=(window._napseEstadoDetalle||{})[estado]||[];
+  el.dataset.actual=estado;
+  const celda=v=>v?`<span>${v}</span>`:`<span style="color:var(--text-muted)">—</span>`;
+  el.innerHTML=`<div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:10px 12px;overflow-x:auto">
+    <div style="font-size:11px;font-weight:700;color:var(--text-muted);margin-bottom:8px">${estado} (${lista.length})</div>
+    <table style="width:100%;border-collapse:collapse;font-size:11px;white-space:nowrap">
+      <thead><tr style="text-align:left;color:var(--text-muted);text-transform:uppercase;font-size:9px;letter-spacing:.03em">
+        <th style="padding:4px 8px 4px 0">OT</th>
+        <th style="padding:4px 8px">Cuenta</th>
+        <th style="padding:4px 8px">CUIT</th>
+        <th style="padding:4px 8px">Comercio</th>
+        <th style="padding:4px 8px">Propietario cta.</th>
+        <th style="padding:4px 8px">Contacto</th>
+        <th style="padding:4px 8px">Terminal ID</th>
+        <th style="padding:4px 8px">Ciudad</th>
+        <th style="padding:4px 0">Motivo</th>
+      </tr></thead>
+      <tbody>
+        ${lista.map(o=>`<tr style="border-top:1px solid var(--border)">
+          <td style="padding:5px 8px 5px 0;font-family:'JetBrains Mono',monospace;font-weight:700">${o.ot}</td>
+          <td style="padding:5px 8px">${celda(o.cuenta)}</td>
+          <td style="padding:5px 8px;font-family:'JetBrains Mono',monospace">${celda(o.cuit)}</td>
+          <td style="padding:5px 8px">${celda(o.comercio)}</td>
+          <td style="padding:5px 8px">${celda(o.propietario)}</td>
+          <td style="padding:5px 8px">${celda(o.contacto)}</td>
+          <td style="padding:5px 8px">${celda(o.terminal_id)}</td>
+          <td style="padding:5px 8px">${celda(o.ciudad)}</td>
+          <td style="padding:5px 0">${celda(o.motivo)}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>
   </div>`;
 }
 
@@ -11129,6 +11174,17 @@ function _imprimirRotuloHTML(envios) {
     return `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(text)}&color=000000&bgcolor=ffffff&margin=2`;
   }
 
+  // Reutiliza el mismo clasificador de zona AMBA que ya usa el dashboard de
+  // Desinstalaciones (dsGetZona) — Norte/Sur/Oeste/CABA/Fuera AMBA, en base
+  // a ciudad/provincia/CP. Ahora que el Rollout Piloto se extiende a AMBA,
+  // el rótulo necesita mostrar la zona bien grande para que quien arma la
+  // ruta la identifique de un vistazo (pedido 29/07, ejemplo rótulo EPSA).
+  const ZONA_COLOR={'Zona Norte':'#10b981','Zona Sur':'#f59e0b','Zona Oeste':'#8b5cf6','CABA':'#1a9fd4','Fuera AMBA':'#ef4444','Sin zona':'#888'};
+  function zonaCalc(e){
+    const z=(typeof dsGetZona==='function') ? dsGetZona({ciudad:e.ciudad,provincia:e.provincia,cp:e.cp_dest}) : 'Sin zona';
+    return z;
+  }
+
   const rotulosHTML = envios.map(e => {
     // QR geo/tracking: si tiene tracking CA → URL tracking, sino → Google Maps con la dirección
     let qrTarget = null;
@@ -11168,14 +11224,12 @@ function _imprimirRotuloHTML(envios) {
       <div class="dest-label">DESTINATARIO</div>
       <div class="dest">${e.cuenta || '—'}</div>
       <div class="row"><span class="lbl">Dirección</span><span class="val">${e.direccion_completa || '—'}</span></div>
+      <div class="loc-box"><span class="loc-lbl">Localidad</span><span class="loc-val">${e.ciudad || '—'}</span></div>
       <div class="row2">
         <div class="row-half"><span class="lbl">C.P.</span><span class="val">${e.cp_dest || '—'}</span></div>
-        <div class="row-half"><span class="lbl">Localidad</span><span class="val">${e.ciudad || '—'}</span></div>
-      </div>
-      <div class="row2">
         <div class="row-half"><span class="lbl">Provincia</span><span class="val">${e.provincia || '—'}</span></div>
-        <div class="row-half"><span class="lbl">Resp.</span><span class="val">${e.responsable || '—'}</span></div>
       </div>
+      <div class="row"><span class="lbl">Resp.</span><span class="val">${e.responsable || '—'}</span></div>
       <div class="divider"></div>
       <div class="bottom">
         ${qrGeoSrc ? `<div class="qr-geo">
@@ -11186,6 +11240,10 @@ function _imprimirRotuloHTML(envios) {
           <div class="obs-lbl">Obs.</div>
           <div class="obs-val">${e.notas || '—'}</div>
         </div>
+      </div>
+      <div class="zona-box" style="border-color:${ZONA_COLOR[zonaCalc(e)]||'#000'}">
+        <span class="zona-lbl">ZONA</span>
+        <span class="zona-val" style="color:${ZONA_COLOR[zonaCalc(e)]||'#000'}">${zonaCalc(e)}</span>
       </div>
       <div class="footer">
         <div class="footer-lbl">Remitente</div>
@@ -11206,7 +11264,7 @@ function _imprimirRotuloHTML(envios) {
     .hdr { display: flex; align-items: center; justify-content: space-between; border-bottom: 1.5px solid #000; padding-bottom: 2mm; margin-bottom: 3mm; }
     .hdr-logo { font-size: 19px; font-weight: 900; letter-spacing: -1px; color: #1dbf8e !important; }
     .hdr-info { font-size: 7.5px; line-height: 1.6; color: #444; text-align: right; }
-    .tipo { font-size: 9px; font-weight: 700; text-align: center; border: 1px solid #ccc; padding: 2mm; margin-bottom: 3mm; text-transform: uppercase; color: #555; }
+    .tipo { font-size: 16px; font-weight: 900; text-align: center; border: 2px solid #000; padding: 2.5mm; margin-bottom: 3mm; text-transform: uppercase; color: #000; letter-spacing: -0.3px; }
     .ot-block { display: flex; align-items: center; justify-content: space-between; gap: 2.5mm; border: 2.5px solid #000; padding: 3mm 4mm; margin-bottom: 3mm; }
     .ot-label { font-size: 8px; font-weight: 700; text-transform: uppercase; color: #555; }
     .ot-num { font-size: 26px; font-weight: 900; letter-spacing: -1px; line-height: 1.1; }
@@ -11227,7 +11285,13 @@ function _imprimirRotuloHTML(envios) {
     .qr-geo-lbl { font-size: 7px; font-weight: 700; text-align: center; text-transform: uppercase; max-width: 18mm; }
     .obs-wrap { flex: 1; min-width: 0; }
     .obs-lbl { font-size: 8.5px; font-weight: 700; text-transform: uppercase; color: #555; margin-bottom: 1mm; }
-    .obs-val { font-size: 9.5px; border: 1px solid #ccc; padding: 1.8mm; word-break: break-word; line-height: 1.4; min-height: 14mm; max-height: 20mm; overflow: hidden; }
+    .obs-val { font-size: 9.5px; border: 1px solid #ccc; padding: 1.8mm; word-break: break-word; line-height: 1.4; min-height: 9mm; max-height: 15mm; overflow: hidden; }
+    .loc-box { display: flex; align-items: center; justify-content: space-between; background: #000 !important; padding: 1.6mm 3mm; margin-bottom: 2mm; border-radius: 1mm; }
+    .loc-lbl { font-size: 8.5px; font-weight: 700; text-transform: uppercase; color: #ddd !important; }
+    .loc-val { font-size: 14px; font-weight: 900; text-transform: uppercase; color: #fff !important; letter-spacing: -0.2px; }
+    .zona-box { display: flex; align-items: center; justify-content: center; gap: 2.5mm; border: 3px solid #000; border-radius: 1.5mm; padding: 2mm; margin-top: 2mm; }
+    .zona-lbl { font-size: 10px; font-weight: 700; color: #555; text-transform: uppercase; }
+    .zona-val { font-size: 20px; font-weight: 900; text-transform: uppercase; letter-spacing: -0.3px; }
     .footer { margin-top: auto; border-top: 1.5px solid #000; padding-top: 2mm; }
     .footer-lbl { font-size: 7px; font-weight: 700; color: #555; text-transform: uppercase; }
     .footer-val { font-size: 7.5px; color: #333; margin-top: 0.5mm; }
