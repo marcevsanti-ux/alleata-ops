@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.6.20</title>
+<title>Alleata · Operaciones v4.6.22</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -400,7 +400,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.20 · 30 jul 2026
+      v4.6.22 · 30 jul 2026
     </div>
   </div>
 </div>
@@ -488,7 +488,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.20 · 30 jul 2026
+      v4.6.22 · 30 jul 2026
     </div>
   </div>
 </nav>
@@ -528,7 +528,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.20</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.22</div>
   </div>
   <div class="content">
 
@@ -4659,7 +4659,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.6.20] OK');
+console.log('[Alleata v4.6.22] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -6233,19 +6233,32 @@ async function loadRolloutPiloto(){
   // Dirección de envío y horario de entrega — pedido 30/07: reemplazan a
   // SLA/Volumen en la tabla. Estos campos NO viven en rollout_piloto, ya
   // están sincronizados en sf_workorders (Direccion_de_envio__c /
-  // Horario_de_Entrega__c) para cada OT ya vinculada, así que se traen acá
-  // con un join en memoria en vez de duplicar el dato en otra tabla.
+  // Horario_de_Entrega__c), así que se traen con dos cruces en memoria:
+  //   1) por número de OT, para las filas que ya tienen OT de Cambio vinculada
+  //   2) por CUIT (la OT más reciente de ese cliente), para las que todavía
+  //      no — la dirección de instalación original suele ser la misma que
+  //      la del cambio de terminal, así que sirve como estimación mientras
+  //      no se vincula la OT real (pedido de marcelos 30/07)
   const otsVinculadas=_rpData.map(r=>r.ot_numero).filter(Boolean);
+  const cuitsSinOT=[...new Set(_rpData.filter(r=>!r.ot_numero&&r.cuit).map(r=>r.cuit))];
+
+  const porOt={}, porCuit={};
   if(otsVinculadas.length){
     const{data:otsInfo}=await sb.from('sf_workorders').select('workorder_number,direccion,horario_entrega,horario').in('workorder_number',otsVinculadas);
-    const porOt={};
     (otsInfo||[]).forEach(o=>{porOt[o.workorder_number]=o;});
-    _rpData.forEach(r=>{
-      const info=r.ot_numero?porOt[r.ot_numero]:null;
-      r._direccion=info?.direccion||null;
-      r._horario=info?.horario_entrega||info?.horario||null;
-    });
   }
+  if(cuitsSinOT.length){
+    // Traemos todas las OT de esos CUIT ordenadas por más reciente primero,
+    // y nos quedamos con la primera que aparezca por cada CUIT.
+    const{data:otsPorCuit}=await sb.from('sf_workorders').select('cuit,direccion,horario_entrega,horario,sf_last_modified').in('cuit',cuitsSinOT).order('sf_last_modified',{ascending:false});
+    (otsPorCuit||[]).forEach(o=>{ if(!porCuit[o.cuit]) porCuit[o.cuit]=o; });
+  }
+  _rpData.forEach(r=>{
+    const info=r.ot_numero?porOt[r.ot_numero]:(r.cuit?porCuit[r.cuit]:null);
+    r._direccion=info?.direccion||null;
+    r._horario=info?.horario_entrega||info?.horario||null;
+    r._direccionEstimada=!r.ot_numero&&!!info; // para avisar en la UI que es de una OT anterior, no de la del piloto
+  });
 
   renderRolloutPiloto();
 }
@@ -6346,7 +6359,7 @@ function renderRolloutPiloto(){
       <td><span class="badge" style="background:${ec}18;border:1px solid ${ec}40;color:${ec}">${r.etapa==='Cerrado'?'Exitoso':r.etapa==='Contactado'?'Notificado':r.etapa}</span></td>
       <td>${r.ot_numero?`<span style="font-family:'JetBrains Mono',monospace;font-weight:700">${r.ot_numero}</span>`:(soloLectura?'—':`<button class="btn-sm" style="background:rgba(139,92,246,.12);color:#8b5cf6;border:1px solid rgba(139,92,246,.3)" onclick="vincularOTPiloto('${r.id}')">🔗 Vincular OT</button>`)}</td>
       <td>${r.estado_ot||'—'}</td>
-      <td style="font-size:11px;max-width:220px">${r._direccion||'<span style="color:var(--text-muted)">'+(r.ot_numero?'sin dato':'vinculá la OT')+'</span>'}</td>
+      <td style="font-size:11px;max-width:220px">${r._direccion?r._direccion+(r._direccionEstimada?' <span style="color:var(--text-muted)" title="Todavía no se vinculó la OT de Cambio — esta dirección es de la última OT registrada con este CUIT">(anterior)</span>':''):'<span style="color:var(--text-muted)">sin dato</span>'}</td>
       <td style="font-size:11px">${r._horario||'<span style="color:var(--text-muted)">—</span>'}</td>
       <td>${soloLectura?'':`${puedeEditarEtapa?`<button class="btn-sm" style="background:none;border:1px solid var(--border2);color:#f59e0b" onclick="editarNotaPiloto('${r.id}')" title="Cambiar estado">✏️</button> `:''}${r.ot_numero?`<button class="btn-sm" style="background:none;border:1px solid var(--border2);color:var(--teal)" onclick="printRotuloPiloto('${r.ot_numero}')" title="Imprimir rótulo (QR para escanear en mobile)">🖨️</button>`:''}`}</td>
     </tr>`;
@@ -6831,7 +6844,7 @@ async function loadBadges(){
   const isAdmin=currentProfile?.rol==='admin';
   const nombre=currentProfile?.nombre||'';
   const pn=nombre.split(' ')[0];
-  const TIPOS_ENVIO = ['Instalación Equipo + Simcard','Instalación Simcard','Asistencia Tecnica'];
+  const TIPOS_ENVIO = ['Instalación Equipo + Simcard','Instalación Simcard','Asistencia Tecnica','Asistencia Técnica'];
   let envQ=sb.from('sf_workorders')
     .select('id,status,logistica')
     .in('record_type', TIPOS_ENVIO)
@@ -8586,7 +8599,7 @@ async function loadStatsOperador(){
 }
 
 async function _loadStatsEnvios(nombre, set){
-  const TIPOS_ENVIO=['Instalación Equipo + Simcard','Instalación Simcard','Asistencia Tecnica','Cambio de Terminal'];
+  const TIPOS_ENVIO=['Instalación Equipo + Simcard','Instalación Simcard','Asistencia Tecnica','Asistencia Técnica','Cambio de Terminal'];
 
   const{data:rawEnvios}=await sb.from('sf_workorders')
     .select('status,logistica,sla_ca_dias,sla_total_dias')
@@ -8714,7 +8727,7 @@ function _opSlaDistribucion(ots){
 }
 
 async function loadFiltroResponsables(){
-  const TIPOS_ENVIO = ['Instalación Equipo + Simcard','Instalación Simcard','Asistencia Tecnica'];
+  const TIPOS_ENVIO = ['Instalación Equipo + Simcard','Instalación Simcard','Asistencia Tecnica','Asistencia Técnica'];
   const{data}=await sb.from('sf_workorders')
     .select('responsable,status,logistica')
     .in('record_type', TIPOS_ENVIO)
@@ -8996,7 +9009,7 @@ async function renderEnvios(){
 
   // OTs de Envíos: Instalación Equipo+Simcard / Instalación Simcard / Asistencia Tecnica / Cambio de Terminal (no-NAPSE)
   // Activos: Pre-Colecta, Despachado, En Proceso
-  const TIPOS_ENVIO = ['Instalación Equipo + Simcard','Instalación Simcard','Asistencia Tecnica','Cambio de Terminal'];
+  const TIPOS_ENVIO = ['Instalación Equipo + Simcard','Instalación Simcard','Asistencia Tecnica','Asistencia Técnica','Cambio de Terminal'];
 
   let query=sb.from('sf_workorders')
     .select('*')
@@ -9166,7 +9179,7 @@ let _exitosasHoyList = [];
 
 async function cargarExitosasHoy(){
   try{
-    const TIPOS_ENVIO = ['Instalación Equipo + Simcard','Instalación Simcard','Asistencia Tecnica','Cambio de Terminal'];
+    const TIPOS_ENVIO = ['Instalación Equipo + Simcard','Instalación Simcard','Asistencia Tecnica','Asistencia Técnica','Cambio de Terminal'];
     const LOG_MAP = {ALLEATA:'ALLEATA', CORREO:'CORREO ARGENTINO', CABIFY:'CABIFY', EPSA:'EPSA'};
     const hoy = new Date();
     hoy.setHours(0,0,0,0);
@@ -10345,7 +10358,7 @@ async function autoActualizarTracking(){
   const isAdmin = currentProfile?.rol === 'admin';
   const nombreOperador = currentProfile?.nombre || '';
 
-  const TIPOS_ENVIO_AT = ['Instalación Equipo + Simcard','Instalación Simcard','Asistencia Tecnica'];
+  const TIPOS_ENVIO_AT = ['Instalación Equipo + Simcard','Instalación Simcard','Asistencia Tecnica','Asistencia Técnica'];
   let query = sb.from('sf_workorders')
     .select('id,tracking_envio,status,record_type,responsable,cuenta,workorder_number,logistica')
     .in('record_type', TIPOS_ENVIO_AT)
