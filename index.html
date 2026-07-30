@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.6.19</title>
+<title>Alleata · Operaciones v4.6.20</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -400,7 +400,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.19 · 30 jul 2026
+      v4.6.20 · 30 jul 2026
     </div>
   </div>
 </div>
@@ -488,7 +488,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.19 · 30 jul 2026
+      v4.6.20 · 30 jul 2026
     </div>
   </div>
 </nav>
@@ -528,7 +528,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.19</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.20</div>
   </div>
   <div class="content">
 
@@ -1141,10 +1141,10 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     <table class="table">
       <thead><tr>
         <th>Cliente</th><th>CUIT</th><th>Contacto</th><th>Etapa</th>
-        <th>OT</th><th>Estado OT</th><th>SLA (días)</th><th>Vol. Baseline 30D</th><th>Último Vol.</th><th></th>
+        <th>OT</th><th>Estado OT</th><th>Dirección de envío</th><th>Horario</th><th></th>
       </tr></thead>
       <tbody id="rp-tbody">
-        <tr><td colspan="11" style="text-align:center;padding:30px;color:var(--text-muted)">Cargando...</td></tr>
+        <tr><td colspan="9" style="text-align:center;padding:30px;color:var(--text-muted)">Cargando...</td></tr>
       </tbody>
     </table>
     </div>
@@ -4659,7 +4659,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.6.19] OK');
+console.log('[Alleata v4.6.20] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -6222,13 +6222,31 @@ async function cerrarOTHojaRuta(sfId,tecnico,btn,resultado){
 
 async function loadRolloutPiloto(){
   const tbody=document.getElementById('rp-tbody');
-  if(tbody)tbody.innerHTML='<tr><td colspan="11" style="text-align:center;padding:30px;color:var(--text-muted)">Cargando...</td></tr>';
+  if(tbody)tbody.innerHTML='<tr><td colspan="9" style="text-align:center;padding:30px;color:var(--text-muted)">Cargando...</td></tr>';
   const{data,error}=await sb.from('rollout_piloto').select('*').order('cliente',{ascending:true});
   if(error){
-    if(tbody)tbody.innerHTML=`<tr><td colspan="11" style="text-align:center;padding:30px;color:var(--red)">Error: ${error.message}${error.message.includes('does not exist')?' — falta correr schema_rollout_piloto.sql en Supabase':''}</td></tr>`;
+    if(tbody)tbody.innerHTML=`<tr><td colspan="9" style="text-align:center;padding:30px;color:var(--red)">Error: ${error.message}${error.message.includes('does not exist')?' — falta correr schema_rollout_piloto.sql en Supabase':''}</td></tr>`;
     return;
   }
   _rpData=data||[];
+
+  // Dirección de envío y horario de entrega — pedido 30/07: reemplazan a
+  // SLA/Volumen en la tabla. Estos campos NO viven en rollout_piloto, ya
+  // están sincronizados en sf_workorders (Direccion_de_envio__c /
+  // Horario_de_Entrega__c) para cada OT ya vinculada, así que se traen acá
+  // con un join en memoria en vez de duplicar el dato en otra tabla.
+  const otsVinculadas=_rpData.map(r=>r.ot_numero).filter(Boolean);
+  if(otsVinculadas.length){
+    const{data:otsInfo}=await sb.from('sf_workorders').select('workorder_number,direccion,horario_entrega,horario').in('workorder_number',otsVinculadas);
+    const porOt={};
+    (otsInfo||[]).forEach(o=>{porOt[o.workorder_number]=o;});
+    _rpData.forEach(r=>{
+      const info=r.ot_numero?porOt[r.ot_numero]:null;
+      r._direccion=info?.direccion||null;
+      r._horario=info?.horario_entrega||info?.horario||null;
+    });
+  }
+
   renderRolloutPiloto();
 }
 
@@ -6328,9 +6346,8 @@ function renderRolloutPiloto(){
       <td><span class="badge" style="background:${ec}18;border:1px solid ${ec}40;color:${ec}">${r.etapa==='Cerrado'?'Exitoso':r.etapa==='Contactado'?'Notificado':r.etapa}</span></td>
       <td>${r.ot_numero?`<span style="font-family:'JetBrains Mono',monospace;font-weight:700">${r.ot_numero}</span>`:(soloLectura?'—':`<button class="btn-sm" style="background:rgba(139,92,246,.12);color:#8b5cf6;border:1px solid rgba(139,92,246,.3)" onclick="vincularOTPiloto('${r.id}')">🔗 Vincular OT</button>`)}</td>
       <td>${r.estado_ot||'—'}</td>
-      <td>${r.sla_dias!=null?r.sla_dias+'d':'—'}</td>
-      <td style="font-size:11px">${fmtVol(r.vol_baseline_30d)}</td>
-      <td style="font-size:11px">${r.vol_ultimo_reportado!=null?fmtVol(r.vol_ultimo_reportado)+' <span style=\"color:var(--text-muted)\">('+(r.vol_ultimo_fecha||'')+')</span>':'<span style=\"color:var(--text-muted)\">sin dato post-cambio</span>'}</td>
+      <td style="font-size:11px;max-width:220px">${r._direccion||'<span style="color:var(--text-muted)">'+(r.ot_numero?'sin dato':'vinculá la OT')+'</span>'}</td>
+      <td style="font-size:11px">${r._horario||'<span style="color:var(--text-muted)">—</span>'}</td>
       <td>${soloLectura?'':`${puedeEditarEtapa?`<button class="btn-sm" style="background:none;border:1px solid var(--border2);color:#f59e0b" onclick="editarNotaPiloto('${r.id}')" title="Cambiar estado">✏️</button> `:''}${r.ot_numero?`<button class="btn-sm" style="background:none;border:1px solid var(--border2);color:var(--teal)" onclick="printRotuloPiloto('${r.ot_numero}')" title="Imprimir rótulo (QR para escanear en mobile)">🖨️</button>`:''}`}</td>
     </tr>`;
   };
@@ -6347,7 +6364,7 @@ function renderRolloutPiloto(){
     }
     html+=filaOT(r);
   });
-  tbody.innerHTML=html||'<tr><td colspan="11" style="text-align:center;padding:30px;color:var(--text-muted)">Sin resultados</td></tr>';
+  tbody.innerHTML=html||'<tr><td colspan="9" style="text-align:center;padding:30px;color:var(--text-muted)">Sin resultados</td></tr>';
 
   // Stats
   const total=_rpData.length;
