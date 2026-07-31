@@ -56,8 +56,8 @@
 
   .stop{background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:11px 13px;margin-bottom:8px;position:relative}
   .stop-rollout{border-color:var(--purple);background:linear-gradient(135deg,rgba(139,92,246,.10),var(--panel2) 40%)}
-  .stop-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:5px}
-  .stop-left{display:flex;align-items:center;gap:9px;min-width:0}
+  .stop-top{display:flex;flex-wrap:wrap;row-gap:6px;align-items:flex-start;gap:8px;margin-bottom:5px}
+  .stop-left{display:flex;align-items:center;gap:9px;min-width:0;flex-wrap:wrap;row-gap:4px}
   .stop-orden{font-family:var(--mono);font-size:13px;font-weight:800;color:var(--text-dim);flex-shrink:0;width:20px;text-align:center}
   .stop-ot{font-family:var(--mono);font-size:17px;font-weight:800;letter-spacing:-.4px}
   .rollout-tag{font-size:9px;font-weight:800;color:var(--purple);background:rgba(139,92,246,.18);border:1px solid rgba(139,92,246,.4);padding:2px 7px;border-radius:5px;letter-spacing:.4px;flex-shrink:0}
@@ -124,7 +124,11 @@ tickClock();
 
 function esc(v){return v?String(v).replace(/[<>&]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c])):'';}
 
+let _cargando=false;
 async function cargar(){
+  if(_cargando)return; // por si una carga tarda más que el intervalo de refresco, no se pisan
+  _cargando=true;
+  try{
   const{data,error}=await sb.from('ruta_sugerida_actual')
     .select('*')
     .order('zona',{ascending:true})
@@ -141,6 +145,9 @@ async function cargar(){
     : 'Sin datos todavía';
 
   render(data||[]);
+  } finally {
+    _cargando=false;
+  }
 }
 
 function render(lista){
