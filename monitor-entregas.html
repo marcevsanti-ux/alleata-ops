@@ -83,7 +83,10 @@
     <div class="brand-title">· Entregas pendientes — Logística Alleata</div>
   </div>
   <div class="header-right">
-    <div><span class="live-dot"></span><span class="last-sync" id="lastSync">cargando...</span></div>
+    <div style="text-align:right">
+      <div><span class="live-dot"></span><span class="last-sync" id="lastSync">cargando...</span></div>
+      <div class="last-sync" id="nextSync" style="margin-top:2px;opacity:.75">—</div>
+    </div>
     <div class="clock-wrap">
       <div class="clock" id="clock">--:--:--</div>
       <div class="date" id="dateLbl">—</div>
@@ -96,8 +99,8 @@
 <main id="main"></main>
 
 <footer>
-  <span>Orden sugerido por zona (más cercano + horario de atención) · Rollout siempre primero · Se recalcula en el servidor cada 20 min</span>
-  <span id="footRight">v2.1</span>
+  <span id="footLeft">Orden sugerido por zona (más cercano + horario de atención) · Rollout siempre primero</span>
+  <span id="footRight">v2.2</span>
 </footer>
 
 <script>
@@ -112,6 +115,37 @@ const ZONAS=[
   {key:'Zona Sur',   label:'🟡 Z. Sur',      color:'#f59e0b'},
   {key:'Zona Oeste', label:'🟣 Z. Oeste',    color:'#8b5cf6'},
 ];
+
+// Calcula cuándo va a correr la próxima recalculación en el servidor,
+// siguiendo el MISMO cron que está en scheduler.js:
+//   L-V 08-11h cada 2min | 12-16h cada 10min | 17-19h cada 1h
+// Si esto se cambia en el backend, hay que actualizarlo acá también.
+function proximaCorrida(desde){
+  const d=new Date(desde);
+  for(let intento=0; intento<8*24*60; intento++){ // tope de seguridad, nunca debería iterar tanto
+    d.setSeconds(0,0);
+    d.setMinutes(d.getMinutes()+1);
+    const dia=d.getDay(), h=d.getHours(), m=d.getMinutes();
+    const esHabil = dia>=1 && dia<=5;
+    if(esHabil){
+      if(h>=8&&h<12 && m%2===0) return d;
+      if(h>=12&&h<17 && m%10===0) return d;
+      if(h>=17&&h<20 && m===0) return d;
+    }
+  }
+  return null;
+}
+
+function tickNextSync(){
+  const prox=proximaCorrida(new Date());
+  const el=document.getElementById('nextSync');
+  if(!el)return;
+  el.textContent = prox
+    ? 'Próxima '+prox.toLocaleDateString('es-AR',{weekday:'short'})+' '+prox.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'})
+    : 'Próxima: sin datos';
+}
+setInterval(tickNextSync,1000);
+tickNextSync();
 
 function tickClock(){
   const now=new Date();
