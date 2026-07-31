@@ -153,12 +153,15 @@ function render(lista){
   const strip=document.getElementById('strip');
   const main=document.getElementById('main');
 
-  const rollouts=lista.filter(o=>o.es_rollout).length;
-  const sinGeo=lista.filter(o=>!o.geocodificado).length;
+  const zonasKeys=ZONAS.map(z=>z.key);
+  const enLas4=lista.filter(o=>zonasKeys.includes(o.zona));
+  const fueraDeLas4=lista.filter(o=>!zonasKeys.includes(o.zona));
+  const rollouts=enLas4.filter(o=>o.es_rollout).length;
+  const sinGeo=enLas4.filter(o=>!o.geocodificado).length;
 
   strip.innerHTML=`
     <div class="strip-item">
-      <div class="strip-num" style="color:var(--teal)">${lista.length}</div>
+      <div class="strip-num" style="color:var(--teal)">${enLas4.length}</div>
       <div class="strip-lbl">Pendientes<br>Pre-Colecta</div>
     </div>
     <div class="strip-item">
@@ -169,7 +172,13 @@ function render(lista){
       <div class="strip-num" style="color:${sinGeo?'var(--amber)':'var(--text-dim)'}">${sinGeo}</div>
       <div class="strip-lbl">Sin ubicar<br>en el mapa</div>
     </div>
+    ${fueraDeLas4.length?`<div class="strip-item">
+      <div class="strip-num" style="color:var(--red)">${fueraDeLas4.length}</div>
+      <div class="strip-lbl">Fuera de estas 4<br>zonas — revisar</div>
+    </div>`:''}
   `;
+
+  const lista4=enLas4;
 
   if(!lista.length){
     main.innerHTML=`<div class="empty-all"><div class="big">✅</div><div class="msg">No hay entregas pendientes en Pre-Colecta</div></div>`;
