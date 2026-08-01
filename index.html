@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.6.24</title>
+<title>Alleata · Operaciones v4.6.26</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -400,7 +400,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.24 · 01 ago 2026
+      v4.6.26 · 01 ago 2026
     </div>
   </div>
 </div>
@@ -488,7 +488,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.24 · 01 ago 2026
+      v4.6.26 · 01 ago 2026
     </div>
   </div>
 </nav>
@@ -528,7 +528,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.24</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.26</div>
   </div>
   <div class="content">
 
@@ -4661,7 +4661,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.6.24] OK');
+console.log('[Alleata v4.6.26] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -6938,10 +6938,39 @@ async function loadNapseDesinstPanel(){
 
   window._napseMotivoDetalle=motivoDetalle; // leído por toggleNapseMotivo()
   window._napseEstadoDetalle=estadoDetalle; // leído por toggleNapseEstado()
+
+  // Análisis de producto (días con terminal + volumen antes de la
+  // devolución) — se calcula aparte en Railway (cruza 3 objetos de SF por
+  // OT, no se puede hacer en vivo cada vez que se abre el Dashboard). Acá
+  // solo se lee lo ya calculado y se cruza por número de OT.
+  let analisisPorOt={};
+  try{
+    const rAn=await railwayFetch('/automations/desinst-analisis-producto');
+    const jAn=await rAn.json();
+    if(rAn.ok&&jAn.ok){
+      (jAn.datos||[]).forEach(a=>{analisisPorOt[a.ot_desinstalacion]=a;});
+    }
+  }catch(e){}
+  window._napseAnalisisPorOt=analisisPorOt;
+
   const entries=Object.entries(porEstado).sort((a,b)=>b[1]-a[1]);
   const entriesMotivo=Object.entries(porMotivo).sort((a,b)=>b[1]-a[1]);
   const avisoCache=fuente!=='vivo'?`<div style="font-size:10px;color:var(--yellow);margin-top:10px">⚠️ ${fuente} — puede estar desactualizado</div>`:'';
   const MOTIVO_COLORS=['#1dbf8e','#1a9fd4','#f59e0b','#ef4444','#8b5cf6','#f97316','#6b7280','#a78bfa'];
+
+  // Tabla agrupada por motivo: promedio de días con terminal y volumen
+  // 30d antes de devolver — la idea es que un motivo "PRODUCTO" con pocos
+  // días y volumen alto sea alarma técnica real, y uno con muchos días y
+  // volumen ya bajo sea desgaste comercial (no falla de producto).
+  const promedio=arr=>arr.length?Math.round(arr.reduce((a,b)=>a+b,0)/arr.length):null;
+  const filasAnalisisMotivo=entriesMotivo.map(([motivo,cant],i)=>{
+    const otsDeEsteMotivo=(motivoDetalle[motivo]||[]).map(o=>analisisPorOt[o.ot]).filter(Boolean);
+    const dias=otsDeEsteMotivo.map(a=>a.dias_con_terminal).filter(d=>d!=null);
+    const vols=otsDeEsteMotivo.map(a=>a.volumen_30d_antes).filter(v=>v!=null);
+    const sinMatch=otsDeEsteMotivo.length-dias.length;
+    return{motivo,cant,color:MOTIVO_COLORS[i%MOTIVO_COLORS.length],
+      diasProm:promedio(dias),volProm:promedio(vols),conDatos:otsDeEsteMotivo.length,sinMatch};
+  });
 
   panel.innerHTML=`<div class="card" style="margin-top:16px">
     <div class="sec-title"><div class="sec-dot" style="background:#8b5cf6"></div>🔍 Desinstalaciones NAPSE</div>
@@ -6969,7 +6998,37 @@ async function loadNapseDesinstPanel(){
         return`<div class="badge" style="background:${color}18;border:1px solid ${color}40;color:${color};cursor:pointer;padding:6px 12px;font-size:11px" onclick="toggleNapseMotivo('${mid}','${motivo.replace(/'/g,"\\'")}')">${motivo} · ${cant}</div>`;
       }).join('')}
     </div>
-    <div id="napseMotivoDetalle" style="margin-top:10px"></div>`:''}
+    <div id="napseMotivoDetalle" style="margin-top:10px"></div>
+
+    <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em;margin:16px 0 8px">📊 Análisis por motivo — días con terminal y volumen antes de devolver</div>
+    <div style="overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse;font-size:11px;white-space:nowrap">
+        <thead><tr style="text-align:left;color:var(--text-muted);text-transform:uppercase;font-size:9px;letter-spacing:.03em">
+          <th style="padding:5px 10px 5px 0">Motivo</th>
+          <th style="padding:5px 10px">Cant.</th>
+          <th style="padding:5px 10px">Días prom. con terminal</th>
+          <th style="padding:5px 10px">Volumen prom. 30d antes</th>
+          <th style="padding:5px 0">Lectura</th>
+        </tr></thead>
+        <tbody>
+          ${filasAnalisisMotivo.map(f=>{
+            let lectura='—',lecturaColor='var(--text-muted)';
+            if(f.diasProm!=null&&f.volProm!=null){
+              if(f.diasProm<=30&&f.volProm>1000000){lectura='⚠️ Posible falla técnica real';lecturaColor='#ef4444';}
+              else if(f.diasProm>90){lectura='Desgaste comercial, no técnico';lecturaColor='#6b7280';}
+              else{lectura='Sin patrón claro';lecturaColor='var(--text-muted)';}
+            }
+            return`<tr style="border-top:1px solid var(--border)">
+              <td style="padding:6px 10px 6px 0"><span style="color:${f.color};font-weight:700">${f.motivo}</span></td>
+              <td style="padding:6px 10px">${f.cant}</td>
+              <td style="padding:6px 10px">${f.diasProm!=null?f.diasProm+' días':'<span style="color:var(--text-muted)">sin datos</span>'}${f.sinMatch?` <span style="color:var(--text-muted);font-size:9px">(${f.sinMatch} sin matchear)</span>`:''}</td>
+              <td style="padding:6px 10px">${f.volProm!=null?'$'+f.volProm.toLocaleString('es-AR'):'<span style="color:var(--text-muted)">sin datos</span>'}</td>
+              <td style="padding:6px 0;color:${lecturaColor};font-size:10px">${lectura}</td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>`:''}
     ${avisoCache}
   </div>`;
 }
@@ -6977,6 +7036,23 @@ async function loadNapseDesinstPanel(){
 // Despliega/oculta la lista de OT puntuales para el estado clickeado (cards
 // de arriba: Recuperada/En Proceso/Reactivado/etc) — mismo patrón y misma
 // tabla que ya usa toggleNapseMotivo() para el ranking por motivo.
+// Arma el texto del tooltip con fiscal/ppto de venta/transacciones/estado
+// de la cuenta — se ve al pasar el mouse sobre la celda de volumen, sin
+// llenar la tabla de columnas de más. Pedido 01/08 (análisis de producto NAPSE).
+function _napseVolTooltip(an){
+  if(!an)return'';
+  const fmt=v=>v!=null?'$'+Number(v).toLocaleString('es-AR'):'—';
+  const fmtN=v=>v!=null?v:'—';
+  return[
+    `Volumen total — 30d: ${fmt(an.volumen_30d_antes)} · 60d: ${fmt(an.volumen_60d_antes)} · 90d: ${fmt(an.volumen_90d_antes)}`,
+    `Volumen fiscal — 30d: ${fmt(an.volumen_fiscal_30d)} · 60d: ${fmt(an.volumen_fiscal_60d)} · 90d: ${fmt(an.volumen_fiscal_90d)}`,
+    `Volumen ppto. de venta — 30d: ${fmt(an.volumen_ppto_venta_30d)} · 60d: ${fmt(an.volumen_ppto_venta_60d)} · 90d: ${fmt(an.volumen_ppto_venta_90d)}`,
+    `Transacciones — 15d: ${fmtN(an.transacciones_15d)} · 30d: ${fmtN(an.transacciones_30d)} · 60d: ${fmtN(an.transacciones_60d)} · 90d: ${fmtN(an.transacciones_90d)}`,
+    `Estado de la cuenta (Actividad__c): ${an.estado_actividad||'—'}`,
+    an.volumen_fecha_dato?`Dato al: ${new Date(an.volumen_fecha_dato).toLocaleDateString('es-AR')}`:'',
+  ].filter(Boolean).join('\n');
+}
+
 function toggleNapseEstado(eid,estado){
   const el=document.getElementById('napseEstadoDetalle');
   if(!el)return;
@@ -6996,10 +7072,14 @@ function toggleNapseEstado(eid,estado){
         <th style="padding:4px 8px">Contacto</th>
         <th style="padding:4px 8px">Terminal ID</th>
         <th style="padding:4px 8px">Ciudad</th>
-        <th style="padding:4px 0">Motivo</th>
+        <th style="padding:4px 8px">Motivo</th>
+        <th style="padding:4px 8px">Días c/terminal</th>
+        <th style="padding:4px 0">Vol. 30d antes</th>
       </tr></thead>
       <tbody>
-        ${lista.map(o=>`<tr style="border-top:1px solid var(--border)">
+        ${lista.map(o=>{
+          const an=(window._napseAnalisisPorOt||{})[o.ot];
+          return`<tr style="border-top:1px solid var(--border)">
           <td style="padding:5px 8px 5px 0;font-family:'JetBrains Mono',monospace;font-weight:700">${o.ot}</td>
           <td style="padding:5px 8px">${celda(o.cuenta)}</td>
           <td style="padding:5px 8px;font-family:'JetBrains Mono',monospace">${celda(o.cuit)}</td>
@@ -7008,8 +7088,10 @@ function toggleNapseEstado(eid,estado){
           <td style="padding:5px 8px">${celda(o.contacto)}</td>
           <td style="padding:5px 8px">${celda(o.terminal_id)}</td>
           <td style="padding:5px 8px">${celda(o.ciudad)}</td>
-          <td style="padding:5px 0">${celda(o.motivo)}</td>
-        </tr>`).join('')}
+          <td style="padding:5px 8px">${celda(o.motivo)}</td>
+          <td style="padding:5px 8px">${an?.dias_con_terminal!=null?an.dias_con_terminal+'d':`<span style="color:var(--text-muted)">—</span>`}</td>
+          <td style="padding:5px 0" title="${_napseVolTooltip(an)}">${an?.volumen_30d_antes!=null?'$'+Number(an.volumen_30d_antes).toLocaleString('es-AR')+' <span style="font-size:9px;color:var(--text-muted)">ℹ️</span>':`<span style="color:var(--text-muted)">—</span>`}</td>
+        </tr>`;}).join('')}
       </tbody>
     </table>
   </div>`;
@@ -7040,10 +7122,14 @@ function toggleNapseMotivo(mid,motivo){
         <th style="padding:4px 8px">Contacto</th>
         <th style="padding:4px 8px">Terminal ID</th>
         <th style="padding:4px 8px">Ciudad</th>
-        <th style="padding:4px 0">Estado</th>
+        <th style="padding:4px 8px">Estado</th>
+        <th style="padding:4px 8px">Días c/terminal</th>
+        <th style="padding:4px 0">Vol. 30d antes</th>
       </tr></thead>
       <tbody>
-        ${lista.map(o=>`<tr style="border-top:1px solid var(--border)">
+        ${lista.map(o=>{
+          const an=(window._napseAnalisisPorOt||{})[o.ot];
+          return`<tr style="border-top:1px solid var(--border)">
           <td style="padding:5px 8px 5px 0;font-family:'JetBrains Mono',monospace;font-weight:700">${o.ot}</td>
           <td style="padding:5px 8px">${celda(o.cuenta)}</td>
           <td style="padding:5px 8px;font-family:'JetBrains Mono',monospace">${celda(o.cuit)}</td>
@@ -7052,8 +7138,10 @@ function toggleNapseMotivo(mid,motivo){
           <td style="padding:5px 8px">${celda(o.contacto)}</td>
           <td style="padding:5px 8px">${celda(o.terminal_id)}</td>
           <td style="padding:5px 8px">${celda(o.ciudad)}</td>
-          <td style="padding:5px 0;color:${ESTADO_COLORS_NAPSE[o.status]||'#6b7280'};font-weight:600">${o.status}</td>
-        </tr>`).join('')}
+          <td style="padding:5px 8px;color:${ESTADO_COLORS_NAPSE[o.status]||'#6b7280'};font-weight:600">${o.status}</td>
+          <td style="padding:5px 8px">${an?.dias_con_terminal!=null?an.dias_con_terminal+'d':`<span style="color:var(--text-muted)">—</span>`}</td>
+          <td style="padding:5px 0" title="${_napseVolTooltip(an)}">${an?.volumen_30d_antes!=null?'$'+Number(an.volumen_30d_antes).toLocaleString('es-AR')+' <span style="font-size:9px;color:var(--text-muted)">ℹ️</span>':`<span style="color:var(--text-muted)">—</span>`}</td>
+        </tr>`;}).join('')}
       </tbody>
     </table>
   </div>`;
