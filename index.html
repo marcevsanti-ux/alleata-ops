@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.6.26</title>
+<title>Alleata · Operaciones v4.6.27</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -400,7 +400,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.26 · 01 ago 2026
+      v4.6.27 · 03 ago 2026
     </div>
   </div>
 </div>
@@ -488,7 +488,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.26 · 01 ago 2026
+      v4.6.27 · 03 ago 2026
     </div>
   </div>
 </nav>
@@ -528,7 +528,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.26</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.27</div>
   </div>
   <div class="content">
 
@@ -4661,7 +4661,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.6.26] OK');
+console.log('[Alleata v4.6.27] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -6293,6 +6293,28 @@ async function cargarObjetivoSemanalRollout(){
   const color=llego?'var(--teal)':(pct>=60?'#f59e0b':'#ef4444');
   const fmtCorto=d=>new Date(d).toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit'});
 
+  // Desglose día por día (lunes a domingo) — pedido 03/08, mismo estilo
+  // "tira de calendario" que ya usan en otras pantallas del navegador.
+  // Cuenta agrupando fecha_exitosa por día calendario (ignora la hora).
+  const porDia={};
+  (data||[]).forEach(r=>{
+    const key=String(r.fecha_exitosa).slice(0,10); // 'YYYY-MM-DD', corta la hora si viniera con ella
+    porDia[key]=(porDia[key]||0)+1;
+  });
+  const NOMBRES_DIA=['LU','MA','MI','JU','VI','SA','DO'];
+  const diasHtml=NOMBRES_DIA.map((nombre,i)=>{
+    const d=new Date(lunes);d.setDate(lunes.getDate()+i);
+    const key=d.toLocaleDateString('en-CA');
+    const cant=porDia[key]||0;
+    const esHoy=key===hoyStr;
+    const esFuturo=key>hoyStr;
+    return`<div style="flex:1;text-align:center;min-width:0">
+      <div style="font-size:9px;color:var(--text-muted);font-weight:700;letter-spacing:.03em">${nombre}</div>
+      <div style="width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:3px auto;background:${esHoy?color:'transparent'};border:1px solid ${esHoy?color:'var(--border2)'};color:${esHoy?'#08160f':'var(--text-muted)'};font-size:12px;font-weight:700">${d.getDate()}</div>
+      <div style="font-size:13px;font-weight:800;color:${esFuturo?'var(--text-muted)':(cant>0?color:'var(--text-muted)')}">${esFuturo?'—':cant}</div>
+    </div>`;
+  }).join('');
+
   cont.innerHTML=`<div class="card" style="margin-bottom:14px;border-left:4px solid ${color}">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
       <div style="font-size:13px;font-weight:700">🎯 Objetivo semanal del equipo — Rollout</div>
@@ -6302,9 +6324,10 @@ async function cargarObjetivoSemanalRollout(){
       <span style="font-size:22px;font-weight:800;color:${color}">${total}</span>
       <span style="font-size:12px;color:var(--text-muted)">/ ${OBJETIVO_SEMANAL_MIN}–${OBJETIVO_SEMANAL_MAX} entregas</span>
     </div>
-    <div style="background:var(--navy-700);border-radius:20px;height:8px;overflow:hidden">
+    <div style="background:var(--navy-700);border-radius:20px;height:8px;overflow:hidden;margin-bottom:14px">
       <div style="background:${color};height:100%;width:${pct}%;transition:width .3s"></div>
     </div>
+    <div style="display:flex;gap:4px;border-top:1px solid var(--border);padding-top:12px">${diasHtml}</div>
   </div>`;
 }
 
