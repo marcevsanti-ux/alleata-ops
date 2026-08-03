@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Alleata · Auditoría</title>
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --bg:#070c14; --panel:#0f1a2b; --panel2:#13223a; --border:#1e3252;
+    --teal:#1dbf8e; --red:#ef4444; --amber:#f59e0b; --purple:#8b5cf6;
+    --text:#eef4fb; --text-dim:#7b93b3; --mono:'JetBrains Mono','Courier New',monospace;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{min-height:100%;background:var(--bg);color:var(--text);font-family:'Inter',-apple-system,sans-serif}
+
+  /* ── login ── */
+  #loginWrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+  .login-box{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:36px 32px;width:100%;max-width:380px}
+  .login-logo{font-size:26px;font-weight:800;letter-spacing:-1px;color:var(--teal);text-align:center;margin-bottom:4px}
+  .login-sub{font-size:12px;color:var(--text-dim);text-align:center;margin-bottom:26px;text-transform:uppercase;letter-spacing:1px}
+  .field{margin-bottom:14px}
+  .field label{display:block;font-size:11px;color:var(--text-dim);margin-bottom:5px;font-weight:600}
+  .field input{width:100%;background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:11px 12px;color:var(--text);font-size:14px}
+  .field input:focus{outline:none;border-color:var(--teal)}
+  .btn-login{width:100%;background:var(--teal);color:#06140f;border:none;border-radius:8px;padding:12px;font-weight:700;font-size:14px;cursor:pointer;margin-top:6px}
+  .btn-login:disabled{opacity:.6;cursor:default}
+  .login-error{font-size:12px;color:var(--red);margin-top:12px;text-align:center;min-height:16px}
+
+  /* ── dashboard ── */
+  #dashWrap{display:none;max-width:1200px;margin:0 auto;padding:28px 24px}
+  header{display:flex;justify-content:space-between;align-items:center;margin-bottom:26px;padding-bottom:18px;border-bottom:1px solid var(--border)}
+  .brand{display:flex;align-items:center;gap:12px}
+  .brand-logo{font-size:22px;font-weight:800;color:var(--teal);letter-spacing:-1px}
+  .brand-sub{font-size:12px;color:var(--text-dim)}
+  .user-chip{display:flex;align-items:center;gap:12px}
+  .user-chip span{font-size:12px;color:var(--text-dim)}
+  .btn-logout{background:none;border:1px solid var(--border);color:var(--text-dim);border-radius:7px;padding:7px 14px;font-size:12px;cursor:pointer}
+
+  h2{font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-dim);margin:26px 0 14px}
+  .month-filter{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px}
+  .month-chip{background:var(--panel2);border:1px solid var(--border);border-radius:20px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;color:var(--text-dim)}
+  .month-chip.active{background:rgba(29,191,142,.15);border-color:var(--teal);color:var(--teal)}
+
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:10px}
+  .card{background:var(--panel);border:1px solid var(--border);border-top:3px solid var(--accent);border-radius:12px;padding:18px}
+  .card-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--accent)}
+  .card-num{font-family:var(--mono);font-size:26px;font-weight:800;margin-top:8px}
+  .card-sub{font-size:11px;color:var(--text-dim);margin-top:6px}
+
+  table{width:100%;border-collapse:collapse;margin-top:10px}
+  th{text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-dim);padding:8px 12px;border-bottom:1px solid var(--border)}
+  td{padding:10px 12px;font-size:13px;border-bottom:1px solid rgba(255,255,255,.04)}
+  td.num{font-family:var(--mono);text-align:right}
+  tr:hover td{background:rgba(255,255,255,.02)}
+  .foot-note{font-size:11px;color:var(--text-dim);margin-top:24px;padding-top:16px;border-top:1px solid var(--border)}
+  .loading,.empty{text-align:center;padding:40px;color:var(--text-dim)}
+</style>
+</head>
+<body>
+
+<div id="loginWrap">
+  <div class="login-box">
+    <div class="login-logo">alleata</div>
+    <div class="login-sub">Portal de Auditoría</div>
+    <div class="field">
+      <label>Email</label>
+      <input type="email" id="loginEmail" placeholder="tu@mail.com" autocomplete="username">
+    </div>
+    <div class="field">
+      <label>Contraseña</label>
+      <input type="password" id="loginPass" placeholder="••••••••" autocomplete="current-password">
+    </div>
+    <button class="btn-login" id="btnLogin" onclick="hacerLogin()">Ingresar</button>
+    <div class="login-error" id="loginError"></div>
+  </div>
+</div>
+
+<div id="dashWrap">
+  <header>
+    <div class="brand">
+      <div class="brand-logo">alleata</div>
+      <div class="brand-sub">· Portal de Auditoría</div>
+    </div>
+    <div class="user-chip">
+      <span id="userLabel">—</span>
+      <button class="btn-logout" onclick="hacerLogout()">Salir</button>
+    </div>
+  </header>
+
+  <h2>💰 Logística — Costo de Envíos por mes</h2>
+  <div class="month-filter" id="monthFilter"></div>
+  <div id="cardsWrap" class="loading">Cargando...</div>
+
+  <h2 style="margin-top:32px">📋 Detalle mes a mes</h2>
+  <div style="overflow-x:auto">
+    <table>
+      <thead><tr>
+        <th>Mes</th><th style="text-align:right">Correo Arg.</th><th style="text-align:right">EPSA</th>
+        <th style="text-align:right">Alleata</th><th style="text-align:right">Cabify</th>
+        <th style="text-align:right">Total envíos</th><th style="text-align:right">Costo total</th>
+      </tr></thead>
+      <tbody id="tablaMeses"><tr><td colspan="7" class="loading">Cargando...</td></tr></tbody>
+    </table>
+  </div>
+
+  <div class="foot-note">
+    Datos: OTs de Perfil NAPSE (Instalación Equipo + Simcard / Cambio de Terminal) en estado Despachado o Exitoso,
+    agrupadas por mes de fecha de despacho. Acceso de solo lectura — Alleata Operaciones.
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
+const SUPABASE_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
+const sb=supabase.createClient(SUPABASE_URL,SUPABASE_ANON);
+
+let _todosLosMeses=[];
+let _mesActivo='__todos';
+
+async function hacerLogin(){
+  const email=document.getElementById('loginEmail').value.trim();
+  const pass=document.getElementById('loginPass').value;
+  const errEl=document.getElementById('loginError');
+  const btn=document.getElementById('btnLogin');
+  errEl.textContent='';
+  if(!email||!pass){errEl.textContent='Completá email y contraseña.';return;}
+  btn.disabled=true;btn.textContent='Ingresando...';
+
+  const{data,error}=await sb.auth.signInWithPassword({email,password:pass});
+  if(error){
+    errEl.textContent='Email o contraseña incorrectos.';
+    btn.disabled=false;btn.textContent='Ingresar';
+    return;
+  }
+
+  // Verificación de rol — SOLO auditor_externo puede ver esta pantalla,
+  // aunque el login de Supabase haya sido válido (podría ser cualquier
+  // otra cuenta interna del sistema). No alcanza con loguearse bien.
+  const{data:perfil,error:perfilErr}=await sb.from('profiles').select('nombre,rol').eq('id',data.user.id).maybeSingle();
+  if(perfilErr||!perfil||perfil.rol!=='auditor_externo'){
+    errEl.textContent='Esta cuenta no tiene acceso a este portal.';
+    await sb.auth.signOut();
+    btn.disabled=false;btn.textContent='Ingresar';
+    return;
+  }
+
+  document.getElementById('userLabel').textContent=perfil.nombre||email;
+  document.getElementById('loginWrap').style.display='none';
+  document.getElementById('dashWrap').style.display='block';
+  cargarDatos();
+}
+
+async function hacerLogout(){
+  await sb.auth.signOut();
+  location.reload();
+}
+
+// Si ya había una sesión activa (recargó la página), re-validar el rol
+// antes de mostrar nada — mismo chequeo que en el login.
+async function chequearSesionExistente(){
+  const{data:{session}}=await sb.auth.getSession();
+  if(!session)return;
+  const{data:perfil}=await sb.from('profiles').select('nombre,rol').eq('id',session.user.id).maybeSingle();
+  if(!perfil||perfil.rol!=='auditor_externo'){ await sb.auth.signOut(); return; }
+  document.getElementById('userLabel').textContent=perfil.nombre||session.user.email;
+  document.getElementById('loginWrap').style.display='none';
+  document.getElementById('dashWrap').style.display='block';
+  cargarDatos();
+}
+chequearSesionExistente();
+
+const MESES_NOMBRE=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+const LOGISTICAS=[
+  {key:'CORREO ARGENTINO', label:'Correo Argentino', color:'#e74c3c'},
+  {key:'EPSA',             label:'EPSA',             color:'#f39c12'},
+  {key:'ALLEATA',          label:'Alleata',           color:'#1dbf8e'},
+  {key:'CABIFY',           label:'Cabify',            color:'#9b59b6'},
+];
+
+async function cargarDatos(){
+  const cardsWrap=document.getElementById('cardsWrap');
+  const tbody=document.getElementById('tablaMeses');
+
+  // Mismo criterio que ya usa NAPSE Reporter internamente: Perfil NAPSE,
+  // Instalación Equipo+Simcard o Cambio de Terminal, Status Despachado o
+  // Exitoso — acá además agrupamos por mes de fecha_despacho.
+  const{data,error}=await sb.from('sf_workorders')
+    .select('logistica,costo_envio,fecha_despacho,status,perfil,record_type')
+    .eq('perfil','NAPSE')
+    .in('record_type',['Instalación Equipo + Simcard','Cambio de Terminal'])
+    .in('status',['Despachado','Exitoso'])
+    .not('fecha_despacho','is',null);
+
+  if(error){
+    cardsWrap.innerHTML=`<div class="empty" style="color:var(--red)">Error cargando datos: ${error.message}</div>`;
+    tbody.innerHTML='';
+    return;
+  }
+
+  const porMes={};
+  (data||[]).forEach(r=>{
+    const d=new Date(r.fecha_despacho);
+    const key=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+    if(!porMes[key])porMes[key]={key,label:MESES_NOMBRE[d.getMonth()]+' '+d.getFullYear(),logs:{},total_ots:0,total_costo:0};
+    const log=(r.logistica||'OTROS').toUpperCase().trim();
+    if(!porMes[key].logs[log])porMes[key].logs[log]={ots:0,costo:0};
+    porMes[key].logs[log].ots+=1;
+    porMes[key].logs[log].costo+=Number(r.costo_envio)||0;
+    porMes[key].total_ots+=1;
+    porMes[key].total_costo+=Number(r.costo_envio)||0;
+  });
+
+  _todosLosMeses=Object.values(porMes).sort((a,b)=>b.key.localeCompare(a.key));
+
+  if(!_todosLosMeses.length){
+    cardsWrap.innerHTML='<div class="empty">Sin datos todavía</div>';
+    tbody.innerHTML='<tr><td colspan="7" class="empty">Sin datos</td></tr>';
+    return;
+  }
+
+  renderFiltroMeses();
+  renderVista();
+}
+
+function renderFiltroMeses(){
+  const filterEl=document.getElementById('monthFilter');
+  const chips=['__todos',..._todosLosMeses.map(m=>m.key)];
+  filterEl.innerHTML=chips.map(key=>{
+    const label=key==='__todos'?'Todos los meses':_todosLosMeses.find(m=>m.key===key).label;
+    return `<div class="month-chip${key===_mesActivo?' active':''}" onclick="seleccionarMes('${key}')">${label}</div>`;
+  }).join('');
+}
+
+function seleccionarMes(key){
+  _mesActivo=key;
+  renderFiltroMeses();
+  renderVista();
+}
+
+function fmt$(n){ return n?'$'+Math.round(n).toLocaleString('es-AR'):'$0'; }
+
+function renderVista(){
+  const cardsWrap=document.getElementById('cardsWrap');
+
+  const mesesAMostrar=_mesActivo==='__todos'?_todosLosMeses:_todosLosMeses.filter(m=>m.key===_mesActivo);
+
+  const agregado={};
+  LOGISTICAS.forEach(l=>{agregado[l.key]={ots:0,costo:0};});
+  let totalOts=0,totalCosto=0;
+  mesesAMostrar.forEach(m=>{
+    LOGISTICAS.forEach(l=>{
+      const v=m.logs[l.key];
+      if(v){agregado[l.key].ots+=v.ots;agregado[l.key].costo+=v.costo;}
+    });
+    totalOts+=m.total_ots;totalCosto+=m.total_costo;
+  });
+
+  cardsWrap.className='cards';
+  cardsWrap.innerHTML=LOGISTICAS.map(l=>{
+    const v=agregado[l.key];
+    const prom=v.ots?Math.round(v.costo/v.ots):0;
+    return `<div class="card" style="--accent:${l.color}">
+      <div class="card-label">${l.label}</div>
+      <div class="card-num">${fmt$(v.costo)}</div>
+      <div class="card-sub">${v.ots} envíos · Prom. ${fmt$(prom)}</div>
+    </div>`;
+  }).join('')+`<div class="card" style="--accent:var(--teal)">
+      <div class="card-label">Total período</div>
+      <div class="card-num" style="color:var(--teal)">${fmt$(totalCosto)}</div>
+      <div class="card-sub">${totalOts} envíos</div>
+    </div>`;
+
+  const tbody=document.getElementById('tablaMeses');
+  tbody.innerHTML=_todosLosMeses.map(m=>{
+    const c=k=>m.logs[k]?fmt$(m.logs[k].costo):'—';
+    return `<tr>
+      <td style="font-weight:700">${m.label}</td>
+      <td class="num">${c('CORREO ARGENTINO')}</td>
+      <td class="num">${c('EPSA')}</td>
+      <td class="num">${c('ALLEATA')}</td>
+      <td class="num">${c('CABIFY')}</td>
+      <td class="num">${m.total_ots}</td>
+      <td class="num" style="color:var(--teal);font-weight:700">${fmt$(m.total_costo)}</td>
+    </tr>`;
+  }).join('');
+}
+
+document.getElementById('loginPass').addEventListener('keydown',e=>{if(e.key==='Enter')hacerLogin();});
+document.getElementById('loginEmail').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('loginPass').focus();});
+</script>
+</body>
+</html>
