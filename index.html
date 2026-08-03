@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.6.27</title>
+<title>Alleata · Operaciones v4.6.28</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -400,7 +400,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.27 · 03 ago 2026
+      v4.6.28 · 03 ago 2026
     </div>
   </div>
 </div>
@@ -488,7 +488,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.27 · 03 ago 2026
+      v4.6.28 · 03 ago 2026
     </div>
   </div>
 </nav>
@@ -528,7 +528,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.27</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.28</div>
   </div>
   <div class="content">
 
@@ -4661,7 +4661,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.6.27] OK');
+console.log('[Alleata v4.6.28] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -6315,6 +6315,32 @@ async function cargarObjetivoSemanalRollout(){
     </div>`;
   }).join('');
 
+  // Semana anterior — mismo desglose día por día, para comparar contra la
+  // actual. Pedido 03/08. Puramente informativo, sin barra de objetivo
+  // (ese objetivo es semanal, no tiene sentido "cumplirlo" retroactivo).
+  const lunesAnt=new Date(lunes);lunesAnt.setDate(lunes.getDate()-7);
+  const domingoAnt=new Date(lunes);domingoAnt.setDate(lunes.getDate()-1);
+  const lunesAntStr=lunesAnt.toLocaleDateString('en-CA');
+  const domingoAntStr=domingoAnt.toLocaleDateString('en-CA');
+
+  const{data:dataAnt,error:errorAnt}=await sb.from('rollout_piloto').select('fecha_exitosa').eq('etapa','Cerrado').gte('fecha_exitosa',lunesAntStr).lte('fecha_exitosa',domingoAntStr);
+  const porDiaAnt={};
+  (dataAnt||[]).forEach(r=>{
+    const key=String(r.fecha_exitosa).slice(0,10);
+    porDiaAnt[key]=(porDiaAnt[key]||0)+1;
+  });
+  const totalAnt=(dataAnt||[]).length;
+  const diasHtmlAnt=NOMBRES_DIA.map((nombre,i)=>{
+    const d=new Date(lunesAnt);d.setDate(lunesAnt.getDate()+i);
+    const key=d.toLocaleDateString('en-CA');
+    const cant=porDiaAnt[key]||0;
+    return`<div style="flex:1;text-align:center;min-width:0">
+      <div style="font-size:9px;color:var(--text-muted);font-weight:700;letter-spacing:.03em">${nombre}</div>
+      <div style="width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:3px auto;border:1px solid var(--border2);color:var(--text-muted);font-size:11px">${d.getDate()}</div>
+      <div style="font-size:12px;font-weight:700;color:${cant>0?'var(--text)':'var(--border2)'}">${cant}</div>
+    </div>`;
+  }).join('');
+
   cont.innerHTML=`<div class="card" style="margin-bottom:14px;border-left:4px solid ${color}">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
       <div style="font-size:13px;font-weight:700">🎯 Objetivo semanal del equipo — Rollout</div>
@@ -6328,6 +6354,12 @@ async function cargarObjetivoSemanalRollout(){
       <div style="background:${color};height:100%;width:${pct}%;transition:width .3s"></div>
     </div>
     <div style="display:flex;gap:4px;border-top:1px solid var(--border);padding-top:12px">${diasHtml}</div>
+
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:16px;padding-top:12px;border-top:1px dashed var(--border)">
+      <span style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em">Semana anterior (${fmtCorto(lunesAntStr)} – ${fmtCorto(domingoAntStr)})</span>
+      <span style="font-size:14px;font-weight:800;color:var(--text-muted)">${totalAnt} entregas</span>
+    </div>
+    <div style="display:flex;gap:4px;margin-top:8px;opacity:.75">${diasHtmlAnt}</div>
   </div>`;
 }
 
