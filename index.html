@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.6.29</title>
+<title>Alleata · Operaciones v4.6.31</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -400,7 +400,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.29 · 03 ago 2026
+      v4.6.31 · 03 ago 2026
     </div>
   </div>
 </div>
@@ -488,7 +488,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.29 · 03 ago 2026
+      v4.6.31 · 03 ago 2026
     </div>
   </div>
 </nav>
@@ -528,7 +528,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.29</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.31</div>
   </div>
   <div class="content">
 
@@ -2960,7 +2960,7 @@ async function printRotuloInstalacion(id) {
   if (provZ.includes('ciudad autónoma') || provZ.includes('caba')) { zonaCode = 'CABA'; zonaColor = '#1a9fd4'; }
   else if (['san isidro','vicente lópez','vicente lopez','tigre','pilar','escobar','san fernando','malvinas argentinas','san miguel','san martín','san martin','jose c. paz','josé c. paz','general rodriguez','general rodríguez'].some(n => ciudadZ.includes(n))) { zonaCode = 'ZN'; zonaColor = '#10b981'; }
   else if (['lomas de zamora','lanús','lanus','avellaneda','quilmes','berazategui','florencio varela','almirante brown','ezeiza','esteban echeverría','esteban echeverria','la plata','guernica','monte grande','temperley','banfield'].some(n => ciudadZ.includes(n))) { zonaCode = 'ZS'; zonaColor = '#f59e0b'; }
-  else if (['la matanza','morón','moron','hurlingham','ituzaingó','ituzaingo','merlo','moreno','tres de febrero','luján','lujan','ramos mejía','ramos mejia','san justo','haedo','castelar','palomar','ciudadela','tapiales','villa luzuriaga','aldo bonzi','gregorio laferrere'].some(n => ciudadZ.includes(n))) { zonaCode = 'ZO'; zonaColor = '#8b5cf6'; }
+  else if (['la matanza','morón','moron','hurlingham','ituzaingó','ituzaingo','merlo','moreno','tres de febrero','luján','lujan','ramos mejía','ramos mejia','san justo','haedo','castelar','palomar','ciudadela','tapiales','villa luzuriaga','aldo bonzi','gregorio laferrere','villa tesei','william morris','villa sarmiento'].some(n => ciudadZ.includes(n))) { zonaCode = 'ZO'; zonaColor = '#8b5cf6'; }
 
   // FIX: el rótulo tiene que usar Direccion_de_envio__c (campo 'direccion' en Supabase,
   // viene de Direcci_n_de_env_o__Street__s) — antes priorizaba direccion_formula,
@@ -3531,32 +3531,47 @@ function dsGetZona(ot){
     'santiago del estero','jujuy','formosa','chubut','santa cruz','tierra del fuego'];
   if(FUERA_AMBA.some(p=>prov.includes(p))) return 'Fuera AMBA';
 
-  // Zona Sur — spec explícito + CP
+  // Tabla real de CP por partido (planilla CP_AMBA_por_Zona.xlsx, 03/08) —
+  // mucho más precisa que un rango genérico por zona, se chequea primero,
+  // antes que los nombres de localidad (que vienen de texto libre).
+  const CP_RANGOS=[
+    ['CABA',1000,1499],
+    ['Zona Norte',1602,1638],['Zona Norte',1609,1643],['Zona Norte',1644,1648],
+    ['Zona Norte',1617,1670],['Zona Norte',1619,1625],['Zona Norte',1629,1633],
+    ['Zona Norte',1611,1615],['Zona Norte',1665,1665],['Zona Norte',1663,1663],
+    ['Zona Norte',1650,1672],
+    ['Zona Oeste',1674,1706],['Zona Oeste',1686,1686],['Zona Oeste',1708,1712],
+    ['Zona Oeste',1714,1714],['Zona Oeste',1722,1724],['Zona Oeste',1742,1744],
+    ['Zona Oeste',1752,1778],
+    ['Zona Sur',1870,1875],['Zona Sur',1824,1826],['Zona Sur',1832,1839],
+    ['Zona Sur',1846,1856],['Zona Sur',1804,1842],['Zona Sur',1802,1814],
+    ['Zona Sur',1878,1888],['Zona Sur',1884,1893],['Zona Sur',1888,1891],
+  ];
+  if(cpNum){
+    const match=CP_RANGOS.find(([,desde,hasta])=>cpNum>=desde&&cpNum<=hasta);
+    if(match) return match[0];
+  }
+
+  // Fallback por nombre de localidad — cuando no hay CP o cae fuera de la tabla
   const sur=['la plata','berisso','ensenada','avellaneda','lanús','lanus',
     'lomas de zamora','quilmes','monte grande','guernica','bernal','berazategui',
     'florencio varela','almirante brown','esteban echeverria','esteban echeverría',
-    'ezpeleta','temperley','banfield','adrogué','adrogué','san justo'];
+    'ezpeleta','temperley','banfield','adrogué','adrogué','ezeiza'];
   if(sur.some(c=>ciudad.includes(c))) return 'Zona Sur';
-  if(cpNum>=1800&&cpNum<=1899) return 'Zona Sur';
-  if(cpNum>=1900&&cpNum<=1999) return 'Zona Sur'; // La Plata
 
-  // Zona Oeste — spec explícito + CP
   const oeste=['morón','moron','merlo','moreno','hurlingham','ituzaingo','ituzaingó',
     'la matanza','san justo','ramos mejía','ramos mejia','haedo','castelar',
     'palermo','ciudadela','liniers','marcos paz','luján','lujan',
-    'general rodríguez','general rodriguez'];
+    'general rodríguez','general rodriguez','villa tesei','william morris',
+    'villa sarmiento','tres de febrero'];
   if(oeste.some(c=>ciudad.includes(c))) return 'Zona Oeste';
-  if(cpNum>=1700&&cpNum<=1769) return 'Zona Oeste';
 
-  // Zona Norte — spec explícito + CP
   const norte=['tigre','san isidro','vicente lópez','vicente lopez','pilar','escobar',
     'zárate','zarate','campana','san miguel','malvinas argentinas','jose c paz',
-    'san martín','san martin','tres de febrero','olivos','martinez','martínez',
+    'san martín','san martin','olivos','martinez','martínez',
     'florida','munro','villa del parque','palermo','belgrano','pacheco','general pacheco',
-    'don torcuato','benavídez','benavidez','nordelta','general rodríguez','general rodriguez',
-    'san fernando'];
+    'don torcuato','benavídez','benavidez','nordelta','san fernando'];
   if(norte.some(c=>ciudad.includes(c))) return 'Zona Norte';
-  if(cpNum>=1600&&cpNum<=1669) return 'Zona Norte';
 
   // Buenos Aires pero no clasificada → Fuera AMBA (localidades lejanas)
   if(prov.includes('buenos aires')&&cpNum>=1500) return 'Fuera AMBA';
@@ -4661,7 +4676,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.6.29] OK');
+console.log('[Alleata v4.6.31] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -11868,7 +11883,8 @@ function detectarZona(ciudad, provincia, cp) {
   // Zona Oeste GBA
   if(['la matanza','morón','moron','hurlingham','ituzaingó','ituzaingo','merlo','moreno',
       'tres de febrero','luján','lujan','ramos mejía','ramos mejia','san justo','haedo',
-      'castelar','palomar','del viso','cuartel v','marcos paz','general rodriguez']
+      'castelar','palomar','del viso','cuartel v','marcos paz','general rodriguez',
+      'villa tesei','william morris','villa sarmiento']
     .some(n=>c.includes(n)))
     return {zona:'Zona Oeste', color:'#8b5cf6', icon:'🟣'};
 
