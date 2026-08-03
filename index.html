@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.6.31</title>
+<title>Alleata · Operaciones v4.6.34</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -400,7 +400,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.31 · 03 ago 2026
+      v4.6.34 · 04 ago 2026
     </div>
   </div>
 </div>
@@ -488,7 +488,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.31 · 03 ago 2026
+      v4.6.34 · 04 ago 2026
     </div>
   </div>
 </nav>
@@ -528,7 +528,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.31</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.34</div>
   </div>
   <div class="content">
 
@@ -1968,6 +1968,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     <button class="ally-tab active" onclick="allyTab('contactos',this)">👥 Contactos</button>
     <button class="ally-tab" onclick="allyTab('grupos',this)">📢 Grupos</button>
     <button class="ally-tab" onclick="allyTab('reglas',this)">🔔 Reglas</button>
+    <button class="ally-tab" id="ally-tab-btn-zonas" onclick="allyTab('zonas',this)" style="display:none">📍 Zonas AMBA</button>
   </div>
 
   <!-- TAB CONTACTOS -->
@@ -2013,6 +2014,50 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <div style="font-size:12px;color:var(--text-muted);margin-top:4px">Definí qué estados disparan notificaciones al propietario de la cuenta</div>
     </div>
     <div id="ally-reglas-wrap"></div>
+  </div>
+
+  <!-- TAB ZONAS AMBA — correcciones manuales de "este CP es tal zona".
+       Vive acá (no es específico de Ally/WhatsApp) porque es la pantalla
+       de config admin más a mano — pedido 03/08, para no depender de un
+       deploy cada vez que aparece una localidad que el clasificador
+       automático no reconoce. -->
+  <div id="ally-tab-zonas" style="display:none">
+    <div style="margin-bottom:14px">
+      <div class="sec-title"><div class="sec-dot" style="background:#8b5cf6"></div>📍 Zonas AMBA — correcciones manuales por CP</div>
+      <div style="font-size:12px;color:var(--text-muted);margin-top:4px">Cuando el clasificador automático (rango de CP por partido + nombre de localidad) se equivoca o no reconoce un CP nuevo, cargalo acá una vez — se respeta siempre, antes que cualquier otra regla, en todo el sistema (rótulo, Desinstalaciones, monitor de entregas).</div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:16px;background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:12px">
+      <div>
+        <label class="label">Código Postal</label>
+        <input class="input" id="zcp-cp" placeholder="Ej: 1688" style="width:110px">
+      </div>
+      <div>
+        <label class="label">Zona</label>
+        <select class="input" id="zcp-zona" style="width:150px">
+          <option value="CABA">CABA</option>
+          <option value="Zona Norte">Zona Norte</option>
+          <option value="Zona Sur">Zona Sur</option>
+          <option value="Zona Oeste">Zona Oeste</option>
+          <option value="Fuera AMBA">Fuera AMBA</option>
+        </select>
+      </div>
+      <div>
+        <label class="label">Localidad (opcional, solo referencia)</label>
+        <input class="input" id="zcp-localidad" placeholder="Ej: Villa Tesei" style="width:180px">
+      </div>
+      <div style="flex:1;min-width:180px">
+        <label class="label">Nota (opcional)</label>
+        <input class="input" id="zcp-nota" placeholder="Ej: caía como Sin zona" style="width:100%">
+      </div>
+      <button class="btn btn-sm" onclick="zcpGuardar()">💾 Guardar</button>
+    </div>
+    <div id="zcp-msg" style="font-size:12px;margin-bottom:10px"></div>
+    <div class="table-wrap">
+      <table class="table">
+        <thead><tr><th>CP</th><th>Zona</th><th>Localidad</th><th>Nota</th><th>Cargado</th><th></th></tr></thead>
+        <tbody id="zcp-tbody"><tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:20px">Cargando...</td></tr></tbody>
+      </table>
+    </div>
   </div>
 </div>
 
@@ -3516,6 +3561,10 @@ function dsGetZona(ot){
   const cpNum   = parseInt(cp)||0;
   const distKm  = parseFloat(ot.distancia||ot.distancia_km||0)||0;
 
+  // 0) Corrección manual — máxima prioridad. Si alguien cargó "este CP es
+  // tal zona" desde Config → Zonas AMBA, se respeta siempre.
+  if(cp && _zonaOverridesCP[cp.replace(/\D/g,'')]) return _zonaOverridesCP[cp.replace(/\D/g,'')];
+
   // Distancia > 70km → Fuera AMBA directamente
   if(distKm > 70) return 'Fuera AMBA';
 
@@ -4676,7 +4725,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.6.31] OK');
+console.log('[Alleata v4.6.34] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -4685,6 +4734,23 @@ const SF_SYNC_SECRET='123456';
 const SUPABASE_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const{createClient}=supabase;
 const sb=createClient(SUPABASE_URL,SUPABASE_KEY);
+
+// ── Correcciones manuales de zona por CP (zona_cp_manual) ──────────────
+// Se chequean primero, antes que la tabla de rangos y las listas de
+// localidad, en dsGetZona(). Se cargan una vez acá al arrancar la app —
+// dsGetZona es sync y se usa por todos lados, así que no puede esperar un
+// fetch cada vez que se llama. cargarZonaOverrides() se re-llama también
+// después de guardar una corrección nueva desde la pantalla de gestión,
+// para que tenga efecto sin recargar la página.
+let _zonaOverridesCP={};
+async function cargarZonaOverrides(){
+  try{
+    const{data}=await sb.from('zona_cp_manual').select('cp,zona');
+    _zonaOverridesCP={};
+    (data||[]).forEach(r=>{_zonaOverridesCP[String(r.cp).replace(/\D/g,'')]=r.zona;});
+  }catch(e){console.warn('[zona_cp_manual] No se pudo cargar:',e.message);}
+}
+cargarZonaOverrides();
 // ========== SIMS — Supabase functions (v1.4.0) ==========
 // Reemplaza SIMS_DB, DB_BY_LINEA y KNOWN_PREFIXES embebidos
 // Requiere: const sb = createClient(SUPABASE_URL, SUPABASE_KEY) ya definido
@@ -13392,6 +13458,7 @@ async function napseMatchSF(serialNumber, node, store, btn){
   let termSeries  = [];   // [{serie, modelo, solucion, esError}]
   let termPreview = [];   // resultados del preview SF
   let termMeta    = {};   // serie -> {modelo, solucion, esError}
+  let termMesAno  = '—';  // "Julio 2026", tal cual lo declara el propio Excel — para el histórico
 
   function getFields(){
     return {
@@ -13504,6 +13571,7 @@ async function napseMatchSF(serialNumber, node, store, btn){
         }
         if(!series.length){ alert('No se encontraron series. Verificá que sea el reporte de Logicalis.'); return; }
         termSeries = series;
+        termMesAno = mes;
         termMeta = {};
         series.forEach(s=>{ termMeta[s.serie] = { modelo:s.modelo, solucion:s.solucion, esError:!!s.esError }; });
 
@@ -13737,6 +13805,26 @@ async function napseMatchSF(serialNumber, node, store, btn){
     progLabel.textContent=`Listo — ${ok} OK, ${err} errores, ${skippedYa.length} omitidas`;
     addLog(`[done] ${ok}/${totalOps} terminales procesadas.`);
     document.getElementById('term-done-row').style.display='block';
+
+    // Histórico para el Portal de Auditoría — pedido 04/08. La fecha sale
+    // del "Mes"/"Año" que el propio Excel de Logicalis declara adentro
+    // (celda "Mes"/"Año" en Detalle Despacho), NO de cuándo se sube acá —
+    // así, aunque se procese julio recién en agosto, queda fechado como
+    // julio correctamente.
+    try{
+      const MESES_MAP={enero:1,febrero:2,marzo:3,abril:4,mayo:5,junio:6,julio:7,agosto:8,septiembre:9,setiembre:9,octubre:10,noviembre:11,diciembre:12};
+      const mMatch=termMesAno.toLowerCase().match(/([a-záéíóú]+)\s*(\d{4})/);
+      const fechaDespacho=mMatch&&MESES_MAP[mMatch[1]]
+        ? `${mMatch[2]}-${String(MESES_MAP[mMatch[1]]).padStart(2,'0')}-01`
+        : new Date().toISOString().split('T')[0]; // fallback: si no se pudo leer el mes del Excel, usa hoy
+      await sb.from('logicalis_despachos_historico').insert({
+        fecha_despacho: fechaDespacho,
+        cantidad: termSeries.length,
+        con_error: errorCount,
+        archivo_nombre: (document.getElementById('term-file-input')?.files?.[0]?.name)||null,
+        cargado_por: (currentProfile?.nombre||currentProfile?.email||'—').trim(),
+      });
+    }catch(e){ console.warn('[logicalis_despachos_historico] No se pudo guardar:',e.message); }
   };
 })();
 
@@ -13749,10 +13837,15 @@ async function napseMatchSF(serialNumber, node, store, btn){
 function allyInit() {
   var firstTab = document.querySelector('.ally-tab');
   allyTab('contactos', firstTab);
+  // Zonas AMBA — pedido explícito 03/08: SOLO marcelos, ni siquiera otros
+  // admins. Mismo criterio que ya usa el card de Objetivo Semanal.
+  var esMarcelosZonas = (currentProfile?.email||currentUser?.email||'').trim().toLowerCase()==='marcelos@moretti.com.ar';
+  var btnZonas = document.getElementById('ally-tab-btn-zonas');
+  if(btnZonas) btnZonas.style.display = esMarcelosZonas ? '' : 'none';
 }
 
 function allyTab(tab, btn) {
-  ['contactos','grupos','reglas'].forEach(function(t) {
+  ['contactos','grupos','reglas','zonas'].forEach(function(t) {
     var el = document.getElementById('ally-tab-' + t);
     if (el) el.style.display = (t === tab) ? '' : 'none';
   });
@@ -13761,6 +13854,61 @@ function allyTab(tab, btn) {
   if (tab === 'contactos') allyCargarContactos();
   if (tab === 'grupos')    allyCargarGrupos();
   if (tab === 'reglas')    allyCargarReglas();
+  if (tab === 'zonas')     zcpCargar();
+}
+
+// ── Zonas AMBA — correcciones manuales por CP (zona_cp_manual) ──────────
+// SOLO marcelos, pedido explícito 03/08 — ni siquiera otros admins. El
+// botón del tab ya está oculto para todos los demás (allyInit), pero acá
+// se repite el chequeo por si alguien fuerza el tab a mano desde la
+// consola del navegador — no alcanza con esconder el botón nomás.
+function _esMarcelosZonas(){
+  return (currentProfile?.email||currentUser?.email||'').trim().toLowerCase()==='marcelos@moretti.com.ar';
+}
+
+async function zcpCargar(){
+  const tbody=document.getElementById('zcp-tbody');
+  if(!tbody)return;
+  if(!_esMarcelosZonas()){tbody.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:20px">No tenés permiso para ver esta sección</td></tr>';return;}
+  const{data,error}=await sb.from('zona_cp_manual').select('*').order('created_at',{ascending:false});
+  if(error){tbody.innerHTML=`<tr><td colspan="6" style="text-align:center;color:var(--red);padding:20px">Error: ${error.message}</td></tr>`;return;}
+  if(!data?.length){tbody.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:20px">Sin correcciones cargadas todavía</td></tr>';return;}
+  tbody.innerHTML=data.map(r=>`<tr>
+    <td style="font-family:'JetBrains Mono',monospace;font-weight:700">${r.cp}</td>
+    <td>${r.zona}</td>
+    <td>${r.localidad||'<span style="color:var(--text-muted)">—</span>'}</td>
+    <td style="font-size:11px;color:var(--text-muted)">${r.nota||'—'}</td>
+    <td style="font-size:11px;color:var(--text-muted)">${r.created_at?new Date(r.created_at).toLocaleDateString('es-AR'):'—'}</td>
+    <td><button class="btn-sm" style="background:none;border:1px solid var(--border2);color:var(--red)" onclick="zcpBorrar('${r.cp}')">🗑️</button></td>
+  </tr>`).join('');
+}
+
+async function zcpGuardar(){
+  if(!_esMarcelosZonas()){alert('No tenés permiso para hacer esto.');return;}
+  const cp=document.getElementById('zcp-cp').value.trim().replace(/\D/g,'');
+  const zona=document.getElementById('zcp-zona').value;
+  const localidad=document.getElementById('zcp-localidad').value.trim()||null;
+  const nota=document.getElementById('zcp-nota').value.trim()||null;
+  const msg=document.getElementById('zcp-msg');
+  if(!cp||cp.length<4){msg.innerHTML='<span style="color:var(--red)">Cargá un CP válido (4 dígitos, sin la letra).</span>';return;}
+  const{error}=await sb.from('zona_cp_manual').upsert({
+    cp, zona, localidad, nota,
+    agregado_por:(currentProfile?.nombre||currentProfile?.email||'—').trim(),
+  });
+  if(error){msg.innerHTML=`<span style="color:var(--red)">Error: ${error.message}</span>`;return;}
+  msg.innerHTML='<span style="color:var(--teal)">✅ Guardado — ya está activo en todo el sistema.</span>';
+  ['zcp-cp','zcp-localidad','zcp-nota'].forEach(id=>{document.getElementById(id).value='';});
+  await zcpCargar();
+  await cargarZonaOverrides(); // refresca la caché en memoria — sin esto, seguiría usando el valor viejo hasta recargar la página
+}
+
+async function zcpBorrar(cp){
+  if(!_esMarcelosZonas()){alert('No tenés permiso para hacer esto.');return;}
+  if(!confirm(`¿Borrar la corrección manual del CP ${cp}? Vuelve a depender del clasificador automático.`))return;
+  const{error}=await sb.from('zona_cp_manual').delete().eq('cp',cp);
+  if(error){alert('Error: '+error.message);return;}
+  await zcpCargar();
+  await cargarZonaOverrides();
 }
 
 async function allyCargarContactos() {

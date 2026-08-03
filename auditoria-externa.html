@@ -104,6 +104,21 @@
     </table>
   </div>
 
+  <h2 style="margin-top:36px">🖥️ Logicalis — Terminales entregadas por mes</h2>
+  <div id="logicalisWrap" class="loading">Cargando...</div>
+
+  <h2 style="margin-top:36px">📦 OTs (Cambio / Rollout / Instalación) — creadas por mes, estado actual</h2>
+  <div style="font-size:12px;color:var(--text-dim);margin-bottom:14px">Cuántas OTs se crearon cada mes, y de esas, cuántas siguen HOY en Pre-Colecta (sin despachar todavía) — sin importar la logística.</div>
+  <div style="overflow-x:auto">
+    <table>
+      <thead><tr>
+        <th>Mes de creación</th><th style="text-align:right">Total OTs creadas</th>
+        <th style="text-align:right">En Pre-Colecta hoy</th><th style="text-align:right">% sin despachar</th>
+      </tr></thead>
+      <tbody id="tablaPrecolecta"><tr><td colspan="4" class="loading">Cargando...</td></tr></tbody>
+    </table>
+  </div>
+
   <div class="foot-note">
     Datos: OTs de Perfil NAPSE (Instalación Equipo + Simcard / Cambio de Terminal) en estado Despachado o Exitoso,
     agrupadas por mes de fecha de despacho. Acceso de solo lectura — Alleata Operaciones.
@@ -149,6 +164,8 @@ async function hacerLogin(){
   document.getElementById('loginWrap').style.display='none';
   document.getElementById('dashWrap').style.display='block';
   cargarDatos();
+  cargarLogicalis();
+  cargarPrecolecta();
 }
 
 async function hacerLogout(){
@@ -167,6 +184,8 @@ async function chequearSesionExistente(){
   document.getElementById('loginWrap').style.display='none';
   document.getElementById('dashWrap').style.display='block';
   cargarDatos();
+  cargarLogicalis();
+  cargarPrecolecta();
 }
 chequearSesionExistente();
 
@@ -282,6 +301,69 @@ function renderVista(){
       <td class="num">${c('CABIFY')}</td>
       <td class="num">${m.total_ots}</td>
       <td class="num" style="color:var(--teal);font-weight:700">${fmt$(m.total_costo)}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ── Logicalis — terminales entregadas por mes ───────────────────────────
+// Lee logicalis_despachos_historico, que se empieza a llenar sola cada vez
+// que alguien procesa el Excel de Logicalis desde el portal interno — la
+// fecha sale del "Mes"/"Año" que el propio Excel declara, no de cuándo se
+// subió. Meses anteriores a que se empezara a guardar este histórico
+// quedan sin dato, salvo que se recarguen a mano desde los Excels viejos.
+async function cargarLogicalis(){
+  const wrap=document.getElementById('logicalisWrap');
+  const{data,error}=await sb.from('logicalis_despachos_historico')
+    .select('fecha_despacho,cantidad,con_error')
+    .order('fecha_despacho',{ascending:false});
+
+  if(error){ wrap.innerHTML=`<div class="empty" style="color:var(--red)">Error: ${error.message}</div>`; return; }
+  if(!data?.length){ wrap.innerHTML='<div class="empty">Sin datos cargados todavía para este período.</div>'; return; }
+
+  const porMes={};
+  data.forEach(r=>{
+    const d=new Date(r.fecha_despacho+'T00:00:00');
+    const key=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+    if(!porMes[key])porMes[key]={label:MESES_NOMBRE[d.getMonth()]+' '+d.getFullYear(),cantidad:0,con_error:0};
+    porMes[key].cantidad+=r.cantidad;
+    porMes[key].con_error+=r.con_error||0;
+  });
+  const meses=Object.values(porMes).sort((a,b)=>b.label.localeCompare(a.label));
+
+  wrap.className='';
+  wrap.innerHTML=`<table><thead><tr><th>Mes</th><th style="text-align:right">Terminales entregadas</th><th style="text-align:right">Con error</th></tr></thead><tbody>${
+    meses.map(m=>`<tr><td style="font-weight:700">${m.label}</td><td class="num">${m.cantidad}</td><td class="num" style="color:${m.con_error?'var(--amber)':'var(--text-dim)'}">${m.con_error}</td></tr>`).join('')
+  }</tbody></table>`;
+}
+
+// ── OTs creadas por mes vs. cuántas siguen en Pre-Colecta HOY ───────────
+async function cargarPrecolecta(){
+  const tbody=document.getElementById('tablaPrecolecta');
+  const{data,error}=await sb.from('sf_workorders')
+    .select('sf_created_at,status')
+    .in('record_type',['Instalación Equipo + Simcard','Cambio de Terminal'])
+    .not('sf_created_at','is',null);
+
+  if(error){ tbody.innerHTML=`<tr><td colspan="4" style="color:var(--red)">Error: ${error.message}</td></tr>`; return; }
+  if(!data?.length){ tbody.innerHTML='<tr><td colspan="4" class="empty">Sin datos</td></tr>'; return; }
+
+  const porMes={};
+  data.forEach(r=>{
+    const d=new Date(r.sf_created_at);
+    const key=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+    if(!porMes[key])porMes[key]={key,label:MESES_NOMBRE[d.getMonth()]+' '+d.getFullYear(),total:0,precolecta:0};
+    porMes[key].total+=1;
+    if((r.status||'').trim()==='Pre-Colecta')porMes[key].precolecta+=1;
+  });
+  const meses=Object.values(porMes).sort((a,b)=>b.key.localeCompare(a.key));
+
+  tbody.innerHTML=meses.map(m=>{
+    const pct=m.total?Math.round(m.precolecta/m.total*100):0;
+    return `<tr>
+      <td style="font-weight:700">${m.label}</td>
+      <td class="num">${m.total}</td>
+      <td class="num" style="color:${m.precolecta?'var(--amber)':'var(--text-dim)'}">${m.precolecta}</td>
+      <td class="num">${pct}%</td>
     </tr>`;
   }).join('');
 }
