@@ -165,7 +165,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
       <div class="login-logo">
         <img id="loginLogo" src="" alt="Alleata">
         <div class="login-sub">Portal de Operaciones</div>
-        <div class="login-version">v2.14.36 · mobile</div>
+        <div class="login-version">v2.14.37 · mobile</div>
       </div>
       <div class="field"><label class="label">Email</label><input class="input" id="lEmail" type="email" placeholder="usuario@alleata.com" autocomplete="email"></div>
       <div class="field"><label class="label">Contraseña</label><input class="input" id="lPass" type="password" placeholder="••••••••" autocomplete="current-password"></div>
@@ -181,7 +181,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
   <div class="topbar">
     <img id="appLogo" src="" alt="Alleata">
     <div class="topbar-title" id="topbarTitle">Operaciones</div>
-    <div class="topbar-version" onclick="_tocarVersion()">v2.14.36</div>
+    <div class="topbar-version" onclick="_tocarVersion()">v2.14.37</div>
     <div class="topbar-avatar" id="topbarAvatar" onclick="openDrawer()">?</div>
   </div>
 
@@ -3651,8 +3651,21 @@ async function loadDesinstalaciones(){
         ${wa?`<a href="${wa}" target="_blank" class="btn-sm" style="flex:1;background:rgba(37,211,102,.15);color:#25D366;border:1px solid rgba(37,211,102,.3);text-decoration:none;display:flex;align-items:center;justify-content:center;gap:6px;font-weight:700">${ICON_WA} WhatsApp</a>`:''}
         <a href="${maps}" target="_blank" class="btn-sm btn-maps" style="flex:0 0 40px" title="Abrir en Maps">${ICON_MAPS}</a>
       </div>
+      <button class="btn-sm" style="width:100%;margin-top:5px;background:none;border:1px dashed var(--border2);color:var(--text-muted);font-size:11px" onclick="dsm_quitarDeRuta('${ot.id}','${ot.ot}')">➖ Quitar de mi ruta</button>
     </div>`;
   }).join('');
+}
+
+// Saca la OT de desinstalación de la ruta activa SIN registrar retiro ni
+// fallido — para cuando se asignó por error o hay que reprogramarla más
+// adelante. No toca Salesforce, solo el flag hoja_ruta_activa en Supabase
+// (mismo campo que usa el admin desde el desktop). Pedido 03/08.
+async function dsm_quitarDeRuta(otId,otNum){
+  if(!confirm(`¿Sacar la OT ${otNum} de tu ruta de hoy?\n\nNo se registra como retirada ni fallida — solo desaparece de tu lista. Alguien la va a tener que reasignar más adelante.`))return;
+  const{error}=await sb.from('ordenes_trabajo').update({hoja_ruta_activa:false}).eq('id',otId);
+  if(error){ showScanFeedback('❌ Error: '+error.message,'error'); return; }
+  showScanFeedback(`➖ OT ${otNum} sacada de tu ruta`,'ok');
+  await loadDesinstalaciones();
 }
 
 function dsm_openCierre(otId,otNum,resultado,sfId){
