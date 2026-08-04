@@ -3325,6 +3325,15 @@ async function printRotuloInstalacion(id) {
 
 <!-- Modal Investigación — checklist de recuperación, SOLO estado Pendiente
      (pedido 28/07, no replicar a otros estados todavía) -->
+<div id="modalLogisticaMensualCeo" class="modal-overlay" onclick="if(event.target===this) cerrarDesgloseMensualLogisticaCeo()">
+  <div style="background:var(--navy-800);border:1px solid var(--border2);border-radius:14px;padding:26px;width:100%;max-width:620px;max-height:85vh;overflow-y:auto;position:relative;box-shadow:0 30px 80px rgba(0,0,0,.5)">
+    <button class="modal-close" onclick="cerrarDesgloseMensualLogisticaCeo()">✕</button>
+    <div class="modal-title" id="mmCeo-titulo" style="display:flex;align-items:center;gap:10px">📅 <span id="mmCeo-titulo-txt">—</span></div>
+    <div style="font-size:11px;color:var(--text-muted);margin-bottom:18px">Desglose mensual · Estado: Despachado | Exitoso · agrupado por fecha de creación de la OT</div>
+    <div id="mmCeo-body"><div style="color:var(--text-muted);font-size:12px;padding:10px 0">Cargando…</div></div>
+  </div>
+</div>
+
 <div id="dsInvModal" class="modal-overlay" onclick="if(event.target===this)dsInvCerrar()">
   <div class="modal-box" style="max-width:520px">
     <div class="modal-title">🕵️ Investigación — recuperar terminal</div>
@@ -7922,11 +7931,30 @@ async function loadCeoDashKpis(){
 
     // ── Sistema unificado de cards: título blanco arriba siempre, número abajo.
     // Color = solo acento (borde + número). isTotal = fuente grande (34px), sino chica (22px).
+    // Sistema unificado de cards: título blanco arriba siempre, número abajo.
+    // Color = solo acento (borde + número). isTotal = fuente grande (34px), sino chica (22px).
     const statCard=(label,value,color,sub,isTotal)=>`
       <div style="background:var(--navy-800);border:1px solid var(--border);border-top:3px solid ${color};border-radius:12px;padding:16px;text-align:center;flex:1;min-width:0;height:${isTotal?'132px':'100%'};box-sizing:border-box;display:flex;flex-direction:column;justify-content:center">
         <div style="font-size:10px;font-weight:800;letter-spacing:.06em;color:#fff;text-transform:uppercase">${label}</div>
         <div style="font-size:${isTotal?'34px':'22px'};font-weight:900;color:${color};margin-top:6px;font-family:'JetBrains Mono',monospace;line-height:1.1">${value}</div>
         ${sub?`<div style="font-size:11px;color:var(--text-muted);margin-top:4px">${sub}</div>`:''}
+      </div>`;
+
+    // Card de logística — clickeable, abre desglose mensual (igual que napse-gestion.html)
+    const logisticaCard=(key,label,value,color,sub,extraSub)=>`
+      <div style="background:var(--navy-800);border:1px solid var(--border);border-top:3px solid ${color};border-radius:12px;padding:16px;text-align:center;flex:1;min-width:0;box-sizing:border-box;display:flex;flex-direction:column;justify-content:center;cursor:pointer;transition:transform .15s" onmouseover="this.style.transform='translateY(-3px)'" onmouseout="this.style.transform='translateY(0)'" onclick="abrirDesgloseMensualLogisticaCeo('${key}','${label}','${color}')">
+        <div style="font-size:10px;font-weight:800;letter-spacing:.06em;color:#fff;text-transform:uppercase">${label}</div>
+        <div style="font-size:22px;font-weight:900;color:${color};margin-top:6px;font-family:'JetBrains Mono',monospace;line-height:1.1">${value}</div>
+        ${sub?`<div style="font-size:11px;color:var(--text-muted);margin-top:4px">${sub}</div>`:''}
+        ${extraSub?`<div style="font-size:10px;color:var(--text-muted);margin-top:2px;opacity:.75">${extraSub}</div>`:''}
+        <div style="font-size:9px;color:${color};margin-top:6px;opacity:.85">📅 Click para ver por mes</div>
+      </div>`;
+
+    // Fila de badges de filtros SF (reutilizable)
+    const filterTags=(tags)=>`
+      <div style="display:flex;align-items:center;gap:8px;font-size:11px;color:var(--text-muted);flex-wrap:wrap;margin-bottom:12px">
+        <span>Filtros SF:</span>
+        ${tags.map(t=>`<span style="background:rgba(29,191,142,.1);border:1px solid rgba(29,191,142,.25);color:var(--teal);padding:2px 9px;border-radius:20px;font-size:10px;font-weight:700;font-family:'JetBrains Mono',monospace">${t}</span>`).join('')}
       </div>`;
 
     // Título de sección con más peso visual: barra de color + ícono + texto blanco
@@ -7959,34 +7987,56 @@ async function loadCeoDashKpis(){
 
     // Logística — costo de envíos
     const logProvs=[
-      {label:'Correo Argentino',ots:s.correo_argentino_ots||0,costo:s.correo_argentino_costo||0,color:'#e74c3c'},
-      {label:'EPSA',ots:s.epsa_ots||0,costo:s.epsa_costo||0,color:'#f39c12'},
-      {label:'Alleata',ots:s.alleata_ots||0,costo:s.alleata_costo||0,color:'#1dbf8e'},
-      {label:'Cabify',ots:s.cabify_ots||0,costo:s.cabify_costo||0,color:'#9b59b6'},
+      {key:'correo_argentino',label:'Correo Argentino',ots:s.correo_argentino_ots||0,costo:s.correo_argentino_costo||0,color:'#e74c3c',altas:s.correo_argentino_ots_altas||0,cambios:s.correo_argentino_ots_cambios||0},
+      {key:'epsa',            label:'EPSA',            ots:s.epsa_ots||0,            costo:s.epsa_costo||0,            color:'#f39c12',altas:s.epsa_ots_altas||0,            cambios:s.epsa_ots_cambios||0},
+      {key:'alleata',         label:'Alleata',         ots:s.alleata_ots||0,         costo:s.alleata_costo||0,         color:'#1dbf8e',altas:s.alleata_ots_altas||0,         cambios:s.alleata_ots_cambios||0},
+      {key:'cabify',          label:'Cabify',          ots:s.cabify_ots||0,          costo:s.cabify_costo||0,          color:'#9b59b6',altas:s.cabify_ots_altas||0,          cambios:s.cabify_ots_cambios||0},
     ].filter(e=>e.ots>0||e.costo>0);
     const provsTotales=logProvs.filter(e=>e.label!=='Alleata');
     const totOts=provsTotales.reduce((a,e)=>a+e.ots,0);
     const totCosto=provsTotales.reduce((a,e)=>a+e.costo,0);
     const logHTML=statCard('Total Envíos',fmt$(totCosto),'#1dbf8e',totOts+' envíos (sin Alleata)',true) + logProvs.map(e=>{
       const prom=e.ots?Math.round(e.costo/e.ots):0;
-      return statCard(e.label,fmt$(e.costo),e.color,e.ots+' envíos · Prom. '+fmt$(prom),false);
+      return logisticaCard(e.key,e.label,fmt$(e.costo),e.color,e.ots+' envíos · Prom. '+fmt$(prom),'Altas: '+e.altas+' · Cambios: '+e.cambios);
     }).join('');
+    const logFiltrosHTML=filterTags(['Perfil = NAPSE','Estado = Despachado | Exitoso']);
 
-    // Tipo de OT
-    const inst=s.instalacion_equipo||0, camb=s.cambio_terminal||0, totTipo=(inst+camb)||1;
-    const tipoRow=(label,val,color)=>{
-      const w=Math.round(val/totTipo*100);
+    // Tipo de OT — segmentado por logística, mismo universo que la sección de
+    // arriba (Despachado + Exitoso), no "todos los estados activos".
+    const LOG_COLORS_CEO={
+      correo_argentino:{label:'Correo Argentino',color:'#e74c3c'},
+      epsa:            {label:'EPSA',            color:'#f39c12'},
+      alleata:         {label:'Alleata',          color:'#1dbf8e'},
+      cabify:          {label:'Cabify',           color:'#9b59b6'},
+      otros:           {label:'Otros',            color:'#6b7280'},
+    };
+    const segmentosPorTipoCeo=(campo)=>Object.keys(LOG_COLORS_CEO)
+      .map(key=>({...LOG_COLORS_CEO[key],val:s[`${key}_${campo}`]||0}))
+      .filter(x=>x.val>0);
+    const tipoRowSeg=(label,segmentos)=>{
+      const totalRow=segmentos.reduce((a,x)=>a+x.val,0);
+      const denom=totalRow||1;
+      const segsHtml=segmentos.map(x=>{
+        const w=Math.round(x.val/denom*100);
+        return `<div style="background:${x.color};width:${w}%;height:100%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:rgba(0,0,0,.75)" title="${x.label}: ${x.val}">${w>=10?x.val:''}</div>`;
+      }).join('');
+      const leyenda=segmentos.map(x=>`<span style="color:${x.color};font-weight:700">●</span> ${x.label}: ${x.val}`).join('  ·  ');
       return `<div style="margin-bottom:10px">
         <div style="font-size:12px;color:#fff;margin-bottom:5px">${label}</div>
-        <div style="background:var(--navy-700);border-radius:8px;overflow:hidden;height:26px;position:relative">
-          <div style="background:${color};width:${w}%;height:100%;display:flex;align-items:center;padding-left:10px;font-size:12px;font-weight:700;color:var(--navy-900)">${val}</div>
+        <div style="background:var(--navy-700);border-radius:8px;overflow:hidden;height:26px;display:flex">
+          ${segsHtml||`<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:11px">0</div>`}
         </div>
+        <div style="font-size:10px;color:var(--text-muted);margin-top:4px">${leyenda}${leyenda?'  ·  ':''}<b style="color:#fff">Total: ${totalRow}</b></div>
       </div>`;
     };
     const tipoDeOtHTML=`
       <div style="background:var(--navy-800);border:1px solid var(--border);border-radius:12px;padding:16px;flex:1;min-width:0;height:100%;box-sizing:border-box;display:flex;flex-direction:column;justify-content:center">
-        <div style="font-size:10px;font-weight:800;letter-spacing:.06em;color:#fff;text-transform:uppercase;text-align:center;margin-bottom:12px">📦 Tipo de OT</div>
-        ${tipoRow('Instalación Equipo + Simcard',inst,'#1dbf8e')}${tipoRow('Cambio de Terminal',camb,'#1a9fd4')}
+        <div style="font-size:10px;font-weight:800;letter-spacing:.06em;color:#fff;text-transform:uppercase;text-align:center;margin-bottom:8px">📦 Tipo de OT</div>
+        <div style="display:flex;justify-content:center;flex-wrap:wrap;gap:6px;margin-bottom:10px">
+          <span style="background:rgba(29,191,142,.1);border:1px solid rgba(29,191,142,.25);color:var(--teal);padding:1px 8px;border-radius:20px;font-size:9px;font-weight:700;font-family:'JetBrains Mono',monospace">Perfil = NAPSE</span>
+          <span style="background:rgba(29,191,142,.1);border:1px solid rgba(29,191,142,.25);color:var(--teal);padding:1px 8px;border-radius:20px;font-size:9px;font-weight:700;font-family:'JetBrains Mono',monospace">Estado = Despachado | Exitoso</span>
+        </div>
+        ${tipoRowSeg('Instalación Equipo + Simcard',segmentosPorTipoCeo('ots_altas'))}${tipoRowSeg('Cambio de Terminal',segmentosPorTipoCeo('ots_cambios'))}
       </div>`;
 
     // Desinstalaciones
@@ -8010,6 +8060,7 @@ async function loadCeoDashKpis(){
         ${tipoDeOtHTML}
       </div>
       ${sectionTitle('🚚','Gestión NAPSE — Costo Logística','#3a7bd5')}
+      ${logFiltrosHTML}
       <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:20px;align-items:stretch">
         ${logHTML}
       </div>
@@ -8020,6 +8071,71 @@ async function loadCeoDashKpis(){
     console.error('[CEO Dashboard]',err);
     box.innerHTML='<div style="color:var(--text-muted);font-size:12px;padding:10px 0">No se pudieron cargar los KPIs de NAPSE ahora mismo.</div>';
   }
+}
+
+// ── Desglose mensual por logística (click en card de "Costo Logística") ──────
+const KEY_TO_SF_LOGISTICA_CEO = {
+  correo_argentino: 'CORREO ARGENTINO',
+  epsa: 'EPSA',
+  alleata: 'ALLEATA',
+  cabify: 'CABIFY',
+};
+
+async function abrirDesgloseMensualLogisticaCeo(key, label, color){
+  const overlay = document.getElementById('modalLogisticaMensualCeo');
+  const tituloTxt = document.getElementById('mmCeo-titulo-txt');
+  const body = document.getElementById('mmCeo-body');
+  tituloTxt.textContent = label;
+  tituloTxt.style.color = color;
+  body.innerHTML = '<div style="color:var(--text-muted);font-size:12px;padding:10px 0">Consultando Salesforce…</div>';
+  overlay.classList.add('show');
+
+  const logisticaSF = KEY_TO_SF_LOGISTICA_CEO[key];
+  if(!logisticaSF){
+    body.innerHTML = '<div style="color:var(--text-muted);font-size:12px">Logística no reconocida</div>';
+    return;
+  }
+  try{
+    const resp = await fetch(`https://alleata-agent-production.up.railway.app/automations/napse/logistica-mensual?logistica=${encodeURIComponent(logisticaSF)}`);
+    const json = await resp.json();
+    if(!json.ok) throw new Error(json.error||'Error al consultar');
+    const meses = json.meses||[];
+    if(!meses.length){
+      body.innerHTML = '<div style="color:var(--text-muted);font-size:12px">Sin envíos registrados para esta logística</div>';
+      return;
+    }
+    const fmt$=n=>n?'$'+Math.round(n).toLocaleString('es-AR'):'$0';
+    const totalCosto=meses.reduce((a,m)=>a+m.total_costo,0);
+    const totalOts=meses.reduce((a,m)=>a+m.total_ots,0);
+    body.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(255,255,255,.04);border-radius:10px;padding:10px 14px;margin-bottom:14px">
+        <span style="font-size:11px;color:var(--text-muted)">Total período (todos los meses)</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-weight:800;font-size:16px;color:${color}">${fmt$(totalCosto)} <span style="font-size:11px;color:var(--text-muted);font-weight:400">· ${totalOts} envíos</span></span>
+      </div>
+      ${meses.map(m=>`
+        <div style="background:var(--navy-700);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:10px">
+          <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:8px">
+            <span style="font-size:13px;font-weight:800;color:#fff;text-transform:capitalize">${m.mes_nombre} ${m.anio}</span>
+            <span style="font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:800;color:${color}">${fmt$(m.total_costo)}</span>
+          </div>
+          <div style="display:flex;gap:16px;font-size:11px;color:var(--text-muted)">
+            <span>${m.total_ots} envíos</span>
+            <span>·</span>
+            <span>Altas: <b style="color:#fff">${m.altas_ots}</b> (${fmt$(m.altas_costo)})</span>
+            <span>·</span>
+            <span>Cambios: <b style="color:#fff">${m.cambios_ots}</b> (${fmt$(m.cambios_costo)})</span>
+          </div>
+        </div>
+      `).join('')}
+    `;
+  }catch(err){
+    console.error('[Desglose Mensual CEO]',err);
+    body.innerHTML = `<div style="color:#ef4444;font-size:12px">Error: ${err.message}</div>`;
+  }
+}
+
+function cerrarDesgloseMensualLogisticaCeo(){
+  document.getElementById('modalLogisticaMensualCeo').classList.remove('show');
 }
 
 
