@@ -122,6 +122,24 @@
 
   .stat-card { background:var(--card-bg); border:1px solid var(--border); border-radius:12px; padding:18px 16px 14px; position:relative; overflow:hidden; transition:transform .2s; }
   .stat-card:hover { transform:translateY(-3px); }
+  .stat-card-clickable { cursor:pointer; }
+  .stat-card-clickable:hover { border-color:var(--accent); box-shadow:0 8px 24px rgba(0,0,0,.35); }
+
+  /* MODAL DESGLOSE MENSUAL */
+  .modal-overlay { display:none; position:fixed; inset:0; background:rgba(6,12,20,.72); backdrop-filter:blur(2px); z-index:1000; align-items:center; justify-content:center; padding:20px; }
+  .modal-overlay.show { display:flex; }
+  .modal-box { background:var(--navy-2); border:1px solid var(--border); border-radius:14px; width:100%; max-width:620px; max-height:85vh; overflow-y:auto; padding:24px 26px; box-shadow:0 30px 80px rgba(0,0,0,.5); }
+  .modal-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; }
+  .modal-title { font-size:17px; font-weight:800; color:var(--white); display:flex; align-items:center; gap:10px; }
+  .modal-close { background:rgba(255,255,255,.07); border:none; color:var(--muted); width:28px; height:28px; border-radius:8px; cursor:pointer; font-size:14px; transition:opacity .2s; }
+  .modal-close:hover { opacity:.8; color:var(--white); }
+  .modal-sub { font-size:11px; color:var(--muted); margin-bottom:18px; }
+  .mes-row { background:var(--navy-3); border:1px solid var(--border); border-radius:10px; padding:12px 14px; margin-bottom:10px; }
+  .mes-row-head { display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px; }
+  .mes-row-nombre { font-size:13px; font-weight:800; color:var(--white); text-transform:capitalize; }
+  .mes-row-costo { font-family:'JetBrains Mono',monospace; font-size:18px; font-weight:800; }
+  .mes-row-detalle { display:flex; gap:16px; font-size:11px; color:var(--muted); }
+  .mes-row-detalle b { color:var(--text); }
   .stat-card::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; background:var(--accent); }
   .card-label  { font-size:9px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; color:var(--accent); margin-bottom:8px; }
   .card-number { font-family:'JetBrains Mono',monospace; font-size:44px; font-weight:700; color:var(--white); line-height:1; margin-bottom:4px; transition:all .3s; }
@@ -285,7 +303,13 @@
     <!-- DOS GRAFICOS LADO A LADO -->
     <div style="display:grid;grid-template-columns:1fr;gap:16px;margin-bottom:16px">
       <div style="grid-column:1/-1">
-        <div class="panel-title" style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:12px;display:flex;align-items:center;gap:8px">Logística — costo de envíos<span style="flex:1;height:1px;background:var(--border);display:block"></span></div>
+        <div class="panel-title" style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;display:flex;align-items:center;gap:8px">Logística — costo de envíos<span style="flex:1;height:1px;background:var(--border);display:block"></span></div>
+        <div style="display:flex;align-items:center;gap:8px;font-size:11px;color:var(--muted);flex-wrap:wrap;margin-bottom:12px">
+          <span>Filtros SF:</span>
+          <span class="filter-tag">Perfil = NAPSE</span>
+          <span class="filter-tag">Estado = Despachado | Exitoso</span>
+          <span class="filter-tag" style="opacity:.7">Sin filtro de fecha</span>
+        </div>
         <div id="terminal-chart" class="cards-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))"><div class="empty-state" style="grid-column:1/-1">Sin datos</div></div>
       </div>
       <div class="panel">
@@ -305,6 +329,18 @@
 </div><!-- /app -->
 
 <div id="toast"></div>
+
+<!-- MODAL DESGLOSE MENSUAL LOGÍSTICA -->
+<div class="modal-overlay" id="modal-mensual" onclick="if(event.target===this) cerrarDesgloseMensualLogistica()">
+  <div class="modal-box">
+    <div class="modal-header">
+      <div class="modal-title"><span id="mm-icono">📅</span> <span id="mm-titulo">—</span></div>
+      <button class="modal-close" onclick="cerrarDesgloseMensualLogistica()">✕</button>
+    </div>
+    <div class="modal-sub" id="mm-sub">Desglose mensual · Estado: Despachado | Exitoso · agrupado por fecha de creación de la OT</div>
+    <div id="mm-body"><div class="empty-state">Cargando…</div></div>
+  </div>
+</div>
 
 <script>
 // ════════════════════════════════════════════════════════════════
@@ -583,11 +619,12 @@ function render() {
   const totCosto = provsTotales.reduce((s,e) => s + e.costo, 0);
   const cards = logProvs.map(e => {
     const prom = e.ots ? Math.round(e.costo/e.ots) : 0;
-    return `<div class="stat-card" style="--accent:${e.color};border-color:${e.color}22">
+    return `<div class="stat-card stat-card-clickable" style="--accent:${e.color};border-color:${e.color}22" onclick="abrirDesgloseMensualLogistica('${e.key}','${e.label}','${e.color}')" title="Ver desglose mensual de ${e.label}">
       <div class="card-label">${e.label}</div>
       <div class="card-number" style="font-size:28px">${fmt$(e.costo)}</div>
       <div class="card-pct" style="margin-top:4px">${e.ots} envíos &nbsp;·&nbsp; Prom. <span>${fmt$(prom)}</span></div>
       <div class="card-pct" style="margin-top:2px;opacity:.75">Altas: ${e.altas} &nbsp;·&nbsp; Cambios: ${e.cambios}</div>
+      <div class="card-pct" style="margin-top:6px;font-size:9px;color:${e.color};opacity:.85">📅 Click para ver por mes</div>
       <div class="card-bar"><div class="log-bar-fill" data-w="100" style="background:${e.color};width:0"></div></div>
     </div>`;
   }).join('');
@@ -652,6 +689,80 @@ function toast(msg, type='ok') {
   const t = document.getElementById('toast');
   t.textContent = msg; t.className = `${type} show`;
   clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+// ════════════════════════════════════════════════════════════════
+// MODAL — Desglose mensual por logística (click en card)
+// ════════════════════════════════════════════════════════════════
+const KEY_TO_SF_LOGISTICA = {
+  correo_argentino: 'CORREO ARGENTINO',
+  epsa: 'EPSA',
+  alleata: 'ALLEATA',
+  cabify: 'CABIFY',
+};
+
+async function abrirDesgloseMensualLogistica(key, label, color) {
+  const overlay = document.getElementById('modal-mensual');
+  const titulo  = document.getElementById('mm-titulo');
+  const icono   = document.getElementById('mm-icono');
+  const body    = document.getElementById('mm-body');
+
+  titulo.textContent = label;
+  titulo.style.color = color;
+  icono.style.color  = color;
+  body.innerHTML = '<div class="empty-state">Consultando Salesforce…</div>';
+  overlay.classList.add('show');
+
+  const logisticaSF = KEY_TO_SF_LOGISTICA[key];
+  if (!logisticaSF) {
+    body.innerHTML = '<div class="empty-state">Logística no reconocida</div>';
+    return;
+  }
+
+  try {
+    const resp = await fetch(`${RAILWAY_BASE}/automations/napse/logistica-mensual?logistica=${encodeURIComponent(logisticaSF)}`);
+    const json = await resp.json();
+    if (!json.ok) throw new Error(json.error || 'Error al consultar');
+
+    const meses = json.meses || [];
+    if (!meses.length) {
+      body.innerHTML = '<div class="empty-state">Sin envíos registrados para esta logística</div>';
+      return;
+    }
+
+    const fmt$ = n => n ? '$' + Math.round(n).toLocaleString('es-AR') : '$0';
+    const totalCosto = meses.reduce((a, m) => a + m.total_costo, 0);
+    const totalOts   = meses.reduce((a, m) => a + m.total_ots, 0);
+
+    body.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(255,255,255,.04);border-radius:10px;padding:10px 14px;margin-bottom:14px">
+        <span style="font-size:11px;color:var(--muted)">Total período (todos los meses)</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-weight:800;font-size:16px;color:${color}">${fmt$(totalCosto)} <span style="font-size:11px;color:var(--muted);font-weight:400">· ${totalOts} envíos</span></span>
+      </div>
+      ${meses.map(m => `
+        <div class="mes-row">
+          <div class="mes-row-head">
+            <span class="mes-row-nombre">${m.mes_nombre} ${m.anio}</span>
+            <span class="mes-row-costo" style="color:${color}">${fmt$(m.total_costo)}</span>
+          </div>
+          <div class="mes-row-detalle">
+            <span>${m.total_ots} envíos</span>
+            <span>·</span>
+            <span>Altas: <b>${m.altas_ots}</b> (${fmt$(m.altas_costo)})</span>
+            <span>·</span>
+            <span>Cambios: <b>${m.cambios_ots}</b> (${fmt$(m.cambios_costo)})</span>
+          </div>
+        </div>
+      `).join('')}
+    `;
+  } catch (err) {
+    console.error('[Desglose Mensual]', err);
+    body.innerHTML = `<div class="empty-state" style="color:var(--red)">Error: ${err.message}</div>`;
+  }
+}
+
+function cerrarDesgloseMensualLogistica() {
+  document.getElementById('modal-mensual').classList.remove('show');
 }
 
 // ════════════════════════════════════════════════════════════════
