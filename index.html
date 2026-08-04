@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.6.34</title>
+<title>Alleata · Operaciones v4.6.35</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -400,7 +400,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.34 · 04 ago 2026
+      v4.6.35 · 04 ago 2026
     </div>
   </div>
 </div>
@@ -488,7 +488,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.34 · 04 ago 2026
+      v4.6.35 · 04 ago 2026
     </div>
   </div>
 </nav>
@@ -528,7 +528,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.34</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.35</div>
   </div>
   <div class="content">
 
@@ -4848,7 +4848,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.6.34] OK');
+console.log('[Alleata v4.6.35] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -11698,6 +11698,8 @@ function _imprimirRotuloHTML(envios) {
   }
 
   const rotulosHTML = envios.map(e => {
+    const esEpsa = (e.logistica||'').toUpperCase()==='EPSA';
+
     // QR geo/tracking: si tiene tracking CA → URL tracking, sino → Google Maps con la dirección
     let qrTarget = null;
     let qrLabel = '';
@@ -11709,7 +11711,59 @@ function _imprimirRotuloHTML(envios) {
       qrTarget = `https://maps.google.com/?q=${addr}`;
       qrLabel = 'Ver en Maps';
     }
-    const qrGeoSrc = qrTarget ? makeQRDataUrl(qrTarget, 55) : '';
+    const qrGeoSrc = qrTarget ? makeQRDataUrl(qrTarget, esEpsa?80:55) : '';
+
+    // ── Variante EPSA: sin QR de ruta, badge CT/INS en vez de zona,
+    // footer con logo EPSA en vez de "Remitente" (pedido 04/08) ──────────
+    if (esEpsa) {
+      const tipoTxt  = e.tipo || '—';
+      const esCambio = tipoTxt.toUpperCase().includes('CAMBIO');
+      const tipoCode = esCambio ? 'CT' : 'INS'; // INS cubre Instalación (Equipo+Simcard / Simcard) y Asistencia Técnica
+      const footerLeyenda = esCambio ? 'ENTREGA / RETIRO' : 'ENTREGA';
+      const otNumeroLimpio = String(e.ot_numero || '—').replace(/^0+/, '') || '0';
+      return `
+      <div class="rotulo">
+        <div class="hdr">
+          <div class="hdr-logo">alleata</div>
+          <div class="hdr-info">Andrés Moretti e Hijos S.A.<br>Logística Alleata &nbsp;·&nbsp; (+54 11) 4103-4600</div>
+        </div>
+        <div class="tipo">${tipoTxt}${(typeof esRollout==='function'&&esRollout(e))?' - ROLLOUT':''}</div>
+        <div class="ot-block" style="justify-content:center">
+          <div>
+            <div class="ot-label">ORDEN DE TRABAJO</div>
+            <div class="ot-num">${otNumeroLimpio}</div>
+          </div>
+        </div>
+        <div class="dest-label">DESTINATARIO</div>
+        <div class="dest">${e.cuenta || '—'}</div>
+        <div class="row"><span class="lbl">Dirección</span><span class="val">${e.direccion_completa || '—'}</span></div>
+        <div class="loc-box"><span class="loc-lbl">Localidad</span><span class="loc-val">${e.ciudad || '—'}</span></div>
+        <div class="row2">
+          <div class="row-half"><span class="lbl">C.P.</span><span class="val">${e.cp_dest || '—'}</span></div>
+          <div class="row-half"><span class="lbl">Provincia</span><span class="val">${e.provincia || '—'}</span></div>
+        </div>
+        <div class="row"><span class="lbl">Horario</span><span class="val">${e.horario_entrega || e.horario || '—'}</span></div>
+        <div class="row"><span class="lbl">Nombre Fantasía</span><span class="val">${e.nombre_comercio || '—'}</span></div>
+        <div class="divider"></div>
+        <div class="bottom">
+          ${qrGeoSrc ? `<div class="qr-geo">
+            <img src="${qrGeoSrc}" width="80" height="80" style="display:block;">
+            <div class="qr-geo-lbl">Geoubicación por QR</div>
+          </div>` : ''}
+          <div class="obs-wrap">
+            <div class="obs-lbl">Obs.</div>
+            <div class="obs-val">${e.notas || '—'}</div>
+          </div>
+          <div class="tipo-badge-wrap"><div class="tipo-badge">${tipoCode}</div></div>
+        </div>
+        <div class="row" style="margin-top:1.5mm"><span class="lbl">Resp.</span><span class="val">${e.responsable || '—'}</span></div>
+        <div class="footer">
+          <div class="footer-lbl">ENTREGADO POR LOGISTICA&nbsp; :</div>
+          <img class="footer-logo" src="${EPSA_LOGO_B64}">
+        </div>
+        <div class="leyenda-final">${footerLeyenda}</div>
+      </div>`;
+    }
 
     // QR "Escanear Ruta": abre mobile.html con la OT cargada — mismo patrón que la Hoja de Ruta
     const rutaUrl   = `https://marcevsanti-ux.github.io/alleata-ops/mobile.html?ot=${e.sf_id || e.id}`;
@@ -11803,6 +11857,10 @@ function _imprimirRotuloHTML(envios) {
     .loc-val { font-size: 13px; font-weight: 900; text-transform: uppercase; color: #fff !important; letter-spacing: -0.2px; }
     .zona-box { display: flex; align-items: center; justify-content: center; border: 3px solid #000; border-radius: 1.5mm; padding: 1.5mm; margin-top: 1.5mm; }
     .zona-val { font-size: 18px; font-weight: 900; text-transform: uppercase; letter-spacing: -0.3px; color: #000; }
+    .tipo-badge-wrap { display: flex; flex-direction: column; align-items: center; flex-shrink: 0; }
+    .tipo-badge { font-size: 22px; font-weight: 900; background: #000 !important; color: #fff !important; padding: 2.5mm 4mm; text-align: center; min-width: 15mm; line-height: 1; }
+    .footer-logo { display: block; height: 6mm; margin-top: 0.5mm; }
+    .leyenda-final { font-size: 13px; font-weight: 900; background: #000 !important; color: #fff !important; text-align: center; padding: 1.8mm; letter-spacing: 1px; margin-top: 1.5mm; }
     .footer { margin-top: auto; border-top: 1.5px solid #000; padding-top: 1.5mm; }
     .footer-lbl { font-size: 6.5px; font-weight: 700; color: #555; text-transform: uppercase; }
     .footer-val { font-size: 7px; color: #333; margin-top: 0.5mm; }
