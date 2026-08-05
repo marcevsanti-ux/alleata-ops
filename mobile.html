@@ -165,7 +165,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
       <div class="login-logo">
         <img id="loginLogo" src="" alt="Alleata">
         <div class="login-sub">Portal de Operaciones</div>
-        <div class="login-version">v2.14.37 · mobile</div>
+        <div class="login-version">v2.14.38 · mobile</div>
       </div>
       <div class="field"><label class="label">Email</label><input class="input" id="lEmail" type="email" placeholder="usuario@alleata.com" autocomplete="email"></div>
       <div class="field"><label class="label">Contraseña</label><input class="input" id="lPass" type="password" placeholder="••••••••" autocomplete="current-password"></div>
@@ -181,7 +181,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
   <div class="topbar">
     <img id="appLogo" src="" alt="Alleata">
     <div class="topbar-title" id="topbarTitle">Operaciones</div>
-    <div class="topbar-version" onclick="_tocarVersion()">v2.14.37</div>
+    <div class="topbar-version" onclick="_tocarVersion()">v2.14.38</div>
     <div class="topbar-avatar" id="topbarAvatar" onclick="openDrawer()">?</div>
   </div>
 
@@ -226,7 +226,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
   <!-- TAB: RUTA -->
   <div class="tab-content" id="content-ruta">
 
-    <button onclick="abrirModalParadaManual()" style="width:100%;margin-bottom:12px;background:rgba(245,158,11,.08);border:1px dashed #f59e0b;color:#f59e0b;padding:11px;font-size:13px;font-weight:700;border-radius:10px;cursor:pointer;font-family:'Inter',sans-serif">📦 + Retiro en proveedor</button>
+    <button onclick="abrirModalParadaManual()" style="width:100%;margin-bottom:12px;background:rgba(245,158,11,.08);border:1px dashed #f59e0b;color:#f59e0b;padding:11px;font-size:13px;font-weight:700;border-radius:10px;cursor:pointer;font-family:'Inter',sans-serif">📦 + Retiro / Entrega en proveedor</button>
 
     <!-- SCANNER -->
     <div class="card" style="margin-bottom:12px">
@@ -305,9 +305,6 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
       <div id="rutaActivaList">
         <div class="empty"><div class="empty-icon">🚚</div><p>Sin OTs en tránsito hoy</p></div>
       </div>
-      <button id="btnFinalizarRuta" onclick="abrirResumenModal()" style="width:100%;margin-top:12px;background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:12px;font-size:13px;font-weight:700;border-radius:10px;cursor:pointer;font-family:'Inter',sans-serif">
-        🏁 Finalizar ruta y generar resumen
-      </button>
 
       <!-- CERRAR HOJA DE RUTA → sugiere desinstalaciones cercanas -->
       <div style="display:flex;align-items:center;gap:8px;margin-top:14px;padding:10px 12px;background:var(--surface);border:1px solid var(--border);border-radius:10px">
@@ -317,7 +314,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
           style="width:56px;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;color:var(--text);text-align:center;font-family:'JetBrains Mono',monospace;font-size:13px;padding:4px">
         <span style="font-size:11px;color:var(--text-muted)">km</span>
       </div>
-      <button id="btnCerrarHojaRuta" onclick="cerrarHojaDeRuta()" style="width:100%;margin-top:8px;background:var(--grad);border:none;color:#fff;padding:12px;font-size:13px;font-weight:700;border-radius:10px;cursor:pointer;font-family:'Inter',sans-serif">
+      <button id="btnCerrarHojaRuta" onclick="cerrarHojaDeRuta()" style="width:100%;margin-top:8px;background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:12px;font-size:13px;font-weight:700;border-radius:10px;cursor:pointer;font-family:'Inter',sans-serif">
         🚀 Salir a ruta — avisar y buscar desinstalaciones cercanas
       </button>
       <div id="sugerenciasDesinstWrap" style="margin-top:12px"></div>
@@ -330,6 +327,13 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
         </button>
         <div id="desinstPorZonaWrap" style="margin-top:12px"></div>
       </div>
+
+      <!-- FINALIZAR RUTA — al fondo, a propósito: es el cierre del día, viene
+           después de salir a ruta y de revisar desinstalaciones. Estilo
+           llamativo (gradiente) para que no se confunda con "Salir a ruta". -->
+      <button id="btnFinalizarRutaFinal" onclick="abrirResumenModal()" style="width:100%;margin-top:20px;background:var(--grad);border:none;color:#fff;padding:14px;font-size:14px;font-weight:800;border-radius:10px;cursor:pointer;font-family:'Inter',sans-serif;box-shadow:0 4px 16px rgba(0,0,0,.25)">
+        🏁 Finalizar ruta y generar resumen
+      </button>
     </div>
 
   </div>
@@ -545,11 +549,18 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
   </div>
 </div>
 
-<!-- MODAL PARADA MANUAL — retiro en proveedor, se mezcla con las OTs en la Hoja de Ruta -->
+<!-- MODAL PARADA MANUAL — retiro o entrega fuera de una OT, se mezcla con las OTs en la Hoja de Ruta -->
 <div class="modal-overlay" id="modalParadaManual">
   <div class="modal">
-    <div class="modal-title">📦 Retiro en proveedor</div>
+    <div class="modal-title" id="pm-title">📦 Retiro / Entrega en proveedor</div>
     <div style="font-size:11px;color:var(--text-muted);margin-bottom:14px">Se agrega como una parada más de tu hoja de ruta de hoy.</div>
+
+    <label class="label" style="margin-bottom:6px;display:block">Tipo de parada</label>
+    <div style="display:flex;gap:8px;margin-bottom:14px">
+      <button type="button" id="pm-tipo-retiro" onclick="setTipoParadaManual('retiro_proveedor')" class="btn" style="flex:1;padding:10px;font-size:12px">📦 Retiro</button>
+      <button type="button" id="pm-tipo-entrega" onclick="setTipoParadaManual('entrega_proveedor')" class="btn btn-cancel" style="flex:1;padding:10px;font-size:12px">📤 Entrega</button>
+    </div>
+    <input type="hidden" id="pm-tipo" value="retiro_proveedor">
 
     <label class="label" style="margin-bottom:6px;display:block">Proveedor / a quién vas a ver</label>
     <input class="input" id="pm-proveedor" placeholder="Ej: Newsan, depósito Vicente López..." style="margin-bottom:12px">
@@ -563,7 +574,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
     <label class="label" style="margin-bottom:6px;display:block">Teléfono</label>
     <input class="input" id="pm-telefono" placeholder="Opcional" style="margin-bottom:12px">
 
-    <label class="label" style="margin-bottom:6px;display:block">Qué vas a retirar</label>
+    <label class="label" style="margin-bottom:6px;display:block" id="pm-queretirar-label">Qué vas a retirar</label>
     <input class="input" id="pm-queretirar" placeholder="Ej: 5 terminales POS, cambio de equipo..." style="margin-bottom:12px">
 
     <label class="label" style="margin-bottom:6px;display:block">OT relacionada (opcional)</label>
@@ -1204,10 +1215,13 @@ function fechaLargaHoy(){
 function generarTextoResumen(){
   const envios=cierresHoy.filter(c=>c.tipo==='envio');
   const desinst=cierresHoy.filter(c=>c.tipo==='desinst');
+  const paradas=cierresHoy.filter(c=>c.tipo==='parada_manual');
   const exitosos=envios.filter(c=>c.resultado==='Entregado');
   const fallidos=envios.filter(c=>c.resultado==='Fallido');
   const desRetiradas=desinst.filter(c=>c.resultado==='Retirado');
   const desFallidas=desinst.filter(c=>c.resultado==='Fallido');
+  const retiros=paradas.filter(c=>c.subtipo==='retiro_proveedor');
+  const entregasProveedor=paradas.filter(c=>c.subtipo==='entrega_proveedor');
 
   const tecnico=(currentProfile?.nombre||currentUser?.email||'').trim();
   let txt=`📦 *Reporte Log. Alleata*\n👷 ${tecnico}\n🕐 ${fechaLargaHoy()}\n🛣️ Kmts Recorridos: ${_kmRutaHoyTotal||0} km\n`;
@@ -1224,6 +1238,14 @@ function generarTextoResumen(){
     txt+=`\n*Desinstalaciones OT:*\n`;
     desRetiradas.forEach(c=>{ txt+=`${c.ot_numero} ✅\n`; });
     desFallidas.forEach(c=>{ txt+=`${c.ot_numero} ❌${c.motivo?` (${c.motivo})`:''}\n`; });
+  }
+  if(retiros.length){
+    txt+=`\n*Retiros en proveedor (${retiros.length}):*\n`;
+    retiros.forEach(c=>{ txt+=`📦 ${c.cuenta}${c.ot_numero?` (OT ${c.ot_numero})`:''}\n`; });
+  }
+  if(entregasProveedor.length){
+    txt+=`\n*Entregas en proveedor (${entregasProveedor.length}):*\n`;
+    entregasProveedor.forEach(c=>{ txt+=`📤 ${c.cuenta}${c.ot_numero?` (OT ${c.ot_numero})`:''}\n`; });
   }
   if(!cierresHoy.length){
     txt+=`\nSin movimientos registrados hoy.`;
@@ -1386,7 +1408,17 @@ async function loadRuta(){
 async function abrirModalParadaManual(){
   ['pm-proveedor','pm-direccion','pm-contacto','pm-telefono','pm-queretirar','pm-ot','pm-notas'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   document.getElementById('pm-msg').textContent='';
+  setTipoParadaManual('retiro_proveedor');
   document.getElementById('modalParadaManual').classList.add('show');
+}
+function setTipoParadaManual(tipo){
+  document.getElementById('pm-tipo').value=tipo;
+  const esRetiro=tipo==='retiro_proveedor';
+  document.getElementById('pm-title').textContent=esRetiro?'📦 Retiro en proveedor':'📤 Entrega en proveedor';
+  document.getElementById('pm-queretirar-label').textContent=esRetiro?'Qué vas a retirar':'Qué vas a entregar';
+  document.getElementById('pm-queretirar').placeholder=esRetiro?'Ej: 5 terminales POS, cambio de equipo...':'Ej: 5 terminales POS, insumos...';
+  document.getElementById('pm-tipo-retiro').className=esRetiro?'btn':'btn btn-cancel';
+  document.getElementById('pm-tipo-entrega').className=esRetiro?'btn btn-cancel':'btn';
 }
 function cerrarModalParadaManual(){
   document.getElementById('modalParadaManual').classList.remove('show');
@@ -1401,11 +1433,12 @@ async function confirmarParadaManual(){
   const btn=document.getElementById('pm-confirm');
   btn.disabled=true;btn.textContent='Guardando...';
   const fecha=hoyArgentina();
+  const tipo=document.getElementById('pm-tipo').value||'retiro_proveedor';
   const row={
     fecha,
     chofer_user_id: currentUser?.id||null,
     chofer_nombre: (currentProfile?.nombre||currentProfile?.email||'—').trim(),
-    tipo:'retiro_proveedor',
+    tipo,
     proveedor_nombre: proveedor||null,
     direccion: direccion||null,
     contacto: document.getElementById('pm-contacto').value.trim()||null,
@@ -1422,7 +1455,7 @@ async function confirmarParadaManual(){
     return;
   }
   cerrarModalParadaManual();
-  showScanFeedback('📦 Parada agregada a tu ruta','ok');
+  showScanFeedback(tipo==='retiro_proveedor'?'📦 Retiro agregado a tu ruta':'📤 Entrega agregada a tu ruta','ok');
   await renderParadasManuales();
 }
 
@@ -1443,12 +1476,13 @@ async function renderParadasManuales(){
   if(previo)previo.remove();
   if(!data?.length)return;
   const html=data.map(p=>{
+    const esRetiro=p.tipo!=='entrega_proveedor';
     const mapsUrl=p.direccion?'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(p.direccion):'';
     const telP=String(p.telefono||'').replace(/\D/g,'');
     return `<div class="ot-card" style="margin-bottom:10px;border:1px dashed #f59e0b;background:rgba(245,158,11,.06)">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px">
         <div>
-          <div class="ot-num" style="color:#f59e0b">📦 Retiro en proveedor</div>
+          <div class="ot-num" style="color:#f59e0b">${esRetiro?'📦 Retiro en proveedor':'📤 Entrega en proveedor'}</div>
           <div class="ot-tipo">${p.ot_numero?'OT '+p.ot_numero:'Sin OT asociada'}</div>
         </div>
       </div>
@@ -1460,7 +1494,7 @@ async function renderParadasManuales(){
         ${p.telefono?`<div class="ot-row"><span>📞</span><a href="tel:${p.telefono}" style="color:var(--blue);text-decoration:none">${p.telefono}</a></div>`:''}
       </div>
       <div class="ot-actions">
-        <button class="btn-sm btn-entregar" style="flex:1" onclick="marcarParadaRetirada('${p.id}')">✅ Retirado</button>
+        <button class="btn-sm btn-entregar" style="flex:1" onclick="marcarParadaRetirada('${p.id}')">${esRetiro?'✅ Retirado':'✅ Entregado'}</button>
         ${mapsUrl?`<a href="${mapsUrl}" target="_blank" class="btn-sm btn-maps" title="Abrir en Maps">${ICON_MAPS}</a>`:''}
       </div>
     </div>`;
@@ -1468,9 +1502,22 @@ async function renderParadasManuales(){
   cont.insertAdjacentHTML('beforeend',`<div id="paradasManualesBlock">${html}</div>`);
 }
 
+// FIX 05/08: esta parada nunca se sumaba a cierresHoy (localStorage), así que
+// nunca aparecía en "Finalizar ruta y generar resumen" — quedaba huérfana,
+// y si el chofer solo hacía retiros/entregas manuales (sin cerrar ninguna OT)
+// el botón de resumen ni siquiera abría ("Todavía no cerraste ninguna OT hoy").
 async function marcarParadaRetirada(id){
+  const{data:p}=await sb.from('hoja_ruta_paradas_manuales').select('*').eq('id',id).single();
   await sb.from('hoja_ruta_paradas_manuales').update({completado:true,completado_at:new Date().toISOString()}).eq('id',id);
-  showScanFeedback('✅ Retiro marcado','ok');
+  if(p){
+    registrarCierreResumen({
+      tipo:      'parada_manual',
+      subtipo:   p.tipo, // 'retiro_proveedor' | 'entrega_proveedor'
+      ot_numero: p.ot_numero||'',
+      cuenta:    p.proveedor_nombre||'',
+    });
+  }
+  showScanFeedback(p?.tipo==='entrega_proveedor'?'✅ Entrega marcada':'✅ Retiro marcado','ok');
   await renderParadasManuales();
 }
 
