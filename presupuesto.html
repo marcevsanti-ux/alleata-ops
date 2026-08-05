@@ -3756,12 +3756,23 @@ function amazonParsePDF(text){
 
     // Fecha de factura (Invoice Date) — el mes se imputa por ACÁ, no por el período de uso,
     // igual que Claro/Telecom se imputan por vencimiento y no por período facturado.
+    // Soporta AMBOS formatos: inglés ("Invoice Date: August 1, 2026") y español
+    // ("Factura emitida 1 ago 2026") — AWS genera el PDF en el idioma de la cuenta,
+    // y el regex viejo solo cubría el inglés (bug detectado 05/08).
     const ENG_MESES={january:'ene',february:'feb',march:'mar',april:'abr',may:'may',june:'jun',july:'jul',august:'ago',september:'sep',october:'oct',november:'nov',december:'dic'};
-    const fechaFacM=text.match(/Invoice Date:?\s*([A-Za-z]+)\s+(\d{1,2})\s*,?\s*(\d{4})/i);
+    const ESP_MESES=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
     let mesFactura=null, fechaFactura='—';
-    if(fechaFacM){
-      mesFactura=ENG_MESES[fechaFacM[1].toLowerCase()]||null;
-      fechaFactura=fechaFacM[2]+'/'+fechaFacM[1]+'/'+fechaFacM[3];
+
+    const fechaFacEngM=text.match(/Invoice Date:?\s*([A-Za-z]+)\s+(\d{1,2})\s*,?\s*(\d{4})/i);
+    const fechaFacEsM=text.match(/Factura emitida\s*(\d{1,2})\s+([A-Za-zé]+)\.?\s+(\d{4})/i);
+
+    if(fechaFacEngM){
+      mesFactura=ENG_MESES[fechaFacEngM[1].toLowerCase()]||null;
+      fechaFactura=fechaFacEngM[2]+'/'+fechaFacEngM[1]+'/'+fechaFacEngM[3];
+    } else if(fechaFacEsM){
+      const mesTxt=fechaFacEsM[2].toLowerCase().replace('.','').substring(0,3);
+      mesFactura=ESP_MESES.includes(mesTxt)?mesTxt:null;
+      fechaFactura=fechaFacEsM[1]+'/'+fechaFacEsM[2]+'/'+fechaFacEsM[3];
     }
 
     // Período de uso (billing period) — informativo, no define el mes de imputación
