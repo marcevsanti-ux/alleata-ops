@@ -165,7 +165,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
       <div class="login-logo">
         <img id="loginLogo" src="" alt="Alleata">
         <div class="login-sub">Portal de Operaciones</div>
-        <div class="login-version">v2.14.39 · mobile</div>
+        <div class="login-version">v2.14.40 · mobile</div>
       </div>
       <div class="field"><label class="label">Email</label><input class="input" id="lEmail" type="email" placeholder="usuario@alleata.com" autocomplete="email"></div>
       <div class="field"><label class="label">Contraseña</label><input class="input" id="lPass" type="password" placeholder="••••••••" autocomplete="current-password"></div>
@@ -182,7 +182,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
     <img id="appLogo" src="" alt="Alleata">
     <div class="topbar-title" id="topbarTitle">Operaciones</div>
     <button id="btnSyncRapido" onclick="syncRapido()" title="Actualizar estados desde Salesforce (sin esperar los 10min)" style="background:none;border:none;color:#fff;font-size:18px;cursor:pointer;padding:4px 6px;line-height:1">🔄</button>
-    <div class="topbar-version" onclick="_tocarVersion()">v2.14.39</div>
+    <div class="topbar-version" onclick="_tocarVersion()">v2.14.40</div>
     <div class="topbar-avatar" id="topbarAvatar" onclick="openDrawer()">?</div>
   </div>
 
@@ -1187,7 +1187,16 @@ OT ${ot.ot_numero}
 ${ot.cuenta||''}
 👷 ${ot.responsable||''}
 
-❌ Entrega fallida`
+❌ Entrega fallida`,
+
+    reprogramado:
+`🔄 *Ops informa — OT reprogramada*
+
+OT ${ot.ot_numero}
+${ot.cuenta||''}
+👷 ${ot.responsable||''}
+
+🔄 Se reprograma para otro día`
   };
   try{
     const msg=mensajes[evento]||'';
@@ -1219,6 +1228,7 @@ function generarTextoResumen(){
   const paradas=cierresHoy.filter(c=>c.tipo==='parada_manual');
   const exitosos=envios.filter(c=>c.resultado==='Entregado');
   const fallidos=envios.filter(c=>c.resultado==='Fallido');
+  const reprogramados=envios.filter(c=>c.resultado==='Reprogramar');
   const desRetiradas=desinst.filter(c=>c.resultado==='Retirado');
   const desFallidas=desinst.filter(c=>c.resultado==='Fallido');
   const retiros=paradas.filter(c=>c.subtipo==='retiro_proveedor');
@@ -1234,6 +1244,10 @@ function generarTextoResumen(){
   if(fallidos.length){
     txt+=`\n*OT Fallidas (${fallidos.length}):*\n`;
     fallidos.forEach(c=>{ txt+=`${c.ot_numero} ❌${c.motivo?` (${c.motivo})`:''}\n`; });
+  }
+  if(reprogramados.length){
+    txt+=`\n*OT Reprogramadas (${reprogramados.length}):*\n`;
+    reprogramados.forEach(c=>{ txt+=`${c.ot_numero} 🔄${c.motivo?` (${c.motivo})`:''}\n`; });
   }
   if(desRetiradas.length||desFallidas.length){
     txt+=`\n*Desinstalaciones OT:*\n`;
@@ -1680,6 +1694,7 @@ async function loadEnTransito(){
       <div class="ot-actions">
         <button class="btn-sm btn-entregar" style="flex:1" onclick="openCierreModal('${e.id}','Entregado')">✅ Entregado</button>
         <button class="btn-sm btn-fallido" style="flex:1" onclick="openCierreModal('${e.id}','Fallido')">❌ Fallido</button>
+        <button class="btn-sm btn-reprogramar" style="flex:1;background:rgba(245,158,11,.12);border:1px solid #f59e0b;color:#f59e0b" onclick="openCierreModal('${e.id}','Reprogramar')">🔄 Reprogramar</button>
         <a href="${mapsUrl}" target="_blank" class="btn-sm btn-maps" title="Abrir en Maps">${ICON_MAPS}</a>
       </div>
     </div>`;
@@ -2491,8 +2506,8 @@ function openCierreModal(id,resultado){
   document.getElementById('modalCierre-resultado').value=resultado;
   document.getElementById('modalCierre-notas').value='';
   document.getElementById('modalCierre-datoEnvio').value='';
-  document.getElementById('modalCierre-title').textContent=resultado==='Entregado'?'✅ Confirmar entrega':'❌ Registrar entrega fallida';
-  document.getElementById('modalCierre-confirm').style.background=resultado==='Entregado'?'var(--green)':'var(--red)';
+  document.getElementById('modalCierre-title').textContent=resultado==='Entregado'?'✅ Confirmar entrega':(resultado==='Reprogramar'?'🔄 Reprogramar entrega':'❌ Registrar entrega fallida');
+  document.getElementById('modalCierre-confirm').style.background=resultado==='Entregado'?'var(--green)':(resultado==='Reprogramar'?'#f59e0b':'var(--red)');
   document.getElementById('fotoRequeridaLabel').style.display='none';
   document.getElementById('fotoLabelText').textContent='Tocar para sacar foto';
   document.getElementById('fotoPreview').style.display='none';
@@ -2795,10 +2810,10 @@ async function confirmarCierreOT(){
     ot_numero: _otCierreActual?.ot_numero||'',
     cuenta:    _otCierreActual?.cuenta||'',
     resultado, // 'Entregado' | 'Fallido'
-    motivo:    resultado==='Fallido' ? (datoEnvio||notas||'Sin detalle') : null,
+    motivo:    (resultado==='Fallido'||resultado==='Reprogramar') ? (datoEnvio||notas||'Sin detalle') : null,
     rollout:   esRolloutOT(_otCierreActual),
   });
-  await notificarAlly(_otCierreActual, resultado==='Entregado'?'entregado':'fallido', fotoUrl||null, notas||null);
+  await notificarAlly(_otCierreActual, resultado==='Entregado'?'entregado':(resultado==='Reprogramar'?'reprogramado':'fallido'), fotoUrl||null, notas||null);
   _otCierreActual=null;
   await loadEnTransito();
 }
