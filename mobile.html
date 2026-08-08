@@ -235,7 +235,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
         <span>📷 Escanear rótulo de OT</span>
         <button onclick="toggleManualOT()" id="btnManualOT" style="background:none;border:1px solid var(--red);color:var(--red);font-size:11px;font-weight:700;padding:5px 12px;border-radius:8px;cursor:pointer;font-family:'Inter',sans-serif;letter-spacing:.5px">MANUAL</button>
       </div>
-      <!-- Carga manual de OT — siempre logística Alleata + Pre-Colecta -->
+      <!-- Carga manual de OT — siempre logística Alleata + Pre-Colecta o Reprogramar -->
       <div id="manualOtPanel" style="display:none;margin-bottom:12px">
         <div style="display:flex;gap:8px">
           <input id="manualOtInput" class="input" type="text" inputmode="numeric" placeholder="N° de OT (ej: 22281)" style="flex:1" onkeydown="if(event.key==='Enter'){event.preventDefault();buscarOTManual();}">
@@ -2110,7 +2110,7 @@ async function mostrarOTScaneada(sfId){
     if(ot.estado==='Despachado'){
       showScanFeedback('OT '+ot.ot_numero+' ya está Despachada','warn'); return;
     }
-    if(ot.estado!=='Pre-Colecta'){
+    if(!['Pre-Colecta','Reprogramar'].includes(ot.estado)){
       showScanFeedback('OT '+ot.ot_numero+' · estado: '+ot.estado,'warn'); return;
     }
   } else {
@@ -2192,7 +2192,7 @@ async function validarTerminalNuevaOT(ot){
 
 // ── CARGA MANUAL DE OT ──
 // Habilita ingresar el número de OT a mano cuando no se puede escanear el rótulo.
-// Misma validación que el flujo QR: tiene que ser logística ALLEATA y estar en Pre-Colecta.
+// Misma validación que el flujo QR: tiene que ser logística ALLEATA y estar en Pre-Colecta o Reprogramar.
 function toggleManualOT(force){
   const panel=document.getElementById('manualOtPanel');
   const show = force!==undefined ? force : panel.style.display==='none';
@@ -2234,7 +2234,7 @@ async function buscarOTManual(){
     msgEl.style.color='var(--yellow)';
     return;
   }
-  if(sfOT.status!=='Pre-Colecta'){
+  if(!['Pre-Colecta','Reprogramar'].includes(sfOT.status)){
     msgEl.textContent='⚠️ OT '+sfOT.workorder_number+' · estado: '+sfOT.status;
     msgEl.style.color='var(--yellow)';
     return;
