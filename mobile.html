@@ -1213,6 +1213,34 @@ ${ot.cuenta||''}
     });
     console.log('Ally notif OK:',evento,'→',grupo,fotoUrl?'+ foto':'',observaciones?'+ obs':'');
   }catch(e){console.warn('Ally notif error:',e);}
+
+  // ── Alerta de seguridad directa a marcelos (pedido 10/08) ──────────────
+  // Un Fallido en logística Alleata-Napse deja productos en un estado raro
+  // en SF (no es un simple "reintentar mañana" como Reprogramar) — por eso
+  // necesita aviso inmediato y directo, no solo el mensaje de grupo de
+  // arriba (que puede perderse entre el resto de la actividad del grupo).
+  // Va en un try/catch aparte para que, si esto falla, no rompa ni demore
+  // el flujo normal de notificación por grupo de arriba.
+  if(evento==='fallido' && (ot.logistica||'').toUpperCase()==='ALLEATA' && (ot.perfil||'').toUpperCase()==='NAPSE'){
+    try{
+      const msgMarcelos=
+`🚨 *ALERTA — OT Fallida (Alleata-Napse)*
+
+OT ${ot.ot_numero}
+${ot.cuenta||''}
+👷 ${ot.responsable||''}
+
+⚠️ Un Fallido acá deja el producto en un estado raro en SF — revisar cuanto antes.${observaciones?`\n\n📝 ${observaciones}`:''}`;
+      const payloadMarcelos={numero:'5491165117989',mensaje:msgMarcelos};
+      if(fotoUrl) payloadMarcelos.fotoUrl=fotoUrl;
+      await fetch(ALLY_URL+'/notificar',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify(payloadMarcelos)
+      });
+      console.log('Ally notif directa a marcelos OK (Fallido Napse):',ot.ot_numero);
+    }catch(e){console.warn('Ally notif directa a marcelos error:',e);}
+  }
 }
 
 // ── RESUMEN DE RUTA ──
