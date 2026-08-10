@@ -1140,7 +1140,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
   <div class="card" style="padding:0;overflow-x:auto">
     <div class="table-wrap">
     <table class="table">
-      <thead><tr>
+      <thead><tr id="rp-thead-row">
         <th>Cliente</th><th>CUIT</th><th>Contacto</th><th>Etapa</th>
         <th>OT</th><th>Estado OT</th><th>Dirección de envío</th><th>Horario</th><th></th>
       </tr></thead>
@@ -6035,6 +6035,7 @@ async function loadHojaRuta(){
           <span class="badge" style="background:${cerrada?'rgba(29,191,142,.12)':'rgba(107,114,128,.15)'};color:${cerrada?'var(--teal)':'var(--text-muted)'};border:1px solid ${cerrada?'rgba(29,191,142,.3)':'var(--border2)'}">${ot.status}</span>
           ${cerrada?'':`
             <button class="btn-sm" style="background:var(--teal);color:#fff;border:none" onclick="cerrarOTHojaRuta('${ot.sf_id||''}','${choferJs}',this,'Entregado')">✅ Entregado</button>
+            <button class="btn-sm" style="background:none;border:1px solid #f59e0b;color:#f59e0b" onclick="cerrarOTHojaRuta('${ot.sf_id||''}','${choferJs}',this,'Reprogramar')">🔄 Reprogramar</button>
             <button class="btn-sm" style="background:none;border:1px solid var(--red);color:var(--red)" onclick="cerrarOTHojaRuta('${ot.sf_id||''}','${choferJs}',this,'Fallido')">❌ Fallido</button>
           `}
         </div>
@@ -6405,8 +6406,9 @@ async function moverColaARutaSilencioso(colaId,choferId,otNumero){
 async function cerrarOTHojaRuta(sfId,tecnico,btn,resultado){
   if(!sfId){alert('Esta OT no tiene sf_id cargado — no se puede cerrar desde acá. Probá "↺ Full Sync".');return;}
   let notas='';
-  if(resultado==='Fallido'){
-    notas=prompt('Motivo del fallo (se guarda en Observaciones de SF):','')||'';
+  if(resultado==='Fallido'||resultado==='Reprogramar'){
+    const label=resultado==='Reprogramar'?'Motivo de la reprogramación (comercio cerrado, etc. — se guarda en Observaciones de SF):':'Motivo del fallo (se guarda en Observaciones de SF):';
+    notas=prompt(label,'')||'';
     if(notas===null)return;
   }
   if(!confirm(`¿Marcar esta OT como "${resultado}"${tecnico?' — chofer: '+tecnico:''}? Esto la cierra en Salesforce.`))return;
@@ -6415,7 +6417,7 @@ async function cerrarOTHojaRuta(sfId,tecnico,btn,resultado){
   try{
     const res=await railwayFetch('/automations/entregar-ot',{
       method:'POST',
-      body:JSON.stringify({sf_id:sfId,tecnico,resultado,notas,dato_envio:'Información correcta'})
+      body:JSON.stringify({sf_id:sfId,tecnico,resultado,notas,dato_envio:resultado==='Entregado'?'Información correcta':null})
     });
     const data=await res.json();
     if(!data.ok)throw new Error(data.error||'Error '+res.status);
@@ -6600,8 +6602,33 @@ function renderRolloutPiloto(){
 
   const ETAPA_COLORS={'Sin contactar':'#6b7280','Contactado':'#f59e0b','Notificado 2da vez':'#fb923c','Confirmado':'#1a9fd4','OT creada':'#8b5cf6','Cerrado':'#1dbf8e'};
   const fmtVol=v=>v==null?'—':'$'+Number(v).toLocaleString('es-AR');
+  const fmtFechaCorta=d=>d?new Date(d+'T00:00:00').toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit'}):'';
   const soloLectura=rolloutPilotoEsSoloLectura();
   const puedeEditarEtapa=rolloutPilotoPuedeEditarEtapa();
+
+  // Vista especial: cuando el filtro de etapa es EXACTAMENTE "Exitoso", todas
+  // las filas visibles son casos ya cerrados — ahí Estado OT/Dirección/Horario
+  // dejan de aportar (ya se entregaron) y lo que importa es cuánto facturaban
+  // ANTES del cambio (Prisma, vol_baseline_*) vs. cuánto facturan AHORA con
+  // Napse (vol_ultimo_reportado, el que trae el botón 📊). Pedido de marcelos
+  // 10/08. Si el filtro mezcla etapas, se deja todo como estaba — no tiene
+  // sentido mostrar columnas de volumen para filas que ni siquiera tienen OT.
+  const soloExitosos=filtroEtapa==='Cerrado';
+  const theadRow=document.getElementById('rp-thead-row');
+  if(theadRow){
+    const ths=theadRow.querySelectorAll('th');
+    if(ths[5]&&ths[6]&&ths[7]){
+      if(soloExitosos){
+        ths[5].textContent='Volumen Prisma (antes)';
+        ths[6].textContent='Volumen Napse (desde exitosa)';
+        ths[7].textContent='';
+      }else{
+        ths[5].textContent='Estado OT';
+        ths[6].textContent='Dirección de envío';
+        ths[7].textContent='Horario';
+      }
+    }
+  }
 
   // Agrupar por zona en vez de listar mezclado — pedido de marcelos 28/07:
   // "hacen llamados de una vez a toda la zona". Orden fijo CABA → Norte →
@@ -6613,6 +6640,18 @@ function renderRolloutPiloto(){
 
   const filaOT=r=>{
     const ec=ETAPA_COLORS[r.etapa]||'#6b7280';
+    const celdaEstadoDirHorario=soloExitosos
+      ? `<td style="font-family:'JetBrains Mono',monospace">${fmtVol(r.vol_baseline_mes)}${r.fecha_baseline?` <span style="font-size:9px;color:var(--text-muted)">(${fmtFechaCorta(r.fecha_baseline)})</span>`:''}</td>
+      <td style="font-family:'JetBrains Mono',monospace;color:var(--teal)">${fmtVol(r.vol_ultimo_reportado)}${r.vol_ultimo_fecha?` <span style="font-size:9px;color:var(--text-muted)">(${fmtFechaCorta(r.vol_ultimo_fecha)})</span>`:''}</td>
+      <td></td>`
+      : `<td>${r.estado_ot||'—'}</td>
+      <td style="font-size:11px;max-width:220px">${r._direccion?r._direccion+(r._direccionEstimada?' <span style="color:var(--text-muted)" title="Todavía no se vinculó la OT de Cambio — esta dirección es de la última OT registrada con este CUIT">(anterior)</span>':''):'<span style="color:var(--text-muted)">sin dato</span>'}</td>
+      <td style="font-size:11px">${r._horario||'<span style="color:var(--text-muted)">—</span>'}</td>`;
+    const celdaAccion=soloLectura?''
+      :(r.etapa==='Cerrado'
+        ? `<button class="btn-sm" style="background:rgba(139,92,246,.12);color:#8b5cf6;border:1px solid rgba(139,92,246,.3)" onclick="actualizarVolumenPiloto('${r.id}')" title="${r.cuit?'Consultar volumen en vivo contra SF (últimos 30 días)':'Sin CUIT — no se puede consultar'}"${r.cuit?'':' disabled'}>📊 Actualizar</button>`
+        : `${puedeEditarEtapa?`<button class="btn-sm" style="background:none;border:1px solid var(--border2);color:#f59e0b" onclick="editarNotaPiloto('${r.id}')" title="Cambiar estado">✏️</button> `:''}${r.ot_numero?`<button class="btn-sm" style="background:none;border:1px solid var(--border2);color:var(--teal)" onclick="printRotuloPiloto('${r.ot_numero}')" title="Imprimir rótulo (QR para escanear en mobile)">🖨️</button>`:''}`
+      );
     return`<tr>
       <td><div style="font-weight:600">${r.cliente||'—'}</div><div style="display:flex;align-items:center;gap:5px;margin-top:2px"><span style="font-size:10px;color:var(--text-muted)">${r.localidad||''}</span>${r.zona?`<span style="font-size:9px;font-weight:700;padding:1px 6px;border-radius:10px;color:${zonaColorDe(r.zona)};background:${zonaColorDe(r.zona)}18;border:1px solid ${zonaColorDe(r.zona)}40">${r.zona}</span>`:''}</div></td>
       <td style="font-family:'JetBrains Mono',monospace;font-size:11px">${r.cuit||'—'}</td>
@@ -6622,13 +6661,8 @@ function renderRolloutPiloto(){
       </div></td>
       <td><span class="badge" style="background:${ec}18;border:1px solid ${ec}40;color:${ec}">${r.etapa==='Cerrado'?'Exitoso':r.etapa==='Contactado'?'Notificado':r.etapa}</span></td>
       <td>${r.ot_numero?`<span style="font-family:'JetBrains Mono',monospace;font-weight:700">${r.ot_numero}</span>`:(soloLectura?'—':`<button class="btn-sm" style="background:rgba(139,92,246,.12);color:#8b5cf6;border:1px solid rgba(139,92,246,.3)" onclick="vincularOTPiloto('${r.id}')">🔗 Vincular OT</button>`)}</td>
-      <td>${r.estado_ot||'—'}</td>
-      <td style="font-size:11px;max-width:220px">${r._direccion?r._direccion+(r._direccionEstimada?' <span style="color:var(--text-muted)" title="Todavía no se vinculó la OT de Cambio — esta dirección es de la última OT registrada con este CUIT">(anterior)</span>':''):'<span style="color:var(--text-muted)">sin dato</span>'}</td>
-      <td style="font-size:11px">${r._horario||'<span style="color:var(--text-muted)">—</span>'}</td>
-      <td>${soloLectura?'':(r.etapa==='Cerrado'
-          ? `<button class="btn-sm" style="background:rgba(139,92,246,.12);color:#8b5cf6;border:1px solid rgba(139,92,246,.3)" onclick="actualizarVolumenPiloto('${r.id}')" title="${r.cuit?'Consultar volumen en vivo contra SF (últimos 30 días)':'Sin CUIT — no se puede consultar'}"${r.cuit?'':' disabled'}>📊 ${fmtVol(r.vol_ultimo_reportado)}</button>`
-          : `${puedeEditarEtapa?`<button class="btn-sm" style="background:none;border:1px solid var(--border2);color:#f59e0b" onclick="editarNotaPiloto('${r.id}')" title="Cambiar estado">✏️</button> `:''}${r.ot_numero?`<button class="btn-sm" style="background:none;border:1px solid var(--border2);color:var(--teal)" onclick="printRotuloPiloto('${r.ot_numero}')" title="Imprimir rótulo (QR para escanear en mobile)">🖨️</button>`:''}`
-        )}</td>
+      ${celdaEstadoDirHorario}
+      <td>${celdaAccion}</td>
     </tr>`;
   };
 
