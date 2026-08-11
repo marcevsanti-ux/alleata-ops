@@ -251,7 +251,27 @@ function render(lista){
           ${items.length ? items.map(stopHtml).join('') : '<div class="empty-col">Sin entregas pendientes<br>en esta zona</div>'}
         </div>
       </div>`;
-  }).join('');
+  }).join('') + (fueraDeLas4.length ? `
+      <div class="col">
+        <div class="col-head" style="border-color:var(--red)55">
+          <div class="col-name" style="color:var(--red)">⚠️ Fuera de zonas — revisar</div>
+          <div class="col-count" style="color:var(--red);background:var(--red)22;border-color:var(--red)55">${fueraDeLas4.length}</div>
+        </div>
+        <div class="col-body">
+          ${fueraDeLas4.map(o=>`
+          <div class="stop${o.es_rollout?' stop-rollout':''}${o.geocodificado?'':' sin-geo'}">
+            <div class="stop-top">
+              <div class="stop-left">
+                <span class="stop-ot">${esc(o.ot_numero)}</span>
+                ${o.es_rollout?'<span class="rollout-tag">ROLLOUT</span>':''}
+              </div>
+              ${o.horario_entrega?`<div class="stop-horario">${esc(o.horario_entrega)}</div>`:''}
+            </div>
+            <div class="stop-dir">${esc(o.direccion)||'—'}${o.ciudad?' · '+esc(o.ciudad):''}${o.provincia?' ('+esc(o.provincia)+')':''}</div>
+            <div class="stop-dist" style="color:var(--red)">zona calculada: "${esc(o.zona)||'—'}" — no coincide con ninguna de las 4 zonas AMBA, revisar ciudad/CP</div>
+          </div>`).join('')}
+        </div>
+      </div>` : '');
 }
 
 cargar();

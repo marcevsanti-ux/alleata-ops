@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.6.38</title>
+<title>Alleata · Operaciones v4.6.39</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -400,7 +400,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.38 · 10 ago 2026
+      v4.6.39 · 10 ago 2026
     </div>
   </div>
 </div>
@@ -438,6 +438,10 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     <div class="nav-item" data-mod="desinstalaciones" id="nav-desinstalaciones" onclick="goTo('desinstalaciones')">
       <div class="active-bar"></div><span class="nav-icon-wrap">📦</span> Desinstalaciones
       <span class="nav-badge" id="nb-desins">0</span>
+    </div>
+    <div class="nav-item" data-mod="churn-producto" id="nav-churn-producto" onclick="goTo('churn-producto')">
+      <div class="active-bar"></div><span class="nav-icon-wrap">🔬</span> Churn Producto NAPSE
+      <span class="nav-badge" id="nb-churn-producto">0</span>
     </div>
     <div class="nav-item" data-mod="hoja-ruta" id="nav-hoja-ruta" onclick="goTo('hoja-ruta')">
       <div class="active-bar"></div><span class="nav-icon-wrap">🗺️</span> Hoja de Ruta
@@ -488,7 +492,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.38 · 10 ago 2026
+      v4.6.39 · 10 ago 2026
     </div>
   </div>
 </nav>
@@ -528,7 +532,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.38</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.39</div>
   </div>
   <div class="content">
 
@@ -969,6 +973,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
             <div class="mod-pill" data-mod="rollout" onclick="toggleCreateMod(this)"><span class="pill-dot"></span>🔄 Rollout</div>
             <div class="mod-pill" data-mod="rollout-piloto" onclick="toggleCreateMod(this)"><span class="pill-dot"></span>🧪 Rollout Piloto</div>
             <div class="mod-pill" data-mod="desinstalaciones" onclick="toggleCreateMod(this)"><span class="pill-dot"></span>📦 Desinstalaciones</div>
+            <div class="mod-pill" data-mod="churn-producto" onclick="toggleCreateMod(this)"><span class="pill-dot"></span>🔬 Churn Producto</div>
             <div class="mod-pill" data-mod="napse" onclick="toggleCreateMod(this)"><span class="pill-dot"></span>🔍 Napse</div>
             <div class="mod-pill" data-mod="terminales" onclick="toggleCreateMod(this)"><span class="pill-dot"></span>🖥️ Terminales</div>
             <div class="mod-pill" data-mod="retencion" onclick="toggleCreateMod(this)"><span class="pill-dot"></span>🛡️ Retención</div>
@@ -1146,6 +1151,40 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       </tr></thead>
       <tbody id="rp-tbody">
         <tr><td colspan="9" style="text-align:center;padding:30px;color:var(--text-muted)">Cargando...</td></tr>
+      </tbody>
+    </table>
+    </div>
+  </div>
+</div>
+
+<!-- Churn Producto NAPSE — pedido 10/08: para cada desinstalación NAPSE ya
+     Recuperada, cuánto tiempo estuvo esa terminal instalada antes de la baja
+     y cuánto vendía la cuenta (Actividad__c). Reutiliza el motor que ya
+     existía (desinstAnalisisProducto.js / tabla desinst_analisis_producto)
+     — nunca tenía botón ni pantalla, solo corría manual por API. Filtro
+     ajustado a Status='Recuperada' (antes traía cualquier estado). Match
+     por MISMA cuenta + MISMO Terminal_ID__c (la unidad físicamente
+     retirada) — más preciso que "primera OT Exitosa" si hubo más de un
+     cambio de terminal en la cuenta; para cuentas con un solo terminal
+     (caso típico) da exactamente el mismo resultado. -->
+<div class="module" id="mod-churn-producto">
+  <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:12px">
+    <div>
+      <div style="font-size:19px;font-weight:700">🔬 Churn Producto NAPSE — Recuperadas</div>
+      <div style="font-size:12px;color:var(--text-muted);margin-top:2px">Por cada desinstalación ya Recuperada: cuánto tiempo estuvo esa terminal instalada y cuánto vendía la cuenta antes de la baja (Actividad__c). Match por cuenta + Terminal_ID (la unidad que efectivamente se retiró).</div>
+    </div>
+    <button class="btn btn-sm" id="cp-btn-recalcular" style="background:rgba(139,92,246,.12);color:#8b5cf6;border:1px solid rgba(139,92,246,.3)" onclick="recalcularChurnProducto()">🔄 Recalcular (consulta SF en vivo)</button>
+  </div>
+  <div class="card" style="padding:0;overflow-x:auto">
+    <div class="table-wrap">
+    <table class="table">
+      <thead><tr>
+        <th>Cuenta</th><th>CUIT</th><th>OT Desinst.</th><th>OT Instalación</th>
+        <th>Terminal</th><th>Motivo</th><th>Días con terminal</th>
+        <th>Volumen 30d</th><th>Volumen 60d</th><th>Volumen 90d</th><th>Dato del</th>
+      </tr></thead>
+      <tbody id="cp-tbody">
+        <tr><td colspan="11" style="text-align:center;padding:30px;color:var(--text-muted)">Sin datos todavía — apretá "Recalcular" para traer del vivo de Salesforce.</td></tr>
       </tbody>
     </table>
     </div>
@@ -4848,7 +4887,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.6.38] OK');
+console.log('[Alleata v4.6.39] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -5185,7 +5224,7 @@ function showApp(){
   if(navPresupuesto&&(isAdmin||isCeo)) navPresupuesto.style.display='flex';
   // ── Vista CEO: SOLO Dashboard + Napse + Presupuesto, nada más en el nav ──
   if(isCeo){
-    ['nav-sims','nav-envios','nav-rollout','nav-desinstalaciones','nav-store','nav-recuperadas',
+    ['nav-sims','nav-envios','nav-rollout','nav-desinstalaciones','nav-churn-producto','nav-store','nav-recuperadas',
      'nav-ally','nav-distri','nav-ajustes','nav-retencion','nav-terminales','nav-section-config','nav-napse']
       .forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display='none'; });
   }
@@ -5196,7 +5235,7 @@ function showApp(){
     navRecuperadas.style.display='flex';
     cargarBadgeRecuperadas();
   }
-  ['sims','envios','desinstalaciones','napse','store','recuperadas','rollout','rollout-piloto','retencion','terminales'].forEach(mod=>{
+  ['sims','envios','desinstalaciones','churn-producto','napse','store','recuperadas','rollout','rollout-piloto','retencion','terminales'].forEach(mod=>{
     const el=document.getElementById('nav-'+mod);
     if(el&&!modulos.includes(mod)&&!isAdmin&&!isCeo){el.classList.add('locked');el.onclick=null;}
   });
@@ -5261,7 +5300,7 @@ function buildDashCards(modulos,isAdmin,isCeo){
   loadOpsPanel(isAdmin, modulos);
 }
 
-const MOD_INFO={home:'Dashboard',sims:'Verificador SIMs',envios:'Envíos',rollout:'Rollout','rollout-piloto':'Rollout Piloto — Trazabilidad',desinstalaciones:'Desinstalaciones','hoja-ruta':'Hoja de Ruta — por chofer',napse:'NAPSE — Logs VTOL',instalaciones:'Instalaciones SF',retencion:'Retención de Cuentas',ajustes:'Ajustes',ally:'Configuración Ally',distri:'Distribuidores',terminales:'Terminales — Logicalis',store:'Bancos — Terminales disponibles',presupuesto:'Presupuesto de Operaciones'};
+const MOD_INFO={home:'Dashboard',sims:'Verificador SIMs',envios:'Envíos',rollout:'Rollout','rollout-piloto':'Rollout Piloto — Trazabilidad',desinstalaciones:'Desinstalaciones','churn-producto':'Churn Producto NAPSE — Recuperadas','hoja-ruta':'Hoja de Ruta — por chofer',napse:'NAPSE — Logs VTOL',instalaciones:'Instalaciones SF',retencion:'Retención de Cuentas',ajustes:'Ajustes',ally:'Configuración Ally',distri:'Distribuidores',terminales:'Terminales — Logicalis',store:'Bancos — Terminales disponibles',presupuesto:'Presupuesto de Operaciones'};
 
 function goTo(mod){
   const el=document.getElementById('nav-'+mod);
@@ -5301,6 +5340,7 @@ function goTo(mod){
   if(mod==='rollout')initRollout();
   if(mod==='rollout-piloto')loadRolloutPiloto();
   if(mod==='desinstalaciones'){if(window.cargarDesinstalaciones&&!(window.DesinModule?.cargado))window.cargarDesinstalaciones();if(typeof dsTabSwitch==='function')dsTabSwitch('gestionops');}
+  if(mod==='churn-producto')loadChurnProducto();
   if(mod==='hoja-ruta')loadHojaRuta();
   if(mod==='sims')loadSimStats();
   if(mod==='napse')window.napseInitApp?.();
@@ -6440,6 +6480,62 @@ async function cerrarOTHojaRuta(sfId,tecnico,btn,resultado,otNumero,cuenta,perfi
     await loadHojaRuta();
   }catch(err){
     alert('Error al cerrar: '+err.message);
+    btn.disabled=false;btn.textContent=original;
+  }
+}
+
+// ── Churn Producto NAPSE (pedido 10/08) ─────────────────────────────────────
+// Lee la tabla desinst_analisis_producto (ya existía en Railway, sin UI ni
+// botón hasta ahora) y ofrece "Recalcular" para disparar la corrida en vivo
+// contra SF (POST /automations/run/analisis_producto).
+function fmtVolCP(v){ return (v==null) ? '—' : '$'+Number(v).toLocaleString('es-AR'); }
+function fmtFechaCP(d){ return d ? new Date(d).toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'2-digit'}) : '—'; }
+
+async function loadChurnProducto(){
+  const tbody=document.getElementById('cp-tbody');
+  if(!tbody)return;
+  tbody.innerHTML='<tr><td colspan="11" style="text-align:center;padding:30px;color:var(--text-muted)">Cargando...</td></tr>';
+  const{data,error}=await sb.from('desinst_analisis_producto').select('*').order('fecha_desinstalacion',{ascending:false});
+  if(error){
+    tbody.innerHTML=`<tr><td colspan="11" style="text-align:center;padding:30px;color:var(--red)">Error: ${error.message}${error.message.includes('does not exist')?' — falta crear la tabla desinst_analisis_producto en Supabase':''}</td></tr>`;
+    return;
+  }
+  const nb=document.getElementById('nb-churn-producto');
+  if(nb)nb.textContent=String(data?.length||0);
+  if(!data||!data.length){
+    tbody.innerHTML='<tr><td colspan="11" style="text-align:center;padding:30px;color:var(--text-muted)">Sin datos todavía — apretá "Recalcular" para traer del vivo de Salesforce.</td></tr>';
+    return;
+  }
+  tbody.innerHTML=data.map(r=>`
+    <tr>
+      <td><div style="font-weight:600">${r.cuenta||'—'}</div>${r.comercio?`<div style="font-size:10px;color:var(--text-muted)">${r.comercio}</div>`:''}</td>
+      <td style="font-family:'JetBrains Mono',monospace;font-size:11px">${r.cuit||'—'}</td>
+      <td style="font-family:'JetBrains Mono',monospace;font-weight:700">${r.ot_desinstalacion||'—'}</td>
+      <td style="font-family:'JetBrains Mono',monospace">${r.ot_instalacion||'<span style="color:var(--text-muted)">sin match</span>'}</td>
+      <td style="font-size:11px;font-family:'JetBrains Mono',monospace">${r.terminal_id||'—'}</td>
+      <td style="font-size:11px;max-width:180px">${r.motivo||'—'}</td>
+      <td style="text-align:center;font-weight:700">${r.dias_con_terminal!=null?r.dias_con_terminal+' días':'—'}</td>
+      <td style="font-family:'JetBrains Mono',monospace">${fmtVolCP(r.volumen_30d_antes)}</td>
+      <td style="font-family:'JetBrains Mono',monospace">${fmtVolCP(r.volumen_60d_antes)}</td>
+      <td style="font-family:'JetBrains Mono',monospace">${fmtVolCP(r.volumen_90d_antes)}</td>
+      <td style="font-size:10px;color:var(--text-muted)">${fmtFechaCP(r.volumen_fecha_dato)}</td>
+    </tr>`).join('');
+}
+
+async function recalcularChurnProducto(){
+  if(currentProfile?.rol!=='admin'){alert('Solo un admin puede recalcular esto.');return;}
+  const btn=document.getElementById('cp-btn-recalcular');
+  const original=btn.textContent;
+  btn.disabled=true;btn.textContent='Consultando SF (puede tardar)...';
+  try{
+    const res=await railwayFetch('/automations/run/analisis_producto',{method:'POST'});
+    const data=await res.json();
+    if(!data.ok)throw new Error(data.error||'Error '+res.status);
+    showToastPortal?.(`✅ Recalculado — ${data.procesadas||0} OT(s), ${data.matcheadas||0} con match de instalación, ${data.conVolumen||0} con volumen`);
+    await loadChurnProducto();
+  }catch(err){
+    alert('Error al recalcular: '+err.message);
+  }finally{
     btn.disabled=false;btn.textContent=original;
   }
 }
