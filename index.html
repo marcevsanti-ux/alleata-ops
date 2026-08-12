@@ -447,7 +447,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <span class="nav-badge" id="nb-desins">0</span>
     </div>
     <div class="nav-item" data-mod="churn-producto" id="nav-churn-producto" onclick="goTo('churn-producto')">
-      <div class="active-bar"></div><span class="nav-icon-wrap">🔬</span> Churn Producto NAPSE
+      <div class="active-bar"></div><span class="nav-icon-wrap">🔬</span> Churn Producto
       <span class="nav-badge" id="nb-churn-producto">0</span>
     </div>
     <div class="nav-item" data-mod="hoja-ruta" id="nav-hoja-ruta" onclick="goTo('hoja-ruta')">
@@ -1187,10 +1187,16 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
 <div class="module" id="mod-churn-producto">
   <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:12px">
     <div>
-      <div style="font-size:19px;font-weight:700">🔬 Churn Producto NAPSE</div>
-      <div style="font-size:12px;color:var(--text-muted);margin-top:2px">Por cada desinstalación NAPSE: cuánto tiempo estuvo esa terminal instalada y cuánto vendía la cuenta antes de la baja (Actividad__c). Match por cuenta + Terminal_ID (la unidad que efectivamente se retiró). "Días con terminal" y "SLA Recupero" solo se completan una vez que el estado es Recuperada. Piloto NAPSE arrancó el 1/6/2026 — pocos casos es normal en esta etapa.</div>
+      <div style="font-size:19px;font-weight:700" id="cp-titulo">🔬 Churn Producto NAPSE</div>
+      <div style="font-size:12px;color:var(--text-muted);margin-top:2px" id="cp-subtitulo">Por cada desinstalación NAPSE: cuánto tiempo estuvo esa terminal instalada y cuánto vendía la cuenta antes de la baja (Actividad__c). Match por cuenta + Terminal_ID (la unidad que efectivamente se retiró). "Días con terminal" y "SLA Recupero" solo se completan una vez que el estado es Recuperada. Piloto NAPSE arrancó el 1/6/2026 — pocos casos es normal en esta etapa.</div>
     </div>
-    <button class="btn btn-sm" id="cp-btn-recalcular" style="background:rgba(139,92,246,.12);color:#8b5cf6;border:1px solid rgba(139,92,246,.3)" onclick="recalcularChurnProducto()">🔄 Recalcular (consulta SF en vivo)</button>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <div style="display:flex;background:var(--navy-800);border:1px solid var(--border2);border-radius:8px;padding:3px;gap:2px">
+        <button class="cp-perfil-btn" data-perfil="NAPSE" onclick="cpSetPerfil('NAPSE')" style="border:none;border-radius:6px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;background:#8b5cf6;color:#fff">NAPSE</button>
+        <button class="cp-perfil-btn" data-perfil="PRISMA" onclick="cpSetPerfil('PRISMA')" style="border:none;border-radius:6px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;background:transparent;color:var(--text-muted)">PRISMA</button>
+      </div>
+      <button class="btn btn-sm" id="cp-btn-recalcular" style="background:rgba(139,92,246,.12);color:#8b5cf6;border:1px solid rgba(139,92,246,.3)" onclick="recalcularChurnProducto()">🔄 Recalcular (consulta SF en vivo)</button>
+    </div>
   </div>
   <div id="cp-resumen-cards" style="margin-bottom:16px"></div>
   <div class="card" style="padding:0;overflow-x:auto">
@@ -5326,7 +5332,7 @@ function buildDashCards(modulos,isAdmin,isCeo){
   loadOpsPanel(isAdmin, modulos);
 }
 
-const MOD_INFO={home:'Dashboard',sims:'Verificador SIMs',envios:'Envíos',rollout:'Rollout','rollout-piloto':'Rollout Piloto — Trazabilidad',desinstalaciones:'Desinstalaciones','churn-producto':'Churn Producto NAPSE — Recuperadas','hoja-ruta':'Hoja de Ruta — por chofer',napse:'NAPSE — Logs VTOL',instalaciones:'Instalaciones SF',retencion:'Retención de Cuentas',ajustes:'Ajustes',ally:'Configuración Ally',distri:'Distribuidores',terminales:'Terminales — Logicalis',store:'Bancos — Terminales disponibles',presupuesto:'Presupuesto de Operaciones'};
+const MOD_INFO={home:'Dashboard',sims:'Verificador SIMs',envios:'Envíos',rollout:'Rollout','rollout-piloto':'Rollout Piloto — Trazabilidad',desinstalaciones:'Desinstalaciones','churn-producto':'Churn Producto — NAPSE / PRISMA','hoja-ruta':'Hoja de Ruta — por chofer',napse:'NAPSE — Logs VTOL',instalaciones:'Instalaciones SF',retencion:'Retención de Cuentas',ajustes:'Ajustes',ally:'Configuración Ally',distri:'Distribuidores',terminales:'Terminales — Logicalis',store:'Bancos — Terminales disponibles',presupuesto:'Presupuesto de Operaciones'};
 
 function goTo(mod){
   const el=document.getElementById('nav-'+mod);
@@ -6525,6 +6531,30 @@ let _cpData = [];
 let _cpFiltroEstado = null; // null = todas
 let _cpSortKey = 'fecha_desinstalacion';
 let _cpSortDir = 'desc';
+// Perfil activo del módulo (NAPSE o PRISMA) — comparten toda la UI, cambia
+// solo el filtro de Perfil__c en el backend (tabla desinst_analisis_producto
+// generalizada con columna `perfil`, ver migration_desinst_analisis_producto_perfil.sql).
+let _cpPerfil = 'NAPSE';
+const CP_TEXTOS = {
+  NAPSE:  'Por cada desinstalación NAPSE: cuánto tiempo estuvo esa terminal instalada y cuánto vendía la cuenta antes de la baja (Actividad__c). Match por cuenta + Terminal_ID (la unidad que efectivamente se retiró). "Días con terminal" y "SLA Recupero" solo se completan una vez que el estado es Recuperada. Piloto NAPSE arrancó el 1/6/2026 — pocos casos es normal en esta etapa.',
+  PRISMA: 'Por cada desinstalación PRISMA: cuánto tiempo estuvo esa terminal instalada y cuánto vendía la cuenta antes de la baja (Actividad__c). Match por cuenta + Terminal_ID (la unidad que efectivamente se retiró). "Días con terminal" y "SLA Recupero" solo se completan una vez que el estado es Recuperada.',
+};
+
+function cpSetPerfil(perfil){
+  if(_cpPerfil===perfil)return;
+  _cpPerfil = perfil;
+  _cpFiltroEstado = null; // el filtro por estado era del perfil anterior, no tiene sentido arrastrarlo
+  document.querySelectorAll('.cp-perfil-btn').forEach(btn=>{
+    const activo = btn.dataset.perfil===perfil;
+    btn.style.background = activo ? '#8b5cf6' : 'transparent';
+    btn.style.color = activo ? '#fff' : 'var(--text-muted)';
+  });
+  const tituloEl=document.getElementById('cp-titulo');
+  const subEl=document.getElementById('cp-subtitulo');
+  if(tituloEl)tituloEl.textContent=`🔬 Churn Producto ${perfil}`;
+  if(subEl)subEl.textContent=CP_TEXTOS[perfil]||CP_TEXTOS.NAPSE;
+  loadChurnProducto();
+}
 
 // Card resumen arriba de la tabla — mismo estilo/colores/fuente de datos que
 // el panel "🔍 Desinstalaciones NAPSE" del Dashboard (loadNapseDesinstPanel).
@@ -6536,7 +6566,7 @@ async function loadChurnProductoResumen(){
   if(!cont)return;
   cont.innerHTML='<div class="card" style="padding:16px;color:var(--text-muted);font-size:12px">Consultando Salesforce en vivo...</div>';
   try{
-    const r=await railwayFetch('/automations/sf-stats/desinstalaciones?perfil=NAPSE&todas=1');
+    const r=await railwayFetch(`/automations/sf-stats/desinstalaciones?perfil=${encodeURIComponent(_cpPerfil)}&todas=1`);
     const j=await r.json();
     if(!r.ok||!j.ok)throw new Error(j.error||'Respuesta no OK');
     const total=j.totalGeneral||0;
@@ -6545,7 +6575,7 @@ async function loadChurnProductoResumen(){
       <div style="display:flex;align-items:flex-end;gap:10px;margin-bottom:10px">
         <button onclick="cpFiltrarPorEstado(null)" style="background:none;border:none;cursor:pointer;display:flex;align-items:flex-end;gap:10px;padding:0" title="Ver todas">
           <div style="font-size:34px;font-weight:800;color:#8b5cf6;line-height:1">${total}</div>
-          <div style="font-size:12px;color:var(--text-muted);padding-bottom:5px;text-align:left">total (Desinstalación · Perfil NAPSE) — en vivo desde Salesforce${_cpFiltroEstado?' · click para ver todas':''}</div>
+          <div style="font-size:12px;color:var(--text-muted);padding-bottom:5px;text-align:left">total (Desinstalación · Perfil ${_cpPerfil}) — en vivo desde Salesforce${_cpFiltroEstado?' · click para ver todas':''}</div>
         </button>
       </div>
       <div style="display:flex;flex-wrap:wrap;gap:8px">
@@ -6627,7 +6657,7 @@ async function loadChurnProducto(){
   const tbody=document.getElementById('cp-tbody');
   if(!tbody)return;
   tbody.innerHTML='<tr><td colspan="11" style="text-align:center;padding:30px;color:var(--text-muted)">Cargando...</td></tr>';
-  const{data,error}=await sb.from('desinst_analisis_producto').select('*').order('fecha_desinstalacion',{ascending:false});
+  const{data,error}=await sb.from('desinst_analisis_producto').select('*').eq('perfil',_cpPerfil).order('fecha_desinstalacion',{ascending:false});
   if(error){
     tbody.innerHTML=`<tr><td colspan="11" style="text-align:center;padding:30px;color:var(--red)">Error: ${error.message}${error.message.includes('does not exist')?' — falta crear la tabla desinst_analisis_producto en Supabase':''}</td></tr>`;
     return;
@@ -6648,10 +6678,10 @@ async function recalcularChurnProducto(){
   const original=btn.textContent;
   btn.disabled=true;btn.textContent='Consultando SF (puede tardar)...';
   try{
-    const res=await railwayFetch('/automations/run/analisis_producto',{method:'POST'});
+    const res=await railwayFetch(`/automations/run/analisis_producto?perfil=${encodeURIComponent(_cpPerfil)}`,{method:'POST'});
     const data=await res.json();
     if(!data.ok)throw new Error(data.error||'Error '+res.status);
-    showToastPortal?.(`✅ Recalculado — ${data.procesadas||0} OT(s), ${data.matcheadas||0} con match de instalación, ${data.conVolumen||0} con volumen`);
+    showToastPortal?.(`✅ Recalculado (${_cpPerfil}) — ${data.procesadas||0} OT(s), ${data.matcheadas||0} con match de instalación, ${data.conVolumen||0} con volumen`);
     await loadChurnProducto();
   }catch(err){
     alert('Error al recalcular: '+err.message);
