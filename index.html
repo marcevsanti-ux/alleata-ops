@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.6.55</title>
+<title>Alleata · Operaciones v4.6.56</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -407,7 +407,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.55 · 12 ago 2026
+      v4.6.56 · 12 ago 2026
     </div>
   </div>
 </div>
@@ -499,7 +499,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.55 · 12 ago 2026
+      v4.6.56 · 12 ago 2026
     </div>
   </div>
 </nav>
@@ -539,7 +539,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.55</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.56</div>
   </div>
   <div class="content">
 
@@ -4920,7 +4920,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.6.55] OK');
+console.log('[Alleata v4.6.56] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -6593,7 +6593,7 @@ async function loadChurnProductoResumen(){
             <div style="font-size:20px;font-weight:800;color:${color}">${cant}</div>
             <div style="font-size:10px;color:${activo?color:'var(--text-muted)'};white-space:nowrap;font-weight:${activo?700:400}">${estado}${activo?' ✓':''}</div>
           </button>`;
-        }).join('')||'<div style="font-size:12px;color:var(--text-muted)">Sin OTs NAPSE</div>'}
+        }).join('')||`<div style="font-size:12px;color:var(--text-muted)">Sin OTs ${CP_PERFIL_LABEL[_cpPerfil]||_cpPerfil}</div>`}
       </div>
     </div>`;
   }catch(e){
@@ -7834,12 +7834,21 @@ async function dsGestionOpsCargar(){
       .sort((a,b)=> ORDEN_ESTADOS_GESTIONOPS.indexOf(a[0]) - ORDEN_ESTADOS_GESTIONOPS.indexOf(b[0]) || b[1]-a[1]);
 
     if(resumenEl){
-      resumenEl.innerHTML=`<div style="font-size:22px;font-weight:800;color:var(--teal);margin-right:6px">${j.totalGeneral}</div>`+
+      const entriesPerfil=Object.entries(j.totalPorPerfil||{}).sort((a,b)=>b[1]-a[1]);
+      resumenEl.innerHTML=`<div style="width:100%;display:flex;flex-wrap:wrap;align-items:center;gap:8px">`+
+        `<div style="font-size:22px;font-weight:800;color:var(--teal);margin-right:6px">${j.totalGeneral}</div>`+
         `<div style="font-size:11px;color:var(--text-muted);align-self:center;margin-right:10px">total desde 1/4/2026</div>`+
         entries.map(([estado,cant])=>{
           const color=ESTADO_COLORS_NAPSE[estado]||'#6b7280';
           return `<div class="badge" style="background:${color}18;border:1px solid ${color}40;color:${color};cursor:pointer;padding:6px 12px;font-size:11px" onclick="dsGestionOpsToggleEstado('${estado.replace(/'/g,"\\'")}')">${estado} · ${cant}</div>`;
-        }).join('');
+        }).join('')+
+        `</div>`+
+        `<div style="width:100%;display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:8px;padding-top:8px;border-top:1px solid var(--border2)">`+
+        `<div style="font-size:10px;color:var(--text-muted);align-self:center;margin-right:4px">Por Perfil__c (diagnóstico 12/08 — para comparar contra Churn Producto):</div>`+
+        entriesPerfil.map(([perfilVal,cant])=>
+          `<div class="badge" style="background:rgba(139,92,246,.1);border:1px solid rgba(139,92,246,.3);color:#8b5cf6;padding:4px 10px;font-size:10px">${perfilVal} · ${cant}</div>`
+        ).join('')+
+        `</div>`;
     }
 
     gruposEl.innerHTML=`<div id="ds-gestionops-detalle"></div>`;
