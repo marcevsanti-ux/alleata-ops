@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.6.48</title>
+<title>Alleata · Operaciones v4.6.49</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -379,6 +379,8 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
    "bold" ahí era negrita sintética del navegador — se veía peor, no
    mejor. Pedido 11/08. */
 .ot-num{font-family:'IBM Plex Mono',monospace;font-weight:700;}
+.cp-sort-arrow{font-size:9px;color:var(--teal);margin-left:2px}
+.cp-sortable:hover{color:var(--text)}
 </style>
 </head>
 <body>
@@ -405,7 +407,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.48 · 12 ago 2026
+      v4.6.49 · 12 ago 2026
     </div>
   </div>
 </div>
@@ -497,7 +499,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.48 · 12 ago 2026
+      v4.6.49 · 12 ago 2026
     </div>
   </div>
 </nav>
@@ -537,7 +539,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.48</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.49</div>
   </div>
   <div class="content">
 
@@ -1185,8 +1187,8 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
 <div class="module" id="mod-churn-producto">
   <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:12px">
     <div>
-      <div style="font-size:19px;font-weight:700">🔬 Churn Producto NAPSE — Recuperadas</div>
-      <div style="font-size:12px;color:var(--text-muted);margin-top:2px">Por cada desinstalación ya Recuperada: cuánto tiempo estuvo esa terminal instalada y cuánto vendía la cuenta antes de la baja (Actividad__c). Match por cuenta + Terminal_ID (la unidad que efectivamente se retiró). Piloto NAPSE arrancó el 1/6/2026 — pocos casos es normal en esta etapa.</div>
+      <div style="font-size:19px;font-weight:700">🔬 Churn Producto NAPSE</div>
+      <div style="font-size:12px;color:var(--text-muted);margin-top:2px">Por cada desinstalación NAPSE: cuánto tiempo estuvo esa terminal instalada y cuánto vendía la cuenta antes de la baja (Actividad__c). Match por cuenta + Terminal_ID (la unidad que efectivamente se retiró). "Días con terminal" y "SLA Recupero" solo se completan una vez que el estado es Recuperada. Piloto NAPSE arrancó el 1/6/2026 — pocos casos es normal en esta etapa.</div>
     </div>
     <button class="btn btn-sm" id="cp-btn-recalcular" style="background:rgba(139,92,246,.12);color:#8b5cf6;border:1px solid rgba(139,92,246,.3)" onclick="recalcularChurnProducto()">🔄 Recalcular (consulta SF en vivo)</button>
   </div>
@@ -1195,9 +1197,17 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     <div class="table-wrap">
     <table class="table">
       <thead><tr>
-        <th>Cuenta</th><th>Propietario cta.</th><th>OT Instalación</th><th>OT Desinst.</th>
-        <th>Terminal</th><th>Motivo</th><th>Días con terminal</th><th>SLA Recupero</th>
-        <th>Volumen 30d</th><th>Volumen 60d</th><th>Volumen 90d</th>
+        <th class="cp-sortable" data-key="cuenta" onclick="cpOrdenarPor('cuenta')" style="cursor:pointer">Cuenta <span id="cp-sort-cuenta" class="cp-sort-arrow"></span></th>
+        <th class="cp-sortable" data-key="propietario_cuenta" onclick="cpOrdenarPor('propietario_cuenta')" style="cursor:pointer">Propietario cta. <span id="cp-sort-propietario_cuenta" class="cp-sort-arrow"></span></th>
+        <th class="cp-sortable" data-key="ot_instalacion" onclick="cpOrdenarPor('ot_instalacion')" style="cursor:pointer">OT Instalación <span id="cp-sort-ot_instalacion" class="cp-sort-arrow"></span></th>
+        <th class="cp-sortable" data-key="ot_desinstalacion" onclick="cpOrdenarPor('ot_desinstalacion')" style="cursor:pointer">OT Desinst. <span id="cp-sort-ot_desinstalacion" class="cp-sort-arrow"></span></th>
+        <th class="cp-sortable" data-key="terminal_id" onclick="cpOrdenarPor('terminal_id')" style="cursor:pointer">Terminal <span id="cp-sort-terminal_id" class="cp-sort-arrow"></span></th>
+        <th class="cp-sortable" data-key="motivo" onclick="cpOrdenarPor('motivo')" style="cursor:pointer">Motivo <span id="cp-sort-motivo" class="cp-sort-arrow"></span></th>
+        <th class="cp-sortable" data-key="dias_con_terminal" onclick="cpOrdenarPor('dias_con_terminal')" style="cursor:pointer">Días con terminal <span id="cp-sort-dias_con_terminal" class="cp-sort-arrow"></span></th>
+        <th class="cp-sortable" data-key="sla_recupero_dias" onclick="cpOrdenarPor('sla_recupero_dias')" style="cursor:pointer">SLA Recupero <span id="cp-sort-sla_recupero_dias" class="cp-sort-arrow"></span></th>
+        <th class="cp-sortable" data-key="volumen_30d_antes" onclick="cpOrdenarPor('volumen_30d_antes')" style="cursor:pointer">Volumen 30d <span id="cp-sort-volumen_30d_antes" class="cp-sort-arrow"></span></th>
+        <th class="cp-sortable" data-key="volumen_60d_antes" onclick="cpOrdenarPor('volumen_60d_antes')" style="cursor:pointer">Volumen 60d <span id="cp-sort-volumen_60d_antes" class="cp-sort-arrow"></span></th>
+        <th class="cp-sortable" data-key="volumen_90d_antes" onclick="cpOrdenarPor('volumen_90d_antes')" style="cursor:pointer">Volumen 90d <span id="cp-sort-volumen_90d_antes" class="cp-sort-arrow"></span></th>
       </tr></thead>
       <tbody id="cp-tbody">
         <tr><td colspan="11" style="text-align:center;padding:30px;color:var(--text-muted)">Sin datos todavía — apretá "Recalcular" para traer del vivo de Salesforce.</td></tr>
@@ -4903,7 +4913,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.6.48] OK');
+console.log('[Alleata v4.6.49] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -6502,16 +6512,25 @@ async function cerrarOTHojaRuta(sfId,tecnico,btn,resultado,otNumero,cuenta,perfi
   }
 }
 
-// ── Churn Producto NAPSE (pedido 10/08) ─────────────────────────────────────
+// ── Churn Producto NAPSE (pedido 10/08, ampliado 12/08) ─────────────────────
 // Lee la tabla desinst_analisis_producto (ya existía en Railway, sin UI ni
 // botón hasta ahora) y ofrece "Recalcular" para disparar la corrida en vivo
 // contra SF (POST /automations/run/analisis_producto).
 function fmtVolCP(v){ return (v==null) ? '—' : '$'+Number(v).toLocaleString('es-AR'); }
 function fmtFechaCP(d){ return d ? new Date(d).toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'2-digit'}) : '—'; }
 
+// Estado en memoria: datos crudos + filtro por estado (cards clickeables) +
+// orden de columnas (headers clickeables). Todo client-side, sin re-fetch.
+let _cpData = [];
+let _cpFiltroEstado = null; // null = todas
+let _cpSortKey = 'fecha_desinstalacion';
+let _cpSortDir = 'desc';
+
 // Card resumen arriba de la tabla — mismo estilo/colores/fuente de datos que
-// el panel "🔍 Desinstalaciones NAPSE" del Dashboard (loadNapseDesinstPanel),
-// para que se vea igual en los dos lugares. Consulta en vivo, no la caché.
+// el panel "🔍 Desinstalaciones NAPSE" del Dashboard (loadNapseDesinstPanel).
+// Pedido 12/08: ahora son BOTONES — clickear un estado filtra la tabla de
+// abajo (que lee de desinst_analisis_producto, ya cargada en _cpData) sin
+// tener que volver a pegarle a SF. El total grande limpia el filtro.
 async function loadChurnProductoResumen(){
   const cont=document.getElementById('cp-resumen-cards');
   if(!cont)return;
@@ -6524,22 +6543,83 @@ async function loadChurnProductoResumen(){
     const entries=Object.entries(j.totalPorEstado||{}).sort((a,b)=>b[1]-a[1]);
     cont.innerHTML=`<div class="card">
       <div style="display:flex;align-items:flex-end;gap:10px;margin-bottom:10px">
-        <div style="font-size:34px;font-weight:800;color:#8b5cf6;line-height:1">${total}</div>
-        <div style="font-size:12px;color:var(--text-muted);padding-bottom:5px">total (Desinstalación · Perfil NAPSE) — en vivo desde Salesforce</div>
+        <button onclick="cpFiltrarPorEstado(null)" style="background:none;border:none;cursor:pointer;display:flex;align-items:flex-end;gap:10px;padding:0" title="Ver todas">
+          <div style="font-size:34px;font-weight:800;color:#8b5cf6;line-height:1">${total}</div>
+          <div style="font-size:12px;color:var(--text-muted);padding-bottom:5px;text-align:left">total (Desinstalación · Perfil NAPSE) — en vivo desde Salesforce${_cpFiltroEstado?' · click para ver todas':''}</div>
+        </button>
       </div>
       <div style="display:flex;flex-wrap:wrap;gap:8px">
         ${entries.map(([estado,cant])=>{
           const color=ESTADO_COLORS_NAPSE[estado]||'#6b7280';
-          return`<div style="background:${color}18;border:1px solid ${color}40;border-radius:10px;padding:8px 12px;min-width:100px">
+          const activo=_cpFiltroEstado===estado;
+          return`<button onclick="cpFiltrarPorEstado('${estado.replace(/'/g,"\\'")}')" style="text-align:left;cursor:pointer;background:${color}${activo?'30':'18'};border:1px solid ${color}${activo?'':'40'};${activo?`border-color:${color}`:''};border-radius:10px;padding:8px 12px;min-width:100px;font-family:inherit">
             <div style="font-size:20px;font-weight:800;color:${color}">${cant}</div>
-            <div style="font-size:10px;color:var(--text-muted);white-space:nowrap">${estado}</div>
-          </div>`;
+            <div style="font-size:10px;color:${activo?color:'var(--text-muted)'};white-space:nowrap;font-weight:${activo?700:400}">${estado}${activo?' ✓':''}</div>
+          </button>`;
         }).join('')||'<div style="font-size:12px;color:var(--text-muted)">Sin OTs NAPSE</div>'}
       </div>
     </div>`;
   }catch(e){
     cont.innerHTML=`<div class="card" style="padding:16px;color:var(--red);font-size:12px">No se pudo consultar SF: ${e.message}</div>`;
   }
+}
+
+function cpFiltrarPorEstado(estado){
+  _cpFiltroEstado = (_cpFiltroEstado===estado) ? null : estado;
+  loadChurnProductoResumen();
+  cpRenderTabla();
+}
+
+function cpOrdenarPor(key){
+  if(_cpSortKey===key){ _cpSortDir = _cpSortDir==='asc' ? 'desc' : 'asc'; }
+  else { _cpSortKey=key; _cpSortDir='desc'; }
+  document.querySelectorAll('.cp-sort-arrow').forEach(el=>el.textContent='');
+  const arrowEl=document.getElementById('cp-sort-'+key);
+  if(arrowEl) arrowEl.textContent = _cpSortDir==='asc' ? '▲' : '▼';
+  cpRenderTabla();
+}
+
+function cpRenderTabla(){
+  const tbody=document.getElementById('cp-tbody');
+  if(!tbody)return;
+  let filas = _cpFiltroEstado ? _cpData.filter(r=>r.estado_desinst===_cpFiltroEstado) : _cpData.slice();
+
+  filas.sort((a,b)=>{
+    let va=a[_cpSortKey], vb=b[_cpSortKey];
+    if(va==null && vb==null) return 0;
+    if(va==null) return 1;  // nulls siempre al final, sea cual sea el orden
+    if(vb==null) return -1;
+    if(typeof va==='string') va=va.toLowerCase();
+    if(typeof vb==='string') vb=vb.toLowerCase();
+    const cmp = va<vb ? -1 : va>vb ? 1 : 0;
+    return _cpSortDir==='asc' ? cmp : -cmp;
+  });
+
+  if(!filas.length){
+    tbody.innerHTML=`<tr><td colspan="11" style="text-align:center;padding:30px;color:var(--text-muted)">${_cpFiltroEstado?`Sin casos "${_cpFiltroEstado}" en la tabla cargada.`:'Sin datos todavía — apretá "Recalcular" para traer del vivo de Salesforce.'}</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML=filas.map(r=>{
+    const nombreCuenta = r.account_id
+      ? `<a href="https://alleata.lightning.force.com/lightning/r/Account/${r.account_id}/view" target="_blank" rel="noopener" style="font-weight:600;color:#1dbf8e;text-decoration:none" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'" title="Abrir cuenta en Salesforce">${r.cuenta||'—'} ↗</a>`
+      : `<div style="font-weight:600;color:#1dbf8e">${r.cuenta||'—'}</div>`;
+    const volTarjeta = (v) => v!=null ? `<div style="font-size:9px;color:#f59e0b;font-family:'JetBrains Mono',monospace">🪪 ${fmtVolCP(v)}</div>` : '';
+    return `
+    <tr>
+      <td>${nombreCuenta}<div style="font-size:10px;color:var(--text-muted);font-family:'JetBrains Mono',monospace">${r.cuit||'—'}</div>${r.comercio?`<div style="font-size:10px;color:var(--text-muted)">${r.comercio}</div>`:''}</td>
+      <td style="font-size:11px">${r.propietario_cuenta||'<span style="color:var(--text-muted)">—</span>'}</td>
+      <td class="ot-num">${r.ot_instalacion||'<span style="color:var(--text-muted);font-family:\'Inter\',sans-serif;font-weight:400">sin match</span>'}<div style="font-size:9px;color:var(--text-muted);font-family:'Inter',sans-serif;font-weight:400">${fmtFechaCP(r.fecha_instalacion_exitosa)}</div></td>
+      <td class="ot-num">${r.ot_desinstalacion||'—'}<div style="font-size:9px;color:var(--text-muted);font-weight:400;font-family:'Inter',sans-serif">${fmtFechaCP(r.fecha_desinstalacion)}</div></td>
+      <td style="font-size:11px;font-family:'JetBrains Mono',monospace">${r.terminal_id||'—'}</td>
+      <td style="font-size:11px;max-width:180px">${r.motivo||'—'}</td>
+      <td style="text-align:center;font-weight:700">${r.dias_con_terminal!=null?r.dias_con_terminal+' días':'—'}</td>
+      <td style="text-align:center"><div style="font-weight:700">${r.sla_recupero_dias!=null?r.sla_recupero_dias+' días':'<span style="color:var(--text-muted);font-weight:400">—</span>'}</div>${r.logistica?`<div style="font-size:9px;color:var(--text-muted)">${r.logistica}</div>`:''}</td>
+      <td style="font-family:'JetBrains Mono',monospace">${fmtVolCP(r.volumen_30d_antes)}${volTarjeta(r.volumen_tarjeta_30d)}</td>
+      <td style="font-family:'JetBrains Mono',monospace">${fmtVolCP(r.volumen_60d_antes)}${volTarjeta(r.volumen_tarjeta_60d)}</td>
+      <td style="font-family:'JetBrains Mono',monospace">${fmtVolCP(r.volumen_90d_antes)}${volTarjeta(r.volumen_tarjeta_90d)}</td>
+    </tr>`;
+  }).join('');
 }
 
 async function loadChurnProducto(){
@@ -6554,24 +6634,12 @@ async function loadChurnProducto(){
   }
   const nb=document.getElementById('nb-churn-producto');
   if(nb)nb.textContent=String(data?.length||0);
-  if(!data||!data.length){
-    tbody.innerHTML='<tr><td colspan="11" style="text-align:center;padding:30px;color:var(--text-muted)">Sin datos todavía — apretá "Recalcular" para traer del vivo de Salesforce.</td></tr>';
-    return;
-  }
-  tbody.innerHTML=data.map(r=>`
-    <tr>
-      <td><div style="font-weight:600;color:#1dbf8e">${r.cuenta||'—'}</div><div style="font-size:10px;color:var(--text-muted);font-family:'JetBrains Mono',monospace">${r.cuit||'—'}</div>${r.comercio?`<div style="font-size:10px;color:var(--text-muted)">${r.comercio}</div>`:''}</td>
-      <td style="font-size:11px">${r.propietario_cuenta||'<span style="color:var(--text-muted)">—</span>'}</td>
-      <td class="ot-num">${r.ot_instalacion||'<span style="color:var(--text-muted);font-family:\'Inter\',sans-serif;font-weight:400">sin match</span>'}<div style="font-size:9px;color:var(--text-muted);font-family:'Inter',sans-serif;font-weight:400">${fmtFechaCP(r.fecha_instalacion_exitosa)}</div></td>
-      <td class="ot-num">${r.ot_desinstalacion||'—'}<div style="font-size:9px;color:var(--text-muted);font-weight:400;font-family:'Inter',sans-serif">${fmtFechaCP(r.fecha_desinstalacion)}</div></td>
-      <td style="font-size:11px;font-family:'JetBrains Mono',monospace">${r.terminal_id||'—'}</td>
-      <td style="font-size:11px;max-width:180px">${r.motivo||'—'}</td>
-      <td style="text-align:center;font-weight:700">${r.dias_con_terminal!=null?r.dias_con_terminal+' días':'—'}</td>
-      <td style="text-align:center"><div style="font-weight:700">${r.sla_recupero_dias!=null?r.sla_recupero_dias+' días':'<span style="color:var(--text-muted);font-weight:400">—</span>'}</div>${r.logistica?`<div style="font-size:9px;color:var(--text-muted)">${r.logistica}</div>`:''}</td>
-      <td style="font-family:'JetBrains Mono',monospace">${fmtVolCP(r.volumen_30d_antes)}</td>
-      <td style="font-family:'JetBrains Mono',monospace">${fmtVolCP(r.volumen_60d_antes)}</td>
-      <td style="font-family:'JetBrains Mono',monospace">${fmtVolCP(r.volumen_90d_antes)}</td>
-    </tr>`).join('');
+  _cpData = data || [];
+  // Arranca ordenado por fecha_desinstalacion desc (igual que antes) — esa
+  // fecha no tiene columna propia con flecha visible (vive como subtexto
+  // dentro de "OT Desinst."), el usuario puede reordenar por cualquier
+  // columna con header clickeable.
+  cpRenderTabla();
 }
 
 async function recalcularChurnProducto(){
