@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.6.52</title>
+<title>Alleata · Operaciones v4.6.53</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -407,7 +407,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.52 · 12 ago 2026
+      v4.6.53 · 12 ago 2026
     </div>
   </div>
 </div>
@@ -499,7 +499,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.52 · 12 ago 2026
+      v4.6.53 · 12 ago 2026
     </div>
   </div>
 </nav>
@@ -539,7 +539,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.52</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.53</div>
   </div>
   <div class="content">
 
@@ -4919,7 +4919,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.6.52] OK');
+console.log('[Alleata v4.6.53] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -6528,7 +6528,7 @@ function fmtFechaCP(d){ return d ? new Date(d).toLocaleDateString('es-AR',{day:'
 // Estado en memoria: datos crudos + filtro por estado (cards clickeables) +
 // orden de columnas (headers clickeables). Todo client-side, sin re-fetch.
 let _cpData = [];
-let _cpFiltroEstado = null; // null = todas
+let _cpFiltroEstado = 'Recuperada'; // default: arranca mostrando Recuperadas, no todas
 let _cpSortKey = 'fecha_desinstalacion';
 let _cpSortDir = 'desc';
 // Perfil activo del módulo (NAPSE o PRISMA) — comparten toda la UI, cambia
@@ -6543,7 +6543,7 @@ const CP_TEXTOS = {
 function cpSetPerfil(perfil){
   if(_cpPerfil===perfil)return;
   _cpPerfil = perfil;
-  _cpFiltroEstado = null; // el filtro por estado era del perfil anterior, no tiene sentido arrastrarlo
+  _cpFiltroEstado = 'Recuperada'; // el filtro por estado era del perfil anterior — vuelve al default (Recuperada), no arrastra el filtro viejo ni pasa a "todas"
   document.querySelectorAll('.cp-perfil-btn').forEach(btn=>{
     const activo = btn.dataset.perfil===perfil;
     btn.style.background = activo ? '#8b5cf6' : 'transparent';
@@ -6637,7 +6637,7 @@ function cpRenderTabla(){
     const volTarjeta = (v) => v!=null ? `<div style="font-size:9px;color:#f59e0b;font-family:'JetBrains Mono',monospace">🪪 ${fmtVolCP(v)}</div>` : '';
     return `
     <tr>
-      <td>${nombreCuenta}<div style="font-size:10px;color:var(--text-muted);font-family:'JetBrains Mono',monospace">${r.cuit||'—'}${r.ot_desinstalacion?` <span class="ot-num" style="font-size:10px">· OT ${r.ot_desinstalacion}</span>`:''}</div>${r.comercio?`<div style="font-size:10px;color:var(--text-muted)">${r.comercio}</div>`:''}</td>
+      <td>${nombreCuenta}<div style="font-size:10px;color:var(--text-muted);font-family:'JetBrains Mono',monospace">${r.cuit||'—'}${r.ot_desinstalacion?` <span class="ot-num" style="font-size:10px">· ${r.sf_id_desinstalacion?`<a href="https://alleata.lightning.force.com/lightning/r/WorkOrder/${r.sf_id_desinstalacion}/view" target="_blank" rel="noopener" style="color:inherit;text-decoration:none" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'" title="Abrir OT en Salesforce">OT ${r.ot_desinstalacion} ↗</a>`:`OT ${r.ot_desinstalacion}`}</span>`:''}</div>${r.comercio?`<div style="font-size:10px;color:var(--text-muted)">${r.comercio}</div>`:''}</td>
       <td style="font-size:11px">${r.propietario_cuenta||'<span style="color:var(--text-muted)">—</span>'}</td>
       <td>${fmtFechaCP(r.fecha_instalacion_cuenta)}</td>
       <td>${fmtFechaCP(r.fecha_baja_cuenta)}</td>
