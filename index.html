@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.6.45</title>
+<title>Alleata · Operaciones v4.6.47</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -405,7 +405,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.45 · 12 ago 2026
+      v4.6.47 · 12 ago 2026
     </div>
   </div>
 </div>
@@ -497,7 +497,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.45 · 12 ago 2026
+      v4.6.47 · 12 ago 2026
     </div>
   </div>
 </nav>
@@ -537,7 +537,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.45</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.47</div>
   </div>
   <div class="content">
 
@@ -4899,7 +4899,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.6.45] OK');
+console.log('[Alleata v4.6.47] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -6653,7 +6653,7 @@ async function cargarCambiosPorZona() {
   cont.innerHTML = '<div class="card" style="padding:16px;color:var(--text-muted);font-size:12px">Cargando cambios de terminal por zona...</div>';
 
   const { data, error } = await sb.from('sf_workorders')
-    .select('sf_created_at,status,logistica')
+    .select('workorder_number,sf_created_at,status,logistica')
     .eq('record_type', 'Cambio de Terminal')
     .in('status', CAMBIOS_ZONA_ESTADOS)
     .gte('sf_created_at', '2026-06-01')
@@ -6663,6 +6663,8 @@ async function cargarCambiosPorZona() {
     return;
   }
 
+  const AMBA_LOGS = ['ALLEATA', 'CABIFY'];
+  const INTERIOR_LOGS = ['EPSA', 'CORREO ARGENTINO'];
   const agrupar = logs => {
     const porMes = {}; CAMBIOS_ZONA_MESES.forEach(m => porMes[m.key] = {});
     (data || []).forEach(r => {
@@ -6673,11 +6675,30 @@ async function cargarCambiosPorZona() {
     });
     return porMes;
   };
-  const ambaPorMes = agrupar(['ALLEATA', 'CABIFY']);
-  const interiorPorMes = agrupar(['EPSA', 'CORREO ARGENTINO']);
+  const ambaPorMes = agrupar(AMBA_LOGS);
+  const interiorPorMes = agrupar(INTERIOR_LOGS);
+
+  // Lo que no entra en ninguno de los 2 grupos (hoy: "Instala Ventas" —
+  // pedido 12/08 de marcelos, "lo tengo que ver caso por caso", así que
+  // no lo metemos adentro de AMBA/Interior a la fuerza, pero tampoco lo
+  // escondemos: se cuenta y se muestra como leyenda debajo de cada dona
+  // para que el total de la dona + este número SÍ cierre contra SF.
+  const sinClasificarPorMes = {}; CAMBIOS_ZONA_MESES.forEach(m => sinClasificarPorMes[m.key] = { total: 0, logs: new Set(), ots: [] });
+  (data || []).forEach(r => {
+    const log = (r.logistica || '').toUpperCase();
+    if (AMBA_LOGS.includes(log) || INTERIOR_LOGS.includes(log)) return;
+    const mes = String(r.sf_created_at).slice(0, 7);
+    if (!sinClasificarPorMes[mes]) return;
+    sinClasificarPorMes[mes].total++;
+    sinClasificarPorMes[mes].logs.add(r.logistica || 'sin logística cargada');
+    sinClasificarPorMes[mes].ots.push(r.workorder_number);
+  });
 
   const filaHtml = (idPrefix) => CAMBIOS_ZONA_MESES.map(m =>
-    `<div class="card" style="flex:1;min-width:220px;display:flex;flex-direction:column"><div id="${idPrefix}-${m.key}" style="display:flex;flex-direction:column;flex:1"></div></div>`
+    `<div class="card" style="flex:1;min-width:220px;display:flex;flex-direction:column">
+      <div id="${idPrefix}-${m.key}" style="display:flex;flex-direction:column;flex:1"></div>
+      <div id="${idPrefix}-${m.key}-nota" style="font-size:10px;color:var(--text-muted);border-top:1px solid var(--border);margin-top:8px;padding-top:6px"></div>
+    </div>`
   ).join('');
 
   cont.innerHTML = `
@@ -6691,6 +6712,12 @@ async function cargarCambiosPorZona() {
     renderChartDona(`donut-amba-${m.key}`, `CAMBIOS ${m.label} 2026`, dA, CAMBIOS_ZONA_COLORES, Object.values(dA).reduce((a, b) => a + b, 0));
     const dI = interiorPorMes[m.key] || {};
     renderChartDona(`donut-interior-${m.key}`, `CAMBIOS ${m.label} 2026`, dI, CAMBIOS_ZONA_COLORES, Object.values(dI).reduce((a, b) => a + b, 0));
+    const sinClas = sinClasificarPorMes[m.key] || { total: 0, logs: new Set(), ots: [] };
+    const notaTxt = sinClas.total>0 ? `⚠️ OT ${sinClas.ots.join(', ')} — logística "${Array.from(sinClas.logs).join('", "')}", no está en AMBA ni Interior, revisar caso por caso` : '';
+    const notaA = document.getElementById(`donut-amba-${m.key}-nota`);
+    const notaI = document.getElementById(`donut-interior-${m.key}-nota`);
+    if(notaA) notaA.textContent = notaTxt;
+    if(notaI) notaI.textContent = notaTxt;
   });
 }
 
