@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.6.44</title>
+<title>Alleata · Operaciones v4.6.45</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -405,7 +405,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.44 · 11 ago 2026
+      v4.6.45 · 12 ago 2026
     </div>
   </div>
 </div>
@@ -497,7 +497,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.44 · 11 ago 2026
+      v4.6.45 · 12 ago 2026
     </div>
   </div>
 </nav>
@@ -537,7 +537,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.44</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.45</div>
   </div>
   <div class="content">
 
@@ -553,6 +553,11 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
            compartido: total agregado del equipo, sin desglose por chofer,
            a propósito. -->
       <div id="objSemanalCard" style="display:none"></div>
+
+      <!-- 🏙️📦 Cambios de Terminal por zona (AMBA/Interior), por mes —
+           pedido 12/08, mismo criterio de visibilidad que el card de
+           arriba (solo marcelos, ver cargarCambiosPorZona()). -->
+      <div id="cambiosZonaCard" style="display:none;margin-bottom:18px"></div>
 
       <!-- Paso 1 (vamos por partes, pedido 27/07): antes de meter prioridad,
            mostrar simplemente TODAS las OTs en estado "Configurar Terminal"
@@ -4894,7 +4899,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.6.44] OK');
+console.log('[Alleata v4.6.45] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -6624,6 +6629,69 @@ async function loadRolloutPiloto(){
   });
 
   renderRolloutPiloto();
+}
+
+// ── Cambios de Terminal por zona (AMBA/Interior), por mes — pedido 12/08.
+// Replica el tablero que Diego arma a mano en SF (donas "CAMBIOS JUNIO/
+// JULIO/AGOSTO 2026" filtradas a Estado Despachado/Exitoso/Retirar
+// Terminal), separado en 2 filas: AMBA (logística Alleata + Cabify) e
+// Interior (EPSA + Correo Argentino). "Instala Ventas" queda afuera de
+// las dos — a revisar caso por caso (pedido explícito, no asumir).
+// Totales validados 1:1 contra el reporte real de SF antes de construir
+// esto (62/164/41 por mes, filtro por esos 3 estados).
+const CAMBIOS_ZONA_ESTADOS = ['Despachado', 'Exitoso', 'Retirar Terminal'];
+const CAMBIOS_ZONA_MESES = [
+  { key: '2026-06', label: 'JUNIO' },
+  { key: '2026-07', label: 'JULIO' },
+  { key: '2026-08', label: 'AGOSTO' },
+];
+const CAMBIOS_ZONA_COLORES = { 'Exitoso': '#1dbf8e', 'Despachado': '#1a9fd4', 'Retirar Terminal': '#8b5cf6' };
+
+async function cargarCambiosPorZona() {
+  const cont = document.getElementById('cambiosZonaCard');
+  if (!cont) return;
+  cont.innerHTML = '<div class="card" style="padding:16px;color:var(--text-muted);font-size:12px">Cargando cambios de terminal por zona...</div>';
+
+  const { data, error } = await sb.from('sf_workorders')
+    .select('sf_created_at,status,logistica')
+    .eq('record_type', 'Cambio de Terminal')
+    .in('status', CAMBIOS_ZONA_ESTADOS)
+    .gte('sf_created_at', '2026-06-01')
+    .lte('sf_created_at', '2026-08-31T23:59:59');
+  if (error) {
+    cont.innerHTML = `<div class="card" style="padding:16px;color:var(--red);font-size:12px">No se pudo cargar Cambios por zona: ${error.message}</div>`;
+    return;
+  }
+
+  const agrupar = logs => {
+    const porMes = {}; CAMBIOS_ZONA_MESES.forEach(m => porMes[m.key] = {});
+    (data || []).forEach(r => {
+      if (!logs.includes((r.logistica || '').toUpperCase())) return;
+      const mes = String(r.sf_created_at).slice(0, 7);
+      if (!porMes[mes]) return;
+      porMes[mes][r.status] = (porMes[mes][r.status] || 0) + 1;
+    });
+    return porMes;
+  };
+  const ambaPorMes = agrupar(['ALLEATA', 'CABIFY']);
+  const interiorPorMes = agrupar(['EPSA', 'CORREO ARGENTINO']);
+
+  const filaHtml = (idPrefix) => CAMBIOS_ZONA_MESES.map(m =>
+    `<div class="card" style="flex:1;min-width:220px;display:flex;flex-direction:column"><div id="${idPrefix}-${m.key}" style="display:flex;flex-direction:column;flex:1"></div></div>`
+  ).join('');
+
+  cont.innerHTML = `
+    <div style="font-size:13px;font-weight:700;margin-bottom:8px">🏙️ AMBA — Cambios de Terminal (Alleata + Cabify)</div>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px">${filaHtml('donut-amba')}</div>
+    <div style="font-size:13px;font-weight:700;margin-bottom:8px">📦 Interior — Cambios de Terminal (EPSA + Correo Argentino)</div>
+    <div style="display:flex;gap:12px;flex-wrap:wrap">${filaHtml('donut-interior')}</div>`;
+
+  CAMBIOS_ZONA_MESES.forEach(m => {
+    const dA = ambaPorMes[m.key] || {};
+    renderChartDona(`donut-amba-${m.key}`, `CAMBIOS ${m.label} 2026`, dA, CAMBIOS_ZONA_COLORES, Object.values(dA).reduce((a, b) => a + b, 0));
+    const dI = interiorPorMes[m.key] || {};
+    renderChartDona(`donut-interior-${m.key}`, `CAMBIOS ${m.label} 2026`, dI, CAMBIOS_ZONA_COLORES, Object.values(dI).reduce((a, b) => a + b, 0));
+  });
 }
 
 // ── Objetivo semanal del equipo (Rollout) — SOLO en el dashboard de
@@ -8483,13 +8551,16 @@ async function loadOpsPanel(isAdmin, modulos){
   // explícito 28/07: no lo quiere en Rollout Piloto (Diego mira esa
   // pantalla) y sin desglose por chofer, esto es aparte, privado, agregado.
   const objCard = document.getElementById('objSemanalCard');
+  const cambiosZonaCard = document.getElementById('cambiosZonaCard');
   if(objCard){
     const esMarcelos = (currentProfile?.email||currentUser?.email||'').trim().toLowerCase()==='marcelos@moretti.com.ar';
     if(esMarcelos){
       objCard.style.display='block';
       cargarObjetivoSemanalRollout();
+      if(cambiosZonaCard){ cambiosZonaCard.style.display='block'; cargarCambiosPorZona(); }
     } else {
       objCard.style.display='none';
+      if(cambiosZonaCard) cambiosZonaCard.style.display='none';
     }
   }
 
