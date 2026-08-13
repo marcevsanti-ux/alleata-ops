@@ -279,6 +279,8 @@
       <select id="user-select">
         <option value="facundo">Facundo — Responsable</option>
         <option value="marcelo">Marcelo Santillán — Admin</option>
+        <option value="alejandro">Alejandro Amato — Ventas</option>
+        <option value="angeles">Angeles Eberle — Ventas</option>
         <option value="viewer">Invitado — Solo lectura</option>
       </select>
     </div>
@@ -613,8 +615,8 @@ function gaugeHTML(evalResult, cfg, maxScale){
 function populateFilterOptions(){
   const respSel = document.getElementById('f-responsable');
   const etapaSel = document.getElementById('f-etapa');
-  const resps = [...new Set(OTS.map(o=>o.responsable))].sort();
-  const etapas = [...new Set(OTS.map(o=>o.etapa))];
+  const resps = [...new Set(getVisibleOts().map(o=>o.responsable))].sort();
+  const etapas = [...new Set(getVisibleOts().map(o=>o.etapa))];
   resps.forEach(r=>{
     const opt = document.createElement('option'); opt.value = r; opt.textContent = r;
     respSel.appendChild(opt);
@@ -630,7 +632,7 @@ function initials(name){
 }
 
 function renderKPIs(){
-  const withOps = OTS.map(o=>computeSlas(o));
+  const withOps = getVisibleOts().map(o=>computeSlas(o));
   const opsRunning = withOps.filter(s=>s.ops.status!=='pending' && !s.ops.closed);
   const logRunning = withOps.filter(s=>s.log.status!=='pending' && !s.log.closed);
   const opsRisk = opsRunning.filter(s=>s.ops.status!=='g').length;
@@ -639,7 +641,7 @@ function renderKPIs(){
   const cumplOps = closedOps.length ? Math.round(100*closedOps.filter(s=>s.ops.status!=='r').length/closedOps.length) : 0;
 
   const cards = [
-    { label:'OTs activas', value:OTS.length, cls:'k-blue', delta:'Instalación Equipo + Simcard' },
+    { label:'OTs activas', value:getVisibleOts().length, cls:'k-blue', delta:'Instalación Equipo + Simcard' },
     { label:'SLA Operaciones en riesgo', value:opsRisk, cls: opsRisk>0 ? 'k-amber':'k-green', delta:`de ${opsRunning.length} corriendo` },
     { label:'SLA Logística en riesgo', value:logRisk, cls: logRisk>0 ? 'k-red':'k-green', delta:`de ${logRunning.length} corriendo` },
     { label:'Cumplimiento Operaciones', value:cumplOps+'%', cls: cumplOps>=80?'k-green':cumplOps>=60?'k-amber':'k-red', delta:`sobre ${closedOps.length} OTs cerradas` },
@@ -667,7 +669,7 @@ function renderTable(){
   const eF = document.getElementById('f-etapa').value;
   const sF = document.getElementById('f-semaforo').value;
 
-  const rows = OTS.filter(o=>{
+  const rows = getVisibleOts().filter(o=>{
     if(q && !(o.ot.toLowerCase().includes(q) || o.cuenta.toLowerCase().includes(q))) return false;
     if(rF && o.responsable !== rF) return false;
     if(eF && o.etapa !== eF) return false;
@@ -716,18 +718,40 @@ function renderTable(){
    LOGIN / SESSION (en memoria — sin localStorage, ver nota en pantalla)
    ========================================================================= */
 const USERS = {
-  facundo: { name:'Facundo', role:'Responsable' },
-  marcelo: { name:'Marcelo Santillán', role:'Admin' },
-  viewer:  { name:'Invitado', role:'Solo lectura' }
+  facundo:  { name:'Facundo', role:'Responsable', scope:null },
+  marcelo:  { name:'Marcelo Santillán', role:'Admin', scope:null },
+  alejandro:{ name:'Alejandro Amato', role:'Ventas', scope:'Alejandro Amato' },
+  angeles:  { name:'Angeles Eberle', role:'Ventas', scope:'Angeles Eberle' },
+  viewer:   { name:'Invitado', role:'Solo lectura', scope:null }
 };
+let CURRENT_USER = null;
+
+function getVisibleOts(){
+  if(CURRENT_USER && CURRENT_USER.scope){
+    return OTS.filter(o => o.responsable === CURRENT_USER.scope);
+  }
+  return OTS;
+}
 
 function doLogin(){
   const key = document.getElementById('user-select').value;
   const u = USERS[key];
-  document.getElementById('user-name-label').textContent = u.name;
+  CURRENT_USER = u;
+  document.getElementById('user-name-label').textContent = `${u.name} · ${u.role}`;
   document.getElementById('avatar-initials').textContent = initials(u.name);
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app').style.display = 'block';
+
+  // Rol Ventas: no tiene sentido ofrecerle el filtro por responsable (ya está fijo en el suyo)
+  const respFilterWrap = document.getElementById('f-responsable');
+  if(u.scope){
+    respFilterWrap.style.display = 'none';
+  } else {
+    respFilterWrap.style.display = '';
+  }
+  booted = false; // re-render limpio si se cambia de usuario sin recargar
+  document.getElementById('f-responsable').innerHTML = '<option value="">Responsable (todos)</option>';
+  document.getElementById('f-etapa').innerHTML = '<option value="">Etapa (todas)</option>';
   boot();
 }
 
