@@ -165,7 +165,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
       <div class="login-logo">
         <img id="loginLogo" src="" alt="Alleata">
         <div class="login-sub">Portal de Operaciones</div>
-        <div class="login-version">v2.14.42 · mobile</div>
+        <div class="login-version">v2.14.45 · mobile</div>
       </div>
       <div class="field"><label class="label">Email</label><input class="input" id="lEmail" type="email" placeholder="usuario@alleata.com" autocomplete="email"></div>
       <div class="field"><label class="label">Contraseña</label><input class="input" id="lPass" type="password" placeholder="••••••••" autocomplete="current-password"></div>
@@ -182,7 +182,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
     <img id="appLogo" src="" alt="Alleata">
     <div class="topbar-title" id="topbarTitle">Operaciones</div>
     <button id="btnSyncRapido" onclick="syncRapido()" title="Actualizar estados desde Salesforce (sin esperar los 10min)" style="background:none;border:none;color:#fff;font-size:18px;cursor:pointer;padding:4px 6px;line-height:1">🔄</button>
-    <div class="topbar-version" onclick="_tocarVersion()">v2.14.42</div>
+    <div class="topbar-version" onclick="_tocarVersion()">v2.14.45</div>
     <div class="topbar-avatar" id="topbarAvatar" onclick="openDrawer()">?</div>
   </div>
 
@@ -500,12 +500,16 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
   <div class="modal">
     <div class="modal-title">🏁 Resumen de ruta</div>
     <textarea id="resumenTexto" rows="14" style="width:100%;background:var(--navy-700);border:1px solid var(--border2);color:var(--text);font-family:'JetBrains Mono',monospace;font-size:12.5px;line-height:1.5;padding:12px;border-radius:10px;outline:none;margin-bottom:12px;resize:vertical"></textarea>
-    <button class="btn" id="btnCompartirResumen" onclick="compartirResumen()" style="margin-bottom:10px">
+    <!-- Ocultos 12/08: por ahora el resumen se manda automático solo por
+    WhatsApp al grupo Ally + Ops al abrir este modal (ver abrirResumenModal).
+    Se dejan en el DOM con display:none, no se borra el código, para poder
+    reactivarlos fácil si en algún momento se vuelve a querer elegir canal. -->
+    <button class="btn" id="btnCompartirResumen" onclick="compartirResumen()" style="margin-bottom:10px;display:none">
       📤 Compartir (WhatsApp, Mail, etc.)
     </button>
     <div class="modal-btns">
       <button class="btn btn-cancel" onclick="cerrarResumenModal()">Cerrar</button>
-      <button class="btn" style="background:var(--surface2);border:1px solid var(--border2);color:var(--text)" onclick="copiarResumen()">📋 Copiar</button>
+      <button class="btn" style="background:var(--surface2);border:1px solid var(--border2);color:var(--text);display:none" onclick="copiarResumen()">📋 Copiar</button>
       <button class="btn" id="btnEnviarResumenOps" onclick="enviarResumenAOps()">📲 Enviar a Ops</button>
     </div>
   </div>
@@ -761,7 +765,7 @@ const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSI
 //     el producto en estado raro en SF (por eso existe la opción
 //     Reprogramar como alternativa), así que necesita aviso inmediato.
 //     No bloquea el cierre si el envío directo falla.
-// Cambios v2.14.42 (11/08):
+// Cambios v2.14.45 (11/08):
 //   - Números de OT: .ot-num y #otS-num pasan de JetBrains Mono a IBM
 //     Plex Mono bold (0 con barra diagonal — no se confunde con O).
 //     JetBrains Mono acá solo cargaba 400/500, así que el "bold" viejo
@@ -1151,6 +1155,9 @@ async function railwayFetch(path, options = {}) {
     },
   });
 }
+// NOTA 12/08: pese al nombre, ALLY_GROUP_TEST es en producción el grupo real
+// "Ally + Ops" (mismo ID documentado como OPS_INTEL_GROUP_ID en la integración
+// Cabify) — no es un grupo de pruebas, es donde llega el resumen de ruta hoy.
 const ALLY_GROUP_TEST='120363424299090366@g.us';
 const ALLY_GROUP_PILOTO_NAPSE='120363428888765775@g.us';
 
@@ -1278,22 +1285,36 @@ function generarTextoResumen(){
   const tecnico=(currentProfile?.nombre||currentUser?.email||'').trim();
   let txt=`📦 *Reporte Log. Alleata*\n👷 ${tecnico}\n🕐 ${fechaLargaHoy()}\n🛣️ Kmts Recorridos: ${_kmRutaHoyTotal||0} km\n`;
 
+  // Marca por tipo de OT — mismo estilo que ya se usaba para Rollout
+  // (ícono + palabra en mayúscula). Rollout tiene prioridad: una OT puede
+  // ser "Cambio de Terminal" Y Rollout a la vez, y lo que importa distinguir
+  // ahí es el Rollout, no el tipo base.
+  const rollTag = c => {
+    if(c.rollout) return ' 🔁 *ROLLOUT*';
+    const t=(c.ot_tipo||'').toLowerCase();
+    if(t.includes('instal')) return ' 🟩 *INSTALACIÓN*';
+    if(t.includes('cambio')) return ' 🟦 *CAMBIO*';
+    if(t.includes('retir'))  return ' 🟧 *RETIRO*';
+    if(t.includes('asist'))  return ' 🟨 *ASISTENCIA*';
+    return '';
+  };
+
   if(exitosos.length){
     txt+=`\n*OT Exitosas (${exitosos.length}):*\n`;
-    exitosos.forEach(c=>{ txt+=`${c.ot_numero} ✅${c.cuenta?` — ${c.cuenta}`:''}\n`; });
+    exitosos.forEach(c=>{ txt+=`${c.ot_numero} ✅${rollTag(c)}\n`; });
   }
   if(fallidos.length){
     txt+=`\n*OT Fallidas (${fallidos.length}):*\n`;
-    fallidos.forEach(c=>{ txt+=`${c.ot_numero} ❌${c.motivo?` (${c.motivo})`:''}\n`; });
+    fallidos.forEach(c=>{ txt+=`${c.ot_numero} ❌${c.motivo?` (${c.motivo})`:''}${rollTag(c)}\n`; });
   }
   if(reprogramados.length){
     txt+=`\n*OT Reprogramadas (${reprogramados.length}):*\n`;
-    reprogramados.forEach(c=>{ txt+=`${c.ot_numero} 🔄${c.motivo?` (${c.motivo})`:''}\n`; });
+    reprogramados.forEach(c=>{ txt+=`${c.ot_numero} 🔄${c.motivo?` (${c.motivo})`:''}${rollTag(c)}\n`; });
   }
   if(desRetiradas.length||desFallidas.length){
     txt+=`\n*Desinstalaciones OT:*\n`;
-    desRetiradas.forEach(c=>{ txt+=`${c.ot_numero} ✅\n`; });
-    desFallidas.forEach(c=>{ txt+=`${c.ot_numero} ❌${c.motivo?` (${c.motivo})`:''}\n`; });
+    desRetiradas.forEach(c=>{ txt+=`${c.ot_numero} ✅ 🟥 *DESINSTALACIÓN*\n`; });
+    desFallidas.forEach(c=>{ txt+=`${c.ot_numero} ❌${c.motivo?` (${c.motivo})`:''} 🟥 *DESINSTALACIÓN*\n`; });
   }
   if(retiros.length){
     txt+=`\n*Retiros en proveedor (${retiros.length}):*\n`;
@@ -1326,6 +1347,12 @@ async function abrirResumenModal(){
   document.getElementById('resumenTexto').value=generarTextoResumen();
   document.getElementById('modalResumen').classList.add('show');
   avisarRolloutCierreRuta(); // fire-and-forget, no bloquea la apertura del modal
+  // Envío automático 12/08: antes había que elegir canal a mano (Compartir/
+  // Copiar/Enviar a Ops); ahora se dispara solo apenas se ve el resumen, al
+  // grupo Ally + Ops. enviarResumenAOps() ya cierra el modal sola si sale
+  // bien, y si falla deja el botón "Enviar a Ops" visible para reintentar
+  // a mano sin tener que reabrir todo el flujo de "Finalizar ruta".
+  enviarResumenAOps();
 }
 
 // Cuando se cierra la hoja de ruta del día, si alguna de las OT entregadas
@@ -2850,6 +2877,7 @@ async function confirmarCierreOT(){
     tipo:      'envio',
     ot_numero: _otCierreActual?.ot_numero||'',
     cuenta:    _otCierreActual?.cuenta||'',
+    ot_tipo:   _otCierreActual?.tipo||'',
     resultado, // 'Entregado' | 'Fallido'
     motivo:    (resultado==='Fallido'||resultado==='Reprogramar') ? (datoEnvio||notas||'Sin detalle') : null,
     rollout:   esRolloutOT(_otCierreActual),
