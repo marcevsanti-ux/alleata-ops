@@ -441,7 +441,7 @@
       <!-- Board -->
       <div class="board">
         <table>
-          <thead>
+          <thead id="table-head">
             <tr>
               <th>OT</th>
               <th>Cuenta</th>
@@ -501,6 +501,11 @@ async function loadFromSupabase() {
       f_despachado: r.f_despachado,
       f_exitoso: r.f_exitoso,
       obs: r.observaciones || '',
+      // Sales Performance
+      vendedorCapacitacion: r.vendedor_capacitacion || 'Sin asignar',
+      fInstalacionCuenta: r.f_instalacion_cuenta,
+      fCapacitacionCuenta: r.f_capacitacion_cuenta,
+      alarmaSinFechaInstalacion: !!r.alarma_sin_fecha_instalacion,
     }));
   } catch (e) {
     console.warn('[Portal Ventas] No se pudo leer sla_ots de Supabase, uso datos de ejemplo.', e);
@@ -614,7 +619,8 @@ function showToast(icon, title, bodyHtml){
    ========================================================================= */
 const SLA_CONFIG = {
   operaciones: { green: 2, amber: 4 },   // <=2 verde, 3-4 amarillo, >=5 rojo... ver getStatus()
-  logistica:   { green: 3, amber: 5 }
+  logistica:   { green: 3, amber: 5 },
+  ventas:      { green: 5, amber: 10 }   // SUPUESTO — confirmar SLA real de capacitación con Facundo/Ventas
 };
 const HOY = new Date('2026-08-13'); // fecha de referencia del panel
 
@@ -627,15 +633,16 @@ let OTS_MOCK = [
   {
     ot:'00022281', tipo:'Instalación Equipo + Simcard',
     cuenta:'NEQUI FABIO ANDRES - SUC - 0001', cuit:'20183266757',
-    responsable:'Alejandro Amato', etapa:'EXITOSO',
+    responsable:'Alejandro Amato', etapa:'Exitoso',
     f_configurar:'2026-08-01', f_precolecta:'2026-08-03',
     f_despachado:'2026-08-03', f_exitoso:'2026-08-05',
+    vendedorCapacitacion:'Alejandro Amato', fInstalacionCuenta:'2026-08-05', fCapacitacionCuenta:'2026-08-09', alarmaSinFechaInstalacion:false,
     obs:'FVR>>FACU>>pago dos comodatos seguidos, puntos de venta 100 y 101.'
   },
   {
     ot:'00022305', tipo:'Instalación Equipo + Simcard',
     cuenta:'RAZA NUEVA S.R.L. - SUC - 0001', cuit:'30718281055',
-    responsable:'Alejandro Amato', etapa:'PRE COLECTA',
+    responsable:'Alejandro Amato', etapa:'Pre-Colecta',
     f_configurar:'2026-08-08', f_precolecta:'2026-08-11',
     f_despachado:null, f_exitoso:null,
     obs:'Llamar antes de entregar. Plan contador estudio CMC.'
@@ -643,7 +650,7 @@ let OTS_MOCK = [
   {
     ot:'00022310', tipo:'Instalación Equipo + Simcard',
     cuenta:'KARAI S.A.S. - SUC - 0001', cuit:'30719157013',
-    responsable:'Alejandro Amato', etapa:'CONFIGURAR TERMINAL',
+    responsable:'Alejandro Amato', etapa:'Configurar Terminal',
     f_configurar:'2026-08-09', f_precolecta:null,
     f_despachado:null, f_exitoso:null,
     obs:''
@@ -651,7 +658,7 @@ let OTS_MOCK = [
   {
     ot:'00022318', tipo:'Instalación Equipo + Simcard',
     cuenta:'OLIVARES MARCELA ALEJANDRA - SUC - 0001', cuit:'27248668054',
-    responsable:'Jose Luis Cingolani', etapa:'CONFIGURAR TERMINAL',
+    responsable:'Jose Luis Cingolani', etapa:'Configurar Terminal',
     f_configurar:'2026-08-05', f_precolecta:null,
     f_despachado:null, f_exitoso:null,
     obs:'Cra Florencia González — seguimiento telefónico pendiente.'
@@ -659,7 +666,7 @@ let OTS_MOCK = [
   {
     ot:'00022330', tipo:'Instalación Equipo + Simcard',
     cuenta:'ROCCA RODRIGO ARIEL - SUC - 0001', cuit:'20307842085',
-    responsable:'Guillermo Cichero', etapa:'DESPACHADO',
+    responsable:'Guillermo Cichero', etapa:'Despachado',
     f_configurar:'2026-08-01', f_precolecta:'2026-08-03',
     f_despachado:'2026-08-04', f_exitoso:null,
     obs:''
@@ -667,7 +674,7 @@ let OTS_MOCK = [
   {
     ot:'00022341', tipo:'Instalación Equipo + Simcard',
     cuenta:'SADACA ALBERTO ISMAEL - SUC - 0001', cuit:'23213764519',
-    responsable:'Alejandro Amato', etapa:'DESPACHADO',
+    responsable:'Alejandro Amato', etapa:'Despachado',
     f_configurar:'2026-07-28', f_precolecta:'2026-08-01',
     f_despachado:'2026-08-02', f_exitoso:null,
     obs:'Alta corta / la cuenta es caja de ahorro.'
@@ -675,15 +682,16 @@ let OTS_MOCK = [
   {
     ot:'00022355', tipo:'Instalación Equipo + Simcard',
     cuenta:'BERON RAMON LUJAN - SUC - 0001', cuit:'20261262518',
-    responsable:'Angeles Eberle', etapa:'EXITOSO',
+    responsable:'Angeles Eberle', etapa:'Exitoso',
     f_configurar:'2026-07-30', f_precolecta:'2026-08-01',
     f_despachado:'2026-08-01', f_exitoso:'2026-08-06',
+    vendedorCapacitacion:'Angeles Eberle', fInstalacionCuenta:'2026-08-06', fCapacitacionCuenta:null, alarmaSinFechaInstalacion:false,
     obs:'Enviar junto a suc 002 / enviar por Andreani.'
   },
   {
     ot:'00022368', tipo:'Instalación Equipo + Simcard',
     cuenta:'PEARCE MARIA EUGENIA - SUC - 0002', cuit:'27185503254',
-    responsable:'Angeles Eberle', etapa:'DESPACHADO',
+    responsable:'Angeles Eberle', etapa:'Despachado',
     f_configurar:'2026-07-29', f_precolecta:'2026-08-02',
     f_despachado:'2026-08-02', f_exitoso:null,
     obs:'Contador: Lucas Ahumada.'
@@ -691,7 +699,7 @@ let OTS_MOCK = [
   {
     ot:'00022374', tipo:'Instalación Equipo + Simcard',
     cuenta:'CHACON DAMIAN ESTEBAN - SUC - 0002', cuit:'20316925031',
-    responsable:'Alejandro Amato', etapa:'PRE COLECTA',
+    responsable:'Alejandro Amato', etapa:'Pre-Colecta',
     f_configurar:'2026-08-06', f_precolecta:'2026-08-10',
     f_despachado:null, f_exitoso:null,
     obs:''
@@ -699,7 +707,7 @@ let OTS_MOCK = [
   {
     ot:'00022380', tipo:'Instalación Equipo + Simcard',
     cuenta:'ARIAUDO JOSE LUIS - SUC - 0001', cuit:'20320950210',
-    responsable:'Martha Reyes', etapa:'CONFIGURAR TERMINAL',
+    responsable:'Martha Reyes', etapa:'Configurar Terminal',
     f_configurar:'2026-08-03', f_precolecta:null,
     f_despachado:null, f_exitoso:null,
     obs:'Sin novedades desde el alta — revisar.'
@@ -707,7 +715,7 @@ let OTS_MOCK = [
   {
     ot:'00022392', tipo:'Instalación Equipo + Simcard',
     cuenta:'KISHABA MATIAS - SUC - 0001', cuit:'20310105369',
-    responsable:'Carla Alberici', etapa:'DESPACHADO',
+    responsable:'Carla Alberici', etapa:'Despachado',
     f_configurar:'2026-08-04', f_precolecta:'2026-08-05',
     f_despachado:'2026-08-05', f_exitoso:null,
     obs:''
@@ -715,15 +723,16 @@ let OTS_MOCK = [
   {
     ot:'00022401', tipo:'Instalación Equipo + Simcard',
     cuenta:'BARTOLOMEO ANGELA EDITH - SUC - 0005', cuit:'27218082268',
-    responsable:'Martha Reyes', etapa:'EXITOSO',
+    responsable:'Martha Reyes', etapa:'Exitoso',
     f_configurar:'2026-07-31', f_precolecta:'2026-08-02',
     f_despachado:'2026-08-02', f_exitoso:'2026-08-04',
+    vendedorCapacitacion:'Martha Reyes', fInstalacionCuenta:null, fCapacitacionCuenta:null, alarmaSinFechaInstalacion:true,
     obs:'Comunicarse con el cliente al llegar, sale a recibirlo.'
   },
   {
     ot:'00022415', tipo:'Instalación Equipo + Simcard',
     cuenta:'ROMERO ESTEFANIA ALEJANDRA - SUC - 0001', cuit:'23348301454',
-    responsable:'Vanesa Cetinich', etapa:'DESPACHADO',
+    responsable:'Vanesa Cetinich', etapa:'Despachado',
     f_configurar:'2026-08-02', f_precolecta:'2026-08-05',
     f_despachado:'2026-08-06', f_exitoso:null,
     obs:''
@@ -731,7 +740,7 @@ let OTS_MOCK = [
   {
     ot:'00022427', tipo:'Instalación Equipo + Simcard',
     cuenta:'THOBOKHOLT MARIA LAURA - SUC - 0001', cuit:'27285658360',
-    responsable:'Carla Alberici', etapa:'CONFIGURAR TERMINAL',
+    responsable:'Carla Alberici', etapa:'Configurar Terminal',
     f_configurar:'2026-08-07', f_precolecta:null,
     f_despachado:null, f_exitoso:null,
     obs:''
@@ -739,15 +748,16 @@ let OTS_MOCK = [
   {
     ot:'00022433', tipo:'Instalación Equipo + Simcard',
     cuenta:'TORREZ DIEGO OMAR - SUC - 0001', cuit:'20289982877',
-    responsable:'Carla Alberici', etapa:'EXITOSO',
+    responsable:'Carla Alberici', etapa:'Exitoso',
     f_configurar:'2026-08-01', f_precolecta:'2026-08-04',
     f_despachado:'2026-08-05', f_exitoso:'2026-08-11',
+    vendedorCapacitacion:'Carla Alberici', fInstalacionCuenta:'2026-08-11', fCapacitacionCuenta:null, alarmaSinFechaInstalacion:false,
     obs:'Reutiliza terminal — cambio de titularidad. Logística tardó por reasignación.'
   },
   {
     ot:'00022440', tipo:'Instalación Equipo + Simcard',
     cuenta:'GARCIA SANTANA MELANIE - SUC - 0001', cuit:'20191531621',
-    responsable:'Aldana Fuggini', etapa:'DESPACHADO',
+    responsable:'Aldana Fuggini', etapa:'Despachado',
     f_configurar:'2026-08-06', f_precolecta:'2026-08-06',
     f_despachado:'2026-08-07', f_exitoso:null,
     obs:''
@@ -755,7 +765,7 @@ let OTS_MOCK = [
   {
     ot:'00022448', tipo:'Instalación Equipo + Simcard',
     cuenta:'KACHUK FEDERICO MATIAS - SUC - 0001', cuit:'20344475998',
-    responsable:'Guillermo Cichero', etapa:'CONFIGURAR TERMINAL',
+    responsable:'Guillermo Cichero', etapa:'Configurar Terminal',
     f_configurar:'2026-07-29', f_precolecta:null,
     f_despachado:null, f_exitoso:null,
     obs:'Sin avances hace más de dos semanas — escalar.'
@@ -763,7 +773,7 @@ let OTS_MOCK = [
   {
     ot:'00022455', tipo:'Instalación Equipo + Simcard',
     cuenta:'AGUILERA HECTOR RICARDO - SUC - 0001', cuit:'20147730218',
-    responsable:'Guillermo Cichero', etapa:'PRE COLECTA',
+    responsable:'Guillermo Cichero', etapa:'Pre-Colecta',
     f_configurar:'2026-08-09', f_precolecta:'2026-08-12',
     f_despachado:null, f_exitoso:null,
     obs:'Valeria contadora — coordinar retiro.'
@@ -874,6 +884,9 @@ function renderKPIs(){
   const closedOps = withOps.filter(s=>s.ops.closed);
   const cumplOps = closedOps.length ? Math.round(100*closedOps.filter(s=>s.ops.status!=='r').length/closedOps.length) : 0;
   const exitosas = visibles.filter(o => o.etapa === 'Exitoso').length;
+  const exitosasConFecha = visibles.filter(o => o.etapa === 'Exitoso' && !o.alarmaSinFechaInstalacion);
+  const pendientesCapacitacion = exitosasConFecha.filter(o => o.fInstalacionCuenta && !o.fCapacitacionCuenta).length;
+  const alarmas = visibles.filter(o => o.alarmaSinFechaInstalacion).length;
 
   // Cards clicables — abren la vista de detalle abajo
   const viewCards = [
@@ -886,6 +899,14 @@ function renderKPIs(){
       id:'gestion-ops', label:'GESTIÓN OPS', value:exitosas,
       sub:'OTs exitosas',
       onclick:"openView('gestion-ops')"
+    },
+    {
+      id:'sales-performance', label:'SALES · PERFORMANCE', value:pendientesCapacitacion,
+      sub: alarmas > 0
+        ? `pendientes de capacitación`
+        : 'pendientes de capacitación',
+      alertSub: alarmas > 0 ? `⚠ ${alarmas} sin fecha de instalación (bug SF)` : null,
+      onclick:"openView('sales-performance')"
     },
   ];
 
@@ -900,6 +921,7 @@ function renderKPIs(){
       <div class="label">${c.label}</div>
       <div class="value display">${c.value}</div>
       <div class="subtext">${c.sub}</div>
+      ${c.alertSub ? `<div class="subtext" style="color:var(--red); font-weight:600; margin-top:3px;">${c.alertSub}</div>` : ''}
     </button>
   `).join('');
 
@@ -936,6 +958,9 @@ function openView(viewId){
     document.getElementById('view-heading').innerHTML =
       `<div class="title">Gestión OPS — OTs exitosas</div><span class="close" onclick="closeView()">Cerrar ✕</span>`;
     document.getElementById('f-etapa').value = 'Exitoso';
+  } else if(viewId === 'sales-performance'){
+    document.getElementById('view-heading').innerHTML =
+      `<div class="title">Sales · Performance — capacitación post-instalación</div><span class="close" onclick="closeView()">Cerrar ✕</span>`;
   }
 
   renderKPIs();
@@ -957,13 +982,31 @@ function clearFilters(alsoRender = true){
   if(alsoRender) renderTable();
 }
 
+function evalVentaSla(o){
+  return evalSla(o.fInstalacionCuenta, o.fCapacitacionCuenta, SLA_CONFIG.ventas);
+}
+
+const TABLE_HEADS = {
+  default: `<tr>
+    <th>OT</th><th>Cuenta</th><th>Responsable</th><th>Etapa actual</th>
+    <th>SLA Operaciones</th><th>SLA Logística</th><th>Observaciones</th>
+  </tr>`,
+  'sales-performance': `<tr>
+    <th>OT</th><th>Cuenta</th><th>Vendedor</th><th>Fecha instalación</th>
+    <th>SLA Ventas (capacitación)</th><th>Fecha capacitación</th><th>Alarma</th>
+  </tr>`,
+};
+
 function renderTable(){
   const q = document.getElementById('f-search').value.trim().toLowerCase();
   const rF = document.getElementById('f-responsable').value;
   const eF = document.getElementById('f-etapa').value;
   const sF = document.getElementById('f-semaforo').value;
+  const isSales = currentView === 'sales-performance';
 
-  const rows = getVisibleOts().filter(o=>{
+  document.getElementById('table-head').innerHTML = isSales ? TABLE_HEADS['sales-performance'] : TABLE_HEADS.default;
+
+  let rows = getVisibleOts().filter(o=>{
     if(q && !(o.ot.toLowerCase().includes(q) || o.cuenta.toLowerCase().includes(q))) return false;
     if(rF && o.responsable !== rF) return false;
     if(eF && o.etapa !== eF) return false;
@@ -975,6 +1018,12 @@ function renderTable(){
     return true;
   });
 
+  // Sales Performance: solo tiene sentido para OTs Exitosas (con o sin la
+  // fecha de instalación cargada — las que NO la tienen son justamente la alarma)
+  if(isSales){
+    rows = rows.filter(o => o.etapa === 'Exitoso');
+  }
+
   const tbody = document.getElementById('table-body');
   const empty = document.getElementById('empty-state');
 
@@ -985,9 +1034,12 @@ function renderTable(){
   }
   empty.style.display = 'none';
 
-  tbody.innerHTML = rows.map(o=>{
-    const s = computeSlas(o);
-    return `
+  tbody.innerHTML = rows.map(o => isSales ? renderSalesPerformanceRow(o) : renderDefaultRow(o)).join('');
+}
+
+function renderDefaultRow(o){
+  const s = computeSlas(o);
+  return `
     <tr>
       <td>
         <div class="ot-num">#${o.ot}</div>
@@ -1005,7 +1057,36 @@ function renderTable(){
       <td>${gaugeHTML(s.log, SLA_CONFIG.logistica, 9)}</td>
       <td class="obs-cell ${o.obs ? '' : 'empty'}">${o.obs || 'Sin observaciones'}</td>
     </tr>`;
-  }).join('');
+}
+
+function renderSalesPerformanceRow(o){
+  const alarma = o.alarmaSinFechaInstalacion;
+  const ventaSla = alarma
+    ? { status:'pending', days:null }
+    : evalVentaSla(o);
+
+  return `
+    <tr${alarma ? ' style="background:rgba(255,92,92,0.06);"' : ''}>
+      <td>
+        <div class="ot-num">#${o.ot}</div>
+        <div class="ot-tipo">${o.tipo}</div>
+      </td>
+      <td>
+        <div class="cuenta-name">${o.cuenta}</div>
+        <div class="cuenta-sub">CUIT ${o.cuit}</div>
+      </td>
+      <td>
+        <div class="resp-chip"><span class="resp-dot"></span>${o.vendedorCapacitacion || 'Sin asignar'}</div>
+      </td>
+      <td class="mono" style="font-size:12px;">${o.fInstalacionCuenta ? o.fInstalacionCuenta.slice(0,10) : '—'}</td>
+      <td>${alarma
+          ? '<span class="gauge-not-started" style="color:var(--red); font-style:normal; font-weight:600;">— sin fecha de instalación —</span>'
+          : gaugeHTML(ventaSla, SLA_CONFIG.ventas, 14)}</td>
+      <td class="mono" style="font-size:12px;">${o.fCapacitacionCuenta ? o.fCapacitacionCuenta.slice(0,10) : '—'}</td>
+      <td>${alarma
+          ? '<span style="color:var(--red); font-size:11.5px; font-weight:600;">⚠ Bug SF — falta Fecha_de_Instalación__c</span>'
+          : '<span style="color:var(--muted2); font-size:11.5px;">—</span>'}</td>
+    </tr>`;
 }
 
 /* =========================================================================
