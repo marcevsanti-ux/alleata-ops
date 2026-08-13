@@ -193,7 +193,26 @@
   }
 
   /* KPI cards */
-  .kpi-row{ display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:26px;}
+  .kpi-row{ display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:14px; margin-bottom:26px;}
+  .kpi-card.clickable{
+    cursor:pointer; text-align:left; font-family:inherit; width:100%;
+    color:inherit; margin:0; appearance:none;
+    transition:transform .12s ease, border-color .12s ease;
+  }
+  .kpi-card.clickable:hover{ transform:translateY(-2px); border-color:var(--accent); }
+  .kpi-card.clickable:active{ transform:translateY(0); }
+  .kpi-card.clickable.active-view{ border-color:var(--accent); box-shadow:0 0 0 1px var(--accent); }
+  .kpi-card .subtext{ font-size:11px; color:var(--muted2); margin-top:8px; }
+
+  .view-heading{
+    display:flex; align-items:center; justify-content:space-between;
+    margin-bottom:14px; flex-wrap:wrap; gap:10px;
+  }
+  .view-heading .title{ font-family:'Space Grotesk',sans-serif; font-size:16px; font-weight:600; }
+  .view-heading .close{
+    font-size:12px; color:var(--muted); cursor:pointer; text-decoration:underline; text-underline-offset:2px;
+  }
+  .view-heading .close:hover{ color:var(--text); }
   .kpi-card{
     background:var(--surface); border:1px solid var(--hairline); border-radius:12px;
     padding:18px 18px 16px; position:relative; overflow:hidden;
@@ -358,11 +377,7 @@
   </header>
 
   <main>
-    <div class="page-head">
-      <div>
-        <h1>Panel de SLA — Instalación Equipo + Simcard</h1>
-        <p>Cada OT corre dos relojes: <strong style="color:var(--text)">SLA Operaciones</strong> (Configurar Terminal → Pre Colecta) y <strong style="color:var(--text)">SLA Logística</strong> (Despachado → Exitoso). El semáforo marca qué tan cerca está cada OT de incumplir.</p>
-      </div>
+    <div class="page-head" style="justify-content:flex-end;">
       <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
         <div id="data-source-badge" style="font-size:11px; font-weight:600;"></div>
         <div class="assumptions-tag" onclick="showToast('⚠️','Umbrales SLA','SLA Operaciones — Verde ≤2 días · Amarillo 3 días · Rojo ≥4 días<br>SLA Logística — Verde ≤3 días · Amarillo 4–5 días · Rojo ≥6 días<br><br>Editables cuando definamos los reales con Facundo.')">
@@ -396,48 +411,53 @@
     <!-- KPIs -->
     <div class="kpi-row" id="kpi-row"></div>
 
-    <!-- Legend -->
-    <div class="legend">
-      <div class="legend-item"><span class="dot g"></span> En SLA</div>
-      <div class="legend-item"><span class="dot a"></span> Cerca del límite</div>
-      <div class="legend-item"><span class="dot r"></span> Fuera de SLA</div>
-      <div class="legend-item"><span class="dot n"></span> Sin iniciar / cerrado</div>
-    </div>
+    <!-- Vista detalle (se abre al presionar OTs Activas / Gestión OPS) -->
+    <div id="detail-view" style="display:none;">
+      <div class="view-heading" id="view-heading"></div>
 
-    <!-- Filters -->
-    <div class="filters">
-      <span class="filter-label">Filtrar</span>
-      <input type="text" id="f-search" placeholder="Buscar OT o cuenta..." oninput="renderTable()">
-      <select id="f-responsable" onchange="renderTable()"><option value="">Responsable (todos)</option></select>
-      <select id="f-etapa" onchange="renderTable()"><option value="">Etapa (todas)</option></select>
-      <select id="f-semaforo" onchange="renderTable()">
-        <option value="">Semáforo (cualquiera)</option>
-        <option value="r">Solo rojos</option>
-        <option value="a">Solo amarillos</option>
-        <option value="g">Solo verdes</option>
-      </select>
-      <span class="clear-filters" onclick="clearFilters()">Limpiar filtros</span>
-    </div>
+      <!-- Legend -->
+      <div class="legend">
+        <div class="legend-item"><span class="dot g"></span> En SLA</div>
+        <div class="legend-item"><span class="dot a"></span> Cerca del límite</div>
+        <div class="legend-item"><span class="dot r"></span> Fuera de SLA</div>
+        <div class="legend-item"><span class="dot n"></span> Sin iniciar / cerrado</div>
+      </div>
 
-    <!-- Board -->
-    <div class="board">
-      <table>
-        <thead>
-          <tr>
-            <th>OT</th>
-            <th>Cuenta</th>
-            <th>Responsable</th>
-            <th>Etapa actual</th>
-            <th>SLA Operaciones</th>
-            <th>SLA Logística</th>
-            <th>Observaciones</th>
-          </tr>
-        </thead>
-        <tbody id="table-body"></tbody>
-      </table>
-      <div class="empty-state" id="empty-state" style="display:none;">
-        <div class="display">Sin resultados</div>
-        <div>Probá con otro filtro o limpiá la búsqueda.</div>
+      <!-- Filters -->
+      <div class="filters">
+        <span class="filter-label">Filtrar</span>
+        <input type="text" id="f-search" placeholder="Buscar OT o cuenta..." oninput="renderTable()">
+        <select id="f-responsable" onchange="renderTable()"><option value="">Responsable (todos)</option></select>
+        <select id="f-etapa" onchange="renderTable()"><option value="">Etapa (todas)</option></select>
+        <select id="f-semaforo" onchange="renderTable()">
+          <option value="">Semáforo (cualquiera)</option>
+          <option value="r">Solo rojos</option>
+          <option value="a">Solo amarillos</option>
+          <option value="g">Solo verdes</option>
+        </select>
+        <span class="clear-filters" onclick="clearFilters()">Limpiar filtros</span>
+      </div>
+
+      <!-- Board -->
+      <div class="board">
+        <table>
+          <thead>
+            <tr>
+              <th>OT</th>
+              <th>Cuenta</th>
+              <th>Responsable</th>
+              <th>Etapa actual</th>
+              <th>SLA Operaciones</th>
+              <th>SLA Logística</th>
+              <th>Observaciones</th>
+            </tr>
+          </thead>
+          <tbody id="table-body"></tbody>
+        </table>
+        <div class="empty-state" id="empty-state" style="display:none;">
+          <div class="display">Sin resultados</div>
+          <div>Probá con otro filtro o limpiá la búsqueda.</div>
+        </div>
       </div>
     </div>
 
@@ -845,35 +865,96 @@ function initials(name){
 }
 
 function renderKPIs(){
-  const withOps = getVisibleOts().map(o=>computeSlas(o));
+  const visibles = getVisibleOts();
+  const withOps = visibles.map(o=>computeSlas(o));
   const opsRunning = withOps.filter(s=>s.ops.status!=='pending' && !s.ops.closed);
   const logRunning = withOps.filter(s=>s.log.status!=='pending' && !s.log.closed);
   const opsRisk = opsRunning.filter(s=>s.ops.status!=='g').length;
   const logRisk = logRunning.filter(s=>s.log.status!=='g').length;
   const closedOps = withOps.filter(s=>s.ops.closed);
   const cumplOps = closedOps.length ? Math.round(100*closedOps.filter(s=>s.ops.status!=='r').length/closedOps.length) : 0;
+  const exitosas = visibles.filter(o => o.etapa === 'Exitoso').length;
 
-  const cards = [
-    { label:'OTs activas', value:getVisibleOts().length, cls:'k-blue', delta:'Instalación Equipo + Simcard' },
+  // Cards clicables — abren la vista de detalle abajo
+  const viewCards = [
+    {
+      id:'activas', label:'OTS ACTIVAS', value:visibles.length,
+      sub:`Instalación Equipo + Simcard · desde ${CORTE_FECHA_DISPLAY}`,
+      onclick:"openView('activas')"
+    },
+    {
+      id:'gestion-ops', label:'GESTIÓN OPS', value:exitosas,
+      sub:'OTs exitosas',
+      onclick:"openView('gestion-ops')"
+    },
+  ];
+
+  const statCards = [
     { label:'SLA Operaciones en riesgo', value:opsRisk, cls: opsRisk>0 ? 'k-amber':'k-green', delta:`de ${opsRunning.length} corriendo` },
     { label:'SLA Logística en riesgo', value:logRisk, cls: logRisk>0 ? 'k-red':'k-green', delta:`de ${logRunning.length} corriendo` },
     { label:'Cumplimiento Operaciones', value:cumplOps+'%', cls: cumplOps>=80?'k-green':cumplOps>=60?'k-amber':'k-red', delta:`sobre ${closedOps.length} OTs cerradas` },
   ];
-  document.getElementById('kpi-row').innerHTML = cards.map(c=>`
+
+  const viewCardsHtml = viewCards.map(c=>`
+    <button class="kpi-card clickable accentline k-blue ${currentView===c.id ? 'active-view':''}" id="viewcard-${c.id}" onclick="${c.onclick}">
+      <div class="label">${c.label}</div>
+      <div class="value display">${c.value}</div>
+      <div class="subtext">${c.sub}</div>
+    </button>
+  `).join('');
+
+  const statCardsHtml = statCards.map(c=>`
     <div class="kpi-card accentline ${c.cls}">
       <div class="label">${c.label}</div>
       <div class="value display">${c.value}</div>
       <div class="delta">${c.delta}</div>
     </div>
   `).join('');
+
+  document.getElementById('kpi-row').innerHTML = viewCardsHtml + statCardsHtml;
 }
 
-function clearFilters(){
+let currentView = null; // 'activas' | 'gestion-ops' | null
+
+function openView(viewId){
+  if(currentView === viewId){
+    // click de nuevo sobre la misma card -> colapsa
+    currentView = null;
+    document.getElementById('detail-view').style.display = 'none';
+    renderKPIs();
+    return;
+  }
+  currentView = viewId;
+  document.getElementById('detail-view').style.display = 'block';
+
+  clearFilters(false); // limpia sin re-renderizar todavía
+
+  if(viewId === 'activas'){
+    document.getElementById('view-heading').innerHTML =
+      `<div class="title">OTs activas — desde ${CORTE_FECHA_DISPLAY}</div><span class="close" onclick="closeView()">Cerrar ✕</span>`;
+  } else if(viewId === 'gestion-ops'){
+    document.getElementById('view-heading').innerHTML =
+      `<div class="title">Gestión OPS — OTs exitosas</div><span class="close" onclick="closeView()">Cerrar ✕</span>`;
+    document.getElementById('f-etapa').value = 'Exitoso';
+  }
+
+  renderKPIs();
+  renderTable();
+  document.getElementById('detail-view').scrollIntoView({ behavior:'smooth', block:'start' });
+}
+
+function closeView(){
+  currentView = null;
+  document.getElementById('detail-view').style.display = 'none';
+  renderKPIs();
+}
+
+function clearFilters(alsoRender = true){
   document.getElementById('f-search').value='';
   document.getElementById('f-responsable').value='';
   document.getElementById('f-etapa').value='';
   document.getElementById('f-semaforo').value='';
-  renderTable();
+  if(alsoRender) renderTable();
 }
 
 function renderTable(){
