@@ -165,7 +165,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
       <div class="login-logo">
         <img id="loginLogo" src="" alt="Alleata">
         <div class="login-sub">Portal de Operaciones</div>
-        <div class="login-version">v2.14.45 · mobile</div>
+        <div class="login-version">v2.14.46 · mobile</div>
       </div>
       <div class="field"><label class="label">Email</label><input class="input" id="lEmail" type="email" placeholder="usuario@alleata.com" autocomplete="email"></div>
       <div class="field"><label class="label">Contraseña</label><input class="input" id="lPass" type="password" placeholder="••••••••" autocomplete="current-password"></div>
@@ -182,7 +182,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
     <img id="appLogo" src="" alt="Alleata">
     <div class="topbar-title" id="topbarTitle">Operaciones</div>
     <button id="btnSyncRapido" onclick="syncRapido()" title="Actualizar estados desde Salesforce (sin esperar los 10min)" style="background:none;border:none;color:#fff;font-size:18px;cursor:pointer;padding:4px 6px;line-height:1">🔄</button>
-    <div class="topbar-version" onclick="_tocarVersion()">v2.14.45</div>
+    <div class="topbar-version" onclick="_tocarVersion()">v2.14.46</div>
     <div class="topbar-avatar" id="topbarAvatar" onclick="openDrawer()">?</div>
   </div>
 
@@ -765,7 +765,7 @@ const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSI
 //     el producto en estado raro en SF (por eso existe la opción
 //     Reprogramar como alternativa), así que necesita aviso inmediato.
 //     No bloquea el cierre si el envío directo falla.
-// Cambios v2.14.45 (11/08):
+// Cambios v2.14.46 (11/08):
 //   - Números de OT: .ot-num y #otS-num pasan de JetBrains Mono a IBM
 //     Plex Mono bold (0 con barra diagonal — no se confunde con O).
 //     JetBrains Mono acá solo cargaba 400/500, así que el "bold" viejo
@@ -2239,7 +2239,7 @@ async function validarTerminalNuevaOT(ot){
   if(!esCambioNapse||!ot.n_terminal_nueva) return;
 
   try{
-    const res=await railwayFetch('/automations/validar-terminal-nueva?serie='+encodeURIComponent(ot.n_terminal_nueva));
+    const res=await railwayFetch('/automations/validar-terminal-nueva?serie='+encodeURIComponent(ot.n_terminal_nueva)+'&cuenta='+encodeURIComponent(ot.cuenta||''));
     const data=await res.json();
     if(!data.ok) return; // si falla la validación en sí, no bloqueamos por las dudas
 
@@ -2249,7 +2249,7 @@ async function validarTerminalNuevaOT(ot){
       return;
     }
     if(!data.cumple){
-      alertaEl.innerHTML='⚠️ Terminal nueva no está lista para asignar — Ubicación: <b>'+(data.ubicacion||'—')+'</b> · Estado: <b>'+(data.estado||'—')+'</b> · Perfil: <b>'+(data.perfil||'—')+'</b><br>Tiene que estar en BARRACAS, DISPONIBLE y Perfil NAPSE. Avisá para corregirlo en Salesforce antes de aceptar — si no, el guardado va a rebotar.';
+      alertaEl.innerHTML='⚠️ Terminal nueva no está lista para asignar — Ubicación: <b>'+(data.ubicacion||'—')+'</b> · Estado: <b>'+(data.estado||'—')+'</b> · Perfil: <b>'+(data.perfil||'—')+'</b>'+(data.cuenta?' · Cuenta: <b>'+data.cuenta+'</b>':'')+'<br>Tiene que cumplir UNA de estas dos: (A) BARRACAS + DISPONIBLE + Perfil NAPSE, o (B) COMERCIO + ASIGNADA + Perfil NAPSE + misma cuenta que esta OT. Avisá para corregirlo en Salesforce antes de aceptar — si no, el guardado va a rebotar.';
       alertaEl.style.display='block';
       if(btnEl){ btnEl.disabled=true; btnEl.style.opacity='.5'; btnEl.style.cursor='not-allowed'; }
     }
