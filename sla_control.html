@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SLA Control · Portal Ventas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#0B0F16;
+    --surface:#131924;
+    --surface2:#1B2333;
+    --surface3:#212B3F;
+    --hairline:#29334A;
+    --text:#EEF2FA;
+    --muted:#8FA0BC;
+    --muted2:#5E6C87;
+    --accent:#4C7CF0;
+    --accent-dim:#2C3D66;
+    --green:#2FD180;
+    --green-dim:#12301F;
+    --amber:#FFB020;
+    --amber-dim:#3A2C0E;
+    --red:#FF5C5C;
+    --red-dim:#3A1414;
+    --gray:#5E6C87;
+    --gray-dim:#1B2130;
+    --radius:10px;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    background:
+      radial-gradient(circle at 15% -10%, rgba(76,124,240,0.10), transparent 45%),
+      radial-gradient(circle at 100% 0%, rgba(47,209,128,0.06), transparent 40%),
+      var(--ink);
+    color:var(--text);
+    font-family:'Inter', sans-serif;
+    min-height:100vh;
+    -webkit-font-smoothing:antialiased;
+  }
+  .mono{ font-family:'JetBrains Mono', monospace; }
+  .display{ font-family:'Space Grotesk', sans-serif; }
+
+  /* ---------- LOGIN ---------- */
+  #login-screen{
+    min-height:100vh; display:flex; align-items:center; justify-content:center;
+    padding:24px;
+  }
+  .login-card{
+    width:100%; max-width:400px;
+    background:var(--surface);
+    border:1px solid var(--hairline);
+    border-radius:16px;
+    padding:36px 32px 32px;
+    position:relative;
+    overflow:hidden;
+  }
+  .login-card::before{
+    content:"";
+    position:absolute; top:0; left:0; right:0; height:3px;
+    background:linear-gradient(90deg, var(--green), var(--amber), var(--red));
+  }
+  .beacon{
+    width:10px; height:10px; border-radius:50%;
+    background:var(--green);
+    box-shadow:0 0 0 0 rgba(47,209,128,0.6);
+    animation:pulse 2s infinite;
+    display:inline-block;
+  }
+  @keyframes pulse{
+    0%{ box-shadow:0 0 0 0 rgba(47,209,128,0.55);}
+    70%{ box-shadow:0 0 0 9px rgba(47,209,128,0);}
+    100%{ box-shadow:0 0 0 0 rgba(47,209,128,0);}
+  }
+  .login-eyebrow{
+    display:flex; align-items:center; gap:8px;
+    font-size:11px; letter-spacing:.12em; text-transform:uppercase;
+    color:var(--muted); margin-bottom:18px;
+  }
+  .login-title{ font-size:26px; font-weight:700; letter-spacing:-0.01em; margin-bottom:6px;}
+  .login-sub{ color:var(--muted); font-size:13.5px; margin-bottom:28px; line-height:1.5;}
+  .field-label{
+    font-size:11.5px; text-transform:uppercase; letter-spacing:.08em;
+    color:var(--muted2); margin-bottom:7px; display:block; font-weight:600;
+  }
+  .field{ margin-bottom:16px; }
+  select, input[type=text]{
+    width:100%; background:var(--surface2); border:1px solid var(--hairline);
+    color:var(--text); padding:11px 12px; border-radius:8px; font-size:14px;
+    font-family:'Inter',sans-serif;
+  }
+  select:focus, input:focus{ outline:2px solid var(--accent); outline-offset:1px; border-color:var(--accent); }
+  .btn-primary{
+    width:100%; background:var(--accent); color:#fff; border:none;
+    padding:12px 16px; border-radius:8px; font-size:14.5px; font-weight:600;
+    cursor:pointer; margin-top:6px; transition:filter .15s ease;
+  }
+  .btn-primary:hover{ filter:brightness(1.1); }
+  .login-note{
+    margin-top:20px; font-size:12px; color:var(--muted2); line-height:1.6;
+    border-top:1px solid var(--hairline); padding-top:16px;
+  }
+
+  /* ---------- APP SHELL ---------- */
+  #app{ display:none; min-height:100vh; }
+  header.topbar{
+    border-bottom:1px solid var(--hairline);
+    background:rgba(19,25,36,0.85);
+    backdrop-filter:blur(8px);
+    position:sticky; top:0; z-index:20;
+    padding:16px 28px;
+    display:flex; align-items:center; justify-content:space-between;
+  }
+  .brand{ display:flex; align-items:center; gap:12px; }
+  .brand-mark{
+    width:34px; height:34px; border-radius:9px;
+    background:linear-gradient(135deg, var(--accent), #2C3D8F);
+    display:flex; align-items:center; justify-content:center;
+    font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:15px;
+  }
+  .brand-text .name{ font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:15.5px; letter-spacing:-0.01em;}
+  .brand-text .sub{ font-size:11px; color:var(--muted2); letter-spacing:.04em; }
+  .clock{ font-size:12px; color:var(--muted); display:flex; align-items:center; gap:8px; }
+  .topbar-right{ display:flex; align-items:center; gap:18px; }
+  .user-chip{
+    display:flex; align-items:center; gap:9px;
+    padding:6px 12px 6px 6px; border:1px solid var(--hairline); border-radius:30px;
+    font-size:13px;
+  }
+  .avatar{
+    width:26px; height:26px; border-radius:50%;
+    background:var(--accent-dim); color:var(--accent);
+    display:flex; align-items:center; justify-content:center;
+    font-size:11px; font-weight:700; font-family:'Space Grotesk',sans-serif;
+  }
+  .logout{ color:var(--muted2); font-size:12px; cursor:pointer; text-decoration:underline; text-underline-offset:2px;}
+  .logout:hover{ color:var(--text); }
+
+  main{ padding:28px; max-width:1440px; margin:0 auto; }
+
+  .page-head{ display:flex; align-items:flex-end; justify-content:space-between; margin-bottom:22px; flex-wrap:wrap; gap:14px;}
+  .page-head h1{ font-family:'Space Grotesk',sans-serif; font-size:22px; font-weight:600; letter-spacing:-0.01em;}
+  .page-head p{ color:var(--muted); font-size:13px; margin-top:4px; max-width:560px; line-height:1.5;}
+  .assumptions-tag{
+    font-size:11px; color:var(--amber); background:var(--amber-dim);
+    border:1px solid rgba(255,176,32,0.25); padding:6px 10px; border-radius:7px;
+    display:inline-flex; align-items:center; gap:6px; cursor:pointer;
+  }
+
+  /* KPI cards */
+  .kpi-row{ display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:26px;}
+  .kpi-card{
+    background:var(--surface); border:1px solid var(--hairline); border-radius:12px;
+    padding:18px 18px 16px; position:relative; overflow:hidden;
+  }
+  .kpi-card .label{ font-size:11.5px; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; margin-bottom:10px; font-weight:600;}
+  .kpi-card .value{ font-family:'Space Grotesk',sans-serif; font-size:30px; font-weight:700; letter-spacing:-0.02em; }
+  .kpi-card .delta{ font-size:12px; margin-top:6px; color:var(--muted2);}
+  .kpi-card.accentline::before{
+    content:""; position:absolute; left:0; top:0; bottom:0; width:3px;
+  }
+  .kpi-card.k-green::before{ background:var(--green); }
+  .kpi-card.k-amber::before{ background:var(--amber); }
+  .kpi-card.k-red::before{ background:var(--red); }
+  .kpi-card.k-blue::before{ background:var(--accent); }
+
+  /* Filters */
+  .filters{
+    display:flex; gap:10px; flex-wrap:wrap; margin-bottom:18px; align-items:center;
+  }
+  .filters select, .filters input{
+    width:auto; min-width:150px; padding:9px 12px; font-size:13px;
+  }
+  .filters input{ min-width:220px; }
+  .filter-label{ font-size:11px; text-transform:uppercase; color:var(--muted2); letter-spacing:.06em; margin-right:2px;}
+  .clear-filters{
+    font-size:12px; color:var(--accent); cursor:pointer; padding:9px 4px;
+  }
+
+  /* Legend */
+  .legend{ display:flex; gap:16px; align-items:center; margin-bottom:14px; flex-wrap:wrap;}
+  .legend-item{ display:flex; align-items:center; gap:6px; font-size:12px; color:var(--muted);}
+  .dot{ width:8px; height:8px; border-radius:50%; }
+  .dot.g{ background:var(--green);} .dot.a{ background:var(--amber);} .dot.r{ background:var(--red);} .dot.n{ background:var(--gray);}
+
+  /* Table */
+  .board{
+    background:var(--surface); border:1px solid var(--hairline); border-radius:14px;
+    overflow:hidden;
+  }
+  table{ width:100%; border-collapse:collapse; }
+  thead th{
+    text-align:left; font-size:10.5px; text-transform:uppercase; letter-spacing:.07em;
+    color:var(--muted2); padding:13px 16px; border-bottom:1px solid var(--hairline);
+    font-weight:600; white-space:nowrap;
+    background:var(--surface2);
+  }
+  tbody tr{ border-bottom:1px solid var(--hairline); transition:background .12s ease; }
+  tbody tr:last-child{ border-bottom:none; }
+  tbody tr:hover{ background:var(--surface2); }
+  tbody td{ padding:14px 16px; font-size:13px; vertical-align:middle; }
+  .ot-num{ font-family:'JetBrains Mono',monospace; font-size:12.5px; color:var(--text); font-weight:500;}
+  .ot-tipo{ font-size:11px; color:var(--muted2); margin-top:2px;}
+  .cuenta-name{ font-weight:500; max-width:220px; }
+  .cuenta-sub{ font-size:11px; color:var(--muted2); margin-top:2px; font-family:'JetBrains Mono',monospace;}
+  .resp-chip{
+    display:inline-flex; align-items:center; gap:6px; font-size:12px;
+  }
+  .resp-dot{ width:6px; height:6px; border-radius:50%; background:var(--accent); }
+  .stage-pill{
+    display:inline-block; font-size:11px; padding:4px 9px; border-radius:20px;
+    background:var(--surface3); color:var(--muted); border:1px solid var(--hairline);
+    white-space:nowrap;
+  }
+
+  /* SLA gauge — signature element */
+  .gauge-wrap{ width:150px; }
+  .gauge-track{
+    position:relative; height:7px; border-radius:4px; overflow:visible;
+    background:var(--surface3);
+    display:flex;
+  }
+  .gauge-zone{ height:100%; }
+  .gauge-zone.g{ background:rgba(47,209,128,0.35); }
+  .gauge-zone.a{ background:rgba(255,176,32,0.35); }
+  .gauge-zone.r{ background:rgba(255,92,92,0.35); }
+  .gauge-marker{
+    position:absolute; top:50%; transform:translate(-50%,-50%);
+    width:11px; height:11px; border-radius:50%;
+    border:2px solid var(--ink);
+    box-shadow:0 0 0 1px rgba(255,255,255,0.15);
+  }
+  .gauge-marker.g{ background:var(--green); }
+  .gauge-marker.a{ background:var(--amber); }
+  .gauge-marker.r{ background:var(--red); }
+  .gauge-marker.done{ background:var(--muted2); }
+  .gauge-marker.pending{ background:transparent; border-color:var(--muted2); }
+  .gauge-meta{ display:flex; justify-content:space-between; margin-top:6px; font-size:11px; }
+  .gauge-days{ font-family:'JetBrains Mono',monospace; color:var(--text); }
+  .gauge-status{ font-weight:600; }
+  .gauge-status.g{ color:var(--green); }
+  .gauge-status.a{ color:var(--amber); }
+  .gauge-status.r{ color:var(--red); }
+  .gauge-status.n{ color:var(--muted2); }
+  .gauge-not-started{
+    font-size:11.5px; color:var(--muted2); font-style:italic;
+  }
+
+  .obs-cell{ max-width:220px; font-size:12px; color:var(--muted); line-height:1.4; }
+  .obs-cell.empty{ color:var(--muted2); font-style:italic; }
+
+  .empty-state{ padding:60px 20px; text-align:center; color:var(--muted2); }
+  .empty-state .display{ font-size:16px; color:var(--muted); margin-bottom:6px; }
+
+  footer.foot{ text-align:center; padding:30px; font-size:11.5px; color:var(--muted2); }
+
+  @media (max-width: 980px){
+    .kpi-row{ grid-template-columns:repeat(2,1fr); }
+    main{ padding:16px; }
+    header.topbar{ padding:14px 16px; }
+  }
+  @media (prefers-reduced-motion: reduce){
+    .beacon{ animation:none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ===================== LOGIN (mock — reemplazar por Auth real) ===================== -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-eyebrow"><span class="beacon"></span> SLA CONTROL · PORTAL VENTAS</div>
+    <div class="login-title display">Torre de control</div>
+    <div class="login-sub">Seguimiento de SLA Operaciones y SLA Logística por OT. Acceso interno.</div>
+
+    <div class="field">
+      <label class="field-label">Usuario</label>
+      <select id="user-select">
+        <option value="facundo">Facundo — Responsable</option>
+        <option value="marcelo">Marcelo Santillán — Admin</option>
+        <option value="viewer">Invitado — Solo lectura</option>
+      </select>
+    </div>
+
+    <button class="btn-primary" onclick="doLogin()">Ingresar</button>
+
+    <div class="login-note">
+      Esto es un login de demostración para validar el diseño. Los usuarios reales se dan de alta desde Alleata Ops / Supabase — cuando conectemos el backend, este panel se reemplaza por Auth real (magic link o email+password) y el rol determina qué OTs y qué acciones ve cada persona.
+    </div>
+  </div>
+</div>
+
+<!-- ===================== APP ===================== -->
+<div id="app">
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark display">SC</div>
+      <div class="brand-text">
+        <div class="name">SLA Control</div>
+        <div class="sub">PORTAL VENTAS</div>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <div class="clock mono" id="clock"></div>
+      <div class="user-chip">
+        <div class="avatar" id="avatar-initials">F</div>
+        <span id="user-name-label">Facundo</span>
+      </div>
+      <span class="logout" onclick="doLogout()">Salir</span>
+    </div>
+  </header>
+
+  <main>
+    <div class="page-head">
+      <div>
+        <h1>Panel de SLA — Instalación Equipo + Simcard</h1>
+        <p>Cada OT corre dos relojes: <strong style="color:var(--text)">SLA Operaciones</strong> (Configurar Terminal → Pre Colecta) y <strong style="color:var(--text)">SLA Logística</strong> (Despachado → Exitoso). El semáforo marca qué tan cerca está cada OT de incumplir.</p>
+      </div>
+      <div class="assumptions-tag" onclick="alert('Umbrales actuales (editables cuando definamos los reales):\n\nSLA Operaciones — Verde ≤2 días · Amarillo 3 días · Rojo ≥4 días\nSLA Logística — Verde ≤3 días · Amarillo 4–5 días · Rojo ≥6 días\n\nLos datos de esta pantalla son de ejemplo (mock), todavía no están conectados a Supabase / Excel.')">
+        ⚠ Datos y umbrales de ejemplo — click para ver supuestos
+      </div>
+    </div>
+
+    <!-- KPIs -->
+    <div class="kpi-row" id="kpi-row"></div>
+
+    <!-- Legend -->
+    <div class="legend">
+      <div class="legend-item"><span class="dot g"></span> En SLA</div>
+      <div class="legend-item"><span class="dot a"></span> Cerca del límite</div>
+      <div class="legend-item"><span class="dot r"></span> Fuera de SLA</div>
+      <div class="legend-item"><span class="dot n"></span> Sin iniciar / cerrado</div>
+    </div>
+
+    <!-- Filters -->
+    <div class="filters">
+      <span class="filter-label">Filtrar</span>
+      <input type="text" id="f-search" placeholder="Buscar OT o cuenta..." oninput="renderTable()">
+      <select id="f-responsable" onchange="renderTable()"><option value="">Responsable (todos)</option></select>
+      <select id="f-etapa" onchange="renderTable()"><option value="">Etapa (todas)</option></select>
+      <select id="f-semaforo" onchange="renderTable()">
+        <option value="">Semáforo (cualquiera)</option>
+        <option value="r">Solo rojos</option>
+        <option value="a">Solo amarillos</option>
+        <option value="g">Solo verdes</option>
+      </select>
+      <span class="clear-filters" onclick="clearFilters()">Limpiar filtros</span>
+    </div>
+
+    <!-- Board -->
+    <div class="board">
+      <table>
+        <thead>
+          <tr>
+            <th>OT</th>
+            <th>Cuenta</th>
+            <th>Responsable</th>
+            <th>Etapa actual</th>
+            <th>SLA Operaciones</th>
+            <th>SLA Logística</th>
+            <th>Observaciones</th>
+          </tr>
+        </thead>
+        <tbody id="table-body"></tbody>
+      </table>
+      <div class="empty-state" id="empty-state" style="display:none;">
+        <div class="display">Sin resultados</div>
+        <div>Probá con otro filtro o limpiá la búsqueda.</div>
+      </div>
+    </div>
+
+    <footer class="foot">Prototipo de diseño · datos de ejemplo · Portal Ventas SLA Control</footer>
+  </main>
+</div>
+
+<script>
+/* =========================================================================
+   CONFIG — SUPUESTOS A VALIDAR
+   Umbrales de SLA en días. Ajustar cuando definamos los reales con Facundo.
+   ========================================================================= */
+const SLA_CONFIG = {
+  operaciones: { green: 2, amber: 4 },   // <=2 verde, 3-4 amarillo, >=5 rojo... ver getStatus()
+  logistica:   { green: 3, amber: 5 }
+};
+const HOY = new Date('2026-08-13'); // fecha de referencia del panel
+
+/* =========================================================================
+   MOCK DATA — reemplazar por fetch a Supabase / import Excel
+   Etapas del flujo: CONFIGURAR TERMINAL -> ... -> PRE COLECTA (fin SLA Ops)
+                     DESPACHADO -> ... -> EXITOSO (fin SLA Logística)
+   ========================================================================= */
+const OTS = [
+  {
+    ot:'00022281', tipo:'Instalación Equipo + Simcard',
+    cuenta:'NEQUI FABIO ANDRES - SUC - 0001', cuit:'20183266757',
+    responsable:'Alejandro Amato', etapa:'EXITOSO',
+    f_configurar:'2026-08-01', f_precolecta:'2026-08-03',
+    f_despachado:'2026-08-03', f_exitoso:'2026-08-05',
+    obs:'FVR>>FACU>>pago dos comodatos seguidos, puntos de venta 100 y 101.'
+  },
+  {
+    ot:'00022305', tipo:'Instalación Equipo + Simcard',
+    cuenta:'RAZA NUEVA S.R.L. - SUC - 0001', cuit:'30718281055',
+    responsable:'Alejandro Amato', etapa:'PRE COLECTA',
+    f_configurar:'2026-08-08', f_precolecta:'2026-08-11',
+    f_despachado:null, f_exitoso:null,
+    obs:'Llamar antes de entregar. Plan contador estudio CMC.'
+  },
+  {
+    ot:'00022310', tipo:'Instalación Equipo + Simcard',
+    cuenta:'KARAI S.A.S. - SUC - 0001', cuit:'30719157013',
+    responsable:'Alejandro Amato', etapa:'CONFIGURAR TERMINAL',
+    f_configurar:'2026-08-09', f_precolecta:null,
+    f_despachado:null, f_exitoso:null,
+    obs:''
+  },
+  {
+    ot:'00022318', tipo:'Instalación Equipo + Simcard',
+    cuenta:'OLIVARES MARCELA ALEJANDRA - SUC - 0001', cuit:'27248668054',
+    responsable:'Jose Luis Cingolani', etapa:'CONFIGURAR TERMINAL',
+    f_configurar:'2026-08-05', f_precolecta:null,
+    f_despachado:null, f_exitoso:null,
+    obs:'Cra Florencia González — seguimiento telefónico pendiente.'
+  },
+  {
+    ot:'00022330', tipo:'Instalación Equipo + Simcard',
+    cuenta:'ROCCA RODRIGO ARIEL - SUC - 0001', cuit:'20307842085',
+    responsable:'Guillermo Cichero', etapa:'DESPACHADO',
+    f_configurar:'2026-08-01', f_precolecta:'2026-08-03',
+    f_despachado:'2026-08-04', f_exitoso:null,
+    obs:''
+  },
+  {
+    ot:'00022341', tipo:'Instalación Equipo + Simcard',
+    cuenta:'SADACA ALBERTO ISMAEL - SUC - 0001', cuit:'23213764519',
+    responsable:'Alejandro Amato', etapa:'DESPACHADO',
+    f_configurar:'2026-07-28', f_precolecta:'2026-08-01',
+    f_despachado:'2026-08-02', f_exitoso:null,
+    obs:'Alta corta / la cuenta es caja de ahorro.'
+  },
+  {
+    ot:'00022355', tipo:'Instalación Equipo + Simcard',
+    cuenta:'BERON RAMON LUJAN - SUC - 0001', cuit:'20261262518',
+    responsable:'Angeles Eberle', etapa:'EXITOSO',
+    f_configurar:'2026-07-30', f_precolecta:'2026-08-01',
+    f_despachado:'2026-08-01', f_exitoso:'2026-08-06',
+    obs:'Enviar junto a suc 002 / enviar por Andreani.'
+  },
+  {
+    ot:'00022368', tipo:'Instalación Equipo + Simcard',
+    cuenta:'PEARCE MARIA EUGENIA - SUC - 0002', cuit:'27185503254',
+    responsable:'Angeles Eberle', etapa:'DESPACHADO',
+    f_configurar:'2026-07-29', f_precolecta:'2026-08-02',
+    f_despachado:'2026-08-02', f_exitoso:null,
+    obs:'Contador: Lucas Ahumada.'
+  },
+  {
+    ot:'00022374', tipo:'Instalación Equipo + Simcard',
+    cuenta:'CHACON DAMIAN ESTEBAN - SUC - 0002', cuit:'20316925031',
+    responsable:'Alejandro Amato', etapa:'PRE COLECTA',
+    f_configurar:'2026-08-06', f_precolecta:'2026-08-10',
+    f_despachado:null, f_exitoso:null,
+    obs:''
+  },
+  {
+    ot:'00022380', tipo:'Instalación Equipo + Simcard',
+    cuenta:'ARIAUDO JOSE LUIS - SUC - 0001', cuit:'20320950210',
+    responsable:'Martha Reyes', etapa:'CONFIGURAR TERMINAL',
+    f_configurar:'2026-08-03', f_precolecta:null,
+    f_despachado:null, f_exitoso:null,
+    obs:'Sin novedades desde el alta — revisar.'
+  },
+  {
+    ot:'00022392', tipo:'Instalación Equipo + Simcard',
+    cuenta:'KISHABA MATIAS - SUC - 0001', cuit:'20310105369',
+    responsable:'Carla Alberici', etapa:'DESPACHADO',
+    f_configurar:'2026-08-04', f_precolecta:'2026-08-05',
+    f_despachado:'2026-08-05', f_exitoso:null,
+    obs:''
+  },
+  {
+    ot:'00022401', tipo:'Instalación Equipo + Simcard',
+    cuenta:'BARTOLOMEO ANGELA EDITH - SUC - 0005', cuit:'27218082268',
+    responsable:'Martha Reyes', etapa:'EXITOSO',
+    f_configurar:'2026-07-31', f_precolecta:'2026-08-02',
+    f_despachado:'2026-08-02', f_exitoso:'2026-08-04',
+    obs:'Comunicarse con el cliente al llegar, sale a recibirlo.'
+  },
+  {
+    ot:'00022415', tipo:'Instalación Equipo + Simcard',
+    cuenta:'ROMERO ESTEFANIA ALEJANDRA - SUC - 0001', cuit:'23348301454',
+    responsable:'Vanesa Cetinich', etapa:'DESPACHADO',
+    f_configurar:'2026-08-02', f_precolecta:'2026-08-05',
+    f_despachado:'2026-08-06', f_exitoso:null,
+    obs:''
+  },
+  {
+    ot:'00022427', tipo:'Instalación Equipo + Simcard',
+    cuenta:'THOBOKHOLT MARIA LAURA - SUC - 0001', cuit:'27285658360',
+    responsable:'Carla Alberici', etapa:'CONFIGURAR TERMINAL',
+    f_configurar:'2026-08-07', f_precolecta:null,
+    f_despachado:null, f_exitoso:null,
+    obs:''
+  },
+  {
+    ot:'00022433', tipo:'Instalación Equipo + Simcard',
+    cuenta:'TORREZ DIEGO OMAR - SUC - 0001', cuit:'20289982877',
+    responsable:'Carla Alberici', etapa:'EXITOSO',
+    f_configurar:'2026-08-01', f_precolecta:'2026-08-04',
+    f_despachado:'2026-08-05', f_exitoso:'2026-08-11',
+    obs:'Reutiliza terminal — cambio de titularidad. Logística tardó por reasignación.'
+  },
+  {
+    ot:'00022440', tipo:'Instalación Equipo + Simcard',
+    cuenta:'GARCIA SANTANA MELANIE - SUC - 0001', cuit:'20191531621',
+    responsable:'Aldana Fuggini', etapa:'DESPACHADO',
+    f_configurar:'2026-08-06', f_precolecta:'2026-08-06',
+    f_despachado:'2026-08-07', f_exitoso:null,
+    obs:''
+  },
+  {
+    ot:'00022448', tipo:'Instalación Equipo + Simcard',
+    cuenta:'KACHUK FEDERICO MATIAS - SUC - 0001', cuit:'20344475998',
+    responsable:'Guillermo Cichero', etapa:'CONFIGURAR TERMINAL',
+    f_configurar:'2026-07-29', f_precolecta:null,
+    f_despachado:null, f_exitoso:null,
+    obs:'Sin avances hace más de dos semanas — escalar.'
+  },
+  {
+    ot:'00022455', tipo:'Instalación Equipo + Simcard',
+    cuenta:'AGUILERA HECTOR RICARDO - SUC - 0001', cuit:'20147730218',
+    responsable:'Guillermo Cichero', etapa:'PRE COLECTA',
+    f_configurar:'2026-08-09', f_precolecta:'2026-08-12',
+    f_despachado:null, f_exitoso:null,
+    obs:'Valeria contadora — coordinar retiro.'
+  },
+];
+
+/* =========================================================================
+   LOGICA DE SLA
+   ========================================================================= */
+function daysBetween(a, b){
+  const ms = (new Date(b)) - (new Date(a));
+  return Math.round(ms / 86400000);
+}
+
+// Devuelve estado + días elapsed para una ventana de SLA
+function evalSla(startField, endField, cfg){
+  if(!startField){
+    return { status:'pending', days:null, label:'Sin iniciar' };
+  }
+  const start = new Date(startField);
+  const end = endField ? new Date(endField) : HOY;
+  const days = daysBetween(start, end);
+  let status;
+  if(days <= cfg.green) status = 'g';
+  else if(days <= cfg.amber) status = 'a';
+  else status = 'r';
+  return {
+    status,
+    days,
+    closed: !!endField,
+    label: endField ? `Cerrado en ${days}d` : `${days}d corridos`
+  };
+}
+
+function computeSlas(o){
+  const ops = evalSla(o.f_configurar, o.f_precolecta, SLA_CONFIG.operaciones);
+  const log = evalSla(o.f_despachado, o.f_exitoso, SLA_CONFIG.logistica);
+  return { ops, log };
+}
+
+/* =========================================================================
+   RENDER
+   ========================================================================= */
+function statusColor(s){
+  return {g:'var(--green)', a:'var(--amber)', r:'var(--red)', pending:'var(--gray)'}[s] || 'var(--gray)';
+}
+
+function gaugeHTML(evalResult, cfg, maxScale){
+  if(evalResult.status === 'pending'){
+    return `
+      <div class="gauge-wrap">
+        <div class="gauge-not-started">— sin iniciar —</div>
+      </div>`;
+  }
+  const green = cfg.green, amber = cfg.amber;
+  const gPct = (green / maxScale) * 100;
+  const aPct = ((amber - green) / maxScale) * 100;
+  const rPct = 100 - gPct - aPct;
+  const markerPct = Math.min((evalResult.days / maxScale) * 100, 100);
+  const markerClass = evalResult.closed ? 'done' : evalResult.status;
+  const statusLabel = evalResult.closed
+    ? (evalResult.status === 'g' ? 'Cerrado en SLA' : evalResult.status === 'a' ? 'Cerrado al límite' : 'Cerrado fuera de SLA')
+    : (evalResult.status === 'g' ? 'En SLA' : evalResult.status === 'a' ? 'Cerca del límite' : 'Fuera de SLA');
+
+  return `
+    <div class="gauge-wrap">
+      <div class="gauge-track">
+        <div class="gauge-zone g" style="width:${gPct}%"></div>
+        <div class="gauge-zone a" style="width:${aPct}%"></div>
+        <div class="gauge-zone r" style="width:${rPct}%"></div>
+        <div class="gauge-marker ${markerClass}" style="left:${markerPct}%;"></div>
+      </div>
+      <div class="gauge-meta">
+        <span class="gauge-days">${evalResult.days}d</span>
+        <span class="gauge-status ${evalResult.status}">${statusLabel}</span>
+      </div>
+    </div>`;
+}
+
+function populateFilterOptions(){
+  const respSel = document.getElementById('f-responsable');
+  const etapaSel = document.getElementById('f-etapa');
+  const resps = [...new Set(OTS.map(o=>o.responsable))].sort();
+  const etapas = [...new Set(OTS.map(o=>o.etapa))];
+  resps.forEach(r=>{
+    const opt = document.createElement('option'); opt.value = r; opt.textContent = r;
+    respSel.appendChild(opt);
+  });
+  etapas.forEach(e=>{
+    const opt = document.createElement('option'); opt.value = e; opt.textContent = e;
+    etapaSel.appendChild(opt);
+  });
+}
+
+function initials(name){
+  return name.split(' ').map(p=>p[0]).slice(0,2).join('').toUpperCase();
+}
+
+function renderKPIs(){
+  const withOps = OTS.map(o=>computeSlas(o));
+  const opsRunning = withOps.filter(s=>s.ops.status!=='pending' && !s.ops.closed);
+  const logRunning = withOps.filter(s=>s.log.status!=='pending' && !s.log.closed);
+  const opsRisk = opsRunning.filter(s=>s.ops.status!=='g').length;
+  const logRisk = logRunning.filter(s=>s.log.status!=='g').length;
+  const closedOps = withOps.filter(s=>s.ops.closed);
+  const cumplOps = closedOps.length ? Math.round(100*closedOps.filter(s=>s.ops.status!=='r').length/closedOps.length) : 0;
+
+  const cards = [
+    { label:'OTs activas', value:OTS.length, cls:'k-blue', delta:'Instalación Equipo + Simcard' },
+    { label:'SLA Operaciones en riesgo', value:opsRisk, cls: opsRisk>0 ? 'k-amber':'k-green', delta:`de ${opsRunning.length} corriendo` },
+    { label:'SLA Logística en riesgo', value:logRisk, cls: logRisk>0 ? 'k-red':'k-green', delta:`de ${logRunning.length} corriendo` },
+    { label:'Cumplimiento Operaciones', value:cumplOps+'%', cls: cumplOps>=80?'k-green':cumplOps>=60?'k-amber':'k-red', delta:`sobre ${closedOps.length} OTs cerradas` },
+  ];
+  document.getElementById('kpi-row').innerHTML = cards.map(c=>`
+    <div class="kpi-card accentline ${c.cls}">
+      <div class="label">${c.label}</div>
+      <div class="value display">${c.value}</div>
+      <div class="delta">${c.delta}</div>
+    </div>
+  `).join('');
+}
+
+function clearFilters(){
+  document.getElementById('f-search').value='';
+  document.getElementById('f-responsable').value='';
+  document.getElementById('f-etapa').value='';
+  document.getElementById('f-semaforo').value='';
+  renderTable();
+}
+
+function renderTable(){
+  const q = document.getElementById('f-search').value.trim().toLowerCase();
+  const rF = document.getElementById('f-responsable').value;
+  const eF = document.getElementById('f-etapa').value;
+  const sF = document.getElementById('f-semaforo').value;
+
+  const rows = OTS.filter(o=>{
+    if(q && !(o.ot.toLowerCase().includes(q) || o.cuenta.toLowerCase().includes(q))) return false;
+    if(rF && o.responsable !== rF) return false;
+    if(eF && o.etapa !== eF) return false;
+    if(sF){
+      const s = computeSlas(o);
+      const statuses = [s.ops.status, s.log.status].filter(x=>x!=='pending');
+      if(!statuses.includes(sF)) return false;
+    }
+    return true;
+  });
+
+  const tbody = document.getElementById('table-body');
+  const empty = document.getElementById('empty-state');
+
+  if(rows.length === 0){
+    tbody.innerHTML = '';
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+
+  tbody.innerHTML = rows.map(o=>{
+    const s = computeSlas(o);
+    return `
+    <tr>
+      <td>
+        <div class="ot-num">#${o.ot}</div>
+        <div class="ot-tipo">${o.tipo}</div>
+      </td>
+      <td>
+        <div class="cuenta-name">${o.cuenta}</div>
+        <div class="cuenta-sub">CUIT ${o.cuit}</div>
+      </td>
+      <td>
+        <div class="resp-chip"><span class="resp-dot"></span>${o.responsable}</div>
+      </td>
+      <td><span class="stage-pill">${o.etapa}</span></td>
+      <td>${gaugeHTML(s.ops, SLA_CONFIG.operaciones, 7)}</td>
+      <td>${gaugeHTML(s.log, SLA_CONFIG.logistica, 9)}</td>
+      <td class="obs-cell ${o.obs ? '' : 'empty'}">${o.obs || 'Sin observaciones'}</td>
+    </tr>`;
+  }).join('');
+}
+
+/* =========================================================================
+   LOGIN / SESSION (en memoria — sin localStorage, ver nota en pantalla)
+   ========================================================================= */
+const USERS = {
+  facundo: { name:'Facundo', role:'Responsable' },
+  marcelo: { name:'Marcelo Santillán', role:'Admin' },
+  viewer:  { name:'Invitado', role:'Solo lectura' }
+};
+
+function doLogin(){
+  const key = document.getElementById('user-select').value;
+  const u = USERS[key];
+  document.getElementById('user-name-label').textContent = u.name;
+  document.getElementById('avatar-initials').textContent = initials(u.name);
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  boot();
+}
+
+function doLogout(){
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+}
+
+function tickClock(){
+  const el = document.getElementById('clock');
+  if(!el) return;
+  const now = new Date();
+  el.textContent = now.toLocaleString('es-AR', { weekday:'short', day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' });
+}
+
+let booted = false;
+function boot(){
+  if(booted) return;
+  booted = true;
+  populateFilterOptions();
+  renderKPIs();
+  renderTable();
+  tickClock();
+  setInterval(tickClock, 1000*30);
+}
+</script>
+</body>
+</html>
