@@ -6,6 +6,7 @@
 <title>SLA Control · Portal Ventas</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
   :root{
     --ink:#0B0F16;
@@ -319,8 +320,11 @@
         <h1>Panel de SLA — Instalación Equipo + Simcard</h1>
         <p>Cada OT corre dos relojes: <strong style="color:var(--text)">SLA Operaciones</strong> (Configurar Terminal → Pre Colecta) y <strong style="color:var(--text)">SLA Logística</strong> (Despachado → Exitoso). El semáforo marca qué tan cerca está cada OT de incumplir.</p>
       </div>
-      <div class="assumptions-tag" onclick="alert('Umbrales actuales (editables cuando definamos los reales):\n\nSLA Operaciones — Verde ≤2 días · Amarillo 3 días · Rojo ≥4 días\nSLA Logística — Verde ≤3 días · Amarillo 4–5 días · Rojo ≥6 días\n\nLos datos de esta pantalla son de ejemplo (mock), todavía no están conectados a Supabase / Excel.')">
-        ⚠ Datos y umbrales de ejemplo — click para ver supuestos
+      <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+        <div id="data-source-badge" style="font-size:11px; font-weight:600;"></div>
+        <div class="assumptions-tag" onclick="alert('Umbrales actuales (editables cuando definamos los reales):\n\nSLA Operaciones — Verde ≤2 días · Amarillo 3 días · Rojo ≥4 días\nSLA Logística — Verde ≤3 días · Amarillo 4–5 días · Rojo ≥6 días\n\nSi ves el badge en verde arriba, ya está leyendo sla_ots real de Supabase.')">
+          ⚠ Umbrales de ejemplo — click para ver supuestos
+        </div>
       </div>
     </div>
 
@@ -378,6 +382,46 @@
 
 <script>
 /* =========================================================================
+   CONEXIÓN A SUPABASE (real) — cae a los datos mock de abajo si falla
+   o si la tabla sla_ots todavía no existe / está vacía.
+   Completar SUPABASE_ANON_KEY con el real del proyecto (mismo que usan
+   index.html / mobile.html de Alleata Ops) para activar datos en vivo.
+   ========================================================================= */
+const SUPABASE_URL = 'https://njkstpfmcfhqxdadqbdy.supabase.co';
+const SUPABASE_ANON_KEY = ''; // <-- pegar acá el anon JWT key para activar datos reales
+
+let DATA_SOURCE = 'mock'; // pasa a 'live' si la carga desde Supabase funciona
+
+async function loadFromSupabase() {
+  if (!SUPABASE_ANON_KEY || !window.supabase) return null;
+  try {
+    const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const { data, error } = await client
+      .from('sla_ots')
+      .select('*')
+      .order('ot_numero', { ascending: false });
+    if (error || !data || !data.length) return null;
+
+    return data.map(r => ({
+      ot: r.ot_numero,
+      tipo: 'Instalación Equipo + Simcard',
+      cuenta: r.cuenta || '(sin cuenta)',
+      cuit: r.cuit || '—',
+      responsable: r.responsable_venta || r.responsable_operativo || 'Sin asignar',
+      etapa: r.etapa_actual || 'Sin estado',
+      f_configurar: r.f_configurar_terminal,
+      f_precolecta: r.f_precolecta,
+      f_despachado: r.f_despachado,
+      f_exitoso: r.f_exitoso,
+      obs: r.observaciones || '',
+    }));
+  } catch (e) {
+    console.warn('[SLA Control] No se pudo leer sla_ots de Supabase, uso datos de ejemplo.', e);
+    return null;
+  }
+}
+
+/* =========================================================================
    CONFIG — SUPUESTOS A VALIDAR
    Umbrales de SLA en días. Ajustar cuando definamos los reales con Facundo.
    ========================================================================= */
@@ -392,7 +436,7 @@ const HOY = new Date('2026-08-13'); // fecha de referencia del panel
    Etapas del flujo: CONFIGURAR TERMINAL -> ... -> PRE COLECTA (fin SLA Ops)
                      DESPACHADO -> ... -> EXITOSO (fin SLA Logística)
    ========================================================================= */
-const OTS = [
+let OTS_MOCK = [
   {
     ot:'00022281', tipo:'Instalación Equipo + Simcard',
     cuenta:'NEQUI FABIO ANDRES - SUC - 0001', cuit:'20183266757',
@@ -538,6 +582,8 @@ const OTS = [
     obs:'Valeria contadora — coordinar retiro.'
   },
 ];
+
+let OTS = OTS_MOCK; // se reemplaza por datos reales en boot() si Supabase responde
 
 /* =========================================================================
    LOGICA DE SLA
@@ -768,14 +814,37 @@ function tickClock(){
 }
 
 let booted = false;
-function boot(){
+async function boot(){
   if(booted) return;
   booted = true;
+
+  const liveData = await loadFromSupabase();
+  if(liveData){
+    OTS = liveData;
+    DATA_SOURCE = 'live';
+  } else {
+    OTS = OTS_MOCK;
+    DATA_SOURCE = 'mock';
+  }
+  updateDataSourceBadge();
+
   populateFilterOptions();
   renderKPIs();
   renderTable();
   tickClock();
   setInterval(tickClock, 1000*30);
+}
+
+function updateDataSourceBadge(){
+  const el = document.getElementById('data-source-badge');
+  if(!el) return;
+  if(DATA_SOURCE === 'live'){
+    el.textContent = '● Datos en vivo — Supabase (sla_ots)';
+    el.style.color = 'var(--green)';
+  } else {
+    el.textContent = '● Datos de ejemplo — Supabase sin conectar todavía';
+    el.style.color = 'var(--amber)';
+  }
 }
 </script>
 </body>
