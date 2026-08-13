@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.6.59</title>
+<title>Alleata · Operaciones v4.6.60</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -407,7 +407,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.59 · 12 ago 2026
+      v4.6.60 · 12 ago 2026
     </div>
   </div>
 </div>
@@ -489,6 +489,14 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
   <div class="nav-item" data-mod="ally" id="nav-ally" onclick="goTo('ally')" style="display:none">
     <div class="active-bar"></div><span class="nav-icon-wrap">🤖</span> Config. Ally
   </div>
+  <!-- Módulo propio, separado de Config. Ally a propósito (13/08): Andres y
+  Gonzalo necesitan cargar correcciones de CP/Zona sin tener acceso a
+  Contactos/Grupos/Reglas de Ally (eso sigue siendo solo-admin). Se rige por
+  el mismo sistema de permisos que el resto de los módulos (profiles.modulos),
+  no por el hardcode a un solo email que tenía antes dentro de Config. Ally. -->
+  <div class="nav-item" data-mod="zonas-amba" id="nav-zonas-amba" onclick="goTo('zonas-amba')" style="display:none">
+    <div class="active-bar"></div><span class="nav-icon-wrap">📍</span> Zonas AMBA
+  </div>
   <div class="sidebar-footer">
     <div class="user-chip">
       <div class="user-avatar" id="sideUserAvatar">?</div>
@@ -499,7 +507,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.59 · 12 ago 2026
+      v4.6.60 · 12 ago 2026
     </div>
   </div>
 </nav>
@@ -539,7 +547,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.59</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.60</div>
   </div>
   <div class="content">
 
@@ -996,6 +1004,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
             <div class="mod-pill" data-mod="retencion" onclick="toggleCreateMod(this)"><span class="pill-dot"></span>🛡️ Retención</div>
             <div class="mod-pill" data-mod="store" onclick="toggleCreateMod(this)"><span class="pill-dot"></span>🏦 Bancos</div>
             <div class="mod-pill" data-mod="recuperadas" onclick="toggleCreateMod(this)"><span class="pill-dot"></span>🔁 Recuperadas</div>
+            <div class="mod-pill" data-mod="zonas-amba" onclick="toggleCreateMod(this)"><span class="pill-dot"></span>📍 Zonas AMBA</div>
           </div>
         </div>
         <div id="ajMsg"></div>
@@ -2041,7 +2050,6 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     <button class="ally-tab active" onclick="allyTab('contactos',this)">👥 Contactos</button>
     <button class="ally-tab" onclick="allyTab('grupos',this)">📢 Grupos</button>
     <button class="ally-tab" onclick="allyTab('reglas',this)">🔔 Reglas</button>
-    <button class="ally-tab" id="ally-tab-btn-zonas" onclick="allyTab('zonas',this)" style="display:none">📍 Zonas AMBA</button>
   </div>
 
   <!-- TAB CONTACTOS -->
@@ -2088,49 +2096,50 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <div id="ally-reglas-wrap"></div>
   </div>
+</div>
 
-  <!-- TAB ZONAS AMBA — correcciones manuales de "este CP es tal zona".
-       Vive acá (no es específico de Ally/WhatsApp) porque es la pantalla
-       de config admin más a mano — pedido 03/08, para no depender de un
-       deploy cada vez que aparece una localidad que el clasificador
-       automático no reconoce. -->
-  <div id="ally-tab-zonas" style="display:none">
-    <div style="margin-bottom:14px">
-      <div class="sec-title"><div class="sec-dot" style="background:#8b5cf6"></div>📍 Zonas AMBA — correcciones manuales por CP</div>
-      <div style="font-size:12px;color:var(--text-muted);margin-top:4px">Cuando el clasificador automático (rango de CP por partido + nombre de localidad) se equivoca o no reconoce un CP nuevo, cargalo acá una vez — se respeta siempre, antes que cualquier otra regla, en todo el sistema (rótulo, Desinstalaciones, monitor de entregas).</div>
+<!-- ══ MÓDULO ZONAS AMBA ═══════════════════════════════════════════════════════
+     Separado de Config. Ally (13/08) — antes vivía como tab ahí adentro,
+     visible solo para marcelos por hardcode de email. Ahora es su propio
+     módulo con permisos por profiles.modulos como cualquier otro, para
+     poder darle acceso a Andres/Gonzalo sin exponerles Contactos/Grupos/
+     Reglas de Ally. -->
+<div class="module" id="mod-zonas-amba">
+  <div style="margin-bottom:14px">
+    <div class="sec-title"><div class="sec-dot" style="background:#8b5cf6"></div>📍 Zonas AMBA — correcciones manuales por CP</div>
+    <div style="font-size:12px;color:var(--text-muted);margin-top:4px">Cuando el clasificador automático (rango de CP por partido + nombre de localidad) se equivoca o no reconoce un CP nuevo, cargalo acá una vez — se respeta siempre, antes que cualquier otra regla, en todo el sistema (rótulo, Desinstalaciones, monitor de entregas).</div>
+  </div>
+  <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:16px;background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:12px">
+    <div>
+      <label class="label">Código Postal</label>
+      <input class="input" id="zcp-cp" placeholder="Ej: 1688" style="width:110px">
     </div>
-    <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:16px;background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:12px">
-      <div>
-        <label class="label">Código Postal</label>
-        <input class="input" id="zcp-cp" placeholder="Ej: 1688" style="width:110px">
-      </div>
-      <div>
-        <label class="label">Zona</label>
-        <select class="input" id="zcp-zona" style="width:150px">
-          <option value="CABA">CABA</option>
-          <option value="Zona Norte">Zona Norte</option>
-          <option value="Zona Sur">Zona Sur</option>
-          <option value="Zona Oeste">Zona Oeste</option>
-          <option value="Fuera AMBA">Fuera AMBA</option>
-        </select>
-      </div>
-      <div>
-        <label class="label">Localidad (opcional, solo referencia)</label>
-        <input class="input" id="zcp-localidad" placeholder="Ej: Villa Tesei" style="width:180px">
-      </div>
-      <div style="flex:1;min-width:180px">
-        <label class="label">Nota (opcional)</label>
-        <input class="input" id="zcp-nota" placeholder="Ej: caía como Sin zona" style="width:100%">
-      </div>
-      <button class="btn btn-sm" onclick="zcpGuardar()">💾 Guardar</button>
+    <div>
+      <label class="label">Zona</label>
+      <select class="input" id="zcp-zona" style="width:150px">
+        <option value="CABA">CABA</option>
+        <option value="Zona Norte">Zona Norte</option>
+        <option value="Zona Sur">Zona Sur</option>
+        <option value="Zona Oeste">Zona Oeste</option>
+        <option value="Fuera AMBA">Fuera AMBA</option>
+      </select>
     </div>
-    <div id="zcp-msg" style="font-size:12px;margin-bottom:10px"></div>
-    <div class="table-wrap">
-      <table class="table">
-        <thead><tr><th>CP</th><th>Zona</th><th>Localidad</th><th>Nota</th><th>Cargado</th><th></th></tr></thead>
-        <tbody id="zcp-tbody"><tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:20px">Cargando...</td></tr></tbody>
-      </table>
+    <div>
+      <label class="label">Localidad (opcional, solo referencia)</label>
+      <input class="input" id="zcp-localidad" placeholder="Ej: Villa Tesei" style="width:180px">
     </div>
+    <div style="flex:1;min-width:180px">
+      <label class="label">Nota (opcional)</label>
+      <input class="input" id="zcp-nota" placeholder="Ej: caía como Sin zona" style="width:100%">
+    </div>
+    <button class="btn btn-sm" onclick="zcpGuardar()">💾 Guardar</button>
+  </div>
+  <div id="zcp-msg" style="font-size:12px;margin-bottom:10px"></div>
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>CP</th><th>Zona</th><th>Localidad</th><th>Nota</th><th>Cargado</th><th></th></tr></thead>
+      <tbody id="zcp-tbody"><tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:20px">Cargando...</td></tr></tbody>
+    </table>
   </div>
 </div>
 
@@ -3610,7 +3619,7 @@ function toggleSidebar(){
   const sbW=sb.classList.contains('collapsed')?60:224;
   main.style.marginLeft=sbW+'px';
   // Actualizar módulos outside si hay uno activo
-  const outsideMods=new Set(['ally','retencion','distri','terminales','instalaciones','recuperadas']);
+  const outsideMods=new Set(['ally','retencion','distri','terminales','instalaciones','recuperadas','zonas-amba']);
   const activeOutside=document.querySelector('.module.active');
   if(activeOutside){
     const mod=activeOutside.id.replace('mod-','');
@@ -4921,7 +4930,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.6.59] OK');
+console.log('[Alleata v4.6.60] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -5264,12 +5273,14 @@ function showApp(){
   }
   const navStore=document.getElementById('nav-store');
   if(navStore&&!isCeo&&(isAdmin||modulos.includes('store')))navStore.style.display='flex';
+  const navZonasAmba=document.getElementById('nav-zonas-amba');
+  if(navZonasAmba&&!isCeo&&(isAdmin||modulos.includes('zonas-amba')))navZonasAmba.style.display='flex';
   const navRecuperadas=document.getElementById('nav-recuperadas');
   if(navRecuperadas&&!isCeo&&(isAdmin||modulos.includes('recuperadas'))){
     navRecuperadas.style.display='flex';
     cargarBadgeRecuperadas();
   }
-  ['sims','envios','desinstalaciones','churn-producto','hoja-ruta','napse','store','recuperadas','rollout','rollout-piloto','retencion','terminales'].forEach(mod=>{
+  ['sims','envios','desinstalaciones','churn-producto','hoja-ruta','napse','store','recuperadas','rollout','rollout-piloto','retencion','terminales','zonas-amba'].forEach(mod=>{
     const el=document.getElementById('nav-'+mod);
     if(el&&!modulos.includes(mod)&&!isAdmin&&!isCeo){el.classList.add('locked');el.onclick=null;}
   });
@@ -5334,14 +5345,13 @@ function buildDashCards(modulos,isAdmin,isCeo){
   loadOpsPanel(isAdmin, modulos);
 }
 
-const MOD_INFO={home:'Dashboard',sims:'Verificador SIMs',envios:'Envíos',rollout:'Rollout','rollout-piloto':'Rollout Piloto — Trazabilidad',desinstalaciones:'Desinstalaciones','churn-producto':'Churn Producto — NAPSE / PRISMA / Sin Perfil','hoja-ruta':'Hoja de Ruta — por chofer',napse:'NAPSE — Logs VTOL',instalaciones:'Instalaciones SF',retencion:'Retención de Cuentas',ajustes:'Ajustes',ally:'Configuración Ally',distri:'Distribuidores',terminales:'Terminales — Logicalis',store:'Bancos — Terminales disponibles',presupuesto:'Presupuesto de Operaciones'};
+const MOD_INFO={home:'Dashboard',sims:'Verificador SIMs',envios:'Envíos',rollout:'Rollout','rollout-piloto':'Rollout Piloto — Trazabilidad',desinstalaciones:'Desinstalaciones','churn-producto':'Churn Producto — NAPSE / PRISMA / Sin Perfil','hoja-ruta':'Hoja de Ruta — por chofer',napse:'NAPSE — Logs VTOL',instalaciones:'Instalaciones SF',retencion:'Retención de Cuentas',ajustes:'Ajustes',ally:'Configuración Ally',distri:'Distribuidores',terminales:'Terminales — Logicalis',store:'Bancos — Terminales disponibles',presupuesto:'Presupuesto de Operaciones','zonas-amba':'Zonas AMBA — correcciones por CP'};
 
 function goTo(mod){
   const el=document.getElementById('nav-'+mod);
   if(el&&el.classList.contains('locked'))return;
   // Módulos que viven FUERA del .content div
-  const outsideMods=new Set(['ally','retencion','distri','terminales','instalaciones','recuperadas']);
-  // Ocultar .content PRIMERO para evitar el bloque negro
+  const outsideMods=new Set(['ally','retencion','distri','terminales','instalaciones','recuperadas','zonas-amba']);
   const contentEl=document.querySelector('.content');
   if(contentEl) contentEl.style.display=outsideMods.has(mod)?'none':'';
   document.querySelectorAll('.module').forEach(m=>{
@@ -5393,6 +5403,7 @@ function goTo(mod){
   if(mod==='terminales')window.termInit?.();
   if(mod==='store')window.storeInit?.(); // store
   if(mod==='recuperadas')window.cargarRecuperadas?.();
+  if(mod==='zonas-amba')zcpCargar();
 }
 
 function refreshCurrentModule(){
@@ -5623,6 +5634,7 @@ const ALL_MODS = [
   {id:'retencion',label:'🛡️ Retención'},
   {id:'store',      label:'🏦 Bancos'},
   {id:'recuperadas',label:'🔁 Recuperadas'},
+  {id:'zonas-amba', label:'📍 Zonas AMBA'},
 ];
 
 async function loadUsers() {
@@ -14547,15 +14559,10 @@ async function napseMatchSF(serialNumber, node, store, btn){
 function allyInit() {
   var firstTab = document.querySelector('.ally-tab');
   allyTab('contactos', firstTab);
-  // Zonas AMBA — pedido explícito 03/08: SOLO marcelos, ni siquiera otros
-  // admins. Mismo criterio que ya usa el card de Objetivo Semanal.
-  var esMarcelosZonas = (currentProfile?.email||currentUser?.email||'').trim().toLowerCase()==='marcelos@moretti.com.ar';
-  var btnZonas = document.getElementById('ally-tab-btn-zonas');
-  if(btnZonas) btnZonas.style.display = esMarcelosZonas ? '' : 'none';
 }
 
 function allyTab(tab, btn) {
-  ['contactos','grupos','reglas','zonas'].forEach(function(t) {
+  ['contactos','grupos','reglas'].forEach(function(t) {
     var el = document.getElementById('ally-tab-' + t);
     if (el) el.style.display = (t === tab) ? '' : 'none';
   });
@@ -14564,22 +14571,26 @@ function allyTab(tab, btn) {
   if (tab === 'contactos') allyCargarContactos();
   if (tab === 'grupos')    allyCargarGrupos();
   if (tab === 'reglas')    allyCargarReglas();
-  if (tab === 'zonas')     zcpCargar();
 }
 
 // ── Zonas AMBA — correcciones manuales por CP (zona_cp_manual) ──────────
-// SOLO marcelos, pedido explícito 03/08 — ni siquiera otros admins. El
-// botón del tab ya está oculto para todos los demás (allyInit), pero acá
-// se repite el chequeo por si alguien fuerza el tab a mano desde la
-// consola del navegador — no alcanza con esconder el botón nomás.
-function _esMarcelosZonas(){
-  return (currentProfile?.email||currentUser?.email||'').trim().toLowerCase()==='marcelos@moretti.com.ar';
+// Hasta el 13/08 esto era solo-marcelos por hardcode de email. Ahora usa el
+// mismo sistema de permisos que cualquier otro módulo (profiles.modulos +
+// rol admin), para poder habilitárselo a Andres/Gonzalo desde Ajustes sin
+// darles Config. Ally completo (Contactos/Grupos/Reglas siguen solo-admin).
+// El nav-item ya viene oculto/locked para quien no tiene el módulo (mismo
+// mecanismo que el resto), pero se repite el chequeo acá por si alguien
+// fuerza la pantalla a mano desde la consola del navegador.
+function _puedeZonasAmba(){
+  const rol = (currentProfile?.rol||'').toLowerCase();
+  const modulos = currentProfile?.modulos||[];
+  return rol==='admin' || modulos.includes('zonas-amba');
 }
 
 async function zcpCargar(){
   const tbody=document.getElementById('zcp-tbody');
   if(!tbody)return;
-  if(!_esMarcelosZonas()){tbody.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:20px">No tenés permiso para ver esta sección</td></tr>';return;}
+  if(!_puedeZonasAmba()){tbody.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:20px">No tenés permiso para ver esta sección</td></tr>';return;}
   const{data,error}=await sb.from('zona_cp_manual').select('*').order('created_at',{ascending:false});
   if(error){tbody.innerHTML=`<tr><td colspan="6" style="text-align:center;color:var(--red);padding:20px">Error: ${error.message}</td></tr>`;return;}
   if(!data?.length){tbody.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:20px">Sin correcciones cargadas todavía</td></tr>';return;}
@@ -14594,7 +14605,7 @@ async function zcpCargar(){
 }
 
 async function zcpGuardar(){
-  if(!_esMarcelosZonas()){alert('No tenés permiso para hacer esto.');return;}
+  if(!_puedeZonasAmba()){alert('No tenés permiso para hacer esto.');return;}
   const cp=document.getElementById('zcp-cp').value.trim().replace(/\D/g,'');
   const zona=document.getElementById('zcp-zona').value;
   const localidad=document.getElementById('zcp-localidad').value.trim()||null;
@@ -14613,7 +14624,7 @@ async function zcpGuardar(){
 }
 
 async function zcpBorrar(cp){
-  if(!_esMarcelosZonas()){alert('No tenés permiso para hacer esto.');return;}
+  if(!_puedeZonasAmba()){alert('No tenés permiso para hacer esto.');return;}
   if(!confirm(`¿Borrar la corrección manual del CP ${cp}? Vuelve a depender del clasificador automático.`))return;
   const{error}=await sb.from('zona_cp_manual').delete().eq('cp',cp);
   if(error){alert('Error: '+error.message);return;}
