@@ -343,7 +343,7 @@
     <div class="brand">
       <div class="brand-mark display">PV</div>
       <div class="brand-text">
-        <div class="name">Portal Ventas <span id="version-badge" class="mono" style="font-size:10px; color:var(--muted2); font-weight:500; background:var(--surface3); padding:2px 6px; border-radius:5px; margin-left:4px; vertical-align:middle;">v0.2.0</span></div>
+        <div class="name">Portal Ventas <span id="version-badge" class="mono" style="font-size:10px; color:var(--muted2); font-weight:500; background:var(--surface3); padding:2px 6px; border-radius:5px; margin-left:4px; vertical-align:middle;">v0.3.0</span></div>
         <div class="sub">SLA CONTROL</div>
       </div>
     </div>
@@ -483,7 +483,7 @@ async function loadFromSupabase() {
       obs: r.observaciones || '',
     }));
   } catch (e) {
-    console.warn('[SLA Control] No se pudo leer sla_ots de Supabase, uso datos de ejemplo.', e);
+    console.warn('[Portal Ventas] No se pudo leer sla_ots de Supabase, uso datos de ejemplo.', e);
     return null;
   }
 }
@@ -492,18 +492,15 @@ async function loadFromSupabase() {
    SYNC STATUS — lee automation_runs (rule_code='sla_ots_sync') de Supabase
    para mostrar última corrida y calcular la próxima (cada 10min).
    ========================================================================= */
-const APP_VERSION = 'v0.2.0';
+const APP_VERSION = 'v0.3.0';
 const CORTE_FECHA_DISPLAY = '01/05/2026';
 const CRON_INTERVAL_MIN = 10;
 
-// Base del agente Railway + secret para disparar el Full Sync.
-// Por seguridad el secret arranca vacío: si lo dejás así, el botón te copia
-// el comando curl al portapapeles en vez de pegarle directo a producción
-// desde el HTML (evita exponer el secret en el código fuente del cliente).
-// Completalo solo si asumís ese trade-off — mismo nivel de riesgo que el
-// resto de tu stack, que ya usa este secret fijo en varios lugares.
-const RAILWAY_BASE = 'https://alleata-agent-production.up.railway.app';
-const AUTOMATION_SECRET_CLIENT = '';
+// El Full Sync le pega a un Edge Function de Supabase (sla-sync-proxy), NO
+// directo a Railway — el secret vive server-side ahí (Supabase secrets),
+// mismo patrón que ya usás con ca-proxy / gemini-proxy. Nada sensible queda
+// expuesto en este HTML: solo el anon key, que es público por diseño.
+const SLA_SYNC_PROXY_URL = `${SUPABASE_URL}/functions/v1/sla-sync-proxy`;
 
 let lastSyncAt = null;
 
@@ -523,7 +520,7 @@ async function loadSyncStatus(){
     lastSyncAt = new Date(data.finished_at);
     document.getElementById('sync-count').textContent = (data.processed_count ?? '—') + ' OTs';
   }catch(e){
-    console.warn('[SLA Control] No se pudo leer automation_runs (¿falta la policy de lectura?)', e);
+    console.warn('[Portal Ventas] No se pudo leer automation_runs (¿falta la policy de lectura?)', e);
   }
 }
 
@@ -555,21 +552,17 @@ function tickSyncStatus(){
 
 async function triggerFullSync(){
   const btn = document.querySelector('.btn-fullsync');
-  const endpoint = `${RAILWAY_BASE}/automations/sla-ots-sync/full`;
-
-  if(!AUTOMATION_SECRET_CLIENT){
-    const curl = `curl -X POST ${endpoint} -H "x-automation-secret: TU_SECRET"`;
-    try{ await navigator.clipboard.writeText(curl); }catch(e){}
-    showToast('📋', 'Comando copiado', `Pegalo en tu terminal (con el secret real):<code>${curl}</code>`);
-    return;
-  }
-
   btn.disabled = true;
   btn.textContent = '↻ Sincronizando...';
   try{
-    const resp = await fetch(endpoint, {
+    const resp = await fetch(SLA_SYNC_PROXY_URL, {
       method:'POST',
-      headers:{ 'x-automation-secret': AUTOMATION_SECRET_CLIENT }
+      headers:{
+        'Content-Type':'application/json',
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+      },
+      body: JSON.stringify({ mode:'full' }),
     });
     const json = await resp.json();
     if(json.ok){
@@ -580,7 +573,7 @@ async function triggerFullSync(){
       showToast('⚠️', 'Full Sync con error', json.error || 'Error desconocido.');
     }
   }catch(e){
-    showToast('⚠️', 'No se pudo conectar', e.message);
+    showToast('⚠️', 'No se pudo conectar', e.message + ' — ¿está deployado el edge function sla-sync-proxy?');
   }finally{
     btn.disabled = false;
     btn.textContent = '↻ Full Sync';
