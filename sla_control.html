@@ -149,6 +149,29 @@
     display:inline-flex; align-items:center; gap:6px; cursor:pointer;
   }
 
+  /* Sync status card */
+  .sync-card{
+    display:flex; align-items:center; gap:22px; flex-wrap:wrap;
+    background:var(--surface); border:1px solid var(--hairline); border-radius:12px;
+    padding:12px 16px; margin-bottom:18px; font-size:12.5px;
+  }
+  .sync-row{ display:flex; align-items:center; gap:7px; }
+  .sync-icon{ font-size:12px; }
+  .sync-dot{
+    width:7px; height:7px; border-radius:50%; background:var(--green);
+    box-shadow:0 0 0 0 rgba(47,209,128,0.55); animation:pulse 2s infinite;
+  }
+  .sync-label{ color:var(--muted); }
+  .sync-value{ color:var(--text); font-weight:500; }
+  .sync-hint{ color:var(--muted2); font-size:11px; }
+  .btn-fullsync{
+    margin-left:auto; background:var(--surface3); border:1px solid var(--hairline);
+    color:var(--text); font-size:12px; padding:7px 14px; border-radius:7px;
+    cursor:pointer; font-weight:500; transition:filter .15s ease;
+  }
+  .btn-fullsync:hover{ filter:brightness(1.25); border-color:var(--accent); }
+  .btn-fullsync:disabled{ opacity:.5; cursor:not-allowed; }
+
   /* KPI cards */
   .kpi-row{ display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:26px;}
   .kpi-card{
@@ -300,7 +323,7 @@
     <div class="brand">
       <div class="brand-mark display">SC</div>
       <div class="brand-text">
-        <div class="name">SLA Control</div>
+        <div class="name">SLA Control <span id="version-badge" class="mono" style="font-size:10px; color:var(--muted2); font-weight:500; background:var(--surface3); padding:2px 6px; border-radius:5px; margin-left:4px; vertical-align:middle;">v0.2.0</span></div>
         <div class="sub">PORTAL VENTAS</div>
       </div>
     </div>
@@ -326,6 +349,28 @@
           ⚠ Umbrales de ejemplo — click para ver supuestos
         </div>
       </div>
+    </div>
+
+    <!-- Sync Status -->
+    <div class="sync-card" id="sync-card">
+      <div class="sync-row">
+        <span class="sync-dot" id="sync-dot"></span>
+        <span class="sync-label">Sync OTs (SF)</span>
+        <span class="sync-value mono" id="sync-next">—</span>
+        <span class="sync-hint">(cada 10min)</span>
+      </div>
+      <div class="sync-row">
+        <span class="sync-icon">🕐</span>
+        <span class="sync-label">Última sync</span>
+        <span class="sync-value mono" id="sync-last">—</span>
+      </div>
+      <div class="sync-row">
+        <span class="sync-icon">📦</span>
+        <span class="sync-label">OTs bajo control</span>
+        <span class="sync-value mono" id="sync-count">—</span>
+        <span class="sync-hint">desde 01/05/2026</span>
+      </div>
+      <button class="btn-fullsync" onclick="triggerFullSync()">↻ Full Sync</button>
     </div>
 
     <!-- KPIs -->
@@ -422,7 +467,105 @@ async function loadFromSupabase() {
 }
 
 /* =========================================================================
-   CONFIG — SUPUESTOS A VALIDAR
+   SYNC STATUS — lee automation_runs (rule_code='sla_ots_sync') de Supabase
+   para mostrar última corrida y calcular la próxima (cada 10min).
+   ========================================================================= */
+const APP_VERSION = 'v0.2.0';
+const CORTE_FECHA_DISPLAY = '01/05/2026';
+const CRON_INTERVAL_MIN = 10;
+
+// Base del agente Railway + secret para disparar el Full Sync.
+// Por seguridad el secret arranca vacío: si lo dejás así, el botón te copia
+// el comando curl al portapapeles en vez de pegarle directo a producción
+// desde el HTML (evita exponer el secret en el código fuente del cliente).
+// Completalo solo si asumís ese trade-off — mismo nivel de riesgo que el
+// resto de tu stack, que ya usa este secret fijo en varios lugares.
+const RAILWAY_BASE = 'https://alleata-agent-production.up.railway.app';
+const AUTOMATION_SECRET_CLIENT = '';
+
+let lastSyncAt = null;
+
+async function loadSyncStatus(){
+  if(!SUPABASE_ANON_KEY || !window.supabase) return;
+  try{
+    const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const { data, error } = await client
+      .from('automation_runs')
+      .select('finished_at, processed_count, status')
+      .eq('rule_code', 'sla_ots_sync')
+      .eq('status', 'success')
+      .order('finished_at', { ascending:false })
+      .limit(1)
+      .maybeSingle();
+    if(error || !data) return;
+    lastSyncAt = new Date(data.finished_at);
+    document.getElementById('sync-count').textContent = (data.processed_count ?? '—') + ' OTs';
+  }catch(e){
+    console.warn('[SLA Control] No se pudo leer automation_runs (¿falta la policy de lectura?)', e);
+  }
+}
+
+function tickSyncStatus(){
+  const dot = document.getElementById('sync-dot');
+  const lastEl = document.getElementById('sync-last');
+  const nextEl = document.getElementById('sync-next');
+  if(!lastSyncAt){
+    lastEl.textContent = 'sin registro';
+    nextEl.textContent = '—';
+    if(dot) dot.style.background = 'var(--gray)';
+    return;
+  }
+  const now = new Date();
+  const diffMinLast = Math.floor((now - lastSyncAt) / 60000);
+  lastEl.textContent = diffMinLast < 1 ? 'recién' : `hace ${diffMinLast}min`;
+
+  const nextAt = new Date(lastSyncAt.getTime() + CRON_INTERVAL_MIN*60000);
+  const diffSecNext = Math.round((nextAt - now) / 1000);
+  if(diffSecNext <= 0){
+    nextEl.textContent = 'en curso o atrasado';
+    if(dot) dot.style.background = 'var(--amber)';
+  } else {
+    const m = Math.floor(diffSecNext/60), s = diffSecNext%60;
+    nextEl.textContent = `en ${m}m ${s}s`;
+    if(dot) dot.style.background = 'var(--green)';
+  }
+}
+
+async function triggerFullSync(){
+  const btn = document.querySelector('.btn-fullsync');
+  const endpoint = `${RAILWAY_BASE}/automations/sla-ots-sync/full`;
+
+  if(!AUTOMATION_SECRET_CLIENT){
+    const curl = `curl -X POST ${endpoint} -H "x-automation-secret: TU_SECRET_ACA"`;
+    try{ await navigator.clipboard.writeText(curl); }catch(e){}
+    alert('Por seguridad este botón no tiene el secret embebido en el HTML.\n\nComando copiado al portapapeles (completá el secret real y corré desde tu terminal):\n\n' + curl);
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = '↻ Sincronizando...';
+  try{
+    const resp = await fetch(endpoint, {
+      method:'POST',
+      headers:{ 'x-automation-secret': AUTOMATION_SECRET_CLIENT }
+    });
+    const json = await resp.json();
+    if(json.ok){
+      alert(`Full Sync OK — ${json.procesadas} OTs sincronizadas (de ${json.candidatos} evaluadas).`);
+      booted = false;
+      await boot();
+    } else {
+      alert('Full Sync respondió con error: ' + (json.error || 'desconocido'));
+    }
+  }catch(e){
+    alert('No se pudo contactar al agente Railway: ' + e.message);
+  }finally{
+    btn.disabled = false;
+    btn.textContent = '↻ Full Sync';
+  }
+}
+
+/* =========================================================================
    Umbrales de SLA en días. Ajustar cuando definamos los reales con Facundo.
    ========================================================================= */
 const SLA_CONFIG = {
@@ -818,6 +961,7 @@ async function boot(){
   if(booted) return;
   booted = true;
 
+  document.getElementById('version-badge').textContent = APP_VERSION;
   const liveData = await loadFromSupabase();
   if(liveData){
     OTS = liveData;
@@ -827,6 +971,10 @@ async function boot(){
     DATA_SOURCE = 'mock';
   }
   updateDataSourceBadge();
+
+  await loadSyncStatus();
+  tickSyncStatus();
+  setInterval(tickSyncStatus, 1000);
 
   populateFilterOptions();
   renderKPIs();
