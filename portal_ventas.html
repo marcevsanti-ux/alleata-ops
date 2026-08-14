@@ -18,7 +18,7 @@
     --muted:#8FA0BC;
     --muted2:#5E6C87;
     --accent:#4C7CF0;
-    --violet:#B388F5;
+    --celeste:#4FC3F7;
     --accent-dim:#2C3D66;
     --green:#2FD180;
     --green-dim:#12301F;
@@ -272,8 +272,8 @@
     display:inline-flex; align-items:center; gap:6px; font-size:12px;
   }
   .resp-dot{ width:6px; height:6px; border-radius:50%; background:var(--accent); }
-  .resp-chip.violet{ color:var(--violet); font-weight:600; }
-  .resp-chip.violet .resp-dot{ background:var(--violet); }
+  .resp-chip.celeste{ color:var(--celeste); font-weight:600; }
+  .resp-chip.celeste .resp-dot{ background:var(--celeste); }
 
   /* Links a Salesforce */
   .sf-link{
@@ -375,7 +375,7 @@
     <div class="brand">
       <div class="brand-mark display">PV</div>
       <div class="brand-text">
-        <div class="name">Portal Ventas <span id="version-badge" class="mono" style="font-size:10px; color:var(--muted2); font-weight:500; background:var(--surface3); padding:2px 6px; border-radius:5px; margin-left:4px; vertical-align:middle;">v0.3.2</span></div>
+        <div class="name">Portal Ventas <span id="version-badge" class="mono" style="font-size:10px; color:var(--muted2); font-weight:500; background:var(--surface3); padding:2px 6px; border-radius:5px; margin-left:4px; vertical-align:middle;">v0.3.3</span></div>
         <div class="sub">SLA CONTROL</div>
       </div>
     </div>
@@ -492,6 +492,15 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 
 let DATA_SOURCE = 'mock'; // pasa a 'live' si la carga desde Supabase funciona
 
+// Algunos campos de SF (ej: Owner_de_cuenta_relacionada__c) son fórmulas
+// HYPERLINK() y devuelven HTML crudo en vez de texto plano. Esto lo limpia
+// del lado del cliente por si hay datos viejos en Supabase sin re-sincronizar.
+function stripHtml(value){
+  if(!value) return null;
+  const clean = String(value).replace(/<[^>]*>/g, '').trim();
+  return clean || null;
+}
+
 async function loadFromSupabase() {
   if (!SUPABASE_ANON_KEY || !window.supabase) return null;
   try {
@@ -509,7 +518,7 @@ async function loadFromSupabase() {
       tipo: 'Instalación Equipo + Simcard',
       cuenta: r.cuenta || '(sin cuenta)',
       cuit: r.cuit || '—',
-      responsable: r.responsable_venta || r.responsable_operativo || 'Sin asignar',
+      responsable: stripHtml(r.responsable_venta) || stripHtml(r.responsable_operativo) || 'Sin asignar',
       etapa: r.etapa_actual || 'Sin estado',
       f_configurar: r.f_configurar_terminal,
       f_precolecta: r.f_precolecta,
@@ -517,7 +526,7 @@ async function loadFromSupabase() {
       f_exitoso: r.f_exitoso,
       obs: r.observaciones || '',
       // Sales Performance
-      vendedorCapacitacion: r.vendedor_capacitacion || 'Sin asignar',
+      vendedorCapacitacion: stripHtml(r.vendedor_capacitacion) || 'Sin asignar',
       fInstalacionCuenta: r.f_instalacion_cuenta,
       fCapacitacionCuenta: r.f_capacitacion_cuenta,
       alarmaSinFechaInstalacion: !!r.alarma_sin_fecha_instalacion,
@@ -532,7 +541,7 @@ async function loadFromSupabase() {
    SYNC STATUS — lee automation_runs (rule_code='sla_ots_sync') de Supabase
    para mostrar última corrida y calcular la próxima (cada 10min).
    ========================================================================= */
-const APP_VERSION = 'v0.3.2';
+const APP_VERSION = 'v0.3.3';
 const CORTE_FECHA_DISPLAY = '01/05/2026';
 const CRON_INTERVAL_MIN = 10;
 
@@ -1030,9 +1039,16 @@ function renderTable(){
     if(rF && o.responsable !== rF) return false;
     if(eF && o.etapa !== eF) return false;
     if(sF){
-      const s = computeSlas(o);
-      const statuses = [s.ops.status, s.log.status].filter(x=>x!=='pending');
-      if(!statuses.includes(sF)) return false;
+      if(isSales){
+        // En esta vista el único semáforo relevante es el SLA Ventas (capacitación)
+        if(o.alarmaSinFechaInstalacion) return false; // la alarma no tiene semáforo de color
+        const vs = evalVentaSla(o);
+        if(vs.status !== sF) return false;
+      } else {
+        const s = computeSlas(o);
+        const statuses = [s.ops.status, s.log.status].filter(x=>x!=='pending');
+        if(!statuses.includes(sF)) return false;
+      }
     }
     return true;
   });
@@ -1098,7 +1114,7 @@ function renderSalesPerformanceRow(o){
         <div class="cuenta-sub">CUIT ${o.cuit} ${otLink}</div>
       </td>
       <td>
-        <div class="resp-chip violet"><span class="resp-dot"></span>${o.vendedorCapacitacion || 'Sin asignar'}</div>
+        <div class="resp-chip celeste"><span class="resp-dot"></span>${o.vendedorCapacitacion || 'Sin asignar'}</div>
       </td>
       <td class="mono" style="font-size:12px;">${o.fInstalacionCuenta ? o.fInstalacionCuenta.slice(0,10) : '—'}</td>
       <td>${alarma
