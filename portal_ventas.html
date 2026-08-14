@@ -260,6 +260,8 @@
     font-weight:600; white-space:nowrap;
     background:var(--surface2);
   }
+  thead th.sortable-th{ cursor:pointer; user-select:none; transition:color .12s ease; }
+  thead th.sortable-th:hover{ color:var(--text); }
   tbody tr{ border-bottom:1px solid var(--hairline); transition:background .12s ease; }
   tbody tr:last-child{ border-bottom:none; }
   tbody tr:hover{ background:var(--surface2); }
@@ -375,7 +377,7 @@
     <div class="brand">
       <div class="brand-mark display">PV</div>
       <div class="brand-text">
-        <div class="name">Portal Ventas <span id="version-badge" class="mono" style="font-size:10px; color:var(--muted2); font-weight:500; background:var(--surface3); padding:2px 6px; border-radius:5px; margin-left:4px; vertical-align:middle;">v0.3.3</span></div>
+        <div class="name">Portal Ventas <span id="version-badge" class="mono" style="font-size:10px; color:var(--muted2); font-weight:500; background:var(--surface3); padding:2px 6px; border-radius:5px; margin-left:4px; vertical-align:middle;">v0.3.4</span></div>
         <div class="sub">SLA CONTROL</div>
       </div>
     </div>
@@ -541,7 +543,7 @@ async function loadFromSupabase() {
    SYNC STATUS — lee automation_runs (rule_code='sla_ots_sync') de Supabase
    para mostrar última corrida y calcular la próxima (cada 10min).
    ========================================================================= */
-const APP_VERSION = 'v0.3.3';
+const APP_VERSION = 'v0.3.4';
 const CORTE_FECHA_DISPLAY = '01/05/2026';
 const CRON_INTERVAL_MIN = 10;
 
@@ -1014,16 +1016,46 @@ function evalVentaSla(o){
   return evalSla(o.fInstalacionCuenta, o.fCapacitacionCuenta, SLA_CONFIG.ventas);
 }
 
-const TABLE_HEADS = {
-  default: `<tr>
-    <th>OT</th><th>Cuenta</th><th>Responsable</th><th>Etapa actual</th>
-    <th>SLA Operaciones</th><th>SLA Logística</th><th>Observaciones</th>
-  </tr>`,
-  'sales-performance': `<tr>
-    <th>Cuenta / OT</th><th>Vendedor</th><th>Fecha instalación</th>
-    <th>SLA Ventas (capacitación)</th><th>Fecha capacitación</th><th>Alarma</th>
-  </tr>`,
+const COLUMN_DEFS = {
+  default: [
+    { key:'ot', label:'OT', getValue:o=>o.ot },
+    { key:'cuenta', label:'Cuenta', getValue:o=>o.cuenta },
+    { key:'responsable', label:'Responsable', getValue:o=>o.responsable },
+    { key:'etapa', label:'Etapa actual', getValue:o=>o.etapa },
+    { key:'sla_ops', label:'SLA Operaciones', getValue:o=>{ const d=computeSlas(o).ops.days; return d==null?-1:d; } },
+    { key:'sla_log', label:'SLA Logística', getValue:o=>{ const d=computeSlas(o).log.days; return d==null?-1:d; } },
+    { key:'obs', label:'Observaciones', getValue:o=>o.obs||'' },
+  ],
+  'sales-performance': [
+    { key:'cuenta', label:'Cuenta / OT', getValue:o=>o.cuenta },
+    { key:'vendedor', label:'Vendedor', getValue:o=>o.vendedorCapacitacion||'' },
+    { key:'f_instalacion', label:'Fecha instalación', getValue:o=>o.fInstalacionCuenta||'' },
+    { key:'sla_ventas', label:'SLA Ventas (capacitación)', getValue:o=>{ if(o.alarmaSinFechaInstalacion) return -1; const d=evalVentaSla(o).days; return d==null?-1:d; } },
+    { key:'f_capacitacion', label:'Fecha capacitación', getValue:o=>o.fCapacitacionCuenta||'' },
+    { key:'alarma', label:'Alarma', getValue:o=>o.alarmaSinFechaInstalacion?1:0 },
+  ],
 };
+
+let sortState = { view:null, key:null, dir:'asc' };
+
+function toggleSort(viewKey, key){
+  if(sortState.view===viewKey && sortState.key===key){
+    sortState.dir = sortState.dir==='asc' ? 'desc' : 'asc';
+  } else {
+    sortState = { view:viewKey, key, dir:'asc' };
+  }
+  renderTable();
+}
+
+function renderTableHead(viewKey){
+  const cols = COLUMN_DEFS[viewKey];
+  const thead = document.getElementById('table-head');
+  thead.innerHTML = '<tr>' + cols.map(c=>{
+    const isSorted = sortState.view===viewKey && sortState.key===c.key;
+    const arrow = isSorted ? `<span style="color:var(--accent); margin-left:4px;">${sortState.dir==='asc' ? '▲' : '▼'}</span>` : '';
+    return `<th class="sortable-th" onclick="toggleSort('${viewKey}','${c.key}')">${c.label}${arrow}</th>`;
+  }).join('') + '</tr>';
+}
 
 function renderTable(){
   const q = document.getElementById('f-search').value.trim().toLowerCase();
@@ -1032,7 +1064,8 @@ function renderTable(){
   const sF = document.getElementById('f-semaforo').value;
   const isSales = currentView === 'sales-performance';
 
-  document.getElementById('table-head').innerHTML = isSales ? TABLE_HEADS['sales-performance'] : TABLE_HEADS.default;
+  const viewKey = isSales ? 'sales-performance' : 'default';
+  renderTableHead(viewKey);
 
   let rows = getVisibleOts().filter(o=>{
     if(q && !(o.ot.toLowerCase().includes(q) || o.cuenta.toLowerCase().includes(q))) return false;
@@ -1053,10 +1086,29 @@ function renderTable(){
     return true;
   });
 
-  // Sales Performance: solo tiene sentido para OTs Exitosas (con o sin la
-  // fecha de instalación cargada — las que NO la tienen son justamente la alarma)
+  // Sales Performance: la vista muestra lo que necesita acción — pendientes
+  // de capacitación (instalación cargada, capacitación no) o bloqueadas por
+  // el bug de SF (sin fecha de instalación). Las ya capacitadas (SLA cerrado)
+  // no se listan acá — quedan resueltas, no aportan a esta vista de gestión.
   if(isSales){
-    rows = rows.filter(o => o.etapa === 'Exitoso');
+    rows = rows.filter(o =>
+      o.etapa === 'Exitoso' &&
+      (o.alarmaSinFechaInstalacion || (o.fInstalacionCuenta && !o.fCapacitacionCuenta))
+    );
+  }
+
+  if(sortState.view === viewKey && sortState.key){
+    const col = COLUMN_DEFS[viewKey].find(c=>c.key===sortState.key);
+    if(col){
+      rows = [...rows].sort((a,b)=>{
+        let va = col.getValue(a), vb = col.getValue(b);
+        if(typeof va === 'string') va = va.toLowerCase();
+        if(typeof vb === 'string') vb = vb.toLowerCase();
+        if(va < vb) return sortState.dir==='asc' ? -1 : 1;
+        if(va > vb) return sortState.dir==='asc' ? 1 : -1;
+        return 0;
+      });
+    }
   }
 
   const tbody = document.getElementById('table-body');
