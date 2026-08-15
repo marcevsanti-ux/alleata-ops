@@ -377,7 +377,7 @@
     <div class="brand">
       <div class="brand-mark display">PV</div>
       <div class="brand-text">
-        <div class="name">Portal Ventas <span id="version-badge" class="mono" style="font-size:10px; color:var(--muted2); font-weight:500; background:var(--surface3); padding:2px 6px; border-radius:5px; margin-left:4px; vertical-align:middle;">v0.3.8</span></div>
+        <div class="name">Portal Ventas <span id="version-badge" class="mono" style="font-size:10px; color:var(--muted2); font-weight:500; background:var(--surface3); padding:2px 6px; border-radius:5px; margin-left:4px; vertical-align:middle;">v0.3.9</span></div>
         <div class="sub">SLA CONTROL</div>
       </div>
     </div>
@@ -530,6 +530,9 @@ async function loadFromSupabase() {
       // Sales Performance
       vendedorCapacitacion: stripHtml(r.vendedor_capacitacion) || 'Sin asignar',
       fechaPedidoBaja: r.fecha_pedido_baja,
+      vendedorCuenta: stripHtml(r.vendedor_cuenta) || 'Sin asignar',
+      estadoCuenta: r.estado_cuenta,
+      volumenUltimos30Dias: r.volumen_ultimos_30_dias,
       fInstalacionCuenta: r.f_instalacion_cuenta,
       fCapacitacionCuenta: r.f_capacitacion_cuenta,
       alarmaSinFechaInstalacion: !!r.alarma_sin_fecha_instalacion,
@@ -544,7 +547,7 @@ async function loadFromSupabase() {
    SYNC STATUS — lee automation_runs (rule_code='sla_ots_sync') de Supabase
    para mostrar última corrida y calcular la próxima (cada 10min).
    ========================================================================= */
-const APP_VERSION = 'v0.3.8';
+const APP_VERSION = 'v0.3.9';
 const CORTE_FECHA_DISPLAY = '01/05/2026';
 const CRON_INTERVAL_MIN = 10;
 
@@ -665,6 +668,7 @@ let OTS_MOCK = [
     f_despachado:'2026-08-03', f_exitoso:'2026-08-05',
     sfId:'0WO5g00000ExAMP1AAG', cuentaId:'0015g00000AccNq1AAG',
     vendedorCapacitacion:'Alejandro Amato', fInstalacionCuenta:'2026-08-05', fCapacitacionCuenta:'2026-08-09', alarmaSinFechaInstalacion:false,
+    vendedorCuenta:'Alejandro Amato', estadoCuenta:'Post-Venta', volumenUltimos30Dias:184500,
     obs:'FVR>>FACU>>pago dos comodatos seguidos, puntos de venta 100 y 101.'
   },
   {
@@ -918,6 +922,12 @@ function renderKPIs(){
   const exitosasConFecha = visibles.filter(o => o.etapa === 'Exitoso' && !o.alarmaSinFechaInstalacion);
   const pendientesCapacitacion = exitosasConFecha.filter(o => o.fInstalacionCuenta && !o.fCapacitacionCuenta && !o.fechaPedidoBaja).length;
   const gestionCerrados = visibles.filter(o => o.etapa === 'Exitoso' && o.fInstalacionCuenta && o.fCapacitacionCuenta).length;
+  const ESTADOS_EXCLUIDOS_STOCK = ['Cuenta con error', 'Pedido de baja'];
+  const stockCount = visibles.filter(o =>
+    o.etapa === 'Exitoso' &&
+    o.fInstalacionCuenta && o.fCapacitacionCuenta &&
+    !ESTADOS_EXCLUIDOS_STOCK.includes(o.estadoCuenta)
+  ).length;
   const alarmas = visibles.filter(o => o.alarmaSinFechaInstalacion).length;
 
   // Cards clicables — abren la vista de detalle abajo
@@ -936,6 +946,11 @@ function renderKPIs(){
       id:'sales-gestion', label:'SALES · GESTIÓN', value:gestionCerrados,
       sub:'SLA cerrado (instalación → capacitación)',
       onclick:"openView('sales-gestion')"
+    },
+    {
+      id:'sales-stock', label:'SALES · STOCK', value:stockCount,
+      sub:'SLA cerrado · sin error ni pedido de baja',
+      onclick:"openView('sales-stock')"
     },
     {
       id:'sales-performance', label:'SALES · PERFORMANCE', value:pendientesCapacitacion,
@@ -999,6 +1014,9 @@ function openView(viewId){
   } else if(viewId === 'sales-gestion'){
     document.getElementById('view-heading').innerHTML =
       `<div class="title">Sales · Gestión — SLA cerrado (instalación → capacitación)</div><span class="close" onclick="closeView()">Cerrar ✕</span>`;
+  } else if(viewId === 'sales-stock'){
+    document.getElementById('view-heading').innerHTML =
+      `<div class="title">Sales · Stock — cuentas activas listas para venta</div><span class="close" onclick="closeView()">Cerrar ✕</span>`;
   } else if(viewId === 'sales-performance'){
     document.getElementById('view-heading').innerHTML =
       `<div class="title">Sales · Performance — capacitación post-instalación</div><span class="close" onclick="closeView()">Cerrar ✕</span>`;
@@ -1021,6 +1039,16 @@ function clearFilters(alsoRender = true){
   document.getElementById('f-etapa').value='';
   document.getElementById('f-semaforo').value='';
   if(alsoRender) renderTable();
+}
+
+function formatDateDMY(isoOrDate){
+  if(!isoOrDate) return '—';
+  const d = new Date(isoOrDate);
+  if(isNaN(d.getTime())) return '—';
+  const dd = String(d.getUTCDate()).padStart(2,'0');
+  const mm = String(d.getUTCMonth()+1).padStart(2,'0');
+  const yyyy = d.getUTCFullYear();
+  return `${dd}-${mm}-${yyyy}`;
 }
 
 function evalVentaSla(o){
@@ -1053,6 +1081,13 @@ const COLUMN_DEFS = {
     { key:'f_capacitacion', label:'Fecha capacitación', getValue:o=>o.fCapacitacionCuenta||'' },
     { key:'alarma', label:'Estado', getValue:o=>o.alarmaSinFechaInstalacion?2:(o.fechaPedidoBaja?1:0) },
   ],
+  'sales-stock': [
+    { key:'cuenta', label:'Cuenta / CUIT', getValue:o=>o.cuenta },
+    { key:'vendedor', label:'Vendedor', getValue:o=>o.vendedorCuenta||'' },
+    { key:'f_instalacion', label:'Fecha instalación', getValue:o=>o.fInstalacionCuenta||'' },
+    { key:'f_capacitacion', label:'Fecha capacitación', getValue:o=>o.fCapacitacionCuenta||'' },
+    { key:'volumen', label:'Volumen últimos 30 días', getValue:o=>o.volumenUltimos30Dias ?? -1 },
+  ],
 };
 
 let sortState = { view:null, key:null, dir:'asc' };
@@ -1083,9 +1118,10 @@ function renderTable(){
   const sF = document.getElementById('f-semaforo').value;
   const isSalesPerf = currentView === 'sales-performance';
   const isSalesGestion = currentView === 'sales-gestion';
-  const isSalesTable = isSalesPerf || isSalesGestion;
+  const isSalesStock = currentView === 'sales-stock';
+  const isSalesTable = isSalesPerf || isSalesGestion || isSalesStock;
 
-  const viewKey = isSalesPerf ? 'sales-performance' : isSalesGestion ? 'sales-gestion' : 'default';
+  const viewKey = isSalesPerf ? 'sales-performance' : isSalesGestion ? 'sales-gestion' : isSalesStock ? 'sales-stock' : 'default';
   renderTableHead(viewKey);
 
   let rows = getVisibleOts().filter(o=>{
@@ -1120,6 +1156,15 @@ function renderTable(){
     // Solo SLA cerrado — ambas fechas cargadas. Todo lo que no tiene las dos
     // fechas (pendientes, bug SF, bajas) queda exclusivamente en Sales Performance.
     rows = rows.filter(o => o.etapa === 'Exitoso' && o.fInstalacionCuenta && o.fCapacitacionCuenta);
+  } else if(isSalesStock){
+    // Mismo universo que Sales Gestión (SLA cerrado) pero excluyendo cuentas
+    // en estado "Cuenta con error" o "Pedido de baja" — stock real disponible.
+    const EXCLUIDOS = ['Cuenta con error', 'Pedido de baja'];
+    rows = rows.filter(o =>
+      o.etapa === 'Exitoso' &&
+      o.fInstalacionCuenta && o.fCapacitacionCuenta &&
+      !EXCLUIDOS.includes(o.estadoCuenta)
+    );
   }
 
   if(sortState.view === viewKey && sortState.key){
@@ -1146,7 +1191,7 @@ function renderTable(){
   }
   empty.style.display = 'none';
 
-  tbody.innerHTML = rows.map(o => isSalesTable ? renderSalesPerformanceRow(o) : renderDefaultRow(o)).join('');
+  tbody.innerHTML = rows.map(o => isSalesStock ? renderSalesStockRow(o) : isSalesTable ? renderSalesPerformanceRow(o) : renderDefaultRow(o)).join('');
 }
 
 function renderDefaultRow(o){
@@ -1168,6 +1213,29 @@ function renderDefaultRow(o){
       <td>${gaugeHTML(s.ops, SLA_CONFIG.operaciones, 7)}</td>
       <td>${gaugeHTML(s.log, SLA_CONFIG.logistica, 9)}</td>
       <td class="obs-cell ${o.obs ? '' : 'empty'}">${o.obs || 'Sin observaciones'}</td>
+    </tr>`;
+}
+
+function renderSalesStockRow(o){
+  const cuentaLink = o.cuentaId
+    ? `<a class="sf-link" href="https://alleata.lightning.force.com/lightning/r/Account/${o.cuentaId}/view" target="_blank" rel="noopener">${o.cuenta}</a>`
+    : o.cuenta;
+  const volumen = (o.volumenUltimos30Dias || o.volumenUltimos30Dias === 0)
+    ? '$' + Number(o.volumenUltimos30Dias).toLocaleString('es-AR')
+    : '—';
+
+  return `
+    <tr>
+      <td class="cuenta-ot-cell">
+        <div class="cuenta-name">${cuentaLink}</div>
+        <div class="cuenta-sub">CUIT ${o.cuit}</div>
+      </td>
+      <td>
+        <div class="resp-chip celeste"><span class="resp-dot"></span>${o.vendedorCuenta || 'Sin asignar'}</div>
+      </td>
+      <td class="mono" style="font-size:12px;">${formatDateDMY(o.fInstalacionCuenta)}</td>
+      <td class="mono" style="font-size:12px;">${formatDateDMY(o.fCapacitacionCuenta)}</td>
+      <td class="mono" style="font-size:12px;">${volumen}</td>
     </tr>`;
 }
 
