@@ -377,7 +377,7 @@
     <div class="brand">
       <div class="brand-mark display">PV</div>
       <div class="brand-text">
-        <div class="name">Portal Ventas <span id="version-badge" class="mono" style="font-size:10px; color:var(--muted2); font-weight:500; background:var(--surface3); padding:2px 6px; border-radius:5px; margin-left:4px; vertical-align:middle;">v0.3.7</span></div>
+        <div class="name">Portal Ventas <span id="version-badge" class="mono" style="font-size:10px; color:var(--muted2); font-weight:500; background:var(--surface3); padding:2px 6px; border-radius:5px; margin-left:4px; vertical-align:middle;">v0.3.8</span></div>
         <div class="sub">SLA CONTROL</div>
       </div>
     </div>
@@ -544,7 +544,7 @@ async function loadFromSupabase() {
    SYNC STATUS — lee automation_runs (rule_code='sla_ots_sync') de Supabase
    para mostrar última corrida y calcular la próxima (cada 10min).
    ========================================================================= */
-const APP_VERSION = 'v0.3.7';
+const APP_VERSION = 'v0.3.8';
 const CORTE_FECHA_DISPLAY = '01/05/2026';
 const CRON_INTERVAL_MIN = 10;
 
@@ -917,6 +917,7 @@ function renderKPIs(){
   const exitosas = visibles.filter(o => o.etapa === 'Exitoso').length;
   const exitosasConFecha = visibles.filter(o => o.etapa === 'Exitoso' && !o.alarmaSinFechaInstalacion);
   const pendientesCapacitacion = exitosasConFecha.filter(o => o.fInstalacionCuenta && !o.fCapacitacionCuenta && !o.fechaPedidoBaja).length;
+  const gestionCerrados = visibles.filter(o => o.etapa === 'Exitoso' && o.fInstalacionCuenta && o.fCapacitacionCuenta).length;
   const alarmas = visibles.filter(o => o.alarmaSinFechaInstalacion).length;
 
   // Cards clicables — abren la vista de detalle abajo
@@ -932,8 +933,8 @@ function renderKPIs(){
       onclick:"openView('gestion-ops')"
     },
     {
-      id:'sales-gestion', label:'SALES · GESTIÓN', value:exitosas,
-      sub:'SLA instalación → capacitación (todas)',
+      id:'sales-gestion', label:'SALES · GESTIÓN', value:gestionCerrados,
+      sub:'SLA cerrado (instalación → capacitación)',
       onclick:"openView('sales-gestion')"
     },
     {
@@ -997,7 +998,7 @@ function openView(viewId){
     document.getElementById('f-etapa').value = 'Exitoso';
   } else if(viewId === 'sales-gestion'){
     document.getElementById('view-heading').innerHTML =
-      `<div class="title">Sales · Gestión — SLA instalación → capacitación (todas las exitosas)</div><span class="close" onclick="closeView()">Cerrar ✕</span>`;
+      `<div class="title">Sales · Gestión — SLA cerrado (instalación → capacitación)</div><span class="close" onclick="closeView()">Cerrar ✕</span>`;
   } else if(viewId === 'sales-performance'){
     document.getElementById('view-heading').innerHTML =
       `<div class="title">Sales · Performance — capacitación post-instalación</div><span class="close" onclick="closeView()">Cerrar ✕</span>`;
@@ -1116,9 +1117,9 @@ function renderTable(){
       (o.alarmaSinFechaInstalacion || (o.fInstalacionCuenta && !o.fCapacitacionCuenta))
     );
   } else if(isSalesGestion){
-    // Panorama completo — las 518 exitosas: capacitadas, pendientes,
-    // bloqueadas por bug y con pedido de baja, todas juntas.
-    rows = rows.filter(o => o.etapa === 'Exitoso');
+    // Solo SLA cerrado — ambas fechas cargadas. Todo lo que no tiene las dos
+    // fechas (pendientes, bug SF, bajas) queda exclusivamente en Sales Performance.
+    rows = rows.filter(o => o.etapa === 'Exitoso' && o.fInstalacionCuenta && o.fCapacitacionCuenta);
   }
 
   if(sortState.view === viewKey && sortState.key){
