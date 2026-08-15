@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
   :root{
     --ink:#0B0F16;
@@ -377,7 +378,7 @@
     <div class="brand">
       <div class="brand-mark display">PV</div>
       <div class="brand-text">
-        <div class="name">Portal Ventas <span id="version-badge" class="mono" style="font-size:10px; color:var(--muted2); font-weight:500; background:var(--surface3); padding:2px 6px; border-radius:5px; margin-left:4px; vertical-align:middle;">v0.4.0</span></div>
+        <div class="name">Portal Ventas <span id="version-badge" class="mono" style="font-size:10px; color:var(--muted2); font-weight:500; background:var(--surface3); padding:2px 6px; border-radius:5px; margin-left:4px; vertical-align:middle;">v0.4.1</span></div>
         <div class="sub">SLA CONTROL</div>
       </div>
     </div>
@@ -532,6 +533,13 @@ async function loadFromSupabase() {
       fechaPedidoBaja: r.fecha_pedido_baja,
       vendedorCuenta: stripHtml(r.vendedor_cuenta) || 'Sin asignar',
       estadoCuenta: r.estado_cuenta,
+      costoActivacion: r.costo_activacion,
+      fechaAlta: r.fecha_alta,
+      fechaVentaReal: r.fecha_venta_real,
+      motivoBaja: r.motivo_baja,
+      submotivoBaja: r.submotivo_baja,
+      observacionesGenerales: r.observaciones_generales,
+      ultimoComodatoPago: r.ultimo_comodato_pago,
       volumenUltimos30Dias: r.volumen_ultimos_30_dias,
       fInstalacionCuenta: r.f_instalacion_cuenta,
       fCapacitacionCuenta: r.f_capacitacion_cuenta,
@@ -547,7 +555,7 @@ async function loadFromSupabase() {
    SYNC STATUS — lee automation_runs (rule_code='sla_ots_sync') de Supabase
    para mostrar última corrida y calcular la próxima (cada 10min).
    ========================================================================= */
-const APP_VERSION = 'v0.4.0';
+const APP_VERSION = 'v0.4.1';
 const CORTE_FECHA_DISPLAY = '01/05/2026';
 const CRON_INTERVAL_MIN = 10;
 
@@ -669,6 +677,8 @@ let OTS_MOCK = [
     sfId:'0WO5g00000ExAMP1AAG', cuentaId:'0015g00000AccNq1AAG',
     vendedorCapacitacion:'Alejandro Amato', fInstalacionCuenta:'2026-08-05', fCapacitacionCuenta:'2026-08-09', alarmaSinFechaInstalacion:false,
     vendedorCuenta:'Alejandro Amato', estadoCuenta:'Post-Venta', volumenUltimos30Dias:184500,
+    costoActivacion:true, fechaAlta:'2026-07-28', fechaVentaReal:'2026-07-29', motivoBaja:null, submotivoBaja:null,
+    observacionesGenerales:'Cliente con dos sucursales activas.', ultimoComodatoPago:'2026-08-10',
     obs:'FVR>>FACU>>pago dos comodatos seguidos, puntos de venta 100 y 101.'
   },
   {
@@ -990,7 +1000,8 @@ function renderKPIs(){
   document.getElementById('kpi-row').innerHTML = viewCardsHtml + statCardsHtml;
 }
 
-let currentView = null; // 'activas' | 'gestion-ops' | null
+let currentView = null; // 'activas' | 'gestion-ops' | 'sales-gestion' | 'sales-stock' | 'sales-performance' | null
+let lastSalesStockRows = [];
 
 function openView(viewId){
   if(currentView === viewId){
@@ -1017,7 +1028,7 @@ function openView(viewId){
       `<div class="title">Sales · Gestión — SLA cerrado (instalación → capacitación)</div><span class="close" onclick="closeView()">Cerrar ✕</span>`;
   } else if(viewId === 'sales-stock'){
     document.getElementById('view-heading').innerHTML =
-      `<div class="title">Sales · Stock — cuentas activas listas para venta</div><span class="close" onclick="closeView()">Cerrar ✕</span>`;
+      `<div class="title">Sales · Stock — cuentas activas listas para venta</div><div style="display:flex; align-items:center; gap:16px;"><span class="close" onclick="exportSalesStockXlsx()" style="text-decoration:none; color:var(--accent); font-weight:600;">⬇ Exportar .xlsx</span><span class="close" onclick="closeView()">Cerrar ✕</span></div>`;
   } else if(viewId === 'sales-performance'){
     document.getElementById('view-heading').innerHTML =
       `<div class="title">Sales · Performance — capacitación post-instalación</div><span class="close" onclick="closeView()">Cerrar ✕</span>`;
@@ -1192,6 +1203,8 @@ function renderTable(){
   }
   empty.style.display = 'none';
 
+  if(isSalesStock) lastSalesStockRows = rows;
+
   tbody.innerHTML = rows.map(o => isSalesStock ? renderSalesStockRow(o) : isSalesTable ? renderSalesPerformanceRow(o) : renderDefaultRow(o)).join('');
 }
 
@@ -1215,6 +1228,42 @@ function renderDefaultRow(o){
       <td>${gaugeHTML(s.log, SLA_CONFIG.logistica, 9)}</td>
       <td class="obs-cell ${o.obs ? '' : 'empty'}">${o.obs || 'Sin observaciones'}</td>
     </tr>`;
+}
+
+function exportSalesStockXlsx(){
+  if(!window.XLSX){
+    showToast('⚠️', 'No se pudo exportar', 'La librería xlsx no cargó — revisá la conexión y probá de nuevo.');
+    return;
+  }
+  if(!lastSalesStockRows.length){
+    showToast('⚠️', 'Nada para exportar', 'La vista actual no tiene filas (¿hay filtros aplicados?).');
+    return;
+  }
+
+  const data = lastSalesStockRows.map(o => ({
+    'Cuenta': o.cuenta || '',
+    'CUIT': o.cuit || '',
+    'Estado de la Cuenta': o.estadoCuenta || '',
+    'Costo Activación': o.costoActivacion === true ? 'Sí' : o.costoActivacion === false ? 'No' : '',
+    'Fecha Alta': formatDateDMY(o.fechaAlta),
+    'Fecha Instalación': formatDateDMY(o.fInstalacionCuenta),
+    'Fecha Capacitación': formatDateDMY(o.fCapacitacionCuenta),
+    'Fecha Venta Real': formatDateDMY(o.fechaVentaReal),
+    'Fecha de Pedido de Baja': formatDateDMY(o.fechaPedidoBaja),
+    'Motivo Baja': o.motivoBaja || '',
+    'Submotivo Baja': o.submotivoBaja || '',
+    'Observaciones Generales': o.observacionesGenerales || '',
+    'Último Comodato Pago': formatDateDMY(o.ultimoComodatoPago),
+  }));
+
+  const ws = XLSX.utils.json_to_sheet(data);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Sales Stock');
+
+  const hoy = new Date().toISOString().slice(0,10);
+  XLSX.writeFile(wb, `sales_stock_${hoy}.xlsx`);
+
+  showToast('✅', 'Exportado', `${data.length} cuentas — sales_stock_${hoy}.xlsx`);
 }
 
 function renderSalesStockRow(o){
