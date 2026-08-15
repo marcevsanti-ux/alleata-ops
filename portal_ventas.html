@@ -377,7 +377,7 @@
     <div class="brand">
       <div class="brand-mark display">PV</div>
       <div class="brand-text">
-        <div class="name">Portal Ventas <span id="version-badge" class="mono" style="font-size:10px; color:var(--muted2); font-weight:500; background:var(--surface3); padding:2px 6px; border-radius:5px; margin-left:4px; vertical-align:middle;">v0.3.5</span></div>
+        <div class="name">Portal Ventas <span id="version-badge" class="mono" style="font-size:10px; color:var(--muted2); font-weight:500; background:var(--surface3); padding:2px 6px; border-radius:5px; margin-left:4px; vertical-align:middle;">v0.3.6</span></div>
         <div class="sub">SLA CONTROL</div>
       </div>
     </div>
@@ -529,6 +529,7 @@ async function loadFromSupabase() {
       obs: r.observaciones || '',
       // Sales Performance
       vendedorCapacitacion: stripHtml(r.vendedor_capacitacion) || 'Sin asignar',
+      fechaPedidoBaja: r.fecha_pedido_baja,
       fInstalacionCuenta: r.f_instalacion_cuenta,
       fCapacitacionCuenta: r.f_capacitacion_cuenta,
       alarmaSinFechaInstalacion: !!r.alarma_sin_fecha_instalacion,
@@ -543,7 +544,7 @@ async function loadFromSupabase() {
    SYNC STATUS — lee automation_runs (rule_code='sla_ots_sync') de Supabase
    para mostrar última corrida y calcular la próxima (cada 10min).
    ========================================================================= */
-const APP_VERSION = 'v0.3.5';
+const APP_VERSION = 'v0.3.6';
 const CORTE_FECHA_DISPLAY = '01/05/2026';
 const CRON_INTERVAL_MIN = 10;
 
@@ -915,7 +916,7 @@ function renderKPIs(){
   const cumplOps = closedOps.length ? Math.round(100*closedOps.filter(s=>s.ops.status!=='r').length/closedOps.length) : 0;
   const exitosas = visibles.filter(o => o.etapa === 'Exitoso').length;
   const exitosasConFecha = visibles.filter(o => o.etapa === 'Exitoso' && !o.alarmaSinFechaInstalacion);
-  const pendientesCapacitacion = exitosasConFecha.filter(o => o.fInstalacionCuenta && !o.fCapacitacionCuenta).length;
+  const pendientesCapacitacion = exitosasConFecha.filter(o => o.fInstalacionCuenta && !o.fCapacitacionCuenta && !o.fechaPedidoBaja).length;
   const alarmas = visibles.filter(o => o.alarmaSinFechaInstalacion).length;
 
   // Cards clicables — abren la vista de detalle abajo
@@ -1090,9 +1091,12 @@ function renderTable(){
   // de capacitación (instalación cargada, capacitación no) o bloqueadas por
   // el bug de SF (sin fecha de instalación). Las ya capacitadas (SLA cerrado)
   // no se listan acá — quedan resueltas, no aportan a esta vista de gestión.
+  // Tampoco se listan las que ya tienen pedido de baja (Fecha_de_Pedido_de_Baja__c
+  // en la Cuenta) — si el cliente pidió dar de baja, no hace falta capacitarlo.
   if(isSales){
     rows = rows.filter(o =>
       o.etapa === 'Exitoso' &&
+      !o.fechaPedidoBaja &&
       (o.alarmaSinFechaInstalacion || (o.fInstalacionCuenta && !o.fCapacitacionCuenta))
     );
   }
