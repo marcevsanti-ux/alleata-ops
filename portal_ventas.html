@@ -377,7 +377,7 @@
     <div class="brand">
       <div class="brand-mark display">PV</div>
       <div class="brand-text">
-        <div class="name">Portal Ventas <span id="version-badge" class="mono" style="font-size:10px; color:var(--muted2); font-weight:500; background:var(--surface3); padding:2px 6px; border-radius:5px; margin-left:4px; vertical-align:middle;">v0.3.6</span></div>
+        <div class="name">Portal Ventas <span id="version-badge" class="mono" style="font-size:10px; color:var(--muted2); font-weight:500; background:var(--surface3); padding:2px 6px; border-radius:5px; margin-left:4px; vertical-align:middle;">v0.3.7</span></div>
         <div class="sub">SLA CONTROL</div>
       </div>
     </div>
@@ -544,7 +544,7 @@ async function loadFromSupabase() {
    SYNC STATUS — lee automation_runs (rule_code='sla_ots_sync') de Supabase
    para mostrar última corrida y calcular la próxima (cada 10min).
    ========================================================================= */
-const APP_VERSION = 'v0.3.6';
+const APP_VERSION = 'v0.3.7';
 const CORTE_FECHA_DISPLAY = '01/05/2026';
 const CRON_INTERVAL_MIN = 10;
 
@@ -932,6 +932,11 @@ function renderKPIs(){
       onclick:"openView('gestion-ops')"
     },
     {
+      id:'sales-gestion', label:'SALES · GESTIÓN', value:exitosas,
+      sub:'SLA instalación → capacitación (todas)',
+      onclick:"openView('sales-gestion')"
+    },
+    {
       id:'sales-performance', label:'SALES · PERFORMANCE', value:pendientesCapacitacion,
       sub: alarmas > 0
         ? `pendientes de capacitación`
@@ -944,7 +949,8 @@ function renderKPIs(){
   const statCards = [
     { label:'SLA Operaciones en riesgo', value:opsRisk, cls: opsRisk>0 ? 'k-amber':'k-green', delta:`de ${opsRunning.length} corriendo` },
     { label:'SLA Logística en riesgo', value:logRisk, cls: logRisk>0 ? 'k-red':'k-green', delta:`de ${logRunning.length} corriendo` },
-    { label:'Cumplimiento Operaciones', value:cumplOps+'%', cls: cumplOps>=80?'k-green':cumplOps>=60?'k-amber':'k-red', delta:`sobre ${closedOps.length} OTs cerradas` },
+    // Oculta a pedido (14/08) — se puede reactivar sumándola de nuevo acá.
+    // { label:'Cumplimiento Operaciones', value:cumplOps+'%', cls: cumplOps>=80?'k-green':cumplOps>=60?'k-amber':'k-red', delta:`sobre ${closedOps.length} OTs cerradas` },
   ];
 
   const viewCardsHtml = viewCards.map(c=>`
@@ -989,6 +995,9 @@ function openView(viewId){
     document.getElementById('view-heading').innerHTML =
       `<div class="title">Gestión OPS — OTs exitosas</div><span class="close" onclick="closeView()">Cerrar ✕</span>`;
     document.getElementById('f-etapa').value = 'Exitoso';
+  } else if(viewId === 'sales-gestion'){
+    document.getElementById('view-heading').innerHTML =
+      `<div class="title">Sales · Gestión — SLA instalación → capacitación (todas las exitosas)</div><span class="close" onclick="closeView()">Cerrar ✕</span>`;
   } else if(viewId === 'sales-performance'){
     document.getElementById('view-heading').innerHTML =
       `<div class="title">Sales · Performance — capacitación post-instalación</div><span class="close" onclick="closeView()">Cerrar ✕</span>`;
@@ -1035,6 +1044,14 @@ const COLUMN_DEFS = {
     { key:'f_capacitacion', label:'Fecha capacitación', getValue:o=>o.fCapacitacionCuenta||'' },
     { key:'alarma', label:'Alarma', getValue:o=>o.alarmaSinFechaInstalacion?1:0 },
   ],
+  'sales-gestion': [
+    { key:'cuenta', label:'Cuenta / OT', getValue:o=>o.cuenta },
+    { key:'vendedor', label:'Vendedor', getValue:o=>o.vendedorCapacitacion||'' },
+    { key:'f_instalacion', label:'Fecha instalación', getValue:o=>o.fInstalacionCuenta||'' },
+    { key:'sla_ventas', label:'SLA Ventas (capacitación)', getValue:o=>{ if(o.alarmaSinFechaInstalacion) return -1; const d=evalVentaSla(o).days; return d==null?-1:d; } },
+    { key:'f_capacitacion', label:'Fecha capacitación', getValue:o=>o.fCapacitacionCuenta||'' },
+    { key:'alarma', label:'Estado', getValue:o=>o.alarmaSinFechaInstalacion?2:(o.fechaPedidoBaja?1:0) },
+  ],
 };
 
 let sortState = { view:null, key:null, dir:'asc' };
@@ -1063,9 +1080,11 @@ function renderTable(){
   const rF = document.getElementById('f-responsable').value;
   const eF = document.getElementById('f-etapa').value;
   const sF = document.getElementById('f-semaforo').value;
-  const isSales = currentView === 'sales-performance';
+  const isSalesPerf = currentView === 'sales-performance';
+  const isSalesGestion = currentView === 'sales-gestion';
+  const isSalesTable = isSalesPerf || isSalesGestion;
 
-  const viewKey = isSales ? 'sales-performance' : 'default';
+  const viewKey = isSalesPerf ? 'sales-performance' : isSalesGestion ? 'sales-gestion' : 'default';
   renderTableHead(viewKey);
 
   let rows = getVisibleOts().filter(o=>{
@@ -1073,9 +1092,9 @@ function renderTable(){
     if(rF && o.responsable !== rF) return false;
     if(eF && o.etapa !== eF) return false;
     if(sF){
-      if(isSales){
-        // En esta vista el único semáforo relevante es el SLA Ventas (capacitación)
-        if(o.alarmaSinFechaInstalacion) return false; // la alarma no tiene semáforo de color
+      if(isSalesTable){
+        // En estas vistas el único semáforo relevante es el SLA Ventas (capacitación)
+        if(o.alarmaSinFechaInstalacion || o.fechaPedidoBaja) return false; // no tienen semáforo de color
         const vs = evalVentaSla(o);
         if(vs.status !== sF) return false;
       } else {
@@ -1087,18 +1106,19 @@ function renderTable(){
     return true;
   });
 
-  // Sales Performance: la vista muestra lo que necesita acción — pendientes
-  // de capacitación (instalación cargada, capacitación no) o bloqueadas por
-  // el bug de SF (sin fecha de instalación). Las ya capacitadas (SLA cerrado)
-  // no se listan acá — quedan resueltas, no aportan a esta vista de gestión.
-  // Tampoco se listan las que ya tienen pedido de baja (Fecha_de_Pedido_de_Baja__c
-  // en la Cuenta) — si el cliente pidió dar de baja, no hace falta capacitarlo.
-  if(isSales){
+  if(isSalesPerf){
+    // Lo que necesita acción — pendientes de capacitación (instalación
+    // cargada, capacitación no) o bloqueadas por el bug de SF (sin fecha de
+    // instalación). Las ya capacitadas o con pedido de baja no aportan acá.
     rows = rows.filter(o =>
       o.etapa === 'Exitoso' &&
       !o.fechaPedidoBaja &&
       (o.alarmaSinFechaInstalacion || (o.fInstalacionCuenta && !o.fCapacitacionCuenta))
     );
+  } else if(isSalesGestion){
+    // Panorama completo — las 518 exitosas: capacitadas, pendientes,
+    // bloqueadas por bug y con pedido de baja, todas juntas.
+    rows = rows.filter(o => o.etapa === 'Exitoso');
   }
 
   if(sortState.view === viewKey && sortState.key){
@@ -1125,7 +1145,7 @@ function renderTable(){
   }
   empty.style.display = 'none';
 
-  tbody.innerHTML = rows.map(o => isSales ? renderSalesPerformanceRow(o) : renderDefaultRow(o)).join('');
+  tbody.innerHTML = rows.map(o => isSalesTable ? renderSalesPerformanceRow(o) : renderDefaultRow(o)).join('');
 }
 
 function renderDefaultRow(o){
@@ -1152,7 +1172,8 @@ function renderDefaultRow(o){
 
 function renderSalesPerformanceRow(o){
   const alarma = o.alarmaSinFechaInstalacion;
-  const ventaSla = alarma
+  const baja = !!o.fechaPedidoBaja;
+  const ventaSla = (alarma || baja)
     ? { status:'pending', days:null }
     : evalVentaSla(o);
 
@@ -1163,8 +1184,10 @@ function renderSalesPerformanceRow(o){
     ? `<a class="sf-link small" href="https://alleata.lightning.force.com/lightning/r/WorkOrder/${o.sfId}/view" target="_blank" rel="noopener">OT #${o.ot}</a>`
     : `OT #${o.ot}`;
 
+  const rowBg = alarma ? 'rgba(255,92,92,0.06)' : baja ? 'rgba(94,108,135,0.08)' : null;
+
   return `
-    <tr${alarma ? ' style="background:rgba(255,92,92,0.06);"' : ''}>
+    <tr${rowBg ? ` style="background:${rowBg};"` : ''}>
       <td class="cuenta-ot-cell">
         <div class="cuenta-name">${cuentaLink}</div>
         <div class="cuenta-sub">CUIT ${o.cuit} ${otLink}</div>
@@ -1175,10 +1198,14 @@ function renderSalesPerformanceRow(o){
       <td class="mono" style="font-size:12px;">${o.fInstalacionCuenta ? o.fInstalacionCuenta.slice(0,10) : '—'}</td>
       <td>${alarma
           ? '<span class="gauge-not-started" style="color:var(--red); font-style:normal; font-weight:600;">— sin fecha de instalación —</span>'
+          : baja
+          ? '<span class="gauge-not-started" style="color:var(--muted2); font-style:italic;">no aplica — baja solicitada</span>'
           : gaugeHTML(ventaSla, SLA_CONFIG.ventas, 14)}</td>
       <td class="mono" style="font-size:12px;">${o.fCapacitacionCuenta ? o.fCapacitacionCuenta.slice(0,10) : '—'}</td>
       <td>${alarma
           ? '<span style="color:var(--red); font-size:11.5px; font-weight:600;">⚠ Bug SF — falta Fecha_de_Instalación__c</span>'
+          : baja
+          ? `<span style="color:var(--muted2); font-size:11.5px;">🚪 Baja solicitada — ${o.fechaPedidoBaja.slice(0,10)}</span>`
           : '<span style="color:var(--muted2); font-size:11.5px;">—</span>'}</td>
     </tr>`;
 }
