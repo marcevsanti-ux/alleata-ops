@@ -472,6 +472,9 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     <div class="nav-item" data-mod="auditoria" id="nav-auditoria" style="display:none" onclick="goTo('auditoria')">
       <div class="active-bar"></div><span class="nav-icon-wrap">🕵️</span> Auditoría
     </div>
+    <div class="nav-item" data-mod="indicadores" id="nav-indicadores" style="display:none" onclick="goTo('indicadores')">
+      <div class="active-bar"></div><span class="nav-icon-wrap">📊</span> Indicadores
+    </div>
     <div class="nav-item" data-mod="retencion" id="nav-retencion" onclick="goTo('retencion')">
       <div class="active-bar"></div><span class="nav-icon-wrap">🛡️</span> Retención
     </div>
@@ -1044,6 +1047,14 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
 
   
+<!-- MÓDULO INDICADORES — mismo patrón que Presupuesto: app standalone embebida vía
+     iframe (login/Supabase propios) para no mezclar nombres con el script gigante. -->
+<div class="module" id="mod-indicadores">
+  <iframe id="indicadoresFrame" src="about:blank" data-src="indicadores.html"
+    style="display:block;width:100%;height:82vh;border:1px solid var(--border2);border-radius:12px;background:var(--navy-900)">
+  </iframe>
+</div>
+
 
 <!-- ═══════════════════════════════════════════════════════════
      MÓDULO DESINSTALACIONES
@@ -5249,6 +5260,7 @@ function showApp(){
     document.getElementById('nav-ajustes').style.display='flex';
     document.getElementById('nav-section-config').style.display='block';
     document.getElementById('nav-auditoria').style.display='flex';
+    document.getElementById('nav-indicadores').style.display='flex';
   } else {
     // Operadores con envios: mostrar sync info en topbar
     mostrarSFSyncSiAdmin();
@@ -5345,7 +5357,7 @@ function buildDashCards(modulos,isAdmin,isCeo){
   loadOpsPanel(isAdmin, modulos);
 }
 
-const MOD_INFO={home:'Dashboard',sims:'Verificador SIMs',envios:'Envíos',rollout:'Rollout','rollout-piloto':'Rollout Piloto — Trazabilidad',desinstalaciones:'Desinstalaciones','churn-producto':'Churn Producto — NAPSE / PRISMA / Sin Perfil','hoja-ruta':'Hoja de Ruta — por chofer',napse:'NAPSE — Logs VTOL',instalaciones:'Instalaciones SF',retencion:'Retención de Cuentas',ajustes:'Ajustes',ally:'Configuración Ally',distri:'Distribuidores',terminales:'Terminales — Logicalis',store:'Bancos — Terminales disponibles',presupuesto:'Presupuesto de Operaciones','zonas-amba':'Zonas AMBA — correcciones por CP'};
+const MOD_INFO={home:'Dashboard',sims:'Verificador SIMs',envios:'Envíos',rollout:'Rollout','rollout-piloto':'Rollout Piloto — Trazabilidad',desinstalaciones:'Desinstalaciones','churn-producto':'Churn Producto — NAPSE / PRISMA / Sin Perfil','hoja-ruta':'Hoja de Ruta — por chofer',napse:'NAPSE — Logs VTOL',instalaciones:'Instalaciones SF',retencion:'Retención de Cuentas',ajustes:'Ajustes',ally:'Configuración Ally',distri:'Distribuidores',terminales:'Terminales — Logicalis',store:'Bancos — Terminales disponibles',presupuesto:'Presupuesto de Operaciones','zonas-amba':'Zonas AMBA — correcciones por CP',indicadores:'Indicadores Operaciones — Logística'};
 
 function goTo(mod){
   const el=document.getElementById('nav-'+mod);
@@ -5404,6 +5416,10 @@ function goTo(mod){
   if(mod==='store')window.storeInit?.(); // store
   if(mod==='recuperadas')window.cargarRecuperadas?.();
   if(mod==='zonas-amba')zcpCargar();
+  if(mod==='indicadores'){
+    const f=document.getElementById('indicadoresFrame');
+    if(f&&f.getAttribute('src')==='about:blank') f.src=f.dataset.src;
+  }
 }
 
 function refreshCurrentModule(){

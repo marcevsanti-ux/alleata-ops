@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Alleata · Indicadores</title>
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --bg:#070c14; --panel:#0f1a2b; --panel2:#13223a; --border:#1e3252;
+    --teal:#1dbf8e; --red:#ef4444; --amber:#f59e0b; --purple:#8b5cf6;
+    --text:#eef4fb; --text-dim:#7b93b3; --mono:'JetBrains Mono','Courier New',monospace;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{min-height:100%;background:var(--bg);color:var(--text);font-family:'Inter',-apple-system,sans-serif}
+
+  /* ── login ── */
+  #loginWrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+  .login-box{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:36px 32px;width:100%;max-width:380px}
+  .login-logo{font-size:26px;font-weight:800;letter-spacing:-1px;color:var(--teal);text-align:center;margin-bottom:4px}
+  .login-sub{font-size:12px;color:var(--text-dim);text-align:center;margin-bottom:26px;text-transform:uppercase;letter-spacing:1px}
+  .field{margin-bottom:14px}
+  .field label{display:block;font-size:11px;color:var(--text-dim);margin-bottom:5px;font-weight:600}
+  .field input{width:100%;background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:11px 12px;color:var(--text);font-size:14px}
+  .field input:focus{outline:none;border-color:var(--teal)}
+  .btn-login{width:100%;background:var(--teal);color:#06140f;border:none;border-radius:8px;padding:12px;font-weight:700;font-size:14px;cursor:pointer;margin-top:6px}
+  .btn-login:disabled{opacity:.6;cursor:default}
+  .login-error{font-size:12px;color:var(--red);margin-top:12px;text-align:center;min-height:16px}
+
+  /* ── dashboard ── */
+  #dashWrap{display:none;max-width:1200px;margin:0 auto;padding:28px 24px}
+  header{display:flex;justify-content:space-between;align-items:center;margin-bottom:26px;padding-bottom:18px;border-bottom:1px solid var(--border)}
+  .brand{display:flex;align-items:center;gap:12px}
+  .brand-logo{font-size:22px;font-weight:800;color:var(--teal);letter-spacing:-1px}
+  .brand-sub{font-size:12px;color:var(--text-dim)}
+  .user-chip{display:flex;align-items:center;gap:12px}
+  .user-chip span{font-size:12px;color:var(--text-dim)}
+  .btn-logout{background:none;border:1px solid var(--border);color:var(--text-dim);border-radius:7px;padding:7px 14px;font-size:12px;cursor:pointer}
+
+  h2{font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-dim);margin:26px 0 14px}
+  .month-filter{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px}
+  .month-chip{background:var(--panel2);border:1px solid var(--border);border-radius:20px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;color:var(--text-dim)}
+  .month-chip.active{background:rgba(29,191,142,.15);border-color:var(--teal);color:var(--teal)}
+
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:10px}
+  .card{background:var(--panel);border:1px solid var(--border);border-top:3px solid var(--accent);border-radius:12px;padding:18px}
+  .card-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--accent)}
+  .card-num{font-family:var(--mono);font-size:26px;font-weight:800;margin-top:8px}
+  .card-sub{font-size:11px;color:var(--text-dim);margin-top:6px}
+
+  table{width:100%;border-collapse:collapse;margin-top:10px}
+  th{text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-dim);padding:8px 12px;border-bottom:1px solid var(--border)}
+  td{padding:10px 12px;font-size:13px;border-bottom:1px solid rgba(255,255,255,.04)}
+  td.num{font-family:var(--mono);text-align:right}
+  tr:hover td{background:rgba(255,255,255,.02)}
+  .foot-note{font-size:11px;color:var(--text-dim);margin-top:24px;padding-top:16px;border-top:1px solid var(--border)}
+  .loading,.empty{text-align:center;padding:40px;color:var(--text-dim)}
+</style>
+</head>
+<body>
+
+<div id="loginWrap">
+  <div class="login-box">
+    <div class="login-logo">alleata</div>
+    <div class="login-sub">Portal de Indicadores</div>
+    <div class="field">
+      <label>Email</label>
+      <input type="email" id="loginEmail" placeholder="tu@mail.com" autocomplete="username">
+    </div>
+    <div class="field">
+      <label>Contraseña</label>
+      <input type="password" id="loginPass" placeholder="••••••••" autocomplete="current-password">
+    </div>
+    <button class="btn-login" id="btnLogin" onclick="hacerLogin()">Ingresar</button>
+    <div class="login-error" id="loginError"></div>
+  </div>
+</div>
+
+<div id="dashWrap">
+  <header>
+    <div class="brand">
+      <div class="brand-logo">alleata</div>
+      <div class="brand-sub">· Indicadores Operaciones</div>
+    </div>
+    <div class="user-chip">
+      <span id="userLabel">—</span>
+      <button class="btn-logout" onclick="hacerLogout()">Salir</button>
+    </div>
+  </header>
+
+  <h2>💰 Logística — Costo de Envíos por mes</h2>
+  <div class="month-filter" id="monthFilter"></div>
+  <div id="cardsWrap" class="loading">Cargando...</div>
+
+  <h2 style="margin-top:32px">📋 Detalle mes a mes</h2>
+  <div style="overflow-x:auto">
+    <table>
+      <thead><tr>
+        <th>Mes</th><th style="text-align:right">Correo Arg.</th><th style="text-align:right">EPSA</th>
+        <th style="text-align:right">Cabify</th>
+        <th style="text-align:right">Total envíos</th><th style="text-align:right">Costo total</th>
+      </tr></thead>
+      <tbody id="tablaMeses"><tr><td colspan="6" class="loading">Cargando...</td></tr></tbody>
+    </table>
+  </div>
+
+  <h2 style="margin-top:36px">🖥️ Logicalis — Terminales entregadas por mes</h2>
+  <div id="logicalisWrap" class="loading">Cargando...</div>
+
+  <h2 style="margin-top:36px">📦 OTs (Cambio / Rollout / Instalación) — creadas por mes, estado actual</h2>
+  <div style="font-size:12px;color:var(--text-dim);margin-bottom:14px">Cuántas OTs se crearon cada mes, y de esas, cuántas siguen HOY en Pre-Colecta (sin despachar todavía) — sin importar la logística.</div>
+  <div style="overflow-x:auto">
+    <table>
+      <thead><tr>
+        <th>Mes de creación</th><th style="text-align:right">Total OTs creadas</th>
+        <th style="text-align:right">En Pre-Colecta hoy</th><th style="text-align:right">% sin despachar</th>
+      </tr></thead>
+      <tbody id="tablaPrecolecta"><tr><td colspan="4" class="loading">Cargando...</td></tr></tbody>
+    </table>
+  </div>
+
+  <h2 style="margin-top:36px">⏱️ SLA Operaciones / Logística</h2>
+  <div style="font-size:12px;color:var(--text-dim);margin-bottom:14px">
+    <b>SLA Operaciones</b> = días entre "En Proceso" (arranca configuración) y "Pre-Colecta" (lista para despachar).
+    <b>SLA Logística</b> = días entre "Pre-Colecta" y "Exitoso" (entregada). Calculado acá a partir de las fechas
+    ya sincronizadas desde Salesforce, y cruzado contra el valor que el backend ya guarda (columna "Diferencia")
+    para detectar si quedó desactualizado — no compara todavía contra el campo de fórmula nativo de Salesforce
+    (ese campo aún no está sincronizado a esta base).
+  </div>
+  <div class="month-filter" id="slaMonthFilter"></div>
+  <div id="slaCardsWrap" class="loading">Cargando...</div>
+  <div style="overflow-x:auto">
+    <table>
+      <thead><tr>
+        <th>Mes (cierre)</th><th style="text-align:right">OTs</th>
+        <th style="text-align:right">SLA Operaciones</th>
+        <th style="text-align:right">SLA Logística</th>
+        <th style="text-align:right">SLA Total</th>
+        <th style="text-align:right">Diferencia vs. guardado</th>
+      </tr></thead>
+      <tbody id="tablaSLA"><tr><td colspan="6" class="loading">Cargando...</td></tr></tbody>
+    </table>
+  </div>
+
+  <div class="foot-note">
+    Datos: OTs de Perfil NAPSE (Instalación Equipo + Simcard / Cambio de Terminal) en estado Despachado o Exitoso,
+    agrupadas por mes de fecha de despacho. El bloque SLA toma Instalación Equipo + Simcard / Cambio de Terminal
+    sin filtro de perfil (una vez cerrado el piloto de Rollout, esas OTs llegan por el mismo circuito que el resto).
+    Acceso de solo lectura — Alleata Operaciones.
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
+const SUPABASE_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
+const sb=supabase.createClient(SUPABASE_URL,SUPABASE_ANON);
+
+let _todosLosMeses=[];
+let _mesActivo='__todos';
+
+async function hacerLogin(){
+  const email=document.getElementById('loginEmail').value.trim();
+  const pass=document.getElementById('loginPass').value;
+  const errEl=document.getElementById('loginError');
+  const btn=document.getElementById('btnLogin');
+  errEl.textContent='';
+  if(!email||!pass){errEl.textContent='Completá email y contraseña.';return;}
+  btn.disabled=true;btn.textContent='Ingresando...';
+
+  const{data,error}=await sb.auth.signInWithPassword({email,password:pass});
+  if(error){
+    errEl.textContent='Email o contraseña incorrectos.';
+    btn.disabled=false;btn.textContent='Ingresar';
+    return;
+  }
+
+  // Verificación de rol — admin (uso interno, embebido en el portal) o
+  // auditor_externo (acceso directo vía este mismo archivo) pueden entrar.
+  // Cualquier otro rol, aunque el login de Supabase haya sido válido, no pasa.
+  const{data:perfil,error:perfilErr}=await sb.from('profiles').select('nombre,rol').eq('id',data.user.id).maybeSingle();
+  if(perfilErr||!perfil||!['admin','auditor_externo'].includes(perfil.rol)){
+    errEl.textContent='Esta cuenta no tiene acceso a este portal.';
+    await sb.auth.signOut();
+    btn.disabled=false;btn.textContent='Ingresar';
+    return;
+  }
+
+  document.getElementById('userLabel').textContent=perfil.nombre||email;
+  document.getElementById('loginWrap').style.display='none';
+  document.getElementById('dashWrap').style.display='block';
+  cargarDatos();
+  cargarLogicalis();
+  cargarPrecolecta();
+  cargarSLA();
+}
+
+async function hacerLogout(){
+  await sb.auth.signOut();
+  location.reload();
+}
+
+// Si ya había una sesión activa (recargó la página), re-validar el rol
+// antes de mostrar nada — mismo chequeo que en el login.
+async function chequearSesionExistente(){
+  const{data:{session}}=await sb.auth.getSession();
+  if(!session)return;
+  const{data:perfil}=await sb.from('profiles').select('nombre,rol').eq('id',session.user.id).maybeSingle();
+  if(!perfil||!['admin','auditor_externo'].includes(perfil.rol)){ await sb.auth.signOut(); return; }
+  document.getElementById('userLabel').textContent=perfil.nombre||session.user.email;
+  document.getElementById('loginWrap').style.display='none';
+  document.getElementById('dashWrap').style.display='block';
+  cargarDatos();
+  cargarLogicalis();
+  cargarPrecolecta();
+  cargarSLA();
+}
+chequearSesionExistente();
+
+const MESES_NOMBRE=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+const LOGISTICAS=[
+  {key:'CORREO ARGENTINO', label:'Correo Argentino', color:'#e74c3c'},
+  {key:'EPSA',             label:'EPSA',             color:'#f39c12'},
+  {key:'CABIFY',           label:'Cabify',            color:'#9b59b6'},
+];
+// Alleata sacada del reporte de costos — pedido explícito 04/08: todavía
+// no está definido cómo calcular su costo de envío (es logística propia,
+// no un proveedor externo con factura), así que no corresponde mostrarla
+// acá hasta que se defina esa metodología.
+
+async function cargarDatos(){
+  const cardsWrap=document.getElementById('cardsWrap');
+  const tbody=document.getElementById('tablaMeses');
+
+  // Mismo criterio que ya usa NAPSE Reporter internamente: Perfil NAPSE,
+  // Instalación Equipo+Simcard o Cambio de Terminal, Status Despachado o
+  // Exitoso — acá además agrupamos por mes de fecha_despacho.
+  const{data,error}=await sb.from('sf_workorders')
+    .select('logistica,costo_envio,fecha_despacho,status,perfil,record_type')
+    .eq('perfil','NAPSE')
+    .in('record_type',['Instalación Equipo + Simcard','Cambio de Terminal'])
+    .in('status',['Despachado','Exitoso'])
+    .not('fecha_despacho','is',null);
+
+  if(error){
+    cardsWrap.innerHTML=`<div class="empty" style="color:var(--red)">Error cargando datos: ${error.message}</div>`;
+    tbody.innerHTML='';
+    return;
+  }
+
+  const porMes={};
+  (data||[]).forEach(r=>{
+    const d=new Date(r.fecha_despacho);
+    const key=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+    if(!porMes[key])porMes[key]={key,label:MESES_NOMBRE[d.getMonth()]+' '+d.getFullYear(),logs:{},total_ots:0,total_costo:0};
+    const log=(r.logistica||'OTROS').toUpperCase().trim();
+    if(!porMes[key].logs[log])porMes[key].logs[log]={ots:0,costo:0,altas:0,cambios:0};
+    porMes[key].logs[log].ots+=1;
+    porMes[key].logs[log].costo+=Number(r.costo_envio)||0;
+    if(r.record_type==='Cambio de Terminal') porMes[key].logs[log].cambios+=1;
+    else porMes[key].logs[log].altas+=1; // Instalación Equipo + Simcard = alta nueva
+    porMes[key].total_ots+=1;
+    porMes[key].total_costo+=Number(r.costo_envio)||0;
+  });
+
+  _todosLosMeses=Object.values(porMes).sort((a,b)=>b.key.localeCompare(a.key));
+
+  if(!_todosLosMeses.length){
+    cardsWrap.innerHTML='<div class="empty">Sin datos todavía</div>';
+    tbody.innerHTML='<tr><td colspan="6" class="empty">Sin datos</td></tr>';
+    return;
+  }
+
+  renderFiltroMeses();
+  renderVista();
+}
+
+function renderFiltroMeses(){
+  const filterEl=document.getElementById('monthFilter');
+  const chips=['__todos',..._todosLosMeses.map(m=>m.key)];
+  filterEl.innerHTML=chips.map(key=>{
+    const label=key==='__todos'?'Todos los meses':_todosLosMeses.find(m=>m.key===key).label;
+    return `<div class="month-chip${key===_mesActivo?' active':''}" onclick="seleccionarMes('${key}')">${label}</div>`;
+  }).join('');
+}
+
+function seleccionarMes(key){
+  _mesActivo=key;
+  renderFiltroMeses();
+  renderVista();
+}
+
+function fmt$(n){ return n?'$'+Math.round(n).toLocaleString('es-AR'):'$0'; }
+
+function renderVista(){
+  const cardsWrap=document.getElementById('cardsWrap');
+
+  const mesesAMostrar=_mesActivo==='__todos'?_todosLosMeses:_todosLosMeses.filter(m=>m.key===_mesActivo);
+
+  const agregado={};
+  LOGISTICAS.forEach(l=>{agregado[l.key]={ots:0,costo:0,altas:0,cambios:0};});
+  let totalOts=0,totalCosto=0;
+  mesesAMostrar.forEach(m=>{
+    LOGISTICAS.forEach(l=>{
+      const v=m.logs[l.key];
+      if(v){
+        agregado[l.key].ots+=v.ots;agregado[l.key].costo+=v.costo;
+        agregado[l.key].altas+=v.altas||0;agregado[l.key].cambios+=v.cambios||0;
+        totalOts+=v.ots;totalCosto+=v.costo; // solo lo que se muestra (sin Alleata)
+      }
+    });
+  });
+
+  cardsWrap.className='cards';
+  cardsWrap.innerHTML=LOGISTICAS.map(l=>{
+    const v=agregado[l.key];
+    const prom=v.ots?Math.round(v.costo/v.ots):0;
+    return `<div class="card" style="--accent:${l.color}">
+      <div class="card-label">${l.label}</div>
+      <div class="card-num">${fmt$(v.costo)}</div>
+      <div class="card-sub">${v.ots} envíos · Prom. ${fmt$(prom)}</div>
+      <div class="card-sub" style="margin-top:2px;opacity:.8">${v.altas} altas · ${v.cambios} cambios</div>
+    </div>`;
+  }).join('')+`<div class="card" style="--accent:var(--teal)">
+      <div class="card-label">Total período</div>
+      <div class="card-num" style="color:var(--teal)">${fmt$(totalCosto)}</div>
+      <div class="card-sub">${totalOts} envíos</div>
+      <div class="card-sub" style="margin-top:2px;opacity:.6">No incluye Alleata (logística propia)</div>
+    </div>`;
+
+  const tbody=document.getElementById('tablaMeses');
+  tbody.innerHTML=_todosLosMeses.map(m=>{
+    const c=k=>m.logs[k]?fmt$(m.logs[k].costo):'—';
+    const totOtsSinAlleata=LOGISTICAS.reduce((s,l)=>s+(m.logs[l.key]?.ots||0),0);
+    const totCostoSinAlleata=LOGISTICAS.reduce((s,l)=>s+(m.logs[l.key]?.costo||0),0);
+    return `<tr>
+      <td style="font-weight:700">${m.label}</td>
+      <td class="num">${c('CORREO ARGENTINO')}</td>
+      <td class="num">${c('EPSA')}</td>
+      <td class="num">${c('CABIFY')}</td>
+      <td class="num">${totOtsSinAlleata}</td>
+      <td class="num" style="color:var(--teal);font-weight:700">${fmt$(totCostoSinAlleata)}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ── Logicalis — terminales entregadas por mes ───────────────────────────
+// Lee logicalis_despachos_historico, que se empieza a llenar sola cada vez
+// que alguien procesa el Excel de Logicalis desde el portal interno — la
+// fecha sale del "Mes"/"Año" que el propio Excel declara, no de cuándo se
+// subió. Meses anteriores a que se empezara a guardar este histórico
+// quedan sin dato, salvo que se recarguen a mano desde los Excels viejos.
+async function cargarLogicalis(){
+  const wrap=document.getElementById('logicalisWrap');
+  const{data,error}=await sb.from('logicalis_despachos_historico')
+    .select('fecha_despacho,cantidad,con_error')
+    .order('fecha_despacho',{ascending:false});
+
+  if(error){ wrap.innerHTML=`<div class="empty" style="color:var(--red)">Error: ${error.message}</div>`; return; }
+  if(!data?.length){ wrap.innerHTML='<div class="empty">Sin datos cargados todavía para este período.</div>'; return; }
+
+  const porMes={};
+  data.forEach(r=>{
+    const d=new Date(r.fecha_despacho+'T00:00:00');
+    const key=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+    if(!porMes[key])porMes[key]={label:MESES_NOMBRE[d.getMonth()]+' '+d.getFullYear(),cantidad:0,con_error:0};
+    porMes[key].cantidad+=r.cantidad;
+    porMes[key].con_error+=r.con_error||0;
+  });
+  const meses=Object.values(porMes).sort((a,b)=>b.label.localeCompare(a.label));
+
+  wrap.className='';
+  wrap.innerHTML=`<div style="font-size:11px;color:var(--text-dim);margin-bottom:8px">"Óptimas" = terminales en condición de uso. "Scrap / repuestos" = llegaron con daño (carcaza rota, placa dañada, etc.) — se desarman para repuestos, no cuentan como inventario útil entregado.</div>
+  <table><thead><tr>
+    <th>Mes</th>
+    <th style="text-align:right">Recibidas (total)</th>
+    <th style="text-align:right">Óptimas</th>
+    <th style="text-align:right">Scrap / repuestos</th>
+  </tr></thead><tbody>${
+    meses.map(m=>{
+      const optimas=m.cantidad-m.con_error;
+      return `<tr>
+        <td style="font-weight:700">${m.label}</td>
+        <td class="num" style="color:var(--text-dim)">${m.cantidad}</td>
+        <td class="num" style="color:var(--teal);font-weight:700">${optimas}</td>
+        <td class="num" style="color:${m.con_error?'var(--amber)':'var(--text-dim)'}">${m.con_error}</td>
+      </tr>`;
+    }).join('')
+  }</tbody></table>`;
+}
+
+// ── OTs creadas por mes vs. cuántas siguen en Pre-Colecta HOY ───────────
+async function cargarPrecolecta(){
+  const tbody=document.getElementById('tablaPrecolecta');
+  const{data,error}=await sb.from('sf_workorders')
+    .select('sf_created_at,status')
+    .in('record_type',['Instalación Equipo + Simcard','Cambio de Terminal'])
+    .not('sf_created_at','is',null);
+
+  if(error){ tbody.innerHTML=`<tr><td colspan="4" style="color:var(--red)">Error: ${error.message}</td></tr>`; return; }
+  if(!data?.length){ tbody.innerHTML='<tr><td colspan="4" class="empty">Sin datos</td></tr>'; return; }
+
+  const porMes={};
+  data.forEach(r=>{
+    const d=new Date(r.sf_created_at);
+    const key=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+    if(!porMes[key])porMes[key]={key,label:MESES_NOMBRE[d.getMonth()]+' '+d.getFullYear(),total:0,precolecta:0};
+    porMes[key].total+=1;
+    if((r.status||'').trim()==='Pre-Colecta')porMes[key].precolecta+=1;
+  });
+  const meses=Object.values(porMes).sort((a,b)=>b.key.localeCompare(a.key));
+
+  tbody.innerHTML=meses.map(m=>{
+    const pct=m.total?Math.round(m.precolecta/m.total*100):0;
+    return `<tr>
+      <td style="font-weight:700">${m.label}</td>
+      <td class="num">${m.total}</td>
+      <td class="num" style="color:${m.precolecta?'var(--amber)':'var(--text-dim)'}">${m.precolecta}</td>
+      <td class="num">${pct}%</td>
+    </tr>`;
+  }).join('');
+}
+
+// ── SLA Operaciones / Logística ──────────────────────────────────────────
+// Calculado en el navegador a partir de fecha_entrada_proceso, fecha_pre_colecta
+// y fecha_exitoso (ya sincronizadas desde SF). "Diferencia vs. guardado" compara
+// nuestro cálculo (fecha_exitoso - fecha_entrada_proceso) contra sla_total_dias,
+// que ya guarda el backend — sirve para detectar si ese valor quedó desactualizado.
+// Ojo: esto NO es todavía una validación contra el campo de fórmula nativo de SF
+// (Demora_Total__c y similares), porque esos campos no están sincronizados a esta
+// base — para eso hace falta tocar salesforce.js en el repo alleata-agent.
+let _mesesSLA=[];
+let _mesActivoSLA='__todos';
+
+function diasEntre(desde,hasta){
+  if(!desde||!hasta)return null;
+  return Math.round((new Date(hasta)-new Date(desde))/86400000*10)/10;
+}
+function fmtDias(n){ return n==null?'—':n.toFixed(1)+'d'; }
+
+async function cargarSLA(){
+  const cardsWrap=document.getElementById('slaCardsWrap');
+  const tbody=document.getElementById('tablaSLA');
+
+  const{data,error}=await sb.from('sf_workorders')
+    .select('record_type,fecha_entrada_proceso,fecha_pre_colecta,fecha_exitoso,sla_total_dias')
+    .in('record_type',['Instalación Equipo + Simcard','Cambio de Terminal'])
+    .not('fecha_entrada_proceso','is',null);
+
+  if(error){
+    cardsWrap.innerHTML=`<div class="empty" style="color:var(--red)">Error cargando SLA: ${error.message}</div>`;
+    tbody.innerHTML='';
+    return;
+  }
+  if(!data?.length){
+    cardsWrap.innerHTML='<div class="empty">Sin datos todavía</div>';
+    tbody.innerHTML='<tr><td colspan="6" class="empty">Sin datos</td></tr>';
+    return;
+  }
+
+  const porMes={};
+  data.forEach(r=>{
+    // Mes de referencia: fecha de cierre si ya la tiene, si no la última fecha disponible
+    // (así las OTs todavía en curso también quedan agrupadas en algún mes, no se pierden).
+    const refFecha=r.fecha_exitoso||r.fecha_pre_colecta||r.fecha_entrada_proceso;
+    const d=new Date(refFecha);
+    const key=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+    if(!porMes[key])porMes[key]={key,label:MESES_NOMBRE[d.getMonth()]+' '+d.getFullYear(),
+      n:0,sumOps:0,cntOps:0,sumLog:0,cntLog:0,sumTot:0,cntTot:0,sumDiff:0,cntDiff:0};
+    const m=porMes[key];
+    m.n+=1;
+
+    const slaOps=diasEntre(r.fecha_entrada_proceso,r.fecha_pre_colecta);
+    if(slaOps!=null){ m.sumOps+=slaOps; m.cntOps+=1; }
+
+    const slaLog=diasEntre(r.fecha_pre_colecta,r.fecha_exitoso);
+    if(slaLog!=null){ m.sumLog+=slaLog; m.cntLog+=1; }
+
+    const slaTot=diasEntre(r.fecha_entrada_proceso,r.fecha_exitoso);
+    if(slaTot!=null){
+      m.sumTot+=slaTot; m.cntTot+=1;
+      if(r.sla_total_dias!=null){
+        m.sumDiff+=Math.abs(slaTot-Number(r.sla_total_dias));
+        m.cntDiff+=1;
+      }
+    }
+  });
+
+  _mesesSLA=Object.values(porMes).sort((a,b)=>b.key.localeCompare(a.key));
+  renderFiltroSLA();
+  renderVistaSLA();
+}
+
+function renderFiltroSLA(){
+  const el=document.getElementById('slaMonthFilter');
+  const chips=['__todos',..._mesesSLA.map(m=>m.key)];
+  el.innerHTML=chips.map(key=>{
+    const label=key==='__todos'?'Todos los meses':_mesesSLA.find(m=>m.key===key).label;
+    return `<div class="month-chip${key===_mesActivoSLA?' active':''}" onclick="seleccionarMesSLA('${key}')">${label}</div>`;
+  }).join('');
+}
+
+function seleccionarMesSLA(key){
+  _mesActivoSLA=key;
+  renderFiltroSLA();
+  renderVistaSLA();
+}
+
+function renderVistaSLA(){
+  const cardsWrap=document.getElementById('slaCardsWrap');
+  const mesesAMostrar=_mesActivoSLA==='__todos'?_mesesSLA:_mesesSLA.filter(m=>m.key===_mesActivoSLA);
+
+  let n=0,sumOps=0,cntOps=0,sumLog=0,cntLog=0,sumTot=0,cntTot=0;
+  mesesAMostrar.forEach(m=>{
+    n+=m.n;
+    sumOps+=m.sumOps;cntOps+=m.cntOps;
+    sumLog+=m.sumLog;cntLog+=m.cntLog;
+    sumTot+=m.sumTot;cntTot+=m.cntTot;
+  });
+
+  cardsWrap.className='cards';
+  cardsWrap.innerHTML=`
+    <div class="card" style="--accent:#1a9fd4">
+      <div class="card-label">SLA Operaciones</div>
+      <div class="card-num">${fmtDias(cntOps?sumOps/cntOps:null)}</div>
+      <div class="card-sub">En Proceso → Pre-Colecta</div>
+    </div>
+    <div class="card" style="--accent:var(--amber)">
+      <div class="card-label">SLA Logística</div>
+      <div class="card-num">${fmtDias(cntLog?sumLog/cntLog:null)}</div>
+      <div class="card-sub">Pre-Colecta → Exitoso</div>
+    </div>
+    <div class="card" style="--accent:var(--teal)">
+      <div class="card-label">SLA Total (Sector)</div>
+      <div class="card-num" style="color:var(--teal)">${fmtDias(cntTot?sumTot/cntTot:null)}</div>
+      <div class="card-sub">${n} OTs en el período</div>
+    </div>`;
+
+  const tbody=document.getElementById('tablaSLA');
+  tbody.innerHTML=_mesesSLA.map(m=>{
+    const diffProm=m.cntDiff?(m.sumDiff/m.cntDiff):null;
+    const diffTxt=diffProm==null?'—':(diffProm<0.5?`✅ ${diffProm.toFixed(1)}d`:`⚠️ ${diffProm.toFixed(1)}d`);
+    return `<tr>
+      <td style="font-weight:700">${m.label}</td>
+      <td class="num">${m.n}</td>
+      <td class="num">${fmtDias(m.cntOps?m.sumOps/m.cntOps:null)}</td>
+      <td class="num">${fmtDias(m.cntLog?m.sumLog/m.cntLog:null)}</td>
+      <td class="num" style="color:var(--teal);font-weight:700">${fmtDias(m.cntTot?m.sumTot/m.cntTot:null)}</td>
+      <td class="num" style="font-size:11px">${diffTxt}</td>
+    </tr>`;
+  }).join('');
+}
+
+document.getElementById('loginPass').addEventListener('keydown',e=>{if(e.key==='Enter')hacerLogin();});
+document.getElementById('loginEmail').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('loginPass').focus();});
+</script>
+</body>
+</html>
