@@ -80,7 +80,7 @@
   <header>
     <div class="brand">
       <div class="brand-logo">alleata</div>
-      <div class="brand-sub">· Indicadores Operaciones <span style="opacity:.5">v1.1.0</span></div>
+      <div class="brand-sub">· Indicadores Operaciones <span style="opacity:.5">v1.2.0</span></div>
     </div>
     <div class="user-chip">
       <span id="userLabel">—</span>
@@ -114,9 +114,10 @@
     <table>
       <thead><tr>
         <th>Mes de creación</th><th style="text-align:right">Total OTs creadas</th>
+        <th style="text-align:right">Instalación</th><th style="text-align:right">Cambio + Rollout</th>
         <th style="text-align:right">En Pre-Colecta hoy</th><th style="text-align:right">% sin despachar</th>
       </tr></thead>
-      <tbody id="tablaPrecolecta"><tr><td colspan="4" class="loading">Cargando...</td></tr></tbody>
+      <tbody id="tablaPrecolecta"><tr><td colspan="6" class="loading">Cargando...</td></tr></tbody>
     </table>
   </div>
 
@@ -152,11 +153,13 @@
 </div>
 
 <script>
-// indicadores.html — v1.1.0 (17 ago 2026)
+// indicadores.html — v1.2.0 (17 ago 2026)
 // Changelog:
 //  v1.0.0 — versión inicial (costo logística por mes, Logicalis, % Pre-Colecta, SLA Operaciones/Logística)
 //  v1.1.0 — suma Alleata (logística propia) al reporte de costos a $1/envío (costo simbólico,
 //           no tarifa real de proveedor); agrega tag de versión visible en el header
+//  v1.2.0 — corte global desde 1/6/2026 en las 4 secciones (arranque migración Napse→Prisma);
+//           tabla de OTs creadas separa Instalación vs. Cambio+Rollout
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_ANON);
@@ -233,6 +236,10 @@ const LOGISTICAS=[
 // explícito: usar $1 por envío como costo simbólico/representativo mientras
 // no se defina una metodología real de costeo (combustible, viáticos, etc).
 const COSTO_FIJO_ALLEATA=1;
+// Corte global 1/6/2026: arranque de la migración Napse→Prisma. Se oculta todo
+// lo anterior en las 4 secciones para que el panel quede más limpio — fácil
+// de sacar después si en algún momento hace falta ver histórico completo.
+const FECHA_CORTE='2026-06-01';
 
 async function cargarDatos(){
   const cardsWrap=document.getElementById('cardsWrap');
@@ -246,6 +253,7 @@ async function cargarDatos(){
     .eq('perfil','NAPSE')
     .in('record_type',['Instalación Equipo + Simcard','Cambio de Terminal'])
     .in('status',['Despachado','Exitoso'])
+    .gte('fecha_despacho',FECHA_CORTE)
     .not('fecha_despacho','is',null);
 
   if(error){
@@ -361,6 +369,7 @@ async function cargarLogicalis(){
   const wrap=document.getElementById('logicalisWrap');
   const{data,error}=await sb.from('logicalis_despachos_historico')
     .select('fecha_despacho,cantidad,con_error')
+    .gte('fecha_despacho',FECHA_CORTE)
     .order('fecha_despacho',{ascending:false});
 
   if(error){ wrap.innerHTML=`<div class="empty" style="color:var(--red)">Error: ${error.message}</div>`; return; }
@@ -397,23 +406,29 @@ async function cargarLogicalis(){
 }
 
 // ── OTs creadas por mes vs. cuántas siguen en Pre-Colecta HOY ───────────
+// "Cambio + Rollout" agrupa las OTs con record_type='Cambio de Terminal' —
+// las de Rollout comparten ese mismo record_type en SF (se distinguen por
+// Perfil, no por tipo de registro), así que quedan juntas en este balde.
 async function cargarPrecolecta(){
   const tbody=document.getElementById('tablaPrecolecta');
   const{data,error}=await sb.from('sf_workorders')
-    .select('sf_created_at,status')
+    .select('sf_created_at,status,record_type')
     .in('record_type',['Instalación Equipo + Simcard','Cambio de Terminal'])
+    .gte('sf_created_at',FECHA_CORTE)
     .not('sf_created_at','is',null);
 
-  if(error){ tbody.innerHTML=`<tr><td colspan="4" style="color:var(--red)">Error: ${error.message}</td></tr>`; return; }
-  if(!data?.length){ tbody.innerHTML='<tr><td colspan="4" class="empty">Sin datos</td></tr>'; return; }
+  if(error){ tbody.innerHTML=`<tr><td colspan="6" style="color:var(--red)">Error: ${error.message}</td></tr>`; return; }
+  if(!data?.length){ tbody.innerHTML='<tr><td colspan="6" class="empty">Sin datos</td></tr>'; return; }
 
   const porMes={};
   data.forEach(r=>{
     const d=new Date(r.sf_created_at);
     const key=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
-    if(!porMes[key])porMes[key]={key,label:MESES_NOMBRE[d.getMonth()]+' '+d.getFullYear(),total:0,precolecta:0};
+    if(!porMes[key])porMes[key]={key,label:MESES_NOMBRE[d.getMonth()]+' '+d.getFullYear(),total:0,precolecta:0,instalacion:0,cambioRollout:0};
     porMes[key].total+=1;
     if((r.status||'').trim()==='Pre-Colecta')porMes[key].precolecta+=1;
+    if(r.record_type==='Instalación Equipo + Simcard')porMes[key].instalacion+=1;
+    else if(r.record_type==='Cambio de Terminal')porMes[key].cambioRollout+=1;
   });
   const meses=Object.values(porMes).sort((a,b)=>b.key.localeCompare(a.key));
 
@@ -422,6 +437,8 @@ async function cargarPrecolecta(){
     return `<tr>
       <td style="font-weight:700">${m.label}</td>
       <td class="num">${m.total}</td>
+      <td class="num" style="color:var(--text-dim)">${m.instalacion}</td>
+      <td class="num" style="color:var(--text-dim)">${m.cambioRollout}</td>
       <td class="num" style="color:${m.precolecta?'var(--amber)':'var(--text-dim)'}">${m.precolecta}</td>
       <td class="num">${pct}%</td>
     </tr>`;
@@ -452,6 +469,7 @@ async function cargarSLA(){
   const{data,error}=await sb.from('sf_workorders')
     .select('record_type,fecha_entrada_proceso,fecha_pre_colecta,fecha_exitoso,sla_total_dias')
     .in('record_type',['Instalación Equipo + Simcard','Cambio de Terminal'])
+    .gte('fecha_entrada_proceso',FECHA_CORTE)
     .not('fecha_entrada_proceso','is',null);
 
   if(error){
