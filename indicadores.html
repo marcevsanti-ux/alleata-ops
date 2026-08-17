@@ -80,7 +80,7 @@
   <header>
     <div class="brand">
       <div class="brand-logo">alleata</div>
-      <div class="brand-sub">· Indicadores Operaciones</div>
+      <div class="brand-sub">· Indicadores Operaciones <span style="opacity:.5">v1.1.0</span></div>
     </div>
     <div class="user-chip">
       <span id="userLabel">—</span>
@@ -97,12 +97,13 @@
     <table>
       <thead><tr>
         <th>Mes</th><th style="text-align:right">Correo Arg.</th><th style="text-align:right">EPSA</th>
-        <th style="text-align:right">Cabify</th>
+        <th style="text-align:right">Cabify</th><th style="text-align:right">Alleata ($1/envío)</th>
         <th style="text-align:right">Total envíos</th><th style="text-align:right">Costo total</th>
       </tr></thead>
-      <tbody id="tablaMeses"><tr><td colspan="6" class="loading">Cargando...</td></tr></tbody>
+      <tbody id="tablaMeses"><tr><td colspan="7" class="loading">Cargando...</td></tr></tbody>
     </table>
   </div>
+  <div style="font-size:11px;color:var(--text-dim);margin-top:6px">Alleata (logística propia) usa $1 por envío como costo simbólico, no una tarifa real de proveedor — sirve para contar volumen, no para comparar $ contra el resto.</div>
 
   <h2 style="margin-top:36px">🖥️ Logicalis — Terminales entregadas por mes</h2>
   <div id="logicalisWrap" class="loading">Cargando...</div>
@@ -151,6 +152,11 @@
 </div>
 
 <script>
+// indicadores.html — v1.1.0 (17 ago 2026)
+// Changelog:
+//  v1.0.0 — versión inicial (costo logística por mes, Logicalis, % Pre-Colecta, SLA Operaciones/Logística)
+//  v1.1.0 — suma Alleata (logística propia) al reporte de costos a $1/envío (costo simbólico,
+//           no tarifa real de proveedor); agrega tag de versión visible en el header
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_ANON);
@@ -221,11 +227,12 @@ const LOGISTICAS=[
   {key:'CORREO ARGENTINO', label:'Correo Argentino', color:'#e74c3c'},
   {key:'EPSA',             label:'EPSA',             color:'#f39c12'},
   {key:'CABIFY',           label:'Cabify',            color:'#9b59b6'},
+  {key:'ALLEATA',          label:'Alleata (propia)',  color:'#1dbf8e'},
 ];
-// Alleata sacada del reporte de costos — pedido explícito 04/08: todavía
-// no está definido cómo calcular su costo de envío (es logística propia,
-// no un proveedor externo con factura), así que no corresponde mostrarla
-// acá hasta que se defina esa metodología.
+// Alleata (logística propia, sin factura de proveedor externo) — pedido
+// explícito: usar $1 por envío como costo simbólico/representativo mientras
+// no se defina una metodología real de costeo (combustible, viáticos, etc).
+const COSTO_FIJO_ALLEATA=1;
 
 async function cargarDatos(){
   const cardsWrap=document.getElementById('cardsWrap');
@@ -255,18 +262,18 @@ async function cargarDatos(){
     const log=(r.logistica||'OTROS').toUpperCase().trim();
     if(!porMes[key].logs[log])porMes[key].logs[log]={ots:0,costo:0,altas:0,cambios:0};
     porMes[key].logs[log].ots+=1;
-    porMes[key].logs[log].costo+=Number(r.costo_envio)||0;
+    porMes[key].logs[log].costo+=log==='ALLEATA'?COSTO_FIJO_ALLEATA:(Number(r.costo_envio)||0);
     if(r.record_type==='Cambio de Terminal') porMes[key].logs[log].cambios+=1;
     else porMes[key].logs[log].altas+=1; // Instalación Equipo + Simcard = alta nueva
     porMes[key].total_ots+=1;
-    porMes[key].total_costo+=Number(r.costo_envio)||0;
+    porMes[key].total_costo+=log==='ALLEATA'?COSTO_FIJO_ALLEATA:(Number(r.costo_envio)||0);
   });
 
   _todosLosMeses=Object.values(porMes).sort((a,b)=>b.key.localeCompare(a.key));
 
   if(!_todosLosMeses.length){
     cardsWrap.innerHTML='<div class="empty">Sin datos todavía</div>';
-    tbody.innerHTML='<tr><td colspan="6" class="empty">Sin datos</td></tr>';
+    tbody.innerHTML='<tr><td colspan="7" class="empty">Sin datos</td></tr>';
     return;
   }
 
@@ -324,21 +331,22 @@ function renderVista(){
       <div class="card-label">Total período</div>
       <div class="card-num" style="color:var(--teal)">${fmt$(totalCosto)}</div>
       <div class="card-sub">${totalOts} envíos</div>
-      <div class="card-sub" style="margin-top:2px;opacity:.6">No incluye Alleata (logística propia)</div>
+      <div class="card-sub" style="margin-top:2px;opacity:.6">Incluye Alleata a $1/envío (costo simbólico)</div>
     </div>`;
 
   const tbody=document.getElementById('tablaMeses');
   tbody.innerHTML=_todosLosMeses.map(m=>{
     const c=k=>m.logs[k]?fmt$(m.logs[k].costo):'—';
-    const totOtsSinAlleata=LOGISTICAS.reduce((s,l)=>s+(m.logs[l.key]?.ots||0),0);
-    const totCostoSinAlleata=LOGISTICAS.reduce((s,l)=>s+(m.logs[l.key]?.costo||0),0);
+    const totOts=LOGISTICAS.reduce((s,l)=>s+(m.logs[l.key]?.ots||0),0);
+    const totCosto=LOGISTICAS.reduce((s,l)=>s+(m.logs[l.key]?.costo||0),0);
     return `<tr>
       <td style="font-weight:700">${m.label}</td>
       <td class="num">${c('CORREO ARGENTINO')}</td>
       <td class="num">${c('EPSA')}</td>
       <td class="num">${c('CABIFY')}</td>
-      <td class="num">${totOtsSinAlleata}</td>
-      <td class="num" style="color:var(--teal);font-weight:700">${fmt$(totCostoSinAlleata)}</td>
+      <td class="num">${m.logs['ALLEATA']?m.logs['ALLEATA'].ots+' envíos':'—'}</td>
+      <td class="num">${totOts}</td>
+      <td class="num" style="color:var(--teal);font-weight:700">${fmt$(totCosto)}</td>
     </tr>`;
   }).join('');
 }
