@@ -80,7 +80,7 @@
   <header>
     <div class="brand">
       <div class="brand-logo">alleata</div>
-      <div class="brand-sub">· Indicadores Operaciones <span style="opacity:.5">v1.9.1</span></div>
+      <div class="brand-sub">· Indicadores Operaciones <span style="opacity:.5">v1.9.2</span></div>
     </div>
     <div class="user-chip">
       <span id="userLabel">—</span>
@@ -169,7 +169,7 @@
 </div>
 
 <script>
-// indicadores.html — v1.9.1 (17 ago 2026)
+// indicadores.html — v1.9.2 (17 ago 2026)
 // Changelog:
 //  v1.0.0 — versión inicial (costo logística por mes, Logicalis, % Pre-Colecta, SLA Operaciones/Logística)
 //  v1.1.0 — suma Alleata (logística propia) al reporte de costos a $1/envío (costo simbólico,
@@ -210,6 +210,9 @@
 //           vs ~165 reales según el módulo Rollout Piloto). El campo real es Rollout__c de
 //           SF (columna `rollout` en Supabase), booleano independiente del Perfil — hay
 //           casos confirmados de Perfil=NAPSE + Rollout=true simultáneamente.
+//  v1.9.2 — saca el subrayado punteado de la celda Cambio+Rollout (quedaba confuso, parecía
+//           tachado). Columna "En Pre-Colecta hoy" desglosa Cambio vs Rollout también,
+//           mismo formato "X + Y" chico debajo del total.
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_ANON);
@@ -627,9 +630,10 @@ async function cargarPrecolecta(){
   data.forEach(r=>{
     const d=new Date(r.sf_created_at);
     const key=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
-    if(!porMes[key])porMes[key]={key,label:MESES_NOMBRE[d.getMonth()]+' '+d.getFullYear(),total:0,precolecta:0,instalacion:0,cambioRollout:0,cambio:0,rollout:0};
+    if(!porMes[key])porMes[key]={key,label:MESES_NOMBRE[d.getMonth()]+' '+d.getFullYear(),total:0,precolecta:0,precolectaCambio:0,precolectaRollout:0,instalacion:0,cambioRollout:0,cambio:0,rollout:0};
     porMes[key].total+=1;
-    if((r.status||'').trim()==='Pre-Colecta')porMes[key].precolecta+=1;
+    const enPrecolecta=(r.status||'').trim()==='Pre-Colecta';
+    if(enPrecolecta)porMes[key].precolecta+=1;
     if(r.record_type==='Instalación Equipo + Simcard')porMes[key].instalacion+=1;
     else if(r.record_type==='Cambio de Terminal'){
       porMes[key].cambioRollout+=1;
@@ -638,8 +642,13 @@ async function cargarPrecolecta(){
       // con caso real: Perfil=NAPSE y Rollout=true al mismo tiempo, la OT
       // 00022... de Andres Veyga). No usar Perfil=PRISMA como proxy, estaba
       // mal (daba 2 en vez de ~165 según el módulo Rollout Piloto del portal).
-      if(r.rollout===true) porMes[key].rollout+=1;
-      else porMes[key].cambio+=1;
+      if(r.rollout===true){
+        porMes[key].rollout+=1;
+        if(enPrecolecta)porMes[key].precolectaRollout+=1;
+      } else {
+        porMes[key].cambio+=1;
+        if(enPrecolecta)porMes[key].precolectaCambio+=1;
+      }
     }
 
     if(!diag[key])diag[key]={label:porMes[key].label,napse:0,prisma:0,otroPerfil:0,fueraPipeline:0,estadosFuera:{}};
@@ -661,23 +670,24 @@ async function cargarPrecolecta(){
       <td style="font-weight:700">${m.label}</td>
       <td class="num">${m.total}</td>
       <td class="num" style="color:var(--text-dim)">${m.instalacion}</td>
-      <td class="num" style="color:var(--text-dim);cursor:pointer;text-decoration:underline dotted" onclick="indVerListadoCambio('${m.key}','${m.label}')" title="Cambio: ${m.cambio} · Rollout: ${m.rollout} — Click para ver el listado de OTs">${m.cambio} + ${m.rollout}</td>
-      <td class="num" style="color:${m.precolecta?'var(--amber)':'var(--text-dim)'}">${m.precolecta}</td>
+      <td class="num" style="color:var(--text-dim);cursor:pointer" onclick="indVerListadoCambio('${m.key}','${m.label}')" title="Cambio: ${m.cambio} · Rollout: ${m.rollout} — Click para ver el listado de OTs">${m.cambio} + ${m.rollout}</td>
+      <td class="num" style="color:${m.precolecta?'var(--amber)':'var(--text-dim)'}" title="Instalación: ${m.precolecta-m.precolectaCambio-m.precolectaRollout} · Cambio: ${m.precolectaCambio} · Rollout: ${m.precolectaRollout}">${m.precolecta}<div style="font-size:9px;font-weight:400;opacity:.75">${m.precolectaCambio} + ${m.precolectaRollout}</div></td>
       <td class="num">${pct}%</td>
     </tr>`;
   }).join('');
 
   const tot=meses.reduce((a,m)=>({total:a.total+m.total,instalacion:a.instalacion+m.instalacion,
     cambioRollout:a.cambioRollout+m.cambioRollout,cambio:a.cambio+m.cambio,rollout:a.rollout+m.rollout,
-    precolecta:a.precolecta+m.precolecta}),
-    {total:0,instalacion:0,cambioRollout:0,cambio:0,rollout:0,precolecta:0});
+    precolecta:a.precolecta+m.precolecta,precolectaCambio:a.precolectaCambio+m.precolectaCambio,
+    precolectaRollout:a.precolectaRollout+m.precolectaRollout}),
+    {total:0,instalacion:0,cambioRollout:0,cambio:0,rollout:0,precolecta:0,precolectaCambio:0,precolectaRollout:0});
   const totPct=tot.total?Math.round(tot.precolecta/tot.total*100):0;
   tbody.innerHTML+=`<tr style="border-top:2px solid var(--border2)">
     <td style="font-weight:800;color:var(--teal)">TOTAL</td>
     <td class="num" style="font-weight:800;color:var(--teal)">${tot.total}</td>
     <td class="num" style="font-weight:700">${tot.instalacion}</td>
     <td class="num" style="font-weight:700" title="Cambio: ${tot.cambio} · Rollout: ${tot.rollout}">${tot.cambio} + ${tot.rollout}</td>
-    <td class="num" style="font-weight:700;color:var(--amber)">${tot.precolecta}</td>
+    <td class="num" style="font-weight:700;color:var(--amber)" title="Instalación: ${tot.precolecta-tot.precolectaCambio-tot.precolectaRollout} · Cambio: ${tot.precolectaCambio} · Rollout: ${tot.precolectaRollout}">${tot.precolecta}<div style="font-size:9px;font-weight:400;opacity:.75">${tot.precolectaCambio} + ${tot.precolectaRollout}</div></td>
     <td class="num" style="font-weight:700">${totPct}%</td>
   </tr>`;
 
