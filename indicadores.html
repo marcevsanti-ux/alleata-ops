@@ -80,7 +80,7 @@
   <header>
     <div class="brand">
       <div class="brand-logo">alleata</div>
-      <div class="brand-sub">· Indicadores Operaciones <span style="opacity:.5">v1.4.0</span></div>
+      <div class="brand-sub">· Indicadores Operaciones <span style="opacity:.5">v1.4.1</span></div>
     </div>
     <div class="user-chip">
       <span id="userLabel">—</span>
@@ -96,8 +96,11 @@
   <div style="overflow-x:auto">
     <table>
       <thead><tr>
-        <th>Mes</th><th style="text-align:right">Correo Arg.</th><th style="text-align:right">EPSA</th>
-        <th style="text-align:right">Cabify</th><th style="text-align:right">Alleata ($1/envío)</th>
+        <th>Mes</th>
+        <th style="text-align:right;color:#e74c3c">Correo Arg.</th>
+        <th style="text-align:right;color:#f39c12">EPSA</th>
+        <th style="text-align:right;color:#9b59b6">Cabify</th>
+        <th style="text-align:right;color:#38bdf8">Alleata ($1/envío)</th>
         <th style="text-align:right">Total envíos</th><th style="text-align:right">Costo total</th>
       </tr></thead>
       <tbody id="tablaMeses"><tr><td colspan="7" class="loading">Cargando...</td></tr></tbody>
@@ -154,7 +157,7 @@
 </div>
 
 <script>
-// indicadores.html — v1.4.0 (17 ago 2026)
+// indicadores.html — v1.4.1 (17 ago 2026)
 // Changelog:
 //  v1.0.0 — versión inicial (costo logística por mes, Logicalis, % Pre-Colecta, SLA Operaciones/Logística)
 //  v1.1.0 — suma Alleata (logística propia) al reporte de costos a $1/envío (costo simbólico,
@@ -169,6 +172,8 @@
 //           previo a "Configurar Terminal" (todavía sin usuario/contraseña de cajero), mismo criterio
 //           que ya usan el reporte de SF y Gestión NAPSE. Reconciliado 1:1 contra exportación real de
 //           SF (850 OTs, 827 NAPSE + 23 PRISMA) — coincide exacto con este filtro aplicado.
+//  v1.4.1 — columnas de "Detalle mes a mes" coloreadas igual que su card correspondiente;
+//           Alleata pasa de teal a celeste (#38bdf8) para no confundirse con el card Total
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_ANON);
@@ -239,7 +244,7 @@ const LOGISTICAS=[
   {key:'CORREO ARGENTINO', label:'Correo Argentino', color:'#e74c3c'},
   {key:'EPSA',             label:'EPSA',             color:'#f39c12'},
   {key:'CABIFY',           label:'Cabify',            color:'#9b59b6'},
-  {key:'ALLEATA',          label:'Alleata (propia)',  color:'#1dbf8e'},
+  {key:'ALLEATA',          label:'Alleata (propia)',  color:'#38bdf8'},
 ];
 // Alleata (logística propia, sin factura de proveedor externo) — pedido
 // explícito: usar $1 por envío como costo simbólico/representativo mientras
@@ -358,10 +363,10 @@ function renderVista(){
     const totCosto=LOGISTICAS.reduce((s,l)=>s+(m.logs[l.key]?.costo||0),0);
     return `<tr>
       <td style="font-weight:700">${m.label}</td>
-      <td class="num">${c('CORREO ARGENTINO')}</td>
-      <td class="num">${c('EPSA')}</td>
-      <td class="num">${c('CABIFY')}</td>
-      <td class="num">${m.logs['ALLEATA']?m.logs['ALLEATA'].ots+' envíos':'—'}</td>
+      <td class="num" style="color:#e74c3c">${c('CORREO ARGENTINO')}</td>
+      <td class="num" style="color:#f39c12">${c('EPSA')}</td>
+      <td class="num" style="color:#9b59b6">${c('CABIFY')}</td>
+      <td class="num" style="color:#38bdf8">${m.logs['ALLEATA']?m.logs['ALLEATA'].ots+' envíos':'—'}</td>
       <td class="num">${totOts}</td>
       <td class="num" style="color:var(--teal);font-weight:700">${fmt$(totCosto)}</td>
     </tr>`;
@@ -373,10 +378,10 @@ function renderVista(){
   const granTotCosto=LOGISTICAS.reduce((s,l)=>s+sumCosto(l.key),0);
   tbody.innerHTML+=`<tr style="border-top:2px solid var(--border2)">
     <td style="font-weight:800;color:var(--teal)">TOTAL</td>
-    <td class="num" style="font-weight:700">${fmt$(sumCosto('CORREO ARGENTINO'))}</td>
-    <td class="num" style="font-weight:700">${fmt$(sumCosto('EPSA'))}</td>
-    <td class="num" style="font-weight:700">${fmt$(sumCosto('CABIFY'))}</td>
-    <td class="num" style="font-weight:700">${sumOtsAlleata} envíos</td>
+    <td class="num" style="font-weight:700;color:#e74c3c">${fmt$(sumCosto('CORREO ARGENTINO'))}</td>
+    <td class="num" style="font-weight:700;color:#f39c12">${fmt$(sumCosto('EPSA'))}</td>
+    <td class="num" style="font-weight:700;color:#9b59b6">${fmt$(sumCosto('CABIFY'))}</td>
+    <td class="num" style="font-weight:700;color:#38bdf8">${sumOtsAlleata} envíos</td>
     <td class="num" style="font-weight:800;color:var(--teal)">${granTotOts}</td>
     <td class="num" style="font-weight:800;color:var(--teal)">${fmt$(granTotCosto)}</td>
   </tr>`;
