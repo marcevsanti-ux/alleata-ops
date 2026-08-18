@@ -120,6 +120,7 @@
       <tbody id="tablaPrecolecta"><tr><td colspan="6" class="loading">Cargando...</td></tr></tbody>
     </table>
   </div>
+  <div id="diagPrecolecta"></div>
 
   <h2 style="margin-top:36px">⏱️ SLA Operaciones / Logística</h2>
   <div style="font-size:12px;color:var(--text-dim);margin-bottom:14px">
@@ -357,6 +358,20 @@ function renderVista(){
       <td class="num" style="color:var(--teal);font-weight:700">${fmt$(totCosto)}</td>
     </tr>`;
   }).join('');
+
+  const sumCosto=k=>_todosLosMeses.reduce((s,m)=>s+(m.logs[k]?.costo||0),0);
+  const sumOtsAlleata=_todosLosMeses.reduce((s,m)=>s+(m.logs['ALLEATA']?.ots||0),0);
+  const granTotOts=LOGISTICAS.reduce((s,l)=>s+_todosLosMeses.reduce((s2,m)=>s2+(m.logs[l.key]?.ots||0),0),0);
+  const granTotCosto=LOGISTICAS.reduce((s,l)=>s+sumCosto(l.key),0);
+  tbody.innerHTML+=`<tr style="border-top:2px solid var(--border2)">
+    <td style="font-weight:800;color:var(--teal)">TOTAL</td>
+    <td class="num" style="font-weight:700">${fmt$(sumCosto('CORREO ARGENTINO'))}</td>
+    <td class="num" style="font-weight:700">${fmt$(sumCosto('EPSA'))}</td>
+    <td class="num" style="font-weight:700">${fmt$(sumCosto('CABIFY'))}</td>
+    <td class="num" style="font-weight:700">${sumOtsAlleata} envíos</td>
+    <td class="num" style="font-weight:800;color:var(--teal)">${granTotOts}</td>
+    <td class="num" style="font-weight:800;color:var(--teal)">${fmt$(granTotCosto)}</td>
+  </tr>`;
 }
 
 // ── Logicalis — terminales entregadas por mes ───────────────────────────
@@ -401,7 +416,15 @@ async function cargarLogicalis(){
         <td class="num" style="color:var(--teal);font-weight:700">${optimas}</td>
         <td class="num" style="color:${m.con_error?'var(--amber)':'var(--text-dim)'}">${m.con_error}</td>
       </tr>`;
-    }).join('')
+    }).join('')+(()=>{
+      const tot=meses.reduce((a,m)=>({cantidad:a.cantidad+m.cantidad,con_error:a.con_error+m.con_error}),{cantidad:0,con_error:0});
+      return `<tr style="border-top:2px solid var(--border2)">
+        <td style="font-weight:800;color:var(--teal)">TOTAL</td>
+        <td class="num" style="font-weight:800;color:var(--teal)">${tot.cantidad}</td>
+        <td class="num" style="font-weight:700">${tot.cantidad-tot.con_error}</td>
+        <td class="num" style="font-weight:700">${tot.con_error}</td>
+      </tr>`;
+    })()
   }</tbody></table>`;
 }
 
@@ -412,13 +435,21 @@ async function cargarLogicalis(){
 async function cargarPrecolecta(){
   const tbody=document.getElementById('tablaPrecolecta');
   const{data,error}=await sb.from('sf_workorders')
-    .select('sf_created_at,status,record_type')
+    .select('sf_created_at,status,record_type,perfil')
     .in('record_type',['Instalación Equipo + Simcard','Cambio de Terminal'])
     .gte('sf_created_at',FECHA_CORTE)
     .not('sf_created_at','is',null);
 
   if(error){ tbody.innerHTML=`<tr><td colspan="6" style="color:var(--red)">Error: ${error.message}</td></tr>`; return; }
   if(!data?.length){ tbody.innerHTML='<tr><td colspan="6" class="empty">Sin datos</td></tr>'; return; }
+
+  // Diagnóstico (pedido 17/08): verificar con datos reales, no suposición,
+  // si la diferencia contra Gestión NAPSE (802 vs 1000) viene de Perfil
+  // PRISMA ya presente desde junio y/o de estados fuera del pipeline de
+  // Gestión NAPSE (que solo cuenta Configurar Terminal / En Proceso /
+  // Pre-Colecta / Despachado / Retirar Terminal / Exitoso).
+  const PIPELINE_NAPSE=['Configurar Terminal','En Proceso','Pre-Colecta','Despachado','Retirar Terminal','Exitoso'];
+  const diag={};
 
   const porMes={};
   data.forEach(r=>{
@@ -429,6 +460,17 @@ async function cargarPrecolecta(){
     if((r.status||'').trim()==='Pre-Colecta')porMes[key].precolecta+=1;
     if(r.record_type==='Instalación Equipo + Simcard')porMes[key].instalacion+=1;
     else if(r.record_type==='Cambio de Terminal')porMes[key].cambioRollout+=1;
+
+    if(!diag[key])diag[key]={label:porMes[key].label,napse:0,prisma:0,otroPerfil:0,fueraPipeline:0,estadosFuera:{}};
+    const p=(r.perfil||'').toUpperCase().trim();
+    if(p==='NAPSE')diag[key].napse+=1;
+    else if(p==='PRISMA')diag[key].prisma+=1;
+    else diag[key].otroPerfil+=1;
+    const st=(r.status||'').trim();
+    if(!PIPELINE_NAPSE.includes(st)){
+      diag[key].fueraPipeline+=1;
+      diag[key].estadosFuera[st||'(sin estado)']=(diag[key].estadosFuera[st||'(sin estado)']||0)+1;
+    }
   });
   const meses=Object.values(porMes).sort((a,b)=>b.key.localeCompare(a.key));
 
@@ -443,6 +485,70 @@ async function cargarPrecolecta(){
       <td class="num">${pct}%</td>
     </tr>`;
   }).join('');
+
+  const tot=meses.reduce((a,m)=>({total:a.total+m.total,instalacion:a.instalacion+m.instalacion,
+    cambioRollout:a.cambioRollout+m.cambioRollout,precolecta:a.precolecta+m.precolecta}),
+    {total:0,instalacion:0,cambioRollout:0,precolecta:0});
+  const totPct=tot.total?Math.round(tot.precolecta/tot.total*100):0;
+  tbody.innerHTML+=`<tr style="border-top:2px solid var(--border2)">
+    <td style="font-weight:800;color:var(--teal)">TOTAL</td>
+    <td class="num" style="font-weight:800;color:var(--teal)">${tot.total}</td>
+    <td class="num" style="font-weight:700">${tot.instalacion}</td>
+    <td class="num" style="font-weight:700">${tot.cambioRollout}</td>
+    <td class="num" style="font-weight:700;color:var(--amber)">${tot.precolecta}</td>
+    <td class="num" style="font-weight:700">${totPct}%</td>
+  </tr>`;
+
+  renderDiagPrecolecta(diag);
+}
+
+// Diagnóstico temporal — sacar cuando se resuelva la comparación contra
+// Gestión NAPSE (ver ask del 17/08). Muestra con datos reales cuánto de la
+// diferencia 802 vs 1000 es Perfil PRISMA y cuánto es estados fuera del
+// pipeline de 6 estados que usa Gestión NAPSE.
+function renderDiagPrecolecta(diag){
+  const el=document.getElementById('diagPrecolecta');
+  if(!el)return;
+  const filas=Object.values(diag).sort((a,b)=>b.label.localeCompare(a.label));
+  const totNapse=filas.reduce((s,f)=>s+f.napse,0);
+  const totPrisma=filas.reduce((s,f)=>s+f.prisma,0);
+  const totOtro=filas.reduce((s,f)=>s+f.otroPerfil,0);
+  const totFuera=filas.reduce((s,f)=>s+f.fueraPipeline,0);
+
+  const estadosFueraGlobal={};
+  filas.forEach(f=>Object.entries(f.estadosFuera).forEach(([st,n])=>{
+    estadosFueraGlobal[st]=(estadosFueraGlobal[st]||0)+n;
+  }));
+  const estadosFueraTxt=Object.entries(estadosFueraGlobal)
+    .sort((a,b)=>b[1]-a[1])
+    .map(([st,n])=>`${st}: ${n}`).join(' · ')||'ninguno';
+
+  el.innerHTML=`
+    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--purple);margin:14px 0 8px">🔍 Diagnóstico — por qué no coincide con Gestión NAPSE (802)</div>
+    <div style="overflow-x:auto"><table>
+      <thead><tr>
+        <th>Mes</th><th style="text-align:right">Perfil NAPSE</th><th style="text-align:right">Perfil PRISMA</th>
+        <th style="text-align:right">Otro/sin perfil</th><th style="text-align:right">Fuera del pipeline*</th>
+      </tr></thead>
+      <tbody>${filas.map(f=>`<tr>
+        <td style="font-weight:700">${f.label}</td>
+        <td class="num">${f.napse}</td>
+        <td class="num" style="color:var(--purple);font-weight:700">${f.prisma}</td>
+        <td class="num" style="color:var(--text-dim)">${f.otroPerfil}</td>
+        <td class="num" style="color:${f.fueraPipeline?'var(--amber)':'var(--text-dim)'}">${f.fueraPipeline}</td>
+      </tr>`).join('')}
+      <tr style="border-top:2px solid var(--border2)">
+        <td style="font-weight:800;color:var(--teal)">TOTAL</td>
+        <td class="num" style="font-weight:800">${totNapse}</td>
+        <td class="num" style="font-weight:800;color:var(--purple)">${totPrisma}</td>
+        <td class="num" style="font-weight:800">${totOtro}</td>
+        <td class="num" style="font-weight:800;color:var(--amber)">${totFuera}</td>
+      </tr>
+      </tbody>
+    </table></div>
+    <div style="font-size:11px;color:var(--text-dim);margin-top:6px">*Estados encontrados fuera del pipeline de 6 estados que usa Gestión NAPSE (Configurar Terminal / En Proceso / Pre-Colecta / Despachado / Retirar Terminal / Exitoso): ${estadosFueraTxt}</div>
+    <div style="font-size:11px;color:var(--text-dim);margin-top:4px">Perfil PRISMA + Fuera del pipeline = <b>${totPrisma+totFuera}</b> — compará ese número contra la diferencia real entre el total de esta tabla y el "Total OTs Activas" que muestre Gestión NAPSE en el momento en que lo mires (el 802 de la captura ya puede haber cambiado).</div>
+  `;
 }
 
 // ── SLA Operaciones / Logística ──────────────────────────────────────────
@@ -574,6 +680,21 @@ function renderVistaSLA(){
       <td class="num" style="font-size:11px">${diffTxt}</td>
     </tr>`;
   }).join('');
+
+  // Fila de cierre: promedio PONDERADO por cantidad de OTs de cada mes (no
+  // promedio simple de los promedios mensuales), para que coincida con lo
+  // que muestran las cards de arriba cuando el filtro está en "Todos los meses".
+  const tot=_mesesSLA.reduce((a,m)=>({n:a.n+m.n,sumOps:a.sumOps+m.sumOps,cntOps:a.cntOps+m.cntOps,
+    sumLog:a.sumLog+m.sumLog,cntLog:a.cntLog+m.cntLog,sumTot:a.sumTot+m.sumTot,cntTot:a.cntTot+m.cntTot}),
+    {n:0,sumOps:0,cntOps:0,sumLog:0,cntLog:0,sumTot:0,cntTot:0});
+  tbody.innerHTML+=`<tr style="border-top:2px solid var(--border2)">
+    <td style="font-weight:800;color:var(--teal)">PROMEDIO (ponderado)</td>
+    <td class="num" style="font-weight:800;color:var(--teal)">${tot.n}</td>
+    <td class="num" style="font-weight:700">${fmtDias(tot.cntOps?tot.sumOps/tot.cntOps:null)}</td>
+    <td class="num" style="font-weight:700">${fmtDias(tot.cntLog?tot.sumLog/tot.cntLog:null)}</td>
+    <td class="num" style="font-weight:800;color:var(--teal)">${fmtDias(tot.cntTot?tot.sumTot/tot.cntTot:null)}</td>
+    <td class="num">—</td>
+  </tr>`;
 }
 
 document.getElementById('loginPass').addEventListener('keydown',e=>{if(e.key==='Enter')hacerLogin();});
