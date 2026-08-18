@@ -80,7 +80,7 @@
   <header>
     <div class="brand">
       <div class="brand-logo">alleata</div>
-      <div class="brand-sub">· Indicadores Operaciones <span style="opacity:.5">v1.9.0</span></div>
+      <div class="brand-sub">· Indicadores Operaciones <span style="opacity:.5">v1.9.1</span></div>
     </div>
     <div class="user-chip">
       <span id="userLabel">—</span>
@@ -169,7 +169,7 @@
 </div>
 
 <script>
-// indicadores.html — v1.9.0 (17 ago 2026)
+// indicadores.html — v1.9.1 (17 ago 2026)
 // Changelog:
 //  v1.0.0 — versión inicial (costo logística por mes, Logicalis, % Pre-Colecta, SLA Operaciones/Logística)
 //  v1.1.0 — suma Alleata (logística propia) al reporte de costos a $1/envío (costo simbólico,
@@ -206,6 +206,10 @@
 //           cards. Columna "Cambio + Rollout" cambia de formato: en vez de mostrar el total
 //           con el desglose chico abajo, muestra directamente "Cambio + Rollout" como suma
 //           (ej: "171 + 1"), en la fila mensual y en el TOTAL.
+//  v1.9.1 — FIX: Rollout se detectaba mal (Cambio de Terminal + Perfil=PRISMA daba solo 2,
+//           vs ~165 reales según el módulo Rollout Piloto). El campo real es Rollout__c de
+//           SF (columna `rollout` en Supabase), booleano independiente del Perfil — hay
+//           casos confirmados de Perfil=NAPSE + Rollout=true simultáneamente.
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_ANON);
@@ -596,7 +600,7 @@ async function cargarLogicalis(){
 async function cargarPrecolecta(){
   const tbody=document.getElementById('tablaPrecolecta');
   const{data:dataCruda,error}=await sb.from('sf_workorders')
-    .select('sf_created_at,status,record_type,perfil,workorder_number,cuenta,responsable')
+    .select('sf_created_at,status,record_type,perfil,rollout,workorder_number,cuenta,responsable')
     .in('record_type',['Instalación Equipo + Simcard','Cambio de Terminal'])
     .gte('sf_created_at',FECHA_CORTE)
     .not('sf_created_at','is',null)
@@ -629,10 +633,12 @@ async function cargarPrecolecta(){
     if(r.record_type==='Instalación Equipo + Simcard')porMes[key].instalacion+=1;
     else if(r.record_type==='Cambio de Terminal'){
       porMes[key].cambioRollout+=1;
-      // Rollout = Cambio de Terminal con destino Perfil PRISMA (la migración
-      // Napse→Prisma); "Cambio" a secas = reemplazo NAPSE→NAPSE (terminal
-      // rota, etc.), sin relación con el rollout.
-      if((r.perfil||'').toUpperCase().trim()==='PRISMA') porMes[key].rollout+=1;
+      // Rollout = campo booleano Rollout__c de SF, sincronizado como
+      // `rollout` en Supabase — es independiente del Perfil (confirmado
+      // con caso real: Perfil=NAPSE y Rollout=true al mismo tiempo, la OT
+      // 00022... de Andres Veyga). No usar Perfil=PRISMA como proxy, estaba
+      // mal (daba 2 en vez de ~165 según el módulo Rollout Piloto del portal).
+      if(r.rollout===true) porMes[key].rollout+=1;
       else porMes[key].cambio+=1;
     }
 
