@@ -80,7 +80,7 @@
   <header>
     <div class="brand">
       <div class="brand-logo">alleata</div>
-      <div class="brand-sub">· Indicadores Operaciones <span style="opacity:.5">v1.2.0</span></div>
+      <div class="brand-sub">· Indicadores Operaciones <span style="opacity:.5">v1.3.0</span></div>
     </div>
     <div class="user-chip">
       <span id="userLabel">—</span>
@@ -154,13 +154,17 @@
 </div>
 
 <script>
-// indicadores.html — v1.2.0 (17 ago 2026)
+// indicadores.html — v1.3.0 (17 ago 2026)
 // Changelog:
 //  v1.0.0 — versión inicial (costo logística por mes, Logicalis, % Pre-Colecta, SLA Operaciones/Logística)
 //  v1.1.0 — suma Alleata (logística propia) al reporte de costos a $1/envío (costo simbólico,
 //           no tarifa real de proveedor); agrega tag de versión visible en el header
 //  v1.2.0 — corte global desde 1/6/2026 en las 4 secciones (arranque migración Napse→Prisma);
-//           tabla de OTs creadas separa Instalación vs. Cambio+Rollout
+//           tabla de OTs creadas separa Instalación vs. Cambio+Rollout; totalizadores en las 4 tablas;
+//           bloque de diagnóstico temporal (perfil NAPSE/PRISMA + estados fuera del pipeline de Gestión NAPSE)
+//  v1.3.0 — filtro cuenta IS NOT NULL en "OTs creadas": excluye lote de 172 registros
+//           administrativos/de sistema detectados el 9/6 (sin cuenta, perfil=PRISMA por defecto,
+//           terminal_id=null, status Recuperada/Reactivado) que no son altas reales de cliente
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_ANON);
@@ -432,13 +436,19 @@ async function cargarLogicalis(){
 // "Cambio + Rollout" agrupa las OTs con record_type='Cambio de Terminal' —
 // las de Rollout comparten ese mismo record_type en SF (se distinguen por
 // Perfil, no por tipo de registro), así que quedan juntas en este balde.
+// Filtro cuenta IS NOT NULL (17/08): se detectó un lote de 172 registros
+// generado de una sola vez el 9/6 — mismo timestamp exacto, sin cuenta,
+// perfil=PRISMA, terminal_id=null, status Recuperada/Reactivado — que no
+// son altas reales de cliente sino un artefacto administrativo/de sistema.
+// Excluirlos acerca el número a lo que mide Gestión NAPSE (802).
 async function cargarPrecolecta(){
   const tbody=document.getElementById('tablaPrecolecta');
   const{data,error}=await sb.from('sf_workorders')
     .select('sf_created_at,status,record_type,perfil')
     .in('record_type',['Instalación Equipo + Simcard','Cambio de Terminal'])
     .gte('sf_created_at',FECHA_CORTE)
-    .not('sf_created_at','is',null);
+    .not('sf_created_at','is',null)
+    .not('cuenta','is',null);
 
   if(error){ tbody.innerHTML=`<tr><td colspan="6" style="color:var(--red)">Error: ${error.message}</td></tr>`; return; }
   if(!data?.length){ tbody.innerHTML='<tr><td colspan="6" class="empty">Sin datos</td></tr>'; return; }
