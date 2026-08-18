@@ -80,7 +80,7 @@
   <header>
     <div class="brand">
       <div class="brand-logo">alleata</div>
-      <div class="brand-sub">· Indicadores Operaciones <span style="opacity:.5">v1.9.2</span></div>
+      <div class="brand-sub">· Indicadores Operaciones <span style="opacity:.5">v2.0.0</span></div>
     </div>
     <div class="user-chip">
       <span id="userLabel">—</span>
@@ -169,7 +169,7 @@
 </div>
 
 <script>
-// indicadores.html — v1.9.2 (17 ago 2026)
+// indicadores.html — v2.0.0 (17 ago 2026)
 // Changelog:
 //  v1.0.0 — versión inicial (costo logística por mes, Logicalis, % Pre-Colecta, SLA Operaciones/Logística)
 //  v1.1.0 — suma Alleata (logística propia) al reporte de costos a $1/envío (costo simbólico,
@@ -213,6 +213,8 @@
 //  v1.9.2 — saca el subrayado punteado de la celda Cambio+Rollout (quedaba confuso, parecía
 //           tachado). Columna "En Pre-Colecta hoy" desglosa Cambio vs Rollout también,
 //           mismo formato "X + Y" chico debajo del total.
+//  v2.0.0 — card "SLA Logística" desglosa el promedio por proveedor: Alleata / CA (Correo
+//           Argentino) / EPSA / Varios (Cabify + el resto), respetando el filtro de mes activo.
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_ANON);
@@ -765,7 +767,7 @@ async function cargarSLA(){
   const tbody=document.getElementById('tablaSLA');
 
   const{data,error}=await sb.from('sf_workorders')
-    .select('record_type,fecha_entrada_proceso,fecha_pre_colecta,fecha_exitoso,sla_total_dias')
+    .select('record_type,fecha_entrada_proceso,fecha_pre_colecta,fecha_exitoso,sla_total_dias,logistica')
     .in('record_type',['Instalación Equipo + Simcard','Cambio de Terminal'])
     .gte('fecha_entrada_proceso',FECHA_CORTE)
     .not('fecha_entrada_proceso','is',null);
@@ -781,6 +783,17 @@ async function cargarSLA(){
     return;
   }
 
+  // Categorías para el desglose de SLA Logística por proveedor (pedido 18/08):
+  // Alleata / CA (Correo Argentino) / EPSA quedan aparte, todo lo demás
+  // (Cabify, Instala Ventas, Retira Cliente, vacío, etc.) cae en "Varios".
+  const catLogistica=l=>{
+    const v=(l||'').toUpperCase().trim();
+    if(v==='ALLEATA')return 'ALLEATA';
+    if(v==='CORREO ARGENTINO')return 'CA';
+    if(v==='EPSA')return 'EPSA';
+    return 'VARIOS';
+  };
+
   const porMes={};
   data.forEach(r=>{
     // Mes de referencia: fecha de cierre si ya la tiene, si no la última fecha disponible
@@ -789,7 +802,8 @@ async function cargarSLA(){
     const d=new Date(refFecha);
     const key=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
     if(!porMes[key])porMes[key]={key,label:MESES_NOMBRE[d.getMonth()]+' '+d.getFullYear(),
-      n:0,sumOps:0,cntOps:0,sumLog:0,cntLog:0,sumTot:0,cntTot:0,sumDiff:0,cntDiff:0};
+      n:0,sumOps:0,cntOps:0,sumLog:0,cntLog:0,sumTot:0,cntTot:0,sumDiff:0,cntDiff:0,
+      porLog:{ALLEATA:{sum:0,cnt:0},CA:{sum:0,cnt:0},EPSA:{sum:0,cnt:0},VARIOS:{sum:0,cnt:0}}};
     const m=porMes[key];
     m.n+=1;
 
@@ -797,7 +811,12 @@ async function cargarSLA(){
     if(slaOps!=null){ m.sumOps+=slaOps; m.cntOps+=1; }
 
     const slaLog=diasEntre(r.fecha_pre_colecta,r.fecha_exitoso);
-    if(slaLog!=null){ m.sumLog+=slaLog; m.cntLog+=1; }
+    if(slaLog!=null){
+      m.sumLog+=slaLog; m.cntLog+=1;
+      const cat=catLogistica(r.logistica);
+      m.porLog[cat].sum+=slaLog;
+      m.porLog[cat].cnt+=1;
+    }
 
     const slaTot=diasEntre(r.fecha_entrada_proceso,r.fecha_exitoso);
     if(slaTot!=null){
@@ -834,12 +853,27 @@ function renderVistaSLA(){
   const mesesAMostrar=_mesActivoSLA==='__todos'?_mesesSLA:_mesesSLA.filter(m=>m.key===_mesActivoSLA);
 
   let n=0,sumOps=0,cntOps=0,sumLog=0,cntLog=0,sumTot=0,cntTot=0;
+  const porLog={ALLEATA:{sum:0,cnt:0},CA:{sum:0,cnt:0},EPSA:{sum:0,cnt:0},VARIOS:{sum:0,cnt:0}};
   mesesAMostrar.forEach(m=>{
     n+=m.n;
     sumOps+=m.sumOps;cntOps+=m.cntOps;
     sumLog+=m.sumLog;cntLog+=m.cntLog;
     sumTot+=m.sumTot;cntTot+=m.cntTot;
+    if(m.porLog){
+      Object.keys(porLog).forEach(cat=>{
+        porLog[cat].sum+=m.porLog[cat].sum;
+        porLog[cat].cnt+=m.porLog[cat].cnt;
+      });
+    }
   });
+
+  const LOG_LABELS={ALLEATA:'Alleata',CA:'CA',EPSA:'EPSA',VARIOS:'Varios'};
+  const desgloseLogHtml=Object.entries(porLog).map(([cat,v])=>
+    `<div style="display:flex;justify-content:space-between;font-size:11px;padding:2px 0">
+      <span style="color:var(--text-dim)">${LOG_LABELS[cat]}</span>
+      <span style="font-family:var(--mono);font-weight:700">${v.cnt?fmtDias(v.sum/v.cnt):'—'}</span>
+    </div>`
+  ).join('');
 
   cardsWrap.className='cards';
   cardsWrap.innerHTML=`
@@ -852,6 +886,7 @@ function renderVistaSLA(){
       <div class="card-label">SLA Logística</div>
       <div class="card-num">${fmtDias(cntLog?sumLog/cntLog:null)}</div>
       <div class="card-sub">Pre-Colecta → Exitoso</div>
+      <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border)">${desgloseLogHtml}</div>
     </div>
     <div class="card" style="--accent:var(--teal)">
       <div class="card-label">SLA Total (Sector)</div>
