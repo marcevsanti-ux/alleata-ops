@@ -80,7 +80,7 @@
   <header>
     <div class="brand">
       <div class="brand-logo">alleata</div>
-      <div class="brand-sub">· Indicadores Operaciones <span style="opacity:.5">v1.8.0</span></div>
+      <div class="brand-sub">· Indicadores Operaciones <span style="opacity:.5">v1.9.0</span></div>
     </div>
     <div class="user-chip">
       <span id="userLabel">—</span>
@@ -169,7 +169,7 @@
 </div>
 
 <script>
-// indicadores.html — v1.8.0 (17 ago 2026)
+// indicadores.html — v1.9.0 (17 ago 2026)
 // Changelog:
 //  v1.0.0 — versión inicial (costo logística por mes, Logicalis, % Pre-Colecta, SLA Operaciones/Logística)
 //  v1.1.0 — suma Alleata (logística propia) al reporte de costos a $1/envío (costo simbólico,
@@ -202,6 +202,10 @@
 //  v1.8.0 — "Total envíos" (card + tabla) ya no incluye Alleata, igual que Gestión NAPSE
 //           (Alleata sigue con su propia card/columna, solo se saca del agregado). Columna
 //           "Cambio + Rollout" desglosa Cambio (perfil NAPSE) vs Rollout (perfil PRISMA).
+//  v1.9.0 — card "Total envíos" suma costo promedio (Prom. $X), igual que el resto de las
+//           cards. Columna "Cambio + Rollout" cambia de formato: en vez de mostrar el total
+//           con el desglose chico abajo, muestra directamente "Cambio + Rollout" como suma
+//           (ej: "171 + 1"), en la fila mensual y en el TOTAL.
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_ANON);
@@ -480,7 +484,7 @@ function renderVista(){
   }).join('')+`<div class="card" style="--accent:var(--teal)">
       <div class="card-label">Total envíos</div>
       <div class="card-num" style="color:var(--teal)">${fmt$(totalCosto)}</div>
-      <div class="card-sub">${totalOts} envíos</div>
+      <div class="card-sub">${totalOts} envíos · Prom. ${fmt$(totalOts?Math.round(totalCosto/totalOts):0)}</div>
       <div class="card-sub" style="margin-top:2px;opacity:.6">No contempla envíos Alleata (igual que Gestión NAPSE)</div>
     </div>`;
 
@@ -651,10 +655,7 @@ async function cargarPrecolecta(){
       <td style="font-weight:700">${m.label}</td>
       <td class="num">${m.total}</td>
       <td class="num" style="color:var(--text-dim)">${m.instalacion}</td>
-      <td class="num" style="color:var(--text-dim);cursor:pointer;text-decoration:underline dotted" onclick="indVerListadoCambio('${m.key}','${m.label}')" title="Click para ver el listado de OTs">
-        ${m.cambioRollout}
-        <div style="font-size:9px;color:var(--text-dim);font-weight:400;margin-top:1px">Cambio: ${m.cambio} · Rollout: ${m.rollout}</div>
-      </td>
+      <td class="num" style="color:var(--text-dim);cursor:pointer;text-decoration:underline dotted" onclick="indVerListadoCambio('${m.key}','${m.label}')" title="Cambio: ${m.cambio} · Rollout: ${m.rollout} — Click para ver el listado de OTs">${m.cambio} + ${m.rollout}</td>
       <td class="num" style="color:${m.precolecta?'var(--amber)':'var(--text-dim)'}">${m.precolecta}</td>
       <td class="num">${pct}%</td>
     </tr>`;
@@ -669,10 +670,7 @@ async function cargarPrecolecta(){
     <td style="font-weight:800;color:var(--teal)">TOTAL</td>
     <td class="num" style="font-weight:800;color:var(--teal)">${tot.total}</td>
     <td class="num" style="font-weight:700">${tot.instalacion}</td>
-    <td class="num" style="font-weight:700">
-      ${tot.cambioRollout}
-      <div style="font-size:9px;color:var(--text-dim);font-weight:400;margin-top:1px">Cambio: ${tot.cambio} · Rollout: ${tot.rollout}</div>
-    </td>
+    <td class="num" style="font-weight:700" title="Cambio: ${tot.cambio} · Rollout: ${tot.rollout}">${tot.cambio} + ${tot.rollout}</td>
     <td class="num" style="font-weight:700;color:var(--amber)">${tot.precolecta}</td>
     <td class="num" style="font-weight:700">${totPct}%</td>
   </tr>`;
