@@ -80,7 +80,7 @@
   <header>
     <div class="brand">
       <div class="brand-logo">alleata</div>
-      <div class="brand-sub">· Indicadores Operaciones <span style="opacity:.5">v1.5.0</span></div>
+      <div class="brand-sub">· Indicadores Operaciones <span style="opacity:.5">v1.6.0</span></div>
     </div>
     <div class="user-chip">
       <span id="userLabel">—</span>
@@ -156,8 +156,19 @@
   </div>
 </div>
 
+<!-- Modal de solo lectura — listado de OTs (usado por indVerListadoSinFecha) -->
+<div id="indModalOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:1000;align-items:center;justify-content:center;padding:20px" onclick="if(event.target===this)indCerrarModal()">
+  <div style="background:var(--panel);border:1px solid var(--border2);border-radius:14px;max-width:900px;width:100%;max-height:80vh;overflow-y:auto;padding:22px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:12px">
+      <div id="indModalTitulo" style="font-size:14px;font-weight:800;color:var(--text)"></div>
+      <button class="btn-logout" onclick="indCerrarModal()" style="flex-shrink:0">✕ Cerrar</button>
+    </div>
+    <div id="indModalBody"></div>
+  </div>
+</div>
+
 <script>
-// indicadores.html — v1.5.0 (17 ago 2026)
+// indicadores.html — v1.6.0 (17 ago 2026)
 // Changelog:
 //  v1.0.0 — versión inicial (costo logística por mes, Logicalis, % Pre-Colecta, SLA Operaciones/Logística)
 //  v1.1.0 — suma Alleata (logística propia) al reporte de costos a $1/envío (costo simbólico,
@@ -178,11 +189,15 @@
 //           70 envíos reales — 42 Alleata, 15 EPSA, 6 Cabify, 5 Correo — que Gestión NAPSE
 //           sí contaba). Ahora se agrupan en una fila aparte "Sin fecha despacho". Con esto
 //           las cards en "Todos los meses" coinciden exacto con Gestión NAPSE.
+//  v1.6.0 — cards de logística clickeables cuando el filtro está en "Sin fecha despacho":
+//           abre un modal de solo lectura con el listado de OTs (N° OT, cuenta, tipo,
+//           status, responsable, costo) de esa logística puntual.
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_ANON);
 
 let _todosLosMeses=[];
+let _datosCrudosCostos=[]; // sf_workorders crudo de cargarDatos(), para el modal de listado de OTs
 let _mesActivo='__todos';
 
 async function hacerLogin(){
@@ -273,7 +288,7 @@ async function cargarDatos(){
   // despacho" en vez de perderse — así las cards de "Todos los meses"
   // coinciden con Gestión NAPSE.
   const{data,error}=await sb.from('sf_workorders')
-    .select('logistica,costo_envio,fecha_despacho,status,perfil,record_type')
+    .select('workorder_number,cuenta,responsable,logistica,costo_envio,fecha_despacho,status,perfil,record_type')
     .eq('perfil','NAPSE')
     .in('record_type',['Instalación Equipo + Simcard','Cambio de Terminal'])
     .in('status',['Despachado','Exitoso'])
@@ -284,6 +299,8 @@ async function cargarDatos(){
     tbody.innerHTML='';
     return;
   }
+
+  _datosCrudosCostos=data||[]; // guardado para el listado clickeable de "Sin fecha despacho"
 
   const porMes={};
   (data||[]).forEach(r=>{
@@ -335,6 +352,39 @@ function seleccionarMes(key){
 
 function fmt$(n){ return n?'$'+Math.round(n).toLocaleString('es-AR'):'$0'; }
 
+// Modal de solo lectura: lista las OTs individuales de una logística dentro
+// del bucket "Sin fecha despacho" (17/08, pedido explícito). Usa los datos
+// crudos ya traídos por cargarDatos(), no dispara una consulta nueva.
+function indVerListadoSinFecha(logKey){
+  const label=(LOGISTICAS.find(l=>l.key===logKey)||{}).label||logKey;
+  const filas=_datosCrudosCostos.filter(r=>!r.fecha_despacho && (r.logistica||'OTROS').toUpperCase().trim()===logKey);
+
+  const filasHtml=filas.length
+    ? filas.map(r=>`<tr>
+        <td style="font-family:var(--mono)">${r.workorder_number||'—'}</td>
+        <td>${r.cuenta||'<span style="color:var(--text-dim)">— sin cuenta —</span>'}</td>
+        <td>${r.record_type||'—'}</td>
+        <td>${r.status||'—'}</td>
+        <td>${r.responsable||'—'}</td>
+        <td class="num">${r.costo_envio!=null?fmt$(Number(r.costo_envio)):'—'}</td>
+      </tr>`).join('')
+    : `<tr><td colspan="6" class="empty">Sin registros</td></tr>`;
+
+  document.getElementById('indModalTitulo').textContent=`${label} — Sin fecha despacho (${filas.length} OT${filas.length===1?'':'s'})`;
+  document.getElementById('indModalBody').innerHTML=`
+    <div style="overflow-x:auto"><table>
+      <thead><tr>
+        <th>N° OT</th><th>Cuenta</th><th>Tipo</th><th>Status</th><th>Responsable</th>
+        <th style="text-align:right">Costo envío</th>
+      </tr></thead>
+      <tbody>${filasHtml}</tbody>
+    </table></div>`;
+  document.getElementById('indModalOverlay').style.display='flex';
+}
+function indCerrarModal(){
+  document.getElementById('indModalOverlay').style.display='none';
+}
+
 function renderVista(){
   const cardsWrap=document.getElementById('cardsWrap');
 
@@ -355,14 +405,17 @@ function renderVista(){
   });
 
   cardsWrap.className='cards';
+  const esSinFecha=_mesActivo==='0000-00';
   cardsWrap.innerHTML=LOGISTICAS.map(l=>{
     const v=agregado[l.key];
     const prom=v.ots?Math.round(v.costo/v.ots):0;
-    return `<div class="card" style="--accent:${l.color}">
+    const clickAttrs=esSinFecha?`onclick="indVerListadoSinFecha('${l.key}')" style="--accent:${l.color};cursor:pointer" title="Click para ver el listado de OTs"`:`style="--accent:${l.color}"`;
+    return `<div class="card" ${clickAttrs}>
       <div class="card-label">${l.label}</div>
       <div class="card-num">${fmt$(v.costo)}</div>
       <div class="card-sub">${v.ots} envíos · Prom. ${fmt$(prom)}</div>
       <div class="card-sub" style="margin-top:2px;opacity:.8">${v.altas} altas · ${v.cambios} cambios</div>
+      ${esSinFecha?'<div class="card-sub" style="margin-top:6px;color:var(--teal);font-weight:700">🔍 Click para ver listado</div>':''}
     </div>`;
   }).join('')+`<div class="card" style="--accent:var(--teal)">
       <div class="card-label">Total período</div>
