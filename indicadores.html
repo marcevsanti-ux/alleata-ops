@@ -80,7 +80,7 @@
   <header>
     <div class="brand">
       <div class="brand-logo">alleata</div>
-      <div class="brand-sub">· Indicadores Operaciones <span style="opacity:.5">v1.7.0</span></div>
+      <div class="brand-sub">· Indicadores Operaciones <span style="opacity:.5">v1.8.0</span></div>
     </div>
     <div class="user-chip">
       <span id="userLabel">—</span>
@@ -169,7 +169,7 @@
 </div>
 
 <script>
-// indicadores.html — v1.7.0 (17 ago 2026)
+// indicadores.html — v1.8.0 (17 ago 2026)
 // Changelog:
 //  v1.0.0 — versión inicial (costo logística por mes, Logicalis, % Pre-Colecta, SLA Operaciones/Logística)
 //  v1.1.0 — suma Alleata (logística propia) al reporte de costos a $1/envío (costo simbólico,
@@ -199,12 +199,16 @@
 //           fecha). Nunca pisa el dato real en Supabase — solo aproxima acá para mostrar,
 //           y marca el mes con "*N est." + tooltip/leyenda aclarando el porqué. El modal de
 //           "Sin fecha despacho" ahora solo lista los casos sin NINGUNA fecha disponible.
+//  v1.8.0 — "Total envíos" (card + tabla) ya no incluye Alleata, igual que Gestión NAPSE
+//           (Alleata sigue con su propia card/columna, solo se saca del agregado). Columna
+//           "Cambio + Rollout" desglosa Cambio (perfil NAPSE) vs Rollout (perfil PRISMA).
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_ANON);
 
 let _todosLosMeses=[];
 let _datosCrudosCostos=[]; // sf_workorders crudo de cargarDatos(), para el modal de listado de OTs
+let _datosCrudosPrecolecta=[]; // sf_workorders crudo de cargarPrecolecta(), para el modal de Cambio+Rollout
 let _mesActivo='__todos';
 
 async function hacerLogin(){
@@ -405,6 +409,39 @@ function indCerrarModal(){
   document.getElementById('indModalOverlay').style.display='none';
 }
 
+// Modal de solo lectura: lista las OTs "Cambio de Terminal" (incluye Rollout,
+// comparten record_type) de un mes puntual de la tabla "OTs creadas" — pedido
+// 17/08 para poder detectar de un vistazo qué OTs específicas componen ese
+// número, sin tener que ir a buscarlas a mano.
+function indVerListadoCambio(mesKey,mesLabel){
+  const filas=_datosCrudosPrecolecta.filter(r=>{
+    if(r.record_type!=='Cambio de Terminal')return false;
+    const d=new Date(r.sf_created_at);
+    const key=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+    return key===mesKey;
+  });
+
+  const filasHtml=filas.length
+    ? filas.map(r=>`<tr>
+        <td style="font-family:var(--mono)">${r.workorder_number||'—'}</td>
+        <td>${r.cuenta||'<span style="color:var(--text-dim)">— sin cuenta —</span>'}</td>
+        <td>${r.perfil||'—'}</td>
+        <td>${r.status||'—'}</td>
+        <td>${r.responsable||'—'}</td>
+      </tr>`).join('')
+    : `<tr><td colspan="5" class="empty">Sin registros</td></tr>`;
+
+  document.getElementById('indModalTitulo').textContent=`Cambio + Rollout — ${mesLabel} (${filas.length} OT${filas.length===1?'':'s'})`;
+  document.getElementById('indModalBody').innerHTML=`
+    <div style="overflow-x:auto"><table>
+      <thead><tr>
+        <th>N° OT</th><th>Cuenta</th><th>Perfil</th><th>Status</th><th>Responsable</th>
+      </tr></thead>
+      <tbody>${filasHtml}</tbody>
+    </table></div>`;
+  document.getElementById('indModalOverlay').style.display='flex';
+}
+
 function renderVista(){
   const cardsWrap=document.getElementById('cardsWrap');
 
@@ -419,7 +456,10 @@ function renderVista(){
       if(v){
         agregado[l.key].ots+=v.ots;agregado[l.key].costo+=v.costo;
         agregado[l.key].altas+=v.altas||0;agregado[l.key].cambios+=v.cambios||0;
-        totalOts+=v.ots;totalCosto+=v.costo; // solo lo que se muestra (sin Alleata)
+        // Total período (igual que Gestión NAPSE): NO incluye Alleata —
+        // es logística propia, Gestión NAPSE tampoco la contempla en su
+        // card de "Total envíos".
+        if(l.key!=='ALLEATA'){ totalOts+=v.ots; totalCosto+=v.costo; }
       }
     });
   });
@@ -438,17 +478,20 @@ function renderVista(){
       ${esSinFecha?'<div class="card-sub" style="margin-top:6px;color:var(--teal);font-weight:700">🔍 Click para ver listado</div>':''}
     </div>`;
   }).join('')+`<div class="card" style="--accent:var(--teal)">
-      <div class="card-label">Total período</div>
+      <div class="card-label">Total envíos</div>
       <div class="card-num" style="color:var(--teal)">${fmt$(totalCosto)}</div>
       <div class="card-sub">${totalOts} envíos</div>
-      <div class="card-sub" style="margin-top:2px;opacity:.6">Incluye Alleata a $1/envío (costo simbólico)</div>
+      <div class="card-sub" style="margin-top:2px;opacity:.6">No contempla envíos Alleata (igual que Gestión NAPSE)</div>
     </div>`;
 
   const tbody=document.getElementById('tablaMeses');
   tbody.innerHTML=_todosLosMeses.map(m=>{
     const c=k=>m.logs[k]?fmt$(m.logs[k].costo):'—';
-    const totOts=LOGISTICAS.reduce((s,l)=>s+(m.logs[l.key]?.ots||0),0);
-    const totCosto=LOGISTICAS.reduce((s,l)=>s+(m.logs[l.key]?.costo||0),0);
+    // Total de la fila (igual que la card): sin Alleata, para que ambos
+    // números del panel hablen de lo mismo.
+    const LOG_SIN_ALLEATA=LOGISTICAS.filter(l=>l.key!=='ALLEATA');
+    const totOts=LOG_SIN_ALLEATA.reduce((s,l)=>s+(m.logs[l.key]?.ots||0),0);
+    const totCosto=LOG_SIN_ALLEATA.reduce((s,l)=>s+(m.logs[l.key]?.costo||0),0);
     const marcaEstimados=m.estimados>0
       ?` <span style="color:var(--amber);font-weight:600;font-size:10px" title="${m.estimados} OT${m.estimados===1?'':'s'} sin fecha_despacho registrada — se usó la fecha de Pre-Colecta como aproximación (el operador pasó directo de Pre-Colecta a Exitoso sin pasar por Despachado)">*${m.estimados} est.</span>`
       :'';
@@ -465,8 +508,9 @@ function renderVista(){
 
   const sumCosto=k=>_todosLosMeses.reduce((s,m)=>s+(m.logs[k]?.costo||0),0);
   const sumOtsAlleata=_todosLosMeses.reduce((s,m)=>s+(m.logs['ALLEATA']?.ots||0),0);
-  const granTotOts=LOGISTICAS.reduce((s,l)=>s+_todosLosMeses.reduce((s2,m)=>s2+(m.logs[l.key]?.ots||0),0),0);
-  const granTotCosto=LOGISTICAS.reduce((s,l)=>s+sumCosto(l.key),0);
+  const LOG_SIN_ALLEATA=LOGISTICAS.filter(l=>l.key!=='ALLEATA');
+  const granTotOts=LOG_SIN_ALLEATA.reduce((s,l)=>s+_todosLosMeses.reduce((s2,m)=>s2+(m.logs[l.key]?.ots||0),0),0);
+  const granTotCosto=LOG_SIN_ALLEATA.reduce((s,l)=>s+sumCosto(l.key),0);
   tbody.innerHTML+=`<tr style="border-top:2px solid var(--border2)">
     <td style="font-weight:800;color:var(--teal)">TOTAL</td>
     <td class="num" style="font-weight:700;color:#e74c3c">${fmt$(sumCosto('CORREO ARGENTINO'))}</td>
@@ -548,7 +592,7 @@ async function cargarLogicalis(){
 async function cargarPrecolecta(){
   const tbody=document.getElementById('tablaPrecolecta');
   const{data:dataCruda,error}=await sb.from('sf_workorders')
-    .select('sf_created_at,status,record_type,perfil')
+    .select('sf_created_at,status,record_type,perfil,workorder_number,cuenta,responsable')
     .in('record_type',['Instalación Equipo + Simcard','Cambio de Terminal'])
     .gte('sf_created_at',FECHA_CORTE)
     .not('sf_created_at','is',null)
@@ -560,6 +604,8 @@ async function cargarPrecolecta(){
   const ESTADOS_PREVIOS=['Credenciales Pendientes','Pendiente'];
   const data=dataCruda.filter(r=>!ESTADOS_PREVIOS.includes((r.status||'').trim()));
   if(!data.length){ tbody.innerHTML='<tr><td colspan="6" class="empty">Sin datos</td></tr>'; return; }
+
+  _datosCrudosPrecolecta=data; // guardado para el listado clickeable de Cambio + Rollout por mes
 
   // Diagnóstico (pedido 17/08): verificar con datos reales, no suposición,
   // si la diferencia contra Gestión NAPSE (802 vs 1000) viene de Perfil
@@ -573,11 +619,18 @@ async function cargarPrecolecta(){
   data.forEach(r=>{
     const d=new Date(r.sf_created_at);
     const key=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
-    if(!porMes[key])porMes[key]={key,label:MESES_NOMBRE[d.getMonth()]+' '+d.getFullYear(),total:0,precolecta:0,instalacion:0,cambioRollout:0};
+    if(!porMes[key])porMes[key]={key,label:MESES_NOMBRE[d.getMonth()]+' '+d.getFullYear(),total:0,precolecta:0,instalacion:0,cambioRollout:0,cambio:0,rollout:0};
     porMes[key].total+=1;
     if((r.status||'').trim()==='Pre-Colecta')porMes[key].precolecta+=1;
     if(r.record_type==='Instalación Equipo + Simcard')porMes[key].instalacion+=1;
-    else if(r.record_type==='Cambio de Terminal')porMes[key].cambioRollout+=1;
+    else if(r.record_type==='Cambio de Terminal'){
+      porMes[key].cambioRollout+=1;
+      // Rollout = Cambio de Terminal con destino Perfil PRISMA (la migración
+      // Napse→Prisma); "Cambio" a secas = reemplazo NAPSE→NAPSE (terminal
+      // rota, etc.), sin relación con el rollout.
+      if((r.perfil||'').toUpperCase().trim()==='PRISMA') porMes[key].rollout+=1;
+      else porMes[key].cambio+=1;
+    }
 
     if(!diag[key])diag[key]={label:porMes[key].label,napse:0,prisma:0,otroPerfil:0,fueraPipeline:0,estadosFuera:{}};
     const p=(r.perfil||'').toUpperCase().trim();
@@ -598,21 +651,28 @@ async function cargarPrecolecta(){
       <td style="font-weight:700">${m.label}</td>
       <td class="num">${m.total}</td>
       <td class="num" style="color:var(--text-dim)">${m.instalacion}</td>
-      <td class="num" style="color:var(--text-dim)">${m.cambioRollout}</td>
+      <td class="num" style="color:var(--text-dim);cursor:pointer;text-decoration:underline dotted" onclick="indVerListadoCambio('${m.key}','${m.label}')" title="Click para ver el listado de OTs">
+        ${m.cambioRollout}
+        <div style="font-size:9px;color:var(--text-dim);font-weight:400;margin-top:1px">Cambio: ${m.cambio} · Rollout: ${m.rollout}</div>
+      </td>
       <td class="num" style="color:${m.precolecta?'var(--amber)':'var(--text-dim)'}">${m.precolecta}</td>
       <td class="num">${pct}%</td>
     </tr>`;
   }).join('');
 
   const tot=meses.reduce((a,m)=>({total:a.total+m.total,instalacion:a.instalacion+m.instalacion,
-    cambioRollout:a.cambioRollout+m.cambioRollout,precolecta:a.precolecta+m.precolecta}),
-    {total:0,instalacion:0,cambioRollout:0,precolecta:0});
+    cambioRollout:a.cambioRollout+m.cambioRollout,cambio:a.cambio+m.cambio,rollout:a.rollout+m.rollout,
+    precolecta:a.precolecta+m.precolecta}),
+    {total:0,instalacion:0,cambioRollout:0,cambio:0,rollout:0,precolecta:0});
   const totPct=tot.total?Math.round(tot.precolecta/tot.total*100):0;
   tbody.innerHTML+=`<tr style="border-top:2px solid var(--border2)">
     <td style="font-weight:800;color:var(--teal)">TOTAL</td>
     <td class="num" style="font-weight:800;color:var(--teal)">${tot.total}</td>
     <td class="num" style="font-weight:700">${tot.instalacion}</td>
-    <td class="num" style="font-weight:700">${tot.cambioRollout}</td>
+    <td class="num" style="font-weight:700">
+      ${tot.cambioRollout}
+      <div style="font-size:9px;color:var(--text-dim);font-weight:400;margin-top:1px">Cambio: ${tot.cambio} · Rollout: ${tot.rollout}</div>
+    </td>
     <td class="num" style="font-weight:700;color:var(--amber)">${tot.precolecta}</td>
     <td class="num" style="font-weight:700">${totPct}%</td>
   </tr>`;
