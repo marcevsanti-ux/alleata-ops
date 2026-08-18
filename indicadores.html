@@ -80,7 +80,7 @@
   <header>
     <div class="brand">
       <div class="brand-logo">alleata</div>
-      <div class="brand-sub">· Indicadores Operaciones <span style="opacity:.5">v1.6.0</span></div>
+      <div class="brand-sub">· Indicadores Operaciones <span style="opacity:.5">v1.7.0</span></div>
     </div>
     <div class="user-chip">
       <span id="userLabel">—</span>
@@ -107,6 +107,7 @@
     </table>
   </div>
   <div style="font-size:11px;color:var(--text-dim);margin-top:6px">Alleata (logística propia) usa $1 por envío como costo simbólico, no una tarifa real de proveedor — sirve para contar volumen, no para comparar $ contra el resto.</div>
+  <div style="font-size:11px;color:var(--text-dim);margin-top:4px"><span style="color:var(--amber);font-weight:600">*N est.</span> junto a un mes = esa cantidad de OTs no tiene fecha_despacho registrada en Salesforce (el operador pasó directo de Pre-Colecta a Exitoso, sin pasar por Despachado) — se usó la fecha de Pre-Colecta como aproximación para ubicarlas en el mes correcto.</div>
 
   <h2 style="margin-top:36px">🖥️ Logicalis — Terminales entregadas por mes</h2>
   <div id="logicalisWrap" class="loading">Cargando...</div>
@@ -168,7 +169,7 @@
 </div>
 
 <script>
-// indicadores.html — v1.6.0 (17 ago 2026)
+// indicadores.html — v1.7.0 (17 ago 2026)
 // Changelog:
 //  v1.0.0 — versión inicial (costo logística por mes, Logicalis, % Pre-Colecta, SLA Operaciones/Logística)
 //  v1.1.0 — suma Alleata (logística propia) al reporte de costos a $1/envío (costo simbólico,
@@ -192,6 +193,12 @@
 //  v1.6.0 — cards de logística clickeables cuando el filtro está en "Sin fecha despacho":
 //           abre un modal de solo lectura con el listado de OTs (N° OT, cuenta, tipo,
 //           status, responsable, costo) de esa logística puntual.
+//  v1.7.0 — cuando falta fecha_despacho, usa fecha_pre_colecta como aproximación para ubicar
+//           la OT en su mes real (motivo confirmado: el operador pasa la OT directo de
+//           Pre-Colecta a Exitoso sin pasar por Despachado, que es el paso que graba esa
+//           fecha). Nunca pisa el dato real en Supabase — solo aproxima acá para mostrar,
+//           y marca el mes con "*N est." + tooltip/leyenda aclarando el porqué. El modal de
+//           "Sin fecha despacho" ahora solo lista los casos sin NINGUNA fecha disponible.
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_ANON);
@@ -287,8 +294,15 @@ async function cargarDatos(){
   // cuenta. Ahora se traen con .or() y se agrupan aparte en "Sin fecha
   // despacho" en vez de perderse — así las cards de "Todos los meses"
   // coinciden con Gestión NAPSE.
+  // 17/08 v2: se identificó el motivo del fecha_despacho NULL — el operador
+  // pasa la OT directo de Pre-Colecta a Exitoso sin pasar por Despachado, y
+  // ese paso intermedio es el que graba la fecha. Como aproximación se usa
+  // fecha_pre_colecta para ubicar el mes real, marcando el registro como
+  // "estimado" (nunca se pisa el dato real en Supabase, solo se aproxima acá
+  // para mostrar). Si tampoco hay fecha_pre_colecta, sigue cayendo en el
+  // bucket "Sin fecha despacho".
   const{data,error}=await sb.from('sf_workorders')
-    .select('workorder_number,cuenta,responsable,logistica,costo_envio,fecha_despacho,status,perfil,record_type')
+    .select('workorder_number,cuenta,responsable,logistica,costo_envio,fecha_despacho,fecha_pre_colecta,status,perfil,record_type')
     .eq('perfil','NAPSE')
     .in('record_type',['Instalación Equipo + Simcard','Cambio de Terminal'])
     .in('status',['Despachado','Exitoso'])
@@ -304,15 +318,18 @@ async function cargarDatos(){
 
   const porMes={};
   (data||[]).forEach(r=>{
-    let key,label;
-    if(!r.fecha_despacho){
+    let key,label,estimada=false;
+    const fechaUsar=r.fecha_despacho||r.fecha_pre_colecta;
+    if(!fechaUsar){
       key='0000-00'; label='Sin fecha despacho';
     } else {
-      const d=new Date(r.fecha_despacho);
+      if(!r.fecha_despacho) estimada=true; // usó fecha_pre_colecta como aproximación
+      const d=new Date(fechaUsar);
       key=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
       label=MESES_NOMBRE[d.getMonth()]+' '+d.getFullYear();
     }
-    if(!porMes[key])porMes[key]={key,label,logs:{},total_ots:0,total_costo:0};
+    if(!porMes[key])porMes[key]={key,label,logs:{},total_ots:0,total_costo:0,estimados:0};
+    if(estimada)porMes[key].estimados+=1;
     const log=(r.logistica||'OTROS').toUpperCase().trim();
     if(!porMes[key].logs[log])porMes[key].logs[log]={ots:0,costo:0,altas:0,cambios:0};
     porMes[key].logs[log].ots+=1;
@@ -357,7 +374,10 @@ function fmt$(n){ return n?'$'+Math.round(n).toLocaleString('es-AR'):'$0'; }
 // crudos ya traídos por cargarDatos(), no dispara una consulta nueva.
 function indVerListadoSinFecha(logKey){
   const label=(LOGISTICAS.find(l=>l.key===logKey)||{}).label||logKey;
-  const filas=_datosCrudosCostos.filter(r=>!r.fecha_despacho && (r.logistica||'OTROS').toUpperCase().trim()===logKey);
+  // Sin fecha real = ni fecha_despacho ni fecha_pre_colecta (esta última ya
+  // se usa como aproximación en cargarDatos(), así que estos son los casos
+  // donde ni siquiera hay fallback posible).
+  const filas=_datosCrudosCostos.filter(r=>!r.fecha_despacho && !r.fecha_pre_colecta && (r.logistica||'OTROS').toUpperCase().trim()===logKey);
 
   const filasHtml=filas.length
     ? filas.map(r=>`<tr>
@@ -429,8 +449,11 @@ function renderVista(){
     const c=k=>m.logs[k]?fmt$(m.logs[k].costo):'—';
     const totOts=LOGISTICAS.reduce((s,l)=>s+(m.logs[l.key]?.ots||0),0);
     const totCosto=LOGISTICAS.reduce((s,l)=>s+(m.logs[l.key]?.costo||0),0);
+    const marcaEstimados=m.estimados>0
+      ?` <span style="color:var(--amber);font-weight:600;font-size:10px" title="${m.estimados} OT${m.estimados===1?'':'s'} sin fecha_despacho registrada — se usó la fecha de Pre-Colecta como aproximación (el operador pasó directo de Pre-Colecta a Exitoso sin pasar por Despachado)">*${m.estimados} est.</span>`
+      :'';
     return `<tr>
-      <td style="font-weight:700">${m.label}</td>
+      <td style="font-weight:700">${m.label}${marcaEstimados}</td>
       <td class="num" style="color:#e74c3c">${c('CORREO ARGENTINO')}</td>
       <td class="num" style="color:#f39c12">${c('EPSA')}</td>
       <td class="num" style="color:#9b59b6">${c('CABIFY')}</td>
