@@ -109,7 +109,7 @@ table.table tr:hover td{background:var(--surface2);}
   <header>
     <div class="brand">
       <div class="brand-logo">alleata</div>
-      <div class="brand-sub">· Churn Producto <span style="opacity:.5">v1.2.0</span></div>
+      <div class="brand-sub">· Churn Producto <span style="opacity:.5">v1.3.0</span></div>
     </div>
     <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
       <div style="font-size:11px;color:var(--text-muted);text-align:right;line-height:1.4">
@@ -173,6 +173,17 @@ table.table tr:hover td{background:var(--surface2);}
   <!-- ══════════════════════════════════════════════════════════════════
        FIN del clon del módulo
        ══════════════════════════════════════════════════════════════════ -->
+</div>
+
+<!-- Modal de solo lectura — listado de OTs por grupo de logística -->
+<div id="cpModalOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:1000;align-items:center;justify-content:center;padding:20px" onclick="if(event.target===this)cpCerrarModal()">
+  <div style="background:var(--surface);border:1px solid var(--border2);border-radius:14px;max-width:900px;width:100%;max-height:80vh;overflow-y:auto;padding:22px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:12px">
+      <div id="cpModalTitulo" style="font-size:14px;font-weight:800;color:var(--text)"></div>
+      <button class="btn-logout" onclick="cpCerrarModal()" style="flex-shrink:0">✕ Cerrar</button>
+    </div>
+    <div id="cpModalBody"></div>
+  </div>
 </div>
 
 <script>
@@ -396,7 +407,7 @@ function cpRenderDesgloseLogistica(){
   const recuperadas=_cpData.filter(r=>r.estado_desinst==='Recuperada');
   if(!recuperadas.length){ cont.innerHTML=''; return; }
 
-  const grupos={ALLEATA:{n:0,gasto:0},CA:{n:0,gasto:0},OTRA:{n:0,gasto:0}};
+  const grupos={ALLEATA:{n:0,gasto:0,filas:[]},CA:{n:0,gasto:0,filas:[]},OTRA:{n:0,gasto:0,filas:[]}};
   recuperadas.forEach(r=>{
     const log=(r.logistica||'').toUpperCase().trim();
     let cat='OTRA';
@@ -404,7 +415,9 @@ function cpRenderDesgloseLogistica(){
     else if(log==='CORREO ARGENTINO'||log==='CA')cat='CA';
     grupos[cat].n+=1;
     grupos[cat].gasto+=r._costoEnvio||0;
+    grupos[cat].filas.push(r);
   });
+  _cpGruposLogistica=grupos; // para el modal de listado al hacer click
 
   const LABELS={ALLEATA:'Alleata',CA:'Correo Argentino',OTRA:'Otra logística'};
   const COLORS={ALLEATA:'#38bdf8',CA:'#e74c3c',OTRA:'#6b7280'};
@@ -412,7 +425,7 @@ function cpRenderDesgloseLogistica(){
     <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:10px">📦 Por logística — solo Recuperadas (${recuperadas.length})</div>
     <div style="display:flex;flex-wrap:wrap;gap:8px">
       ${Object.entries(grupos).map(([cat,v])=>`
-        <div style="background:${COLORS[cat]}18;border:1px solid ${COLORS[cat]}40;border-radius:10px;padding:8px 14px;min-width:140px">
+        <div onclick="cpVerListadoLogistica('${cat}')" style="cursor:pointer;background:${COLORS[cat]}18;border:1px solid ${COLORS[cat]}40;border-radius:10px;padding:8px 14px;min-width:140px" title="Click para ver el listado de OTs">
           <div style="font-size:18px;font-weight:800;color:${COLORS[cat]}">${v.n} <span style="font-size:11px;font-weight:600;opacity:.8">OT${v.n===1?'':'s'}</span></div>
           <div style="font-size:10px;color:var(--text-muted)">${LABELS[cat]}</div>
           <div style="font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--text);margin-top:3px">$${Math.round(v.gasto).toLocaleString('es-AR')}</div>
@@ -420,6 +433,41 @@ function cpRenderDesgloseLogistica(){
     </div>
     <div style="font-size:10px;color:var(--text-muted);margin-top:8px">* Gasto = sf_workorders.costo_envio de la OT de desinstalación (cruce por ot_desinstalacion = workorder_number).</div>
   </div>`;
+}
+
+// Modal de solo lectura con las OTs de un grupo logística — mismo patrón
+// que los modales de indicadores.html.
+let _cpGruposLogistica={};
+const CP_LOG_LABELS={ALLEATA:'Alleata',CA:'Correo Argentino',OTRA:'Otra logística'};
+function cpVerListadoLogistica(cat){
+  const grupo=_cpGruposLogistica[cat];
+  if(!grupo)return;
+  const filasHtml=grupo.filas.length
+    ? grupo.filas.map(r=>`<tr>
+        <td style="font-family:'JetBrains Mono',monospace">${r.ot_desinstalacion||'—'}</td>
+        <td>${r.cuenta||'—'}</td>
+        <td style="font-family:'JetBrains Mono',monospace">${r.terminal_id||'—'}</td>
+        <td>${r.motivo||'—'}</td>
+        <td style="text-align:center">${r.dias_con_terminal!=null?r.dias_con_terminal+' días':'—'}</td>
+        <td style="text-align:center">${r.sla_recupero_dias!=null?r.sla_recupero_dias+' días':'—'}</td>
+        <td style="text-align:right;font-family:'JetBrains Mono',monospace">$${Math.round(r._costoEnvio||0).toLocaleString('es-AR')}</td>
+      </tr>`).join('')
+    : `<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--text-muted)">Sin registros</td></tr>`;
+
+  document.getElementById('cpModalTitulo').textContent=`${CP_LOG_LABELS[cat]} — Recuperadas (${grupo.filas.length})`;
+  document.getElementById('cpModalBody').innerHTML=`
+    <div style="overflow-x:auto"><table class="table">
+      <thead><tr>
+        <th>N° OT</th><th>Cuenta</th><th>Terminal</th><th>Motivo</th>
+        <th style="text-align:center">Días con terminal</th><th style="text-align:center">SLA Recupero</th>
+        <th style="text-align:right">Costo envío</th>
+      </tr></thead>
+      <tbody>${filasHtml}</tbody>
+    </table></div>`;
+  document.getElementById('cpModalOverlay').style.display='flex';
+}
+function cpCerrarModal(){
+  document.getElementById('cpModalOverlay').style.display='none';
 }
 
 function cpFiltrarPorEstado(estado){
