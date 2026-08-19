@@ -40,6 +40,8 @@
   h2{font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-dim);margin:26px 0 14px}
   .month-filter{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px}
   .month-chip{background:var(--panel2);border:1px solid var(--border);border-radius:20px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;color:var(--text-dim)}
+  .filter-tag{background:rgba(29,191,142,.1);border:1px solid rgba(29,191,142,.25);color:var(--teal);padding:2px 9px;border-radius:20px;font-size:10px;font-weight:700;font-family:'JetBrains Mono',monospace}
+  .filter-tags-row{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
   .month-chip.active{background:rgba(29,191,142,.15);border-color:var(--teal);color:var(--teal)}
 
   .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:10px}
@@ -80,7 +82,7 @@
   <header>
     <div class="brand">
       <div class="brand-logo">alleata</div>
-      <div class="brand-sub">· Indicadores Operaciones <span style="opacity:.5">v2.3.0</span></div>
+      <div class="brand-sub">· Indicadores Operaciones <span style="opacity:.5">v2.4.0</span></div>
     </div>
     <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
       <div style="font-size:11px;color:var(--text-dim);text-align:right;line-height:1.4">
@@ -97,6 +99,12 @@
   </header>
 
   <h2>💰 Logística — Costo de Envíos por mes</h2>
+  <div class="filter-tags-row">
+    <span class="filter-tag">Perfil = NAPSE</span>
+    <span class="filter-tag">Tipo = Instalación Equipo + Simcard | Cambio de Terminal</span>
+    <span class="filter-tag">Estado = Despachado | Exitoso</span>
+    <span class="filter-tag">Fecha despacho ≥ 01/06/2026 (o sin fecha registrada)</span>
+  </div>
   <div class="month-filter" id="monthFilter"></div>
   <div id="cardsWrap" class="loading">Cargando...</div>
 
@@ -118,9 +126,18 @@
   <div style="font-size:11px;color:var(--text-dim);margin-top:4px"><span style="color:var(--amber);font-weight:600">*N est.</span> junto a un mes = esa cantidad de OTs no tiene fecha_despacho registrada en Salesforce (el operador pasó directo de Pre-Colecta a Exitoso, sin pasar por Despachado) — se usó la fecha de Pre-Colecta como aproximación para ubicarlas en el mes correcto.</div>
 
   <h2 style="margin-top:36px">🖥️ Logicalis — Terminales entregadas por mes</h2>
+  <div class="filter-tags-row">
+    <span class="filter-tag">Fecha despacho ≥ 01/06/2026</span>
+  </div>
   <div id="logicalisWrap" class="loading">Cargando...</div>
 
   <h2 style="margin-top:36px">📦 OTs (Cambio / Rollout / Instalación) — creadas por mes, estado actual</h2>
+  <div class="filter-tags-row">
+    <span class="filter-tag">Tipo = Instalación Equipo + Simcard | Cambio de Terminal</span>
+    <span class="filter-tag">Fecha creación ≥ 01/06/2026</span>
+    <span class="filter-tag">Cuenta ≠ vacío</span>
+    <span class="filter-tag">Estado ≠ Credenciales Pendientes | Pendiente</span>
+  </div>
   <div style="font-size:12px;color:var(--text-dim);margin-bottom:14px">Cuántas OTs se crearon cada mes, y de esas, cuántas siguen HOY en Pre-Colecta (sin despachar todavía) — sin importar la logística.</div>
   <div style="overflow-x:auto">
     <table>
@@ -135,6 +152,12 @@
   <div id="diagPrecolecta"></div>
 
   <h2 style="margin-top:36px">⏱️ SLA Operaciones / Logística</h2>
+  <div class="filter-tags-row">
+    <span class="filter-tag">Tipo = Instalación Equipo + Simcard | Cambio de Terminal</span>
+    <span class="filter-tag">Fecha En Proceso ≥ 01/06/2026</span>
+    <span class="filter-tag">Cuenta ≠ vacío</span>
+    <span class="filter-tag">Estado ≠ Credenciales Pendientes | Pendiente</span>
+  </div>
   <div style="font-size:12px;color:var(--text-dim);margin-bottom:14px">
     <b>SLA Operaciones</b> = días entre "En Proceso" (arranca configuración) y "Pre-Colecta" (lista para despachar).
     <b>SLA Logística</b> = días entre "Pre-Colecta" y "Exitoso" (entregada). Calculado acá a partir de las fechas
@@ -177,7 +200,7 @@
 </div>
 
 <script>
-// indicadores.html — v2.3.0 (18 ago 2026)
+// indicadores.html — v2.4.0 (18 ago 2026)
 // Changelog:
 //  v1.0.0 — versión inicial (costo logística por mes, Logicalis, % Pre-Colecta, SLA Operaciones/Logística)
 //  v1.1.0 — suma Alleata (logística propia) al reporte de costos a $1/envío (costo simbólico,
@@ -235,6 +258,9 @@
 //           Supabase) y "⚡ Full Sync" (dispara /automations/run/sf_sync en Railway, mismo
 //           endpoint que usa napse-gestion.html, y recién después relee) + auto-refresh cada
 //           10 min con indicador de última actualización / próxima corrida en el header.
+//  v2.4.0 — cada sección muestra sus "Filtros activos" en chips (mismo estilo .filter-tag
+//           que ya usa napse-gestion.html) — Perfil, Tipo, Estado, Fecha, Cuenta según
+//           corresponda a cada tabla, para que quede claro qué universo mide cada una.
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_ANON);
