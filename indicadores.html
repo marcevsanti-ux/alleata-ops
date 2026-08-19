@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Alleata · Indicadores</title>
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
   :root{
     --bg:#070c14; --panel:#0f1a2b; --panel2:#13223a; --border:#1e3252;
@@ -82,7 +83,7 @@
   <header>
     <div class="brand">
       <div class="brand-logo">alleata</div>
-      <div class="brand-sub">· Indicadores Operaciones <span style="opacity:.5">v2.4.0</span></div>
+      <div class="brand-sub">· Indicadores Operaciones <span style="opacity:.5">v2.5.0</span></div>
     </div>
     <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
       <div style="font-size:11px;color:var(--text-dim);text-align:right;line-height:1.4">
@@ -91,6 +92,10 @@
       </div>
       <button class="btn-logout" onclick="indActualizar()" title="Vuelve a leer Supabase (no consulta SF)">🔄 Actualizar</button>
       <button class="btn-logout" onclick="indFullSync()" id="btnFullSync" style="background:rgba(29,191,142,.12);border-color:var(--teal);color:var(--teal)" title="Fuerza una sincronización real desde Salesforce antes de refrescar">⚡ Full Sync</button>
+      <select id="exportMesSelect" style="background:var(--panel2);border:1px solid var(--border);border-radius:7px;color:var(--text);font-size:12px;padding:7px 10px">
+        <option value="__todos">Todos los meses</option>
+      </select>
+      <button class="btn-logout" onclick="indExportarXLSX()" style="background:rgba(139,92,246,.12);border-color:var(--purple);color:var(--purple)">📊 Exportar XLSX</button>
       <div class="user-chip">
         <span id="userLabel">—</span>
         <button class="btn-logout" onclick="hacerLogout()">Salir</button>
@@ -159,11 +164,11 @@
     <span class="filter-tag">Estado ≠ Credenciales Pendientes | Pendiente</span>
   </div>
   <div style="font-size:12px;color:var(--text-dim);margin-bottom:14px">
-    <b>SLA Operaciones</b> = días entre "En Proceso" (arranca configuración) y "Pre-Colecta" (lista para despachar).
-    <b>SLA Logística</b> = días entre "Pre-Colecta" y "Exitoso" (entregada). Calculado acá a partir de las fechas
-    ya sincronizadas desde Salesforce, y cruzado contra el valor que el backend ya guarda (columna "Diferencia")
-    para detectar si quedó desactualizado — no compara todavía contra el campo de fórmula nativo de Salesforce
-    (ese campo aún no está sincronizado a esta base).
+    <div><b>SLA Operaciones</b> = días entre "En Proceso" (arranca configuración) y "Pre-Colecta" (lista para despachar).</div>
+    <div style="margin-top:4px"><b>SLA Logística</b> = días entre "Pre-Colecta" y "Exitoso" (entregada).</div>
+    <div style="margin-top:8px;opacity:.8">Calculado acá a partir de las fechas ya sincronizadas desde Salesforce, y cruzado contra el valor que el
+    backend ya guarda (columna "Diferencia") para detectar si quedó desactualizado — no compara todavía contra el
+    campo de fórmula nativo de Salesforce (ese campo aún no está sincronizado a esta base).</div>
   </div>
   <div class="month-filter" id="slaMonthFilter"></div>
   <div id="slaCardsWrap" class="loading">Cargando...</div>
@@ -200,7 +205,7 @@
 </div>
 
 <script>
-// indicadores.html — v2.4.0 (18 ago 2026)
+// indicadores.html — v2.5.0 (18 ago 2026)
 // Changelog:
 //  v1.0.0 — versión inicial (costo logística por mes, Logicalis, % Pre-Colecta, SLA Operaciones/Logística)
 //  v1.1.0 — suma Alleata (logística propia) al reporte de costos a $1/envío (costo simbólico,
@@ -261,6 +266,12 @@
 //  v2.4.0 — cada sección muestra sus "Filtros activos" en chips (mismo estilo .filter-tag
 //           que ya usa napse-gestion.html) — Perfil, Tipo, Estado, Fecha, Cuenta según
 //           corresponda a cada tabla, para que quede claro qué universo mide cada una.
+//  v2.5.0 — definiciones de SLA en renglones separados (más prolijo). Botón "📊 Exportar
+//           XLSX" + selector de mes en el header: exporta un libro con hojas Costos/SLA/
+//           OTs creadas/Logicalis, filtrado al mes elegido o a todos. FIX: Logicalis
+//           también ordenaba por texto del label en vez de por fecha (mismo bug que el
+//           diagnóstico de v2.3.0). Pendiente: bloque "Roll Out AMBA/Interior BoP-EoP"
+//           del Board Report — falta definir la fórmula exacta.
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_ANON);
@@ -276,13 +287,11 @@ const AUTOMATION_SECRET='123456';
 const AUTO_REFRESH_MS=10*60*1000;
 let _ultimaActualizacion=null;
 
-function indCargarTodo(){
-  cargarDatos();
-  cargarLogicalis();
-  cargarPrecolecta();
-  cargarSLA();
+async function indCargarTodo(){
+  await Promise.all([cargarDatos(),cargarLogicalis(),cargarPrecolecta(),cargarSLA()]);
   _ultimaActualizacion=new Date();
   indActualizarLabelSync();
+  indActualizarSelectorMeses();
 }
 
 function indActualizar(){
@@ -328,6 +337,8 @@ setInterval(()=>{
 },AUTO_REFRESH_MS);
 
 let _todosLosMeses=[];
+let _mesesPrecolecta=[]; // resumen mensual de "OTs creadas" (cargarPrecolecta), para exportar
+let _mesesLogicalis=[]; // resumen mensual de Logicalis (cargarLogicalis), para exportar
 let _datosCrudosCostos=[]; // sf_workorders crudo de cargarDatos(), para el modal de listado de OTs
 let _datosCrudosPrecolecta=[]; // sf_workorders crudo de cargarPrecolecta(), para el modal de Cambio+Rollout
 let _mesActivo='__todos';
@@ -693,11 +704,12 @@ async function cargarLogicalis(){
   data.forEach(r=>{
     const d=new Date(r.fecha_despacho+'T00:00:00');
     const key=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
-    if(!porMes[key])porMes[key]={label:MESES_NOMBRE[d.getMonth()]+' '+d.getFullYear(),cantidad:0,con_error:0};
+    if(!porMes[key])porMes[key]={key,label:MESES_NOMBRE[d.getMonth()]+' '+d.getFullYear(),cantidad:0,con_error:0};
     porMes[key].cantidad+=r.cantidad;
     porMes[key].con_error+=r.con_error||0;
   });
-  const meses=Object.values(porMes).sort((a,b)=>b.label.localeCompare(a.label));
+  const meses=Object.values(porMes).sort((a,b)=>b.key.localeCompare(a.key));
+  _mesesLogicalis=meses;
 
   wrap.className='';
   wrap.innerHTML=`<div style="font-size:11px;color:var(--text-dim);margin-bottom:8px">"Óptimas" = terminales en condición de uso. "Scrap / repuestos" = llegaron con daño (carcaza rota, placa dañada, etc.) — se desarman para repuestos, no cuentan como inventario útil entregado.</div>
@@ -803,6 +815,7 @@ async function cargarPrecolecta(){
     }
   });
   const meses=Object.values(porMes).sort((a,b)=>b.key.localeCompare(a.key));
+  _mesesPrecolecta=meses;
 
   tbody.innerHTML=meses.map(m=>{
     const pct=m.total?Math.round(m.precolecta/m.total*100):0;
@@ -1073,6 +1086,74 @@ function renderVistaSLA(){
     <td class="num" style="font-weight:800;color:var(--teal)">${fmtDias(tot.cntTot?tot.sumTot/tot.cntTot:null)}</td>
     <td class="num">—</td>
   </tr>`;
+}
+
+// ── Exportar XLSX (18/08) ─────────────────────────────────────────────────
+// Arma un selector de mes a partir de lo que ya trajo cargarDatos() (Costos),
+// y exporta un libro con una hoja por sección — filtrado al mes elegido o a
+// todos. NO incluye todavía el bloque "Roll Out AMBA/Interior BoP-EoP" del
+// Board Report — pendiente de definir la fórmula exacta con Marcelo.
+function indActualizarSelectorMeses(){
+  const sel=document.getElementById('exportMesSelect');
+  if(!sel)return;
+  const valorPrevio=sel.value;
+  const meses=_todosLosMeses.filter(m=>m.key!=='0000-00'); // sin el bucket "Sin fecha despacho"
+  sel.innerHTML='<option value="__todos">Todos los meses</option>'+
+    meses.map(m=>`<option value="${m.key}">${m.label}</option>`).join('');
+  if([...sel.options].some(o=>o.value===valorPrevio)) sel.value=valorPrevio;
+}
+
+function indExportarXLSX(){
+  if(typeof XLSX==='undefined'){ alert('No se pudo cargar la librería de export (XLSX). Revisá tu conexión y probá de nuevo.'); return; }
+  const mesFiltro=document.getElementById('exportMesSelect').value;
+  const filtrar=arr=>mesFiltro==='__todos'?arr:arr.filter(m=>m.key===mesFiltro);
+
+  const wb=XLSX.utils.book_new();
+
+  // Hoja 1 — Costos de envíos
+  const costosRows=[['Mes','Correo Argentino','EPSA','Cabify','Alleata (envíos, $1 c/u)','Total envíos (sin Alleata)','Costo total (sin Alleata)']];
+  filtrar(_todosLosMeses).forEach(m=>{
+    const c=k=>m.logs[k]?m.logs[k].costo:0;
+    const LOG_SIN_ALLEATA=LOGISTICAS.filter(l=>l.key!=='ALLEATA');
+    const totOts=LOG_SIN_ALLEATA.reduce((s,l)=>s+(m.logs[l.key]?.ots||0),0);
+    const totCosto=LOG_SIN_ALLEATA.reduce((s,l)=>s+(m.logs[l.key]?.costo||0),0);
+    costosRows.push([m.label,c('CORREO ARGENTINO'),c('EPSA'),c('CABIFY'),m.logs['ALLEATA']?.ots||0,totOts,totCosto]);
+  });
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(costosRows),'Costos');
+
+  // Hoja 2 — SLA
+  const slaRows=[['Mes','OTs','SLA Operaciones (d)','SLA Logística (d)','SLA Total (d)','Diferencia vs. guardado (d)']];
+  filtrar(_mesesSLA).forEach(m=>{
+    slaRows.push([
+      m.label,m.n,
+      m.cntOps?+(m.sumOps/m.cntOps).toFixed(1):null,
+      m.cntLog?+(m.sumLog/m.cntLog).toFixed(1):null,
+      m.cntTot?+(m.sumTot/m.cntTot).toFixed(1):null,
+      m.cntDiff?+(m.sumDiff/m.cntDiff).toFixed(1):null,
+    ]);
+  });
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(slaRows),'SLA');
+
+  // Hoja 3 — OTs creadas
+  const otsRows=[['Mes de creación','Total OTs','Instalación','Cambio','Rollout','En Pre-Colecta hoy','% sin despachar']];
+  filtrar(_mesesPrecolecta).forEach(m=>{
+    const pct=m.total?Math.round(m.precolecta/m.total*100):0;
+    otsRows.push([m.label,m.total,m.instalacion,m.cambio,m.rollout,m.precolecta,pct+'%']);
+  });
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(otsRows),'OTs creadas');
+
+  // Hoja 4 — Logicalis
+  const logicalisRows=[['Mes','Recibidas (total)','Óptimas','Scrap / repuestos']];
+  filtrar(_mesesLogicalis).forEach(m=>{
+    logicalisRows.push([m.label,m.cantidad,m.cantidad-m.con_error,m.con_error]);
+  });
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(logicalisRows),'Logicalis');
+
+  const mesLabel=mesFiltro==='__todos'?'todos-los-meses':mesFiltro;
+  const hoy=new Date();
+  const p=n=>String(n).padStart(2,'0');
+  const fechaGen=`${hoy.getFullYear()}-${p(hoy.getMonth()+1)}-${p(hoy.getDate())}`;
+  XLSX.writeFile(wb,`indicadores-alleata_${mesLabel}_${fechaGen}.xlsx`);
 }
 
 document.getElementById('loginPass').addEventListener('keydown',e=>{if(e.key==='Enter')hacerLogin();});
