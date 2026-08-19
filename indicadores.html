@@ -83,7 +83,7 @@
   <header>
     <div class="brand">
       <div class="brand-logo">alleata</div>
-      <div class="brand-sub">· Indicadores Operaciones <span style="opacity:.5">v2.5.0</span></div>
+      <div class="brand-sub">· Indicadores Operaciones <span style="opacity:.5">v2.6.0</span></div>
     </div>
     <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
       <div style="font-size:11px;color:var(--text-dim);text-align:right;line-height:1.4">
@@ -159,12 +159,12 @@
   <h2 style="margin-top:36px">⏱️ SLA Operaciones / Logística</h2>
   <div class="filter-tags-row">
     <span class="filter-tag">Tipo = Instalación Equipo + Simcard | Cambio de Terminal</span>
-    <span class="filter-tag">Fecha En Proceso ≥ 01/06/2026</span>
+    <span class="filter-tag">Fecha Configurar Terminal ≥ 01/06/2026</span>
     <span class="filter-tag">Cuenta ≠ vacío</span>
     <span class="filter-tag">Estado ≠ Credenciales Pendientes | Pendiente</span>
   </div>
   <div style="font-size:12px;color:var(--text-dim);margin-bottom:14px">
-    <div><b>SLA Operaciones</b> = días entre "En Proceso" (arranca configuración) y "Pre-Colecta" (lista para despachar).</div>
+    <div><b>SLA Operaciones</b> = días entre "Configurar Terminal" (arranca configuración) y "Pre-Colecta" (lista para despachar).</div>
     <div style="margin-top:4px"><b>SLA Logística</b> = días entre "Pre-Colecta" y "Exitoso" (entregada).</div>
     <div style="margin-top:8px;opacity:.8">Calculado acá a partir de las fechas ya sincronizadas desde Salesforce, y cruzado contra el valor que el
     backend ya guarda (columna "Diferencia") para detectar si quedó desactualizado — no compara todavía contra el
@@ -205,7 +205,7 @@
 </div>
 
 <script>
-// indicadores.html — v2.5.0 (18 ago 2026)
+// indicadores.html — v2.6.0 (18 ago 2026)
 // Changelog:
 //  v1.0.0 — versión inicial (costo logística por mes, Logicalis, % Pre-Colecta, SLA Operaciones/Logística)
 //  v1.1.0 — suma Alleata (logística propia) al reporte de costos a $1/envío (costo simbólico,
@@ -272,6 +272,12 @@
 //           también ordenaba por texto del label en vez de por fecha (mismo bug que el
 //           diagnóstico de v2.3.0). Pendiente: bloque "Roll Out AMBA/Interior BoP-EoP"
 //           del Board Report — falta definir la fórmula exacta.
+//  v2.6.0 — FIX: SLA Operaciones arrancaba mal — usaba fecha_entrada_proceso ("En Proceso",
+//           un paso posterior) en vez de fecha_configurar_terminal (el arranque real de
+//           "Configurar Terminal"). Confirmado con el historial real de una OT en SF
+//           (Credenciales Pendientes → Configurar Terminal → ... → Pre-Colecta). SLA Total
+//           también recalculado con el mismo punto de partida para que siga siendo
+//           Operaciones + Logística.
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_ANON);
@@ -897,9 +903,9 @@ function renderDiagPrecolecta(diag){
 }
 
 // ── SLA Operaciones / Logística ──────────────────────────────────────────
-// Calculado en el navegador a partir de fecha_entrada_proceso, fecha_pre_colecta
+// Calculado en el navegador a partir de fecha_configurar_terminal, fecha_pre_colecta
 // y fecha_exitoso (ya sincronizadas desde SF). "Diferencia vs. guardado" compara
-// nuestro cálculo (fecha_exitoso - fecha_entrada_proceso) contra sla_total_dias,
+// nuestro cálculo (fecha_exitoso - fecha_configurar_terminal) contra sla_total_dias,
 // que ya guarda el backend — sirve para detectar si ese valor quedó desactualizado.
 // Ojo: esto NO es todavía una validación contra el campo de fórmula nativo de SF
 // (Demora_Total__c y similares), porque esos campos no están sincronizados a esta
@@ -921,11 +927,16 @@ async function cargarSLA(){
   // el lote fantasma de 172 registros (cuenta=null) y las OTs que todavía
   // no arrancaron (Credenciales Pendientes/Pendiente) podían ensuciar el
   // cálculo de SLA sin que se notara — quedaba inconsistente entre tablas.
+  // 18/08 v2: SLA Operaciones arranca en fecha_configurar_terminal (entrada
+  // real a "Configurar Terminal"), NO en fecha_entrada_proceso (que es un
+  // paso posterior, "En Proceso") — confirmado con el historial real de la
+  // OT 00023019 en Salesforce: Credenciales Pendientes → Configurar Terminal
+  // → ... → Pre-Colecta. Antes esto inflaba/distorsionaba el SLA Operaciones.
   const{data:dataCruda,error}=await sb.from('sf_workorders')
-    .select('record_type,fecha_entrada_proceso,fecha_pre_colecta,fecha_exitoso,sla_total_dias,logistica,status,cuenta')
+    .select('record_type,fecha_configurar_terminal,fecha_pre_colecta,fecha_exitoso,sla_total_dias,logistica,status,cuenta')
     .in('record_type',['Instalación Equipo + Simcard','Cambio de Terminal'])
-    .gte('fecha_entrada_proceso',FECHA_CORTE)
-    .not('fecha_entrada_proceso','is',null)
+    .gte('fecha_configurar_terminal',FECHA_CORTE)
+    .not('fecha_configurar_terminal','is',null)
     .not('cuenta','is',null);
 
   if(error){
@@ -962,7 +973,7 @@ async function cargarSLA(){
   data.forEach(r=>{
     // Mes de referencia: fecha de cierre si ya la tiene, si no la última fecha disponible
     // (así las OTs todavía en curso también quedan agrupadas en algún mes, no se pierden).
-    const refFecha=r.fecha_exitoso||r.fecha_pre_colecta||r.fecha_entrada_proceso;
+    const refFecha=r.fecha_exitoso||r.fecha_pre_colecta||r.fecha_configurar_terminal;
     const d=new Date(refFecha);
     const key=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
     if(!porMes[key])porMes[key]={key,label:MESES_NOMBRE[d.getMonth()]+' '+d.getFullYear(),
@@ -971,7 +982,7 @@ async function cargarSLA(){
     const m=porMes[key];
     m.n+=1;
 
-    const slaOps=diasEntre(r.fecha_entrada_proceso,r.fecha_pre_colecta);
+    const slaOps=diasEntre(r.fecha_configurar_terminal,r.fecha_pre_colecta);
     if(slaOps!=null){ m.sumOps+=slaOps; m.cntOps+=1; }
 
     const slaLog=diasEntre(r.fecha_pre_colecta,r.fecha_exitoso);
@@ -982,7 +993,7 @@ async function cargarSLA(){
       m.porLog[cat].cnt+=1;
     }
 
-    const slaTot=diasEntre(r.fecha_entrada_proceso,r.fecha_exitoso);
+    const slaTot=diasEntre(r.fecha_configurar_terminal,r.fecha_exitoso);
     if(slaTot!=null){
       m.sumTot+=slaTot; m.cntTot+=1;
       if(r.sla_total_dias!=null){
@@ -1044,7 +1055,7 @@ function renderVistaSLA(){
     <div class="card" style="--accent:#1a9fd4">
       <div class="card-label">SLA Operaciones</div>
       <div class="card-num">${fmtDias(cntOps?sumOps/cntOps:null)}</div>
-      <div class="card-sub">En Proceso → Pre-Colecta</div>
+      <div class="card-sub">Configurar Terminal → Pre-Colecta</div>
     </div>
     <div class="card" style="--accent:var(--amber)">
       <div class="card-label">SLA Logística</div>
