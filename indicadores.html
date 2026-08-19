@@ -80,11 +80,19 @@
   <header>
     <div class="brand">
       <div class="brand-logo">alleata</div>
-      <div class="brand-sub">· Indicadores Operaciones <span style="opacity:.5">v2.2.0</span></div>
+      <div class="brand-sub">· Indicadores Operaciones <span style="opacity:.5">v2.3.0</span></div>
     </div>
-    <div class="user-chip">
-      <span id="userLabel">—</span>
-      <button class="btn-logout" onclick="hacerLogout()">Salir</button>
+    <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+      <div style="font-size:11px;color:var(--text-dim);text-align:right;line-height:1.4">
+        <div id="syncStatus">● Datos cargados</div>
+        <div id="syncNext" style="opacity:.7"></div>
+      </div>
+      <button class="btn-logout" onclick="indActualizar()" title="Vuelve a leer Supabase (no consulta SF)">🔄 Actualizar</button>
+      <button class="btn-logout" onclick="indFullSync()" id="btnFullSync" style="background:rgba(29,191,142,.12);border-color:var(--teal);color:var(--teal)" title="Fuerza una sincronización real desde Salesforce antes de refrescar">⚡ Full Sync</button>
+      <div class="user-chip">
+        <span id="userLabel">—</span>
+        <button class="btn-logout" onclick="hacerLogout()">Salir</button>
+      </div>
     </div>
   </header>
 
@@ -169,7 +177,7 @@
 </div>
 
 <script>
-// indicadores.html — v2.2.0 (17 ago 2026)
+// indicadores.html — v2.3.0 (18 ago 2026)
 // Changelog:
 //  v1.0.0 — versión inicial (costo logística por mes, Logicalis, % Pre-Colecta, SLA Operaciones/Logística)
 //  v1.1.0 — suma Alleata (logística propia) al reporte de costos a $1/envío (costo simbólico,
@@ -221,9 +229,77 @@
 //           comparable 1:1, en parte por esto).
 //  v2.2.0 — columna "En Pre-Colecta hoy" clickeable: abre modal con el listado de OTs
 //           (N° OT, cuenta, tipo, perfil, responsable), mismo patrón que Cambio+Rollout.
+//  v2.3.0 — FIX: diagnóstico Perfil ordenaba por texto del label ("Ago"/"Jul"/"Jun" alfabético),
+//           no por fecha real — daba un orden cronológico incorrecto. Ahora ordena por key
+//           YYYY-MM, igual que el resto de las tablas. Suma botones "🔄 Actualizar" (relee
+//           Supabase) y "⚡ Full Sync" (dispara /automations/run/sf_sync en Railway, mismo
+//           endpoint que usa napse-gestion.html, y recién después relee) + auto-refresh cada
+//           10 min con indicador de última actualización / próxima corrida en el header.
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_ANON);
+
+// ── Sync / auto-refresh (18/08) ──────────────────────────────────────────
+// "Actualizar" solo vuelve a leer Supabase (rápido, no toca Salesforce).
+// "Full Sync" dispara el mismo endpoint que ya usa napse-gestion.html para
+// forzar una sincronización real SF→Supabase en el backend (Railway), y
+// recién después re-lee. Auto-refresh cada 10 min, mismo intervalo que
+// usa el resto del portal para el sync automático.
+const RAILWAY_BASE='https://alleata-agent-production.up.railway.app';
+const AUTOMATION_SECRET='123456';
+const AUTO_REFRESH_MS=10*60*1000;
+let _ultimaActualizacion=null;
+
+function indCargarTodo(){
+  cargarDatos();
+  cargarLogicalis();
+  cargarPrecolecta();
+  cargarSLA();
+  _ultimaActualizacion=new Date();
+  indActualizarLabelSync();
+}
+
+function indActualizar(){
+  indCargarTodo();
+}
+
+async function indFullSync(){
+  const btn=document.getElementById('btnFullSync');
+  const statusEl=document.getElementById('syncStatus');
+  btn.disabled=true; btn.textContent='⏳ Sincronizando...';
+  statusEl.innerHTML='<span style="color:var(--amber)">● Full Sync en curso…</span>';
+  try{
+    const resp=await fetch(`${RAILWAY_BASE}/automations/run/sf_sync`,{
+      method:'POST',
+      headers:{'x-automation-secret':AUTOMATION_SECRET,'Content-Type':'application/json'}
+    });
+    if(!resp.ok)throw new Error(`HTTP ${resp.status}`);
+    statusEl.innerHTML='<span style="color:var(--teal)">● Sync disparado — actualizando en 8s…</span>';
+    setTimeout(()=>{ indCargarTodo(); btn.disabled=false; btn.textContent='⚡ Full Sync'; },8000);
+  }catch(err){
+    console.error('[FullSync]',err);
+    statusEl.innerHTML='<span style="color:var(--red)">● Error al iniciar Full Sync</span>';
+    btn.disabled=false; btn.textContent='⚡ Full Sync';
+  }
+}
+
+function indActualizarLabelSync(){
+  const statusEl=document.getElementById('syncStatus');
+  const nextEl=document.getElementById('syncNext');
+  if(!_ultimaActualizacion||!statusEl)return;
+  const p=n=>String(n).padStart(2,'0');
+  const h=_ultimaActualizacion;
+  statusEl.innerHTML=`<span style="color:var(--teal)">●</span> Actualizado ${p(h.getHours())}:${p(h.getMinutes())}:${p(h.getSeconds())}`;
+  if(nextEl){
+    const prox=new Date(h.getTime()+AUTO_REFRESH_MS);
+    nextEl.textContent=`Próxima auto-actualización: ${p(prox.getHours())}:${p(prox.getMinutes())}`;
+  }
+}
+
+setInterval(()=>{
+  // Solo si el dashboard ya está visible (usuario logueado)
+  if(document.getElementById('dashWrap').style.display==='block') indCargarTodo();
+},AUTO_REFRESH_MS);
 
 let _todosLosMeses=[];
 let _datosCrudosCostos=[]; // sf_workorders crudo de cargarDatos(), para el modal de listado de OTs
@@ -260,10 +336,7 @@ async function hacerLogin(){
   document.getElementById('userLabel').textContent=perfil.nombre||email;
   document.getElementById('loginWrap').style.display='none';
   document.getElementById('dashWrap').style.display='block';
-  cargarDatos();
-  cargarLogicalis();
-  cargarPrecolecta();
-  cargarSLA();
+  indCargarTodo();
 }
 
 async function hacerLogout(){
@@ -281,10 +354,7 @@ async function chequearSesionExistente(){
   document.getElementById('userLabel').textContent=perfil.nombre||session.user.email;
   document.getElementById('loginWrap').style.display='none';
   document.getElementById('dashWrap').style.display='block';
-  cargarDatos();
-  cargarLogicalis();
-  cargarPrecolecta();
-  cargarSLA();
+  indCargarTodo();
 }
 chequearSesionExistente();
 
@@ -695,7 +765,7 @@ async function cargarPrecolecta(){
       }
     }
 
-    if(!diag[key])diag[key]={label:porMes[key].label,napse:0,prisma:0,otroPerfil:0,fueraPipeline:0,estadosFuera:{}};
+    if(!diag[key])diag[key]={key,label:porMes[key].label,napse:0,prisma:0,otroPerfil:0,fueraPipeline:0,estadosFuera:{}};
     const p=(r.perfil||'').toUpperCase().trim();
     if(p==='NAPSE')diag[key].napse+=1;
     else if(p==='PRISMA')diag[key].prisma+=1;
@@ -745,7 +815,7 @@ async function cargarPrecolecta(){
 function renderDiagPrecolecta(diag){
   const el=document.getElementById('diagPrecolecta');
   if(!el)return;
-  const filas=Object.values(diag).sort((a,b)=>b.label.localeCompare(a.label));
+  const filas=Object.values(diag).sort((a,b)=>b.key.localeCompare(a.key));
   const totNapse=filas.reduce((s,f)=>s+f.napse,0);
   const totPrisma=filas.reduce((s,f)=>s+f.prisma,0);
   const totOtro=filas.reduce((s,f)=>s+f.otroPerfil,0);
