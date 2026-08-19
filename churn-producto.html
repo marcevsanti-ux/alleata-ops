@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Alleata · Churn Producto</title>
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<style>
+:root {
+  --navy-900: #0d1b2a;
+  --navy-800: #112236;
+  --navy-700: #162d45;
+  --navy-600: #1d3a55;
+  --navy-500: #2a4a6b;
+  --navy-400: #3d6080;
+  --navy-300: #6b8eaa;
+  --navy-200: #a0bdd0;
+  --navy-100: #d6e6f0;
+  --navy-50:  #f0f6fa;
+
+  --teal:     #1dbf8e;
+  --teal-dark:#17a07a;
+  --teal-light:#e8f9f4;
+  --blue:     #1a9fd4;
+  --blue-light:#e8f4fb;
+  --grad: linear-gradient(135deg, #1dbf8e, #1a9fd4);
+
+  --green: #10b981; --green-bg: #ecfdf5; --green-border: #a7f3d0;
+  --red:   #ef4444; --red-bg:   #fef2f2; --red-border:   #fecaca;
+  --yellow:#f59e0b; --yellow-bg:#fffbeb; --yellow-border:#fde68a;
+  --orange:#f97316; --orange-bg:#fff7ed; --orange-border:#fed7aa;
+  --purple:#8b5cf6; --purple-bg:#f5f3ff; --purple-border:#ddd6fe;
+
+  --bg:        var(--navy-900);
+  --surface:   var(--navy-800);
+  --surface2:  var(--navy-700);
+  --border:    rgba(255,255,255,.07);
+  --border2:   rgba(255,255,255,.12);
+  --text:      #e8f0f7;
+  --text-mid:  #a0bdd0;
+  --text-muted:#6b8eaa;
+  --shadow: 0 4px 16px rgba(0,0,0,.3);
+  --shadow-lg: 0 12px 40px rgba(0,0,0,.4);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'Inter',-apple-system,sans-serif;min-height:100vh;font-size:14px;}
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--navy-500);border-radius:10px}
+
+/* ── login (mismo patrón que indicadores.html) ── */
+#loginWrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.login-box{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:36px 32px;width:100%;max-width:380px}
+.login-logo{font-size:26px;font-weight:800;letter-spacing:-1px;color:var(--teal);text-align:center;margin-bottom:4px}
+.login-sub{font-size:12px;color:var(--text-muted);text-align:center;margin-bottom:26px;text-transform:uppercase;letter-spacing:1px}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:11px;color:var(--text-muted);margin-bottom:5px;font-weight:600}
+.field input{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:11px 12px;color:var(--text);font-size:14px}
+.field input:focus{outline:none;border-color:var(--teal)}
+.btn-login{width:100%;background:var(--teal);color:#06140f;border:none;border-radius:8px;padding:12px;font-weight:700;font-size:14px;cursor:pointer;margin-top:6px}
+.btn-login:disabled{opacity:.6;cursor:default}
+.login-error{font-size:12px;color:var(--red);margin-top:12px;text-align:center;min-height:16px}
+
+/* ── header ── */
+#dashWrap{display:none;max-width:1400px;margin:0 auto;padding:24px}
+header{display:flex;justify-content:space-between;align-items:center;margin-bottom:22px;padding-bottom:16px;border-bottom:1px solid var(--border);flex-wrap:wrap;gap:12px}
+.brand{display:flex;align-items:center;gap:12px}
+.brand-logo{font-size:20px;font-weight:800;color:var(--teal);letter-spacing:-1px}
+.brand-sub{font-size:12px;color:var(--text-muted)}
+.user-chip{display:flex;align-items:center;gap:12px}
+.user-chip span{font-size:12px;color:var(--text-muted)}
+.btn-logout{background:none;border:1px solid var(--border);color:var(--text-muted);border-radius:7px;padding:7px 14px;font-size:12px;cursor:pointer}
+.loading,.empty{text-align:center;padding:40px;color:var(--text-muted)}
+
+/* ── clases que usa el módulo Churn Producto tal cual vive en index.html ── */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;}
+.table-wrap{overflow-x:auto;}
+table{width:100%;border-collapse:collapse;font-size:13px;}
+table.table th{font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-muted);padding:10px 14px;text-align:left;border-bottom:1px solid var(--border);font-weight:700;background:var(--navy-900);}
+table.table td{padding:12px 14px;border-bottom:1px solid var(--border);color:var(--text);vertical-align:middle;}
+table.table tr:hover td{background:var(--surface2);}
+.btn{background:var(--grad);color:#fff;border:none;padding:11px 22px;font-family:'Inter',sans-serif;font-size:14px;font-weight:600;cursor:pointer;border-radius:8px;transition:all .2s;width:auto;}
+.btn-sm{padding:7px 14px;font-size:12px;width:auto;}
+.ot-num{font-family:'IBM Plex Mono',monospace;font-weight:700;}
+.badge-green{background:rgba(16,185,129,.12);color:#6ee7b7;border:1px solid rgba(16,185,129,.2);}
+.badge-red{background:rgba(239,68,68,.12);color:#fca5a5;border:1px solid rgba(239,68,68,.2);}
+</style>
+</head>
+<body>
+
+<div id="loginWrap">
+  <div class="login-box">
+    <div class="login-logo">alleata</div>
+    <div class="login-sub">Churn Producto</div>
+    <div class="field">
+      <label>Email</label>
+      <input type="email" id="loginEmail" placeholder="tu@mail.com" autocomplete="username">
+    </div>
+    <div class="field">
+      <label>Contraseña</label>
+      <input type="password" id="loginPass" placeholder="••••••••" autocomplete="current-password">
+    </div>
+    <button class="btn-login" id="btnLogin" onclick="hacerLogin()">Ingresar</button>
+    <div class="login-error" id="loginError"></div>
+  </div>
+</div>
+
+<div id="dashWrap">
+  <header>
+    <div class="brand">
+      <div class="brand-logo">alleata</div>
+      <div class="brand-sub">· Churn Producto <span style="opacity:.5">v1.0.0</span></div>
+    </div>
+    <div class="user-chip">
+      <span id="userLabel">—</span>
+      <button class="btn-logout" onclick="hacerLogout()">Salir</button>
+    </div>
+  </header>
+
+  <!-- ══════════════════════════════════════════════════════════════════
+       A PARTIR DE ACÁ: clon 1:1 del módulo Churn Producto de index.html
+       (líneas 1197-1246 HTML + 6551-6738 JS). Mismos ids, mismas clases,
+       mismas funciones — si cambia algo en el portal principal, este
+       archivo hay que actualizarlo a mano en paralelo (no comparten código).
+       ══════════════════════════════════════════════════════════════════ -->
+  <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:12px">
+    <div>
+      <div style="font-size:19px;font-weight:700" id="cp-titulo">🔬 Churn Producto NAPSE <span style="font-size:12px;font-weight:400;color:var(--text-muted)">(desde 1/4/2026)</span></div>
+      <div style="font-size:12px;color:var(--text-muted);margin-top:2px" id="cp-subtitulo">Por cada desinstalación NAPSE: cuánto tiempo estuvo esa terminal instalada y cuánto vendía la cuenta antes de la baja (Actividad__c). Match por cuenta + Terminal_ID (la unidad que efectivamente se retiró). "Días con terminal" y "SLA Recupero" solo se completan una vez que el estado es Recuperada. Piloto NAPSE arrancó el 1/6/2026 — pocos casos es normal en esta etapa.</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <div style="display:flex;background:var(--navy-800);border:1px solid var(--border2);border-radius:8px;padding:3px;gap:2px">
+        <button class="cp-perfil-btn" data-perfil="NAPSE" onclick="cpSetPerfil('NAPSE')" style="border:none;border-radius:6px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;background:#8b5cf6;color:#fff">NAPSE</button>
+        <button class="cp-perfil-btn" data-perfil="PRISMA" onclick="cpSetPerfil('PRISMA')" style="border:none;border-radius:6px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;background:transparent;color:var(--text-muted)">PRISMA</button>
+        <button class="cp-perfil-btn" data-perfil="SIN_PERFIL" onclick="cpSetPerfil('SIN_PERFIL')" style="border:none;border-radius:6px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;background:transparent;color:var(--text-muted)">Sin Perfil</button>
+      </div>
+      <button class="btn btn-sm" id="cp-btn-recalcular" style="background:rgba(139,92,246,.12);color:#8b5cf6;border:1px solid rgba(139,92,246,.3)" onclick="recalcularChurnProducto()">🔄 Recalcular (consulta SF en vivo)</button>
+    </div>
+  </div>
+  <div id="cp-resumen-cards" style="margin-bottom:16px"></div>
+  <div class="card" style="padding:0;overflow-x:auto">
+    <div class="table-wrap">
+    <table class="table">
+      <thead><tr>
+        <th class="cp-sortable" data-key="cuenta" onclick="cpOrdenarPor('cuenta')" style="cursor:pointer">Cuenta <span id="cp-sort-cuenta" class="cp-sort-arrow"></span></th>
+        <th class="cp-sortable" data-key="propietario_cuenta" onclick="cpOrdenarPor('propietario_cuenta')" style="cursor:pointer">Propietario cta. <span id="cp-sort-propietario_cuenta" class="cp-sort-arrow"></span></th>
+        <th class="cp-sortable" data-key="fecha_instalacion_cuenta" onclick="cpOrdenarPor('fecha_instalacion_cuenta')" style="cursor:pointer">Fecha Instalación <span id="cp-sort-fecha_instalacion_cuenta" class="cp-sort-arrow"></span></th>
+        <th class="cp-sortable" data-key="fecha_baja_cuenta" onclick="cpOrdenarPor('fecha_baja_cuenta')" style="cursor:pointer">Fecha de baja <span id="cp-sort-fecha_baja_cuenta" class="cp-sort-arrow"></span></th>
+        <th class="cp-sortable" data-key="terminal_id" onclick="cpOrdenarPor('terminal_id')" style="cursor:pointer">Terminal <span id="cp-sort-terminal_id" class="cp-sort-arrow"></span></th>
+        <th class="cp-sortable" data-key="motivo" onclick="cpOrdenarPor('motivo')" style="cursor:pointer">Motivo <span id="cp-sort-motivo" class="cp-sort-arrow"></span></th>
+        <th class="cp-sortable" data-key="dias_con_terminal" onclick="cpOrdenarPor('dias_con_terminal')" style="cursor:pointer">Días con terminal <span id="cp-sort-dias_con_terminal" class="cp-sort-arrow"></span></th>
+        <th class="cp-sortable" data-key="sla_recupero_dias" onclick="cpOrdenarPor('sla_recupero_dias')" style="cursor:pointer">SLA Recupero <span id="cp-sort-sla_recupero_dias" class="cp-sort-arrow"></span></th>
+        <th class="cp-sortable" data-key="volumen_30d_antes" onclick="cpOrdenarPor('volumen_30d_antes')" style="cursor:pointer">Volumen 30d <span id="cp-sort-volumen_30d_antes" class="cp-sort-arrow"></span></th>
+        <th class="cp-sortable" data-key="volumen_60d_antes" onclick="cpOrdenarPor('volumen_60d_antes')" style="cursor:pointer">Volumen 60d <span id="cp-sort-volumen_60d_antes" class="cp-sort-arrow"></span></th>
+        <th class="cp-sortable" data-key="volumen_90d_antes" onclick="cpOrdenarPor('volumen_90d_antes')" style="cursor:pointer">Volumen 90d <span id="cp-sort-volumen_90d_antes" class="cp-sort-arrow"></span></th>
+        <th id="cp-th-observaciones">Observaciones</th>
+      </tr></thead>
+      <tbody id="cp-tbody">
+        <tr><td colspan="12" style="text-align:center;padding:30px;color:var(--text-muted)">Sin datos todavía — apretá "Recalcular" para traer del vivo de Salesforce.</td></tr>
+      </tbody>
+    </table>
+    </div>
+  </div>
+  <!-- ══════════════════════════════════════════════════════════════════
+       FIN del clon del módulo
+       ══════════════════════════════════════════════════════════════════ -->
+</div>
+
+<script>
+const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
+const SUPABASE_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
+const sb=supabase.createClient(SUPABASE_URL,SUPABASE_ANON);
+
+// currentProfile — el módulo original usa currentProfile?.rol==='admin' para
+// habilitar "Recalcular". Acá se completa en el login/chequeo de sesión.
+let currentProfile=null;
+
+async function hacerLogin(){
+  const email=document.getElementById('loginEmail').value.trim();
+  const pass=document.getElementById('loginPass').value;
+  const errEl=document.getElementById('loginError');
+  const btn=document.getElementById('btnLogin');
+  errEl.textContent='';
+  if(!email||!pass){errEl.textContent='Completá email y contraseña.';return;}
+  btn.disabled=true;btn.textContent='Ingresando...';
+
+  const{data,error}=await sb.auth.signInWithPassword({email,password:pass});
+  if(error){
+    errEl.textContent='Email o contraseña incorrectos.';
+    btn.disabled=false;btn.textContent='Ingresar';
+    return;
+  }
+
+  // Mismo criterio que indicadores.html: solo admin puede entrar acá.
+  // (Este módulo no tiene versión "auditor_externo" — es 100% operativo,
+  // con botón de recalcular en vivo contra SF.)
+  const{data:perfil,error:perfilErr}=await sb.from('profiles').select('nombre,rol').eq('id',data.user.id).maybeSingle();
+  if(perfilErr||!perfil||perfil.rol!=='admin'){
+    errEl.textContent='Esta cuenta no tiene acceso a este portal.';
+    await sb.auth.signOut();
+    btn.disabled=false;btn.textContent='Ingresar';
+    return;
+  }
+
+  currentProfile=perfil;
+  document.getElementById('userLabel').textContent=perfil.nombre||email;
+  document.getElementById('loginWrap').style.display='none';
+  document.getElementById('dashWrap').style.display='block';
+  loadChurnProducto();
+}
+
+async function hacerLogout(){
+  await sb.auth.signOut();
+  location.reload();
+}
+
+async function chequearSesionExistente(){
+  const{data:{session}}=await sb.auth.getSession();
+  if(!session)return;
+  const{data:perfil}=await sb.from('profiles').select('nombre,rol').eq('id',session.user.id).maybeSingle();
+  if(!perfil||perfil.rol!=='admin'){ await sb.auth.signOut(); return; }
+  currentProfile=perfil;
+  document.getElementById('userLabel').textContent=perfil.nombre||session.user.email;
+  document.getElementById('loginWrap').style.display='none';
+  document.getElementById('dashWrap').style.display='block';
+  loadChurnProducto();
+}
+chequearSesionExistente();
+
+document.getElementById('loginPass').addEventListener('keydown',e=>{if(e.key==='Enter')hacerLogin();});
+document.getElementById('loginEmail').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('loginPass').focus();});
+
+// ═══════════════════════════════════════════════════════════════════════
+// A PARTIR DE ACÁ: JS calcado de index.html líneas 6551-6738 (Churn
+// Producto). railwayFetch() adaptado — el original usa el token de sesión
+// de Supabase + secret, acá es igual porque `sb` ya está autenticado.
+// ═══════════════════════════════════════════════════════════════════════
+const ALLY_RAILWAY_BASE = 'https://alleata-agent-production.up.railway.app';
+
+async function railwayFetch(path, options = {}) {
+  const { data: { session } } = await sb.auth.getSession();
+  return fetch(ALLY_RAILWAY_BASE + path, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ' + (session ? session.access_token : ''),
+      'x-automation-secret': '123456',
+      ...(options.headers || {}),
+    },
+  });
+}
+
+const ESTADO_COLORS_NAPSE={
+  'Pendiente':'#f59e0b','En Proceso':'#1a9fd4','Recuperada':'#1dbf8e',
+  'NO RESPONDE':'#ef4444','Reactivado':'#8b5cf6','Cancelado':'#6b7280',
+  'Extraviada':'#6b7280','Reprogramar':'#f97316',
+};
+
+function fmtVolCP(v){ return (v==null) ? '—' : '$'+Number(v).toLocaleString('es-AR'); }
+function fmtFechaCP(d){ return d ? new Date(d).toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'2-digit'}) : '—'; }
+
+let _cpData = [];
+let _cpFiltroEstado = 'Recuperada';
+let _cpSortKey = 'fecha_desinstalacion';
+let _cpSortDir = 'desc';
+let _cpPerfil = 'NAPSE';
+const CP_PERFIL_LABEL = { NAPSE: 'NAPSE', PRISMA: 'PRISMA', SIN_PERFIL: 'Sin Perfil' };
+const CP_TEXTOS = {
+  NAPSE:  'Por cada desinstalación NAPSE: cuánto tiempo estuvo esa terminal instalada y cuánto vendía la cuenta antes de la baja (Actividad__c). Match por cuenta + Terminal_ID (la unidad que efectivamente se retiró). "Días con terminal" y "SLA Recupero" solo se completan una vez que el estado es Recuperada. Piloto NAPSE arrancó el 1/6/2026 — pocos casos es normal en esta etapa.',
+  PRISMA: 'Por cada desinstalación PRISMA: cuánto tiempo estuvo esa terminal instalada y cuánto vendía la cuenta antes de la baja (Actividad__c). Match por cuenta + Terminal_ID (la unidad que efectivamente se retiró). "Días con terminal" y "SLA Recupero" solo se completan una vez que el estado es Recuperada.',
+  SIN_PERFIL: 'OTs de desinstalación que no tienen Perfil__c cargado en Salesforce (ni NAPSE ni PRISMA). Se separan acá para que la suma de las tres pestañas coincida con el total de Gestión OPS.',
+};
+
+function cpSetPerfil(perfil){
+  if(_cpPerfil===perfil)return;
+  _cpPerfil = perfil;
+  _cpFiltroEstado = 'Recuperada';
+  document.querySelectorAll('.cp-perfil-btn').forEach(btn=>{
+    const activo = btn.dataset.perfil===perfil;
+    btn.style.background = activo ? '#8b5cf6' : 'transparent';
+    btn.style.color = activo ? '#fff' : 'var(--text-muted)';
+  });
+  const tituloEl=document.getElementById('cp-titulo');
+  const subEl=document.getElementById('cp-subtitulo');
+  if(tituloEl)tituloEl.innerHTML=`🔬 Churn Producto ${CP_PERFIL_LABEL[perfil]||perfil} <span style="font-size:12px;font-weight:400;color:var(--text-muted)">(desde 1/4/2026)</span>`;
+  if(subEl)subEl.textContent=CP_TEXTOS[perfil]||CP_TEXTOS.NAPSE;
+  loadChurnProducto();
+}
+
+async function loadChurnProductoResumen(){
+  const cont=document.getElementById('cp-resumen-cards');
+  if(!cont)return;
+  cont.innerHTML='<div class="card" style="padding:16px;color:var(--text-muted);font-size:12px">Consultando Salesforce en vivo...</div>';
+  try{
+    const r=await railwayFetch(`/automations/sf-stats/desinstalaciones?perfil=${encodeURIComponent(_cpPerfil)}&fechaInicio=2026-04-01`);
+    const j=await r.json();
+    if(!r.ok||!j.ok)throw new Error(j.error||'Respuesta no OK');
+    const total=j.totalGeneral||0;
+    const entries=Object.entries(j.totalPorEstado||{}).sort((a,b)=>b[1]-a[1]);
+    cont.innerHTML=`<div class="card">
+      <div style="display:flex;align-items:flex-end;gap:10px;margin-bottom:10px">
+        <button onclick="cpFiltrarPorEstado(null)" style="background:none;border:none;cursor:pointer;display:flex;align-items:flex-end;gap:10px;padding:0" title="Ver todas">
+          <div style="font-size:34px;font-weight:800;color:#8b5cf6;line-height:1">${total}</div>
+          <div style="font-size:12px;color:var(--text-muted);padding-bottom:5px;text-align:left">total (Desinstalación · Perfil ${CP_PERFIL_LABEL[_cpPerfil]||_cpPerfil}) · <strong style="color:var(--text)">desde 1/4/2026</strong> — en vivo desde Salesforce${_cpFiltroEstado?' · click para ver todas':''}</div>
+        </button>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px">
+        ${entries.map(([estado,cant])=>{
+          const color=ESTADO_COLORS_NAPSE[estado]||'#6b7280';
+          const activo=_cpFiltroEstado===estado;
+          return`<button onclick="cpFiltrarPorEstado('${estado.replace(/'/g,"\\'")}')" style="text-align:left;cursor:pointer;background:${color}${activo?'30':'18'};border:1px solid ${color}${activo?'':'40'};${activo?`border-color:${color}`:''};border-radius:10px;padding:8px 12px;min-width:100px;font-family:inherit">
+            <div style="font-size:20px;font-weight:800;color:${color}">${cant}</div>
+            <div style="font-size:10px;color:${activo?color:'var(--text-muted)'};white-space:nowrap;font-weight:${activo?700:400}">${estado}${activo?' ✓':''}</div>
+          </button>`;
+        }).join('')||`<div style="font-size:12px;color:var(--text-muted)">Sin OTs ${CP_PERFIL_LABEL[_cpPerfil]||_cpPerfil}</div>`}
+      </div>
+    </div>`;
+  }catch(e){
+    cont.innerHTML=`<div class="card" style="padding:16px;color:var(--red);font-size:12px">No se pudo consultar SF: ${e.message}</div>`;
+  }
+}
+
+function cpFiltrarPorEstado(estado){
+  _cpFiltroEstado = (_cpFiltroEstado===estado) ? null : estado;
+  loadChurnProductoResumen();
+  cpRenderTabla();
+}
+
+function cpOrdenarPor(key){
+  if(_cpSortKey===key){ _cpSortDir = _cpSortDir==='asc' ? 'desc' : 'asc'; }
+  else { _cpSortKey=key; _cpSortDir='desc'; }
+  document.querySelectorAll('.cp-sort-arrow').forEach(el=>el.textContent='');
+  const arrowEl=document.getElementById('cp-sort-'+key);
+  if(arrowEl) arrowEl.textContent = _cpSortDir==='asc' ? '▲' : '▼';
+  cpRenderTabla();
+}
+
+function cpRenderTabla(){
+  const tbody=document.getElementById('cp-tbody');
+  if(!tbody)return;
+
+  const ocultarObservaciones = ['Recuperada','En Proceso','Reactivado'].includes(_cpFiltroEstado);
+  const thObs=document.getElementById('cp-th-observaciones');
+  if(thObs)thObs.style.display=ocultarObservaciones?'none':'';
+
+  let filas = _cpFiltroEstado ? _cpData.filter(r=>r.estado_desinst===_cpFiltroEstado) : _cpData.slice();
+
+  filas.sort((a,b)=>{
+    let va=a[_cpSortKey], vb=b[_cpSortKey];
+    if(va==null && vb==null) return 0;
+    if(va==null) return 1;
+    if(vb==null) return -1;
+    if(typeof va==='string') va=va.toLowerCase();
+    if(typeof vb==='string') vb=vb.toLowerCase();
+    const cmp = va<vb ? -1 : va>vb ? 1 : 0;
+    return _cpSortDir==='asc' ? cmp : -cmp;
+  });
+
+  if(!filas.length){
+    tbody.innerHTML=`<tr><td colspan="12" style="text-align:center;padding:30px;color:var(--text-muted)">${_cpFiltroEstado?`Sin casos "${_cpFiltroEstado}" en la tabla cargada.`:'Sin datos todavía — apretá "Recalcular" para traer del vivo de Salesforce.'}</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML=filas.map(r=>{
+    const nombreCuenta = r.account_id
+      ? `<a href="https://alleata.lightning.force.com/lightning/r/Account/${r.account_id}/view" target="_blank" rel="noopener" style="font-weight:600;color:#1dbf8e;text-decoration:none" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'" title="Abrir cuenta en Salesforce">${r.cuenta||'—'} ↗</a>`
+      : `<div style="font-weight:600;color:#1dbf8e">${r.cuenta||'—'}</div>`;
+    const volTarjeta = (v) => v!=null ? `<div style="font-size:9px;color:#f59e0b;font-family:'JetBrains Mono',monospace">🪪 ${fmtVolCP(v)}</div>` : '';
+    return `
+    <tr>
+      <td>${nombreCuenta}<div style="font-size:10px;color:var(--text-muted);font-family:'JetBrains Mono',monospace">${r.cuit||'—'}${r.ot_desinstalacion?` <span class="ot-num" style="font-size:10px">· ${r.sf_id_desinstalacion?`<a href="https://alleata.lightning.force.com/lightning/r/WorkOrder/${r.sf_id_desinstalacion}/view" target="_blank" rel="noopener" style="color:inherit;text-decoration:none" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'" title="Abrir OT en Salesforce">OT ${r.ot_desinstalacion} ↗</a>`:`OT ${r.ot_desinstalacion}`}</span>`:''}</div>${r.comercio?`<div style="font-size:10px;color:var(--text-muted)">${r.comercio}</div>`:''}</td>
+      <td style="font-size:11px">${r.propietario_cuenta||'<span style="color:var(--text-muted)">—</span>'}</td>
+      <td>${fmtFechaCP(r.fecha_instalacion_cuenta)}</td>
+      <td>${fmtFechaCP(r.fecha_baja_cuenta)}</td>
+      <td style="font-size:11px;font-family:'JetBrains Mono',monospace">${r.terminal_id||'—'}</td>
+      <td style="font-size:11px;max-width:180px">${r.motivo||'—'}${r.sub_motivo?`<div style="font-size:10px;color:var(--text-muted);margin-top:2px">${r.sub_motivo}</div>`:''}</td>
+      <td style="text-align:center;font-weight:700">${r.dias_con_terminal!=null?r.dias_con_terminal+' días':'—'}</td>
+      <td style="text-align:center">${r.estado_desinst==='Extraviada'?'<span style="color:var(--text-muted)">n/a</span>':`<div style="font-weight:700">${r.sla_recupero_dias!=null?r.sla_recupero_dias+' días':'<span style="color:var(--text-muted);font-weight:400">—</span>'}</div>${r.logistica?`<div style="font-size:9px;color:var(--text-muted)">${r.logistica}</div>`:''}`}</td>
+      <td style="font-family:'JetBrains Mono',monospace">${fmtVolCP(r.volumen_30d_antes)}${volTarjeta(r.volumen_tarjeta_30d)}</td>
+      <td style="font-family:'JetBrains Mono',monospace">${fmtVolCP(r.volumen_60d_antes)}${volTarjeta(r.volumen_tarjeta_60d)}</td>
+      <td style="font-family:'JetBrains Mono',monospace">${fmtVolCP(r.volumen_90d_antes)}${volTarjeta(r.volumen_tarjeta_90d)}</td>
+      <td class="cp-td-observaciones" style="font-size:11px;max-width:220px;color:var(--text-muted)">${['Recuperada','En Proceso','Reactivado'].includes(r.estado_desinst)?'':(r.observaciones||'—')}</td>
+    </tr>`;
+  }).join('');
+
+  document.querySelectorAll('.cp-td-observaciones').forEach(td=>{ td.style.display=ocultarObservaciones?'none':''; });
+}
+
+async function loadChurnProducto(){
+  loadChurnProductoResumen();
+  const tbody=document.getElementById('cp-tbody');
+  if(!tbody)return;
+  tbody.innerHTML='<tr><td colspan="12" style="text-align:center;padding:30px;color:var(--text-muted)">Cargando...</td></tr>';
+  const{data,error}=await sb.from('desinst_analisis_producto').select('*').eq('perfil',_cpPerfil).order('fecha_desinstalacion',{ascending:false});
+  if(error){
+    tbody.innerHTML=`<tr><td colspan="12" style="text-align:center;padding:30px;color:var(--red)">Error: ${error.message}${error.message.includes('does not exist')?' — falta crear la tabla desinst_analisis_producto en Supabase':''}</td></tr>`;
+    return;
+  }
+  _cpData = data || [];
+  cpRenderTabla();
+}
+
+async function recalcularChurnProducto(){
+  if(currentProfile?.rol!=='admin'){alert('Solo un admin puede recalcular esto.');return;}
+  const btn=document.getElementById('cp-btn-recalcular');
+  const original=btn.textContent;
+  btn.disabled=true;btn.textContent='Consultando SF (puede tardar)...';
+  try{
+    const res=await railwayFetch(`/automations/run/analisis_producto?perfil=${encodeURIComponent(_cpPerfil)}`,{method:'POST'});
+    const data=await res.json();
+    if(!data.ok)throw new Error(data.error||'Error '+res.status);
+    alert(`✅ Recalculado (${_cpPerfil}) — ${data.procesadas||0} OT(s), ${data.matcheadas||0} con match de instalación, ${data.conVolumen||0} con volumen`);
+    await loadChurnProducto();
+  }catch(err){
+    alert('Error al recalcular: '+err.message);
+  }finally{
+    btn.disabled=false;btn.textContent=original;
+  }
+}
+</script>
+</body>
+</html>
