@@ -109,7 +109,7 @@ table.table tr:hover td{background:var(--surface2);}
   <header>
     <div class="brand">
       <div class="brand-logo">alleata</div>
-      <div class="brand-sub">· Churn Producto <span style="opacity:.5">v1.3.0</span></div>
+      <div class="brand-sub">· Churn Producto <span style="opacity:.5">v1.4.0</span></div>
     </div>
     <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
       <div style="font-size:11px;color:var(--text-muted);text-align:right;line-height:1.4">
@@ -133,21 +133,26 @@ table.table tr:hover td{background:var(--surface2);}
        ══════════════════════════════════════════════════════════════════ -->
   <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:12px">
     <div>
-      <div style="font-size:19px;font-weight:700" id="cp-titulo">🔬 Churn Producto NAPSE <span style="font-size:12px;font-weight:400;color:var(--text-muted)">(desde 1/4/2026)</span></div>
-      <div style="font-size:12px;color:var(--text-muted);margin-top:2px" id="cp-subtitulo">Por cada desinstalación NAPSE: cuánto tiempo estuvo esa terminal instalada y cuánto vendía la cuenta antes de la baja (Actividad__c). Match por cuenta + Terminal_ID (la unidad que efectivamente se retiró). "Días con terminal" y "SLA Recupero" solo se completan una vez que el estado es Recuperada. Piloto NAPSE arrancó el 1/6/2026 — pocos casos es normal en esta etapa.</div>
+      <div style="font-size:19px;font-weight:700">🔬 Churn Producto <span style="font-size:12px;font-weight:400;color:var(--text-muted)">(desde 1/4/2026)</span></div>
+      <div style="font-size:12px;color:var(--text-muted);margin-top:2px">Por cada desinstalación: cuánto tiempo estuvo esa terminal instalada y cuánto vendía la cuenta antes de la baja. Match por cuenta + Terminal_ID (la unidad que efectivamente se retiró). Elegí un perfil abajo para ver el desglose completo.</div>
     </div>
-    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-      <div style="display:flex;background:var(--navy-800);border:1px solid var(--border2);border-radius:8px;padding:3px;gap:2px">
-        <button class="cp-perfil-btn" data-perfil="NAPSE" onclick="cpSetPerfil('NAPSE')" style="border:none;border-radius:6px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;background:#8b5cf6;color:#fff">NAPSE</button>
-        <button class="cp-perfil-btn" data-perfil="PRISMA" onclick="cpSetPerfil('PRISMA')" style="border:none;border-radius:6px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;background:transparent;color:var(--text-muted)">PRISMA</button>
-        <button class="cp-perfil-btn" data-perfil="SIN_PERFIL" onclick="cpSetPerfil('SIN_PERFIL')" style="border:none;border-radius:6px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;background:transparent;color:var(--text-muted)">Sin Perfil</button>
-      </div>
-      <button class="btn btn-sm" id="cp-btn-recalcular" style="background:rgba(139,92,246,.12);color:#8b5cf6;border:1px solid rgba(139,92,246,.3)" onclick="recalcularChurnProducto()">🔄 Recalcular (consulta SF en vivo)</button>
-    </div>
+    <button class="btn btn-sm" id="cp-btn-recalcular" style="background:rgba(139,92,246,.12);color:#8b5cf6;border:1px solid rgba(139,92,246,.3)" onclick="recalcularChurnProducto()">🔄 Recalcular (consulta SF en vivo)</button>
   </div>
-  <div id="cp-resumen-cards" style="margin-bottom:8px"></div>
-  <div id="cp-logistica-cards" style="margin-bottom:16px"></div>
-  <div class="card" style="padding:0;overflow-x:auto">
+
+  <!-- Total general — suma en vivo de los 3 perfiles (NAPSE + PRISMA + Sin
+       Perfil), pedido 19/08 para tener la foto completa antes de elegir con
+       cuál perfil profundizar. -->
+  <div id="cp-total-general" class="card" style="margin-bottom:16px">
+    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:10px">TOTAL GENERAL — todos los perfiles</div>
+    <div style="font-size:12px;color:var(--text-muted)">Consultando Salesforce en vivo...</div>
+  </div>
+
+  <div id="cp-tabs-perfil" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px"></div>
+
+  <div id="cp-detalle-perfil" style="display:none">
+    <div id="cp-resumen-cards" style="margin-bottom:8px"></div>
+    <div id="cp-logistica-cards" style="margin-bottom:16px"></div>
+    <div class="card" style="padding:0;overflow-x:auto">
     <div class="table-wrap">
     <table class="table">
       <thead><tr>
@@ -169,6 +174,7 @@ table.table tr:hover td{background:var(--surface2);}
       </tbody>
     </table>
     </div>
+  </div>
   </div>
   <!-- ══════════════════════════════════════════════════════════════════
        FIN del clon del módulo
@@ -211,7 +217,8 @@ function indActualizarLabelSync(){
 }
 
 function indActualizar(){
-  loadChurnProducto();
+  cpCargarTotalGeneral();
+  if(_cpPerfil) loadChurnProducto();
   _ultimaActualizacion=new Date();
   indActualizarLabelSync();
 }
@@ -275,7 +282,7 @@ async function hacerLogin(){
   document.getElementById('userLabel').textContent=perfil.nombre||email;
   document.getElementById('loginWrap').style.display='none';
   document.getElementById('dashWrap').style.display='block';
-  loadChurnProducto();
+  cpCargarTotalGeneral();
   _ultimaActualizacion=new Date();
   indActualizarLabelSync();
 }
@@ -294,7 +301,7 @@ async function chequearSesionExistente(){
   document.getElementById('userLabel').textContent=perfil.nombre||session.user.email;
   document.getElementById('loginWrap').style.display='none';
   document.getElementById('dashWrap').style.display='block';
-  loadChurnProducto();
+  cpCargarTotalGeneral();
   _ultimaActualizacion=new Date();
   indActualizarLabelSync();
 }
@@ -336,27 +343,71 @@ let _cpData = [];
 let _cpFiltroEstado = 'Recuperada';
 let _cpSortKey = 'fecha_desinstalacion';
 let _cpSortDir = 'desc';
-let _cpPerfil = 'NAPSE';
+let _cpPerfil = null; // nada elegido hasta que el usuario clickea una card de perfil
 const CP_PERFIL_LABEL = { NAPSE: 'NAPSE', PRISMA: 'PRISMA', SIN_PERFIL: 'Sin Perfil' };
-const CP_TEXTOS = {
-  NAPSE:  'Por cada desinstalación NAPSE: cuánto tiempo estuvo esa terminal instalada y cuánto vendía la cuenta antes de la baja (Actividad__c). Match por cuenta + Terminal_ID (la unidad que efectivamente se retiró). "Días con terminal" y "SLA Recupero" solo se completan una vez que el estado es Recuperada. Piloto NAPSE arrancó el 1/6/2026 — pocos casos es normal en esta etapa.',
-  PRISMA: 'Por cada desinstalación PRISMA: cuánto tiempo estuvo esa terminal instalada y cuánto vendía la cuenta antes de la baja (Actividad__c). Match por cuenta + Terminal_ID (la unidad que efectivamente se retiró). "Días con terminal" y "SLA Recupero" solo se completan una vez que el estado es Recuperada.',
-  SIN_PERFIL: 'OTs de desinstalación que no tienen Perfil__c cargado en Salesforce (ni NAPSE ni PRISMA). Se separan acá para que la suma de las tres pestañas coincida con el total de Gestión OPS.',
-};
+
+// Total general (19/08, pedido explícito): suma en vivo de los 3 perfiles,
+// para tener la foto completa antes de elegir con cuál profundizar. Hace
+// 3 llamadas en paralelo (una por perfil) porque el endpoint de stats no
+// tiene un modo "todos los perfiles juntos".
+async function cpCargarTotalGeneral(){
+  const cont=document.getElementById('cp-total-general');
+  const tabsCont=document.getElementById('cp-tabs-perfil');
+  cont.innerHTML=`<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:10px">TOTAL GENERAL — todos los perfiles</div><div style="font-size:12px;color:var(--text-muted)">Consultando Salesforce en vivo...</div>`;
+  try{
+    const perfiles=['NAPSE','PRISMA','SIN_PERFIL'];
+    const resultados=await Promise.all(perfiles.map(async p=>{
+      const r=await railwayFetch(`/automations/sf-stats/desinstalaciones?perfil=${encodeURIComponent(p)}&fechaInicio=2026-04-01`);
+      const j=await r.json();
+      if(!r.ok||!j.ok)throw new Error(j.error||'Respuesta no OK');
+      return {perfil:p,total:j.totalGeneral||0,porEstado:j.totalPorEstado||{}};
+    }));
+    const totalGeneral=resultados.reduce((s,r)=>s+r.total,0);
+    const estadosSumados={};
+    resultados.forEach(r=>{
+      Object.entries(r.porEstado).forEach(([estado,cant])=>{
+        estadosSumados[estado]=(estadosSumados[estado]||0)+cant;
+      });
+    });
+    const entries=Object.entries(estadosSumados).sort((a,b)=>b[1]-a[1]);
+    cont.innerHTML=`
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:10px">TOTAL GENERAL — todos los perfiles</div>
+      <div style="font-size:34px;font-weight:800;color:var(--teal);line-height:1;margin-bottom:12px">${totalGeneral} <span style="font-size:12px;font-weight:400;color:var(--text-muted)">OTs de desinstalación · desde 1/4/2026 · en vivo desde Salesforce</span></div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px">
+        ${entries.map(([estado,cant])=>{
+          const color=ESTADO_COLORS_NAPSE[estado]||'#6b7280';
+          const pct=totalGeneral?Math.round(cant/totalGeneral*100):0;
+          return `<div style="background:${color}18;border:1px solid ${color}40;border-radius:10px;padding:8px 12px;min-width:100px">
+            <div style="font-size:18px;font-weight:800;color:${color}">${cant} <span style="font-size:11px;font-weight:700;opacity:.75">(${pct}%)</span></div>
+            <div style="font-size:10px;color:var(--text-muted)">${estado}</div>
+          </div>`;
+        }).join('')}
+      </div>`;
+
+    tabsCont.innerHTML=resultados.map(r=>{
+      const activo=_cpPerfil===r.perfil;
+      return `<div onclick="cpSetPerfil('${r.perfil}')" class="cp-perfil-btn" data-perfil="${r.perfil}" style="cursor:pointer;background:${activo?'#8b5cf6':'var(--surface)'};border:1px solid ${activo?'#8b5cf6':'var(--border2)'};border-radius:10px;padding:14px 20px;min-width:150px;transition:all .15s">
+        <div class="cp-tab-num" style="font-size:26px;font-weight:800;color:${activo?'#fff':'var(--text)'}">${r.total}</div>
+        <div class="cp-tab-label" style="font-size:11px;font-weight:700;color:${activo?'#fff':'var(--text-muted)'}">${CP_PERFIL_LABEL[r.perfil]} ${activo?'✓':''}</div>
+      </div>`;
+    }).join('');
+  }catch(e){
+    cont.innerHTML=`<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:10px">TOTAL GENERAL — todos los perfiles</div><div style="color:var(--red);font-size:12px">No se pudo consultar SF: ${e.message}</div>`;
+  }
+}
 
 function cpSetPerfil(perfil){
-  if(_cpPerfil===perfil)return;
   _cpPerfil = perfil;
   _cpFiltroEstado = 'Recuperada';
+  document.getElementById('cp-detalle-perfil').style.display='block';
   document.querySelectorAll('.cp-perfil-btn').forEach(btn=>{
     const activo = btn.dataset.perfil===perfil;
-    btn.style.background = activo ? '#8b5cf6' : 'transparent';
-    btn.style.color = activo ? '#fff' : 'var(--text-muted)';
+    btn.style.background = activo ? '#8b5cf6' : 'var(--surface)';
+    btn.style.borderColor = activo ? '#8b5cf6' : 'var(--border2)';
+    const numEl=btn.querySelector('.cp-tab-num'), labelEl=btn.querySelector('.cp-tab-label');
+    if(numEl)numEl.style.color = activo?'#fff':'var(--text)';
+    if(labelEl){ labelEl.style.color = activo?'#fff':'var(--text-muted)'; labelEl.textContent=`${CP_PERFIL_LABEL[btn.dataset.perfil]} ${activo?'✓':''}`; }
   });
-  const tituloEl=document.getElementById('cp-titulo');
-  const subEl=document.getElementById('cp-subtitulo');
-  if(tituloEl)tituloEl.innerHTML=`🔬 Churn Producto ${CP_PERFIL_LABEL[perfil]||perfil} <span style="font-size:12px;font-weight:400;color:var(--text-muted)">(desde 1/4/2026)</span>`;
-  if(subEl)subEl.textContent=CP_TEXTOS[perfil]||CP_TEXTOS.NAPSE;
   loadChurnProducto();
 }
 
@@ -566,6 +617,7 @@ async function loadChurnProducto(){
 
 async function recalcularChurnProducto(){
   if(currentProfile?.rol!=='admin'){alert('Solo un admin puede recalcular esto.');return;}
+  if(!_cpPerfil){alert('Elegí primero un perfil (NAPSE / PRISMA / Sin Perfil) para saber cuál recalcular.');return;}
   const btn=document.getElementById('cp-btn-recalcular');
   const original=btn.textContent;
   btn.disabled=true;btn.textContent='Consultando SF (puede tardar)...';
@@ -575,6 +627,7 @@ async function recalcularChurnProducto(){
     if(!data.ok)throw new Error(data.error||'Error '+res.status);
     alert(`✅ Recalculado (${_cpPerfil}) — ${data.procesadas||0} OT(s), ${data.matcheadas||0} con match de instalación, ${data.conVolumen||0} con volumen`);
     await loadChurnProducto();
+    cpCargarTotalGeneral();
   }catch(err){
     alert('Error al recalcular: '+err.message);
   }finally{
