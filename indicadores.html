@@ -80,7 +80,7 @@
   <header>
     <div class="brand">
       <div class="brand-logo">alleata</div>
-      <div class="brand-sub">· Indicadores Operaciones <span style="opacity:.5">v2.0.0</span></div>
+      <div class="brand-sub">· Indicadores Operaciones <span style="opacity:.5">v2.2.0</span></div>
     </div>
     <div class="user-chip">
       <span id="userLabel">—</span>
@@ -169,7 +169,7 @@
 </div>
 
 <script>
-// indicadores.html — v2.0.0 (17 ago 2026)
+// indicadores.html — v2.2.0 (17 ago 2026)
 // Changelog:
 //  v1.0.0 — versión inicial (costo logística por mes, Logicalis, % Pre-Colecta, SLA Operaciones/Logística)
 //  v1.1.0 — suma Alleata (logística propia) al reporte de costos a $1/envío (costo simbólico,
@@ -215,6 +215,12 @@
 //           mismo formato "X + Y" chico debajo del total.
 //  v2.0.0 — card "SLA Logística" desglosa el promedio por proveedor: Alleata / CA (Correo
 //           Argentino) / EPSA / Varios (Cabify + el resto), respetando el filtro de mes activo.
+//  v2.1.0 — SLA usa los mismos filtros de calidad que "OTs creadas" (cuenta IS NOT NULL +
+//           excluye Credenciales Pendientes/Pendiente) — antes no los tenía y quedaba
+//           inconsistente entre las dos tablas (849 vs 740 OTs en el mismo período no era
+//           comparable 1:1, en parte por esto).
+//  v2.2.0 — columna "En Pre-Colecta hoy" clickeable: abre modal con el listado de OTs
+//           (N° OT, cuenta, tipo, perfil, responsable), mismo patrón que Cambio+Rollout.
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_ANON);
@@ -455,6 +461,42 @@ function indVerListadoCambio(mesKey,mesLabel){
   document.getElementById('indModalOverlay').style.display='flex';
 }
 
+// Modal de solo lectura: lista las OTs que HOY siguen en Pre-Colecta, creadas
+// en un mes puntual — pedido 18/08, mismo patrón que indVerListadoCambio.
+function indVerListadoPrecolecta(mesKey,mesLabel){
+  const filas=_datosCrudosPrecolecta.filter(r=>{
+    if((r.status||'').trim()!=='Pre-Colecta')return false;
+    if(mesKey==='__todos')return true;
+    const d=new Date(r.sf_created_at);
+    const key=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+    return key===mesKey;
+  });
+
+  const filasHtml=filas.length
+    ? filas.map(r=>{
+        const tipo=r.record_type==='Instalación Equipo + Simcard'?'Instalación'
+          :(r.rollout===true?'Rollout':'Cambio');
+        return `<tr>
+          <td style="font-family:var(--mono)">${r.workorder_number||'—'}</td>
+          <td>${r.cuenta||'<span style="color:var(--text-dim)">— sin cuenta —</span>'}</td>
+          <td>${tipo}</td>
+          <td>${r.perfil||'—'}</td>
+          <td>${r.responsable||'—'}</td>
+        </tr>`;
+      }).join('')
+    : `<tr><td colspan="5" class="empty">Sin registros</td></tr>`;
+
+  document.getElementById('indModalTitulo').textContent=`En Pre-Colecta hoy — ${mesLabel} (${filas.length} OT${filas.length===1?'':'s'})`;
+  document.getElementById('indModalBody').innerHTML=`
+    <div style="overflow-x:auto"><table>
+      <thead><tr>
+        <th>N° OT</th><th>Cuenta</th><th>Tipo</th><th>Perfil</th><th>Responsable</th>
+      </tr></thead>
+      <tbody>${filasHtml}</tbody>
+    </table></div>`;
+  document.getElementById('indModalOverlay').style.display='flex';
+}
+
 function renderVista(){
   const cardsWrap=document.getElementById('cardsWrap');
 
@@ -673,7 +715,7 @@ async function cargarPrecolecta(){
       <td class="num">${m.total}</td>
       <td class="num" style="color:var(--text-dim)">${m.instalacion}</td>
       <td class="num" style="color:var(--text-dim);cursor:pointer" onclick="indVerListadoCambio('${m.key}','${m.label}')" title="Cambio: ${m.cambio} · Rollout: ${m.rollout} — Click para ver el listado de OTs">${m.cambio} + ${m.rollout}</td>
-      <td class="num" style="color:${m.precolecta?'var(--amber)':'var(--text-dim)'}" title="Instalación: ${m.precolecta-m.precolectaCambio-m.precolectaRollout} · Cambio: ${m.precolectaCambio} · Rollout: ${m.precolectaRollout}">${m.precolecta}<div style="font-size:9px;font-weight:400;opacity:.75">${m.precolectaCambio} + ${m.precolectaRollout}</div></td>
+      <td class="num" style="color:${m.precolecta?'var(--amber)':'var(--text-dim)'};cursor:pointer" onclick="indVerListadoPrecolecta('${m.key}','${m.label}')" title="Instalación: ${m.precolecta-m.precolectaCambio-m.precolectaRollout} · Cambio: ${m.precolectaCambio} · Rollout: ${m.precolectaRollout} — Click para ver el listado de OTs">${m.precolecta}<div style="font-size:9px;font-weight:400;opacity:.75">${m.precolectaCambio} + ${m.precolectaRollout}</div></td>
       <td class="num">${pct}%</td>
     </tr>`;
   }).join('');
@@ -689,7 +731,7 @@ async function cargarPrecolecta(){
     <td class="num" style="font-weight:800;color:var(--teal)">${tot.total}</td>
     <td class="num" style="font-weight:700">${tot.instalacion}</td>
     <td class="num" style="font-weight:700" title="Cambio: ${tot.cambio} · Rollout: ${tot.rollout}">${tot.cambio} + ${tot.rollout}</td>
-    <td class="num" style="font-weight:700;color:var(--amber)" title="Instalación: ${tot.precolecta-tot.precolectaCambio-tot.precolectaRollout} · Cambio: ${tot.precolectaCambio} · Rollout: ${tot.precolectaRollout}">${tot.precolecta}<div style="font-size:9px;font-weight:400;opacity:.75">${tot.precolectaCambio} + ${tot.precolectaRollout}</div></td>
+    <td class="num" style="font-weight:700;color:var(--amber);cursor:pointer" onclick="indVerListadoPrecolecta('__todos','Todos los meses')" title="Instalación: ${tot.precolecta-tot.precolectaCambio-tot.precolectaRollout} · Cambio: ${tot.precolectaCambio} · Rollout: ${tot.precolectaRollout} — Click para ver el listado de OTs">${tot.precolecta}<div style="font-size:9px;font-weight:400;opacity:.75">${tot.precolectaCambio} + ${tot.precolectaRollout}</div></td>
     <td class="num" style="font-weight:700">${totPct}%</td>
   </tr>`;
 
@@ -766,18 +808,31 @@ async function cargarSLA(){
   const cardsWrap=document.getElementById('slaCardsWrap');
   const tbody=document.getElementById('tablaSLA');
 
-  const{data,error}=await sb.from('sf_workorders')
-    .select('record_type,fecha_entrada_proceso,fecha_pre_colecta,fecha_exitoso,sla_total_dias,logistica')
+  // Mismos filtros de calidad que ya tiene "OTs creadas" (18/08): sin esto,
+  // el lote fantasma de 172 registros (cuenta=null) y las OTs que todavía
+  // no arrancaron (Credenciales Pendientes/Pendiente) podían ensuciar el
+  // cálculo de SLA sin que se notara — quedaba inconsistente entre tablas.
+  const{data:dataCruda,error}=await sb.from('sf_workorders')
+    .select('record_type,fecha_entrada_proceso,fecha_pre_colecta,fecha_exitoso,sla_total_dias,logistica,status,cuenta')
     .in('record_type',['Instalación Equipo + Simcard','Cambio de Terminal'])
     .gte('fecha_entrada_proceso',FECHA_CORTE)
-    .not('fecha_entrada_proceso','is',null);
+    .not('fecha_entrada_proceso','is',null)
+    .not('cuenta','is',null);
 
   if(error){
     cardsWrap.innerHTML=`<div class="empty" style="color:var(--red)">Error cargando SLA: ${error.message}</div>`;
     tbody.innerHTML='';
     return;
   }
-  if(!data?.length){
+  if(!dataCruda?.length){
+    cardsWrap.innerHTML='<div class="empty">Sin datos todavía</div>';
+    tbody.innerHTML='<tr><td colspan="6" class="empty">Sin datos</td></tr>';
+    return;
+  }
+
+  const ESTADOS_PREVIOS_SLA=['Credenciales Pendientes','Pendiente'];
+  const data=dataCruda.filter(r=>!ESTADOS_PREVIOS_SLA.includes((r.status||'').trim()));
+  if(!data.length){
     cardsWrap.innerHTML='<div class="empty">Sin datos todavía</div>';
     tbody.innerHTML='<tr><td colspan="6" class="empty">Sin datos</td></tr>';
     return;
