@@ -109,11 +109,19 @@ table.table tr:hover td{background:var(--surface2);}
   <header>
     <div class="brand">
       <div class="brand-logo">alleata</div>
-      <div class="brand-sub">· Churn Producto <span style="opacity:.5">v1.0.0</span></div>
+      <div class="brand-sub">· Churn Producto <span style="opacity:.5">v1.2.0</span></div>
     </div>
-    <div class="user-chip">
-      <span id="userLabel">—</span>
-      <button class="btn-logout" onclick="hacerLogout()">Salir</button>
+    <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+      <div style="font-size:11px;color:var(--text-muted);text-align:right;line-height:1.4">
+        <div id="syncStatus">● Datos cargados</div>
+        <div id="syncNext" style="opacity:.7"></div>
+      </div>
+      <button class="btn-logout" onclick="indActualizar()" title="Vuelve a leer Supabase (no consulta SF)">🔄 Actualizar</button>
+      <button class="btn-logout" onclick="indFullSync()" id="btnFullSync" style="background:rgba(29,191,142,.12);border-color:var(--teal);color:var(--teal)" title="Fuerza una sincronización real desde Salesforce antes de refrescar">⚡ Full Sync</button>
+      <div class="user-chip">
+        <span id="userLabel">—</span>
+        <button class="btn-logout" onclick="hacerLogout()">Salir</button>
+      </div>
     </div>
   </header>
 
@@ -137,7 +145,8 @@ table.table tr:hover td{background:var(--surface2);}
       <button class="btn btn-sm" id="cp-btn-recalcular" style="background:rgba(139,92,246,.12);color:#8b5cf6;border:1px solid rgba(139,92,246,.3)" onclick="recalcularChurnProducto()">🔄 Recalcular (consulta SF en vivo)</button>
     </div>
   </div>
-  <div id="cp-resumen-cards" style="margin-bottom:16px"></div>
+  <div id="cp-resumen-cards" style="margin-bottom:8px"></div>
+  <div id="cp-logistica-cards" style="margin-bottom:16px"></div>
   <div class="card" style="padding:0;overflow-x:auto">
     <div class="table-wrap">
     <table class="table">
@@ -170,6 +179,55 @@ table.table tr:hover td{background:var(--surface2);}
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_ANON);
+
+// ── Sync / auto-refresh (mismo patrón que indicadores.html) ──────────────
+const RAILWAY_BASE='https://alleata-agent-production.up.railway.app';
+const AUTOMATION_SECRET='123456';
+const AUTO_REFRESH_MS=10*60*1000;
+let _ultimaActualizacion=null;
+
+function indActualizarLabelSync(){
+  const statusEl=document.getElementById('syncStatus');
+  const nextEl=document.getElementById('syncNext');
+  if(!_ultimaActualizacion||!statusEl)return;
+  const p=n=>String(n).padStart(2,'0');
+  const h=_ultimaActualizacion;
+  statusEl.innerHTML=`<span style="color:var(--teal)">●</span> Actualizado ${p(h.getHours())}:${p(h.getMinutes())}:${p(h.getSeconds())}`;
+  if(nextEl){
+    const prox=new Date(h.getTime()+AUTO_REFRESH_MS);
+    nextEl.textContent=`Próxima auto-actualización: ${p(prox.getHours())}:${p(prox.getMinutes())}`;
+  }
+}
+
+function indActualizar(){
+  loadChurnProducto();
+  _ultimaActualizacion=new Date();
+  indActualizarLabelSync();
+}
+
+async function indFullSync(){
+  const btn=document.getElementById('btnFullSync');
+  const statusEl=document.getElementById('syncStatus');
+  btn.disabled=true; btn.textContent='⏳ Sincronizando...';
+  statusEl.innerHTML='<span style="color:var(--yellow)">● Full Sync en curso…</span>';
+  try{
+    const resp=await fetch(`${RAILWAY_BASE}/automations/run/sf_sync`,{
+      method:'POST',
+      headers:{'x-automation-secret':AUTOMATION_SECRET,'Content-Type':'application/json'}
+    });
+    if(!resp.ok)throw new Error(`HTTP ${resp.status}`);
+    statusEl.innerHTML='<span style="color:var(--teal)">● Sync disparado — actualizando en 8s…</span>';
+    setTimeout(()=>{ indActualizar(); btn.disabled=false; btn.textContent='⚡ Full Sync'; },8000);
+  }catch(err){
+    console.error('[FullSync]',err);
+    statusEl.innerHTML='<span style="color:var(--red)">● Error al iniciar Full Sync</span>';
+    btn.disabled=false; btn.textContent='⚡ Full Sync';
+  }
+}
+
+setInterval(()=>{
+  if(document.getElementById('dashWrap').style.display==='block') indActualizar();
+},AUTO_REFRESH_MS);
 
 // currentProfile — el módulo original usa currentProfile?.rol==='admin' para
 // habilitar "Recalcular". Acá se completa en el login/chequeo de sesión.
@@ -207,6 +265,8 @@ async function hacerLogin(){
   document.getElementById('loginWrap').style.display='none';
   document.getElementById('dashWrap').style.display='block';
   loadChurnProducto();
+  _ultimaActualizacion=new Date();
+  indActualizarLabelSync();
 }
 
 async function hacerLogout(){
@@ -224,6 +284,8 @@ async function chequearSesionExistente(){
   document.getElementById('loginWrap').style.display='none';
   document.getElementById('dashWrap').style.display='block';
   loadChurnProducto();
+  _ultimaActualizacion=new Date();
+  indActualizarLabelSync();
 }
 chequearSesionExistente();
 
@@ -308,8 +370,9 @@ async function loadChurnProductoResumen(){
         ${entries.map(([estado,cant])=>{
           const color=ESTADO_COLORS_NAPSE[estado]||'#6b7280';
           const activo=_cpFiltroEstado===estado;
+          const pct=total?Math.round(cant/total*100):0;
           return`<button onclick="cpFiltrarPorEstado('${estado.replace(/'/g,"\\'")}')" style="text-align:left;cursor:pointer;background:${color}${activo?'30':'18'};border:1px solid ${color}${activo?'':'40'};${activo?`border-color:${color}`:''};border-radius:10px;padding:8px 12px;min-width:100px;font-family:inherit">
-            <div style="font-size:20px;font-weight:800;color:${color}">${cant}</div>
+            <div style="font-size:20px;font-weight:800;color:${color}">${cant} <span style="font-size:11px;font-weight:700;opacity:.75">(${pct}%)</span></div>
             <div style="font-size:10px;color:${activo?color:'var(--text-muted)'};white-space:nowrap;font-weight:${activo?700:400}">${estado}${activo?' ✓':''}</div>
           </button>`;
         }).join('')||`<div style="font-size:12px;color:var(--text-muted)">Sin OTs ${CP_PERFIL_LABEL[_cpPerfil]||_cpPerfil}</div>`}
@@ -318,6 +381,45 @@ async function loadChurnProductoResumen(){
   }catch(e){
     cont.innerHTML=`<div class="card" style="padding:16px;color:var(--red);font-size:12px">No se pudo consultar SF: ${e.message}</div>`;
   }
+  cpRenderDesgloseLogistica();
+}
+
+// Desglose por logística — SOLO de las Recuperadas (18/08, pedido explícito):
+// cuántas terminales se recuperaron por cada canal logístico y cuánto costó
+// esa recuperación. Se calcula del lado del cliente a partir de _cpData
+// (ya cargada de Supabase), no de la consulta en vivo a SF.
+// TODO: el campo de $ todavía no está confirmado — falta ver qué columna de
+// costo tiene desinst_analisis_producto (o si hay que traerla de otra tabla).
+function cpRenderDesgloseLogistica(){
+  const cont=document.getElementById('cp-logistica-cards');
+  if(!cont)return;
+  const recuperadas=_cpData.filter(r=>r.estado_desinst==='Recuperada');
+  if(!recuperadas.length){ cont.innerHTML=''; return; }
+
+  const grupos={ALLEATA:{n:0,gasto:0},CA:{n:0,gasto:0},OTRA:{n:0,gasto:0}};
+  recuperadas.forEach(r=>{
+    const log=(r.logistica||'').toUpperCase().trim();
+    let cat='OTRA';
+    if(log==='ALLEATA')cat='ALLEATA';
+    else if(log==='CORREO ARGENTINO'||log==='CA')cat='CA';
+    grupos[cat].n+=1;
+    grupos[cat].gasto+=r._costoEnvio||0;
+  });
+
+  const LABELS={ALLEATA:'Alleata',CA:'Correo Argentino',OTRA:'Otra logística'};
+  const COLORS={ALLEATA:'#38bdf8',CA:'#e74c3c',OTRA:'#6b7280'};
+  cont.innerHTML=`<div class="card" style="margin-top:10px">
+    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:10px">📦 Por logística — solo Recuperadas (${recuperadas.length})</div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px">
+      ${Object.entries(grupos).map(([cat,v])=>`
+        <div style="background:${COLORS[cat]}18;border:1px solid ${COLORS[cat]}40;border-radius:10px;padding:8px 14px;min-width:140px">
+          <div style="font-size:18px;font-weight:800;color:${COLORS[cat]}">${v.n} <span style="font-size:11px;font-weight:600;opacity:.8">OT${v.n===1?'':'s'}</span></div>
+          <div style="font-size:10px;color:var(--text-muted)">${LABELS[cat]}</div>
+          <div style="font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--text);margin-top:3px">$${Math.round(v.gasto).toLocaleString('es-AR')}</div>
+        </div>`).join('')}
+    </div>
+    <div style="font-size:10px;color:var(--text-muted);margin-top:8px">* Gasto = sf_workorders.costo_envio de la OT de desinstalación (cruce por ot_desinstalacion = workorder_number).</div>
+  </div>`;
 }
 
 function cpFiltrarPorEstado(estado){
@@ -397,7 +499,21 @@ async function loadChurnProducto(){
     return;
   }
   _cpData = data || [];
+
+  // Cruce con sf_workorders para el gasto en $ del desglose por logística
+  // (18/08): desinst_analisis_producto NO tiene columna de costo — el dato
+  // real es sf_workorders.costo_envio (Costo_de_envio__c en SF), asociado
+  // por ot_desinstalacion = workorder_number.
+  const otsDesinst=[...new Set(_cpData.map(r=>r.ot_desinstalacion).filter(Boolean))];
+  if(otsDesinst.length){
+    const{data:costos}=await sb.from('sf_workorders').select('workorder_number,costo_envio').in('workorder_number',otsDesinst);
+    const porOt={};
+    (costos||[]).forEach(o=>{ porOt[o.workorder_number]=Number(o.costo_envio)||0; });
+    _cpData.forEach(r=>{ r._costoEnvio = r.ot_desinstalacion ? (porOt[r.ot_desinstalacion]||0) : 0; });
+  }
+
   cpRenderTabla();
+  cpRenderDesgloseLogistica();
 }
 
 async function recalcularChurnProducto(){
