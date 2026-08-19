@@ -5221,7 +5221,6 @@ function showApp(){
     document.getElementById('nav-ajustes').style.display='flex';
     document.getElementById('nav-section-config').style.display='block';
     document.getElementById('nav-auditoria').style.display='flex';
-    document.getElementById('nav-indicadores').style.display='flex';
   } else {
     // Operadores con envios: mostrar sync info en topbar
     mostrarSFSyncSiAdmin();
@@ -5253,6 +5252,11 @@ function showApp(){
     navRecuperadas.style.display='flex';
     cargarBadgeRecuperadas();
   }
+  // Indicadores — ahora es un módulo habilitable como cualquier otro (antes
+  // era admin-only hardcodeado). Para CEO se muestra siempre: es su
+  // "dashboard" (pedido 19/08 — Diego entra directo acá, ver más abajo).
+  const navIndicadores=document.getElementById('nav-indicadores');
+  if(navIndicadores&&(isAdmin||isCeo||modulos.includes('indicadores')))navIndicadores.style.display='flex';
   ['sims','envios','desinstalaciones','churn-producto','hoja-ruta','napse','store','recuperadas','rollout','rollout-piloto','retencion','terminales','zonas-amba'].forEach(mod=>{
     const el=document.getElementById('nav-'+mod);
     if(el&&!modulos.includes(mod)&&!isAdmin&&!isCeo){el.classList.add('locked');el.onclick=null;}
@@ -5261,6 +5265,11 @@ function showApp(){
   loadConfigSLA(); // cargar config SLA al inicio
   updateDate();loadBadges();loadSimStats();
   const envFecha=document.getElementById('envFecha');if(envFecha)envFecha.value=new Date().toISOString().slice(0,10);
+
+  // Vista CEO (pedido 19/08): "Indicadores" pasa a ser su dashboard — antes
+  // aterrizaba en un Dashboard genérico sin definir (ver nota del 12/07).
+  // Ya no hace falta seguir armando esa vista neutra: entra directo acá.
+  if(isCeo) goTo('indicadores');
 
   // ── Realtime: refrescar módulo activo cuando el sync de Railway actualiza sf_workorders ──
   // FIX parpadeo: los eventos postgres_changes llegan uno POR FILA modificada. Un Full
@@ -5615,6 +5624,7 @@ const ALL_MODS = [
   {id:'store',      label:'🏦 Bancos'},
   {id:'recuperadas',label:'🔁 Recuperadas'},
   {id:'zonas-amba', label:'📍 Zonas AMBA'},
+  {id:'indicadores', label:'📊 Indicadores'},
 ];
 
 async function loadUsers() {

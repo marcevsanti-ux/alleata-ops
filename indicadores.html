@@ -83,7 +83,7 @@
   <header>
     <div class="brand">
       <div class="brand-logo">alleata</div>
-      <div class="brand-sub">· Indicadores Operaciones <span style="opacity:.5">v2.6.0</span></div>
+      <div class="brand-sub">· Indicadores Operaciones <span style="opacity:.5">v2.7.0</span></div>
     </div>
     <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
       <div style="font-size:11px;color:var(--text-dim);text-align:right;line-height:1.4">
@@ -205,7 +205,7 @@
 </div>
 
 <script>
-// indicadores.html — v2.6.0 (18 ago 2026)
+// indicadores.html — v2.7.0 (18 ago 2026)
 // Changelog:
 //  v1.0.0 — versión inicial (costo logística por mes, Logicalis, % Pre-Colecta, SLA Operaciones/Logística)
 //  v1.1.0 — suma Alleata (logística propia) al reporte de costos a $1/envío (costo simbólico,
@@ -278,6 +278,8 @@
 //           (Credenciales Pendientes → Configurar Terminal → ... → Pre-Colecta). SLA Total
 //           también recalculado con el mismo punto de partida para que siga siendo
 //           Operaciones + Logística.
+//  v2.7.0 — deja entrar también al rol "ceo" (antes solo admin/auditor_externo) — pasa a
+//           ser el dashboard de Diego, embebido vía iframe en index.html.
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_ANON);
@@ -369,7 +371,7 @@ async function hacerLogin(){
   // auditor_externo (acceso directo vía este mismo archivo) pueden entrar.
   // Cualquier otro rol, aunque el login de Supabase haya sido válido, no pasa.
   const{data:perfil,error:perfilErr}=await sb.from('profiles').select('nombre,rol').eq('id',data.user.id).maybeSingle();
-  if(perfilErr||!perfil||!['admin','auditor_externo'].includes(perfil.rol)){
+  if(perfilErr||!perfil||!['admin','auditor_externo','ceo'].includes(perfil.rol)){
     errEl.textContent='Esta cuenta no tiene acceso a este portal.';
     await sb.auth.signOut();
     btn.disabled=false;btn.textContent='Ingresar';
@@ -393,7 +395,7 @@ async function chequearSesionExistente(){
   const{data:{session}}=await sb.auth.getSession();
   if(!session)return;
   const{data:perfil}=await sb.from('profiles').select('nombre,rol').eq('id',session.user.id).maybeSingle();
-  if(!perfil||!['admin','auditor_externo'].includes(perfil.rol)){ await sb.auth.signOut(); return; }
+  if(!perfil||!['admin','auditor_externo','ceo'].includes(perfil.rol)){ await sb.auth.signOut(); return; }
   document.getElementById('userLabel').textContent=perfil.nombre||session.user.email;
   document.getElementById('loginWrap').style.display='none';
   document.getElementById('dashWrap').style.display='block';
