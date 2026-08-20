@@ -3498,19 +3498,53 @@ function spbParseInvoiceText(text){
   try{
     const joined=text.replace(/\r/g,'');
 
-    const totalM=joined.match(/TOTAL:?\s*\$?\s*(?:AR\$)?\s*([\d.,]+)/i);
-    const total=totalM?logiParseNum(totalM[1]):0;
+    // SuperBol/SimpleTempo usa formato de número tipo inglés (coma=miles,
+    // punto=decimal: "195,230.50"), al revés del resto del presupuesto
+    // (logiParseNum espera formato argentino "195.230,50"). Parser propio.
+    const spbParseNum=s=>parseFloat(String(s).replace(/,/g,''))||0;
 
-    const nroM=joined.match(/N[°ºo]\.?\s*([A-Za-z]?\d{4,5}-\d{6,8})/i);
-    const numero=nroM?nroM[1].toUpperCase():'—';
+    // Total: prioriza "TOTAL AR$ NNN,NNN.NN" (línea de cierre específica de
+    // este formato) — el regex genérico "TOTAL..." sin esto enganchaba el
+    // encabezado de columna de la tabla de ítems ("...% IVA TOTAL\n1 (07-03"),
+    // capturando "1" como total. Bug real detectado 19/08.
+    let totalM=joined.match(/TOTAL\s+AR\$\s*([\d.,]+)/i);
+    if(!totalM) totalM=joined.match(/TOTAL:?\s*\$?\s*(\d[\d.,]{3,})/i); // exige 4+ caracteres para no comerse un "1" suelto
+    const total=totalM?spbParseNum(totalM[1]):0;
+
+    // N° de factura: primero con el prefijo "N°/Nº/No" (otros proveedores),
+    // si no aparece (caso SuperBol: va pelado debajo de "FACTURA A"), se
+    // busca el patrón NNNNN-NNNNNNNN que sigue a la palabra "FACTURA".
+    let nroM=joined.match(/N[°ºo]\.?\s*([A-Za-z]?\d{4,5}-\d{6,8})/i);
+    let numero=nroM?nroM[1].toUpperCase():null;
+    if(!numero){
+      const facturaM=joined.match(/FACTURA\s+[A-Z]\s*\n?\s*(\d{4,5}-\d{6,8})/i);
+      if(facturaM) numero=facturaM[1];
+    }
+    numero=numero||'—';
 
     const MESES_NUM=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
-    let fechaM=null;
-    if(nroM){
+    // Fecha: "Emisión:" es la etiqueta específica de fecha de emisión en
+    // este formato de factura (SimpleTempo) — mucho más confiable que
+    // "primera fecha del documento", que puede matchear por error un
+    // código de ítem entre paréntesis tipo "(07-03-00005)" leído como
+    // 07-03-0000 (día-mes-año). Bug real detectado 19/08 con una factura
+    // real: esa falsa fecha daba "Marzo" en vez de la emisión real (Agosto).
+    let fechaM=joined.match(/Emisi[oó]n:?\s*(\d{2})[-\/](\d{2})[-\/](\d{4})/i);
+    if(fechaM) fechaM=[fechaM[0],fechaM[1],fechaM[2],fechaM[3]];
+    if(!fechaM && nroM){
       const despuesDeNro=joined.slice(nroM.index+nroM[0].length, nroM.index+nroM[0].length+60);
       fechaM=despuesDeNro.match(/(\d{2})[-\/](\d{2})[-\/](\d{4})/);
     }
-    if(!fechaM) fechaM=joined.match(/(\d{2})[-\/](\d{2})[-\/](\d{4})/);
+    // Último fallback: primera fecha "suelta" del documento, pero NUNCA
+    // una que esté pegada a un paréntesis o a otros dígitos+guión antes
+    // (para no comerse códigos de ítem tipo "(07-03-00005)").
+    if(!fechaM){
+      const candidatas=[...joined.matchAll(/(\d{2})[-\/](\d{2})[-\/](\d{4})/g)];
+      fechaM=candidatas.find(c=>{
+        const antes=joined.slice(Math.max(0,c.index-2),c.index);
+        return !/[(\d-]$/.test(antes);
+      })||null;
+    }
     const fecha=fechaM?`${fechaM[1]}-${fechaM[2]}-${fechaM[3]}`:'—';
     let mesFactura=null;
     if(fechaM){
@@ -3519,7 +3553,7 @@ function spbParseInvoiceText(text){
 
     // Cantidad de unidades — "CANT. TOTAL DE UNIDADES: 500.00"
     const cantM=joined.match(/CANT\.?\s*TOTAL\s*DE\s*UNIDADES:?\s*([\d.,]+)/i);
-    const cantidad=cantM?Math.round(logiParseNum(cantM[1])):0;
+    const cantidad=cantM?Math.round(spbParseNum(cantM[1])):0;
 
     return {numero, fecha, mesFactura, cantidad, total};
   }catch(e){ return null; }
