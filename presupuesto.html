@@ -377,6 +377,7 @@ const DATA = [
   {id:'limpieza',  r:'INSUMOS',    p:'CLP SRL (Casa Thames)',       d:'Insumos de limpieza',        prev:{ene:0,feb:0,mar:0,abr:0,may:0,jun:50000,jul:0,ago:50000},                      real:{ene:0,feb:0,mar:0,abr:0,may:0,jun:0,jul:0,ago:0}},
   {id:'coto',      r:'INSUMOS',    p:'COTO CICSA',                  d:'Insumos varios (limpieza / control de plagas)', prev:{ene:0,feb:0,mar:0,abr:0,may:0,jun:0,jul:0,ago:0}, real:{ene:0,feb:0,mar:0,abr:0,may:0,jun:0,jul:0,ago:0}},
   {id:'mercadolibre', r:'INSUMOS', p:'Mercado Libre',               d:'Compras varias vía ML (proveedores distintos)', prev:{ene:0,feb:0,mar:0,abr:0,may:0,jun:0,jul:0,ago:0}, real:{ene:0,feb:0,mar:0,abr:0,may:0,jun:0,jul:0,ago:0}},
+  {id:'superbol',  r:'INSUMOS',    p:'SuperBol SRL',                d:'Insumos de embalaje (sobres e-commerce)', prev:{ene:0,feb:0,mar:0,abr:0,may:0,jun:0,jul:0,ago:0}, real:{ene:0,feb:0,mar:0,abr:0,may:0,jun:0,jul:0,ago:0}},
   {id:'botmaker',  r:'SISTEMAS',   p:'Botmaker',                    d:'Chatbot',                    prev:{ene:0,feb:300000,mar:0,abr:0,may:0,jun:213000,jul:355000,ago:355000},            real:{ene:217569,feb:214560,mar:0,abr:0,may:0,jun:0,jul:0,ago:0}},
   {id:'phoneiq',   r:'SISTEMAS',   p:'Phone IQ',                    d:'Central telefónica virtual', prev:{ene:0,feb:1254000,mar:0,abr:0,may:0,jun:940000,jul:940000,ago:940000},           real:{ene:0,feb:0,mar:0,abr:0,may:0,jun:0,jul:0,ago:0}},
   {id:'ifx',       r:'SISTEMAS',   p:'IFX Networks',                d:'Licencia Office 365',        prev:{ene:0,feb:0,mar:0,abr:0,may:0,jun:250000,jul:250000,ago:250000},                real:{ene:229311,feb:218051,mar:0,abr:0,may:0,jun:212841,jul:0,ago:0}},
@@ -553,6 +554,7 @@ function renderTabla(items, filtro) {
       const isEpsa=it.id==='epsa';
       const isCoto=it.id==='coto';
       const isML=it.id==='mercadolibre';
+      const isSpb=it.id==='superbol';
       // Nro facturas para columna
       const logiFacs = isLogi ? logiGetFacturas(mes) : [];
       const napseFacsRow = isNapse ? (napseFacturas[mes]||[]) : [];
@@ -561,6 +563,7 @@ function renderTabla(items, filtro) {
       const epsaFacsRow = isEpsa ? (epsaFacturas[mes]||[]) : [];
       const cotoFacsRow = isCoto ? (cotoFacturas[mes]||[]) : [];
       const mlFacsRow = isML ? (mlFacturas[mes]||[]) : [];
+      const spbFacsRow = isSpb ? (spbFacturas[mes]||[]) : [];
       // Envíos del mes (solo paquetería, no viajes de personas de Cabify "varios")
       if(isEpsa) totalEnvios += epsaFacsRow.reduce((s,f)=>s+(f.cantidadTotal||0),0);
       if(isCA) totalEnvios += caFacsRow.reduce((s,f)=>s+(f.cantidadAlleata||0),0);
@@ -608,6 +611,12 @@ function renderTabla(items, filtro) {
             <span style="font-family:'JetBrains Mono',monospace;font-size:10px;background:rgba(29,191,142,.08);color:var(--teal);padding:1px 6px;border-radius:4px;border:1px solid rgba(29,191,142,.2);display:block">${f.numero}</span>
             <span style="font-size:9px;color:var(--text-muted);margin-top:2px;display:block">${f.proveedor||'—'}</span>
           </div>`).join('');
+      else if(isSpb && spbFacsRow.length)
+        nroFacCell = spbFacsRow.map(f=>`
+          <div style="display:inline-block;margin:2px;vertical-align:top;text-align:center">
+            <span style="font-family:'JetBrains Mono',monospace;font-size:10px;background:rgba(29,191,142,.08);color:var(--teal);padding:1px 6px;border-radius:4px;border:1px solid rgba(29,191,142,.2);display:block">${f.numero}</span>
+            ${f.cantidad?`<span style="font-size:9px;color:var(--text-muted);margin-top:2px;display:block">${f.cantidad} unid.</span>`:''}
+          </div>`).join('');
       else if(isClaro && claroData[mes])
         nroFacCell = getChip(claroData[mes].nroFac||'—', claroData[mes].nroFac&&claroData[mes].nroFac!=='—'?'Claro':'');
       else if(isTelecom && telecomData[mes])
@@ -632,7 +641,7 @@ function renderTabla(items, filtro) {
           <td class="mono" style="color:${dc}">${(prev||real)?fmtDesv(desv,prev):'—'}</td>
           <td style="text-align:center">${pctBadge}</td>
           <td style="text-align:center">
-            <button class="btn-edit${(isLogi||isClaro)?' logi':''}" onclick="${isLogi?`openLogiModal('${mes}')`:isClaro?`openClaroModal('${mes}')`:isNapse?`openNapseModal('${mes}')`:isTelecom?`openTelecomModal('${mes}')`:isAmazon?`openAmazonModal('${mes}')`:isCA?`openCaModal('${mes}')`:isCabify?`openCabifyModal('${mes}')`:isEpsa?`openEpsaModal('${mes}')`:isCoto?`openCotoModal('${mes}')`:isML?`openMlModal('${mes}')`:`openModal('${it.id}','${it.p}','${it.d}')`}">${(isLogi||isClaro||isNapse||isTelecom||isAmazon||isCA||isCabify||isEpsa||isCoto||isML)?'📎':'✏️'}</button>
+            <button class="btn-edit${(isLogi||isClaro)?' logi':''}" onclick="${isLogi?`openLogiModal('${mes}')`:isClaro?`openClaroModal('${mes}')`:isNapse?`openNapseModal('${mes}')`:isTelecom?`openTelecomModal('${mes}')`:isAmazon?`openAmazonModal('${mes}')`:isCA?`openCaModal('${mes}')`:isCabify?`openCabifyModal('${mes}')`:isEpsa?`openEpsaModal('${mes}')`:isCoto?`openCotoModal('${mes}')`:isML?`openMlModal('${mes}')`:isSpb?`openSpbModal('${mes}')`:`openModal('${it.id}','${it.p}','${it.d}')`}">${(isLogi||isClaro||isNapse||isTelecom||isAmazon||isCA||isCabify||isEpsa||isCoto||isML||isSpb)?'📎':'✏️'}</button>
           </td>
         </tr>`;
     });
@@ -1303,6 +1312,18 @@ let cotoPendingTicket = null; // ticket recién leído, aún sin confirmar
 const mlFacturas = {};
 let mlMesActual = 'jun';
 let mlPendingFactura = null;
+
+// SuperBol SRL / Insumos — proveedor dedicado (embalaje: sobres e-commerce).
+// A diferencia de Mercado Libre (multi-proveedor genérico), acá el proveedor
+// es siempre SuperBol — pero además del total hay que guardar la CANTIDAD
+// de unidades compradas (columna "CANT." del ítem, o "CANT. TOTAL DE
+// UNIDADES:" al pie de la factura — más fácil de matchear por regex porque
+// es una etiqueta única, sin ambigüedad con otras columnas numéricas).
+// Reutiliza la columna `terminales` de presupuesto_facturas (ya se usa así
+// para "cantidad" en Correo Argentino/Cabify/EPSA/Coto — mismo patrón).
+const spbFacturas = {};
+let spbMesActual = 'jun';
+let spbPendingFactura = null;
 
 let logiCurrentTC     = 1428;
 // (logiPendingFac declarado arriba)
@@ -3390,6 +3411,287 @@ async function mlEliminarFactura(numero){
 }
 
 function mlShowMsg(txt,type){ const e=document.getElementById('mlMsgFile');if(e){e.className='up-msg '+type;e.textContent=txt;} }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SUPERBOL SRL / Insumos — proveedor dedicado (embalaje: sobres e-commerce).
+// Clon del flujo de Mercado Libre, con dos diferencias:
+//  1) Proveedor fijo (no hay campo editable "Proveedor" en el preview).
+//  2) Se parsea y guarda además la CANTIDAD de unidades ("CANT. TOTAL DE
+//     UNIDADES:" al pie de la factura SuperBol/SimpleTempo), en la columna
+//     `terminales` de presupuesto_facturas (mismo patrón que otros proveedores).
+// ═══════════════════════════════════════════════════════════════════════════
+
+function openSpbModal(m){
+  spbMesActual=m;
+  document.getElementById('spbBg').classList.add('open');
+  document.getElementById('spbSub').textContent=MESES_LABEL[m]+' 2026 · Insumos (SuperBol SRL — sobres e-commerce)';
+  spbResetForm();
+  spbRenderKPIs();
+  spbRenderFacturas();
+}
+function closeSpbModal(){
+  document.getElementById('spbBg').classList.remove('open');
+  spbSyncReal(); render();
+}
+function spbResetForm(){
+  const inp=document.getElementById('spbFileInp'); if(inp) inp.value='';
+  document.getElementById('spbZoneFile')?.classList.remove('loaded');
+  const fn=document.getElementById('spbFileName'); if(fn){fn.style.display='none';fn.textContent='';}
+  const msg=document.getElementById('spbMsgFile'); if(msg){msg.className='up-msg';msg.textContent='';}
+  const prev=document.getElementById('spbPendingWrap'); if(prev){prev.style.display='none';prev.innerHTML='';}
+  spbPendingFactura=null;
+}
+function spbSyncReal(){
+  MESES.forEach(m=>{
+    const facs=spbFacturas[m]||[];
+    const real=facs.reduce((s,f)=>s+f.total,0);
+    if(real>0) reales['superbol_'+m]=real;
+  });
+}
+function spbRenderKPIs(){
+  const m=spbMesActual;
+  const prev=DATA.find(i=>i.id==='superbol').prev[m]||0;
+  const facs=spbFacturas[m]||[];
+  const real=facs.reduce((s,f)=>s+f.total,0);
+  const totalUnidades=facs.reduce((s,f)=>s+(f.cantidad||0),0);
+  const desvPct=prev>0?((real-prev)/prev)*100:0;
+  const el=document.getElementById('spbKpis'); if(!el) return;
+  el.innerHTML=[
+    {label:'PREV '+MESES_LABEL[m].substring(0,3).toUpperCase()+' 26', val:fmt(prev)||'—', sub:'presupuestado', cls:''},
+    {label:'REAL', val:real>0?fmt(real):'—', sub:facs.length+' factura(s) · '+totalUnidades+' unid.', cls:real>0?'green':''},
+    {label:'DESVÍO', val:real>0?fmtPct(desvPct):'—', sub:desvPct<=0?'por debajo':'por encima', cls:real>0?(Math.abs(desvPct)>20?'warn':'ok'):''},
+  ].map(k=>`<div class="lk"><div class="lk-label">${k.label}</div><div class="lk-val ${k.cls}">${k.val}</div><div class="lk-sub">${k.sub}</div></div>`).join('');
+}
+
+function spbRenderFacturas(){
+  const m=spbMesActual;
+  const facs=spbFacturas[m]||[];
+  const wrap=document.getElementById('spbFacWrap');
+  const sec=document.getElementById('spbFacSecLbl');
+  const badge=document.getElementById('spbFacBadge');
+  if(!wrap) return;
+  if(!facs.length){ wrap.innerHTML=''; if(sec) sec.style.display='none'; return; }
+  if(sec) sec.style.display='flex';
+  if(badge) badge.textContent=facs.length+' factura'+(facs.length!==1?'s':'');
+  wrap.innerHTML=facs.map(f=>`
+    <div style="background:var(--navy-900);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px">
+        <div>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700">${f.numero}</span>
+          <span style="font-size:11px;color:var(--text-muted);margin-left:8px">${f.fecha}${f.cantidad?' · '+f.cantidad+' unid.':''}</span>
+        </div>
+        <div style="text-align:right;display:flex;align-items:center;gap:10px">
+          <div style="font-family:'JetBrains Mono',monospace;font-weight:800;color:var(--teal)">${fmt(f.total)}</div>
+          <button onclick="spbEliminarFactura('${f.numero}')" title="Eliminar factura" class="btn-del-fac" style="background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.25);color:#f87171;border-radius:6px;padding:5px 9px;cursor:pointer;font-size:12px">🗑️</button>
+        </div>
+      </div>
+      ${presupRenderAdjuntosConBoton(f.adjuntos, ['img','pdf'], 'spbAdjuntarArchivo', f.numero)}
+    </div>`).join('');
+}
+
+// Mismo parser base que Mercado Libre (factura AFIP estándar), más la
+// extracción de cantidad. "CANT. TOTAL DE UNIDADES:" es una etiqueta fija
+// que ya vimos repetirse en las facturas SuperBol (generadas con
+// SimpleTempo) — mucho más confiable que leer la columna CANT. de la tabla
+// de ítems, que tiene varios números pegados (precio/subtotal/IVA al lado).
+function spbParseInvoiceText(text){
+  try{
+    const joined=text.replace(/\r/g,'');
+
+    const totalM=joined.match(/TOTAL:?\s*\$?\s*(?:AR\$)?\s*([\d.,]+)/i);
+    const total=totalM?logiParseNum(totalM[1]):0;
+
+    const nroM=joined.match(/N[°ºo]\.?\s*([A-Za-z]?\d{4,5}-\d{6,8})/i);
+    const numero=nroM?nroM[1].toUpperCase():'—';
+
+    const MESES_NUM=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+    let fechaM=null;
+    if(nroM){
+      const despuesDeNro=joined.slice(nroM.index+nroM[0].length, nroM.index+nroM[0].length+60);
+      fechaM=despuesDeNro.match(/(\d{2})[-\/](\d{2})[-\/](\d{4})/);
+    }
+    if(!fechaM) fechaM=joined.match(/(\d{2})[-\/](\d{2})[-\/](\d{4})/);
+    const fecha=fechaM?`${fechaM[1]}-${fechaM[2]}-${fechaM[3]}`:'—';
+    let mesFactura=null;
+    if(fechaM){
+      mesFactura=MESES_NUM[parseInt(fechaM[2],10)-1]||null;
+    }
+
+    // Cantidad de unidades — "CANT. TOTAL DE UNIDADES: 500.00"
+    const cantM=joined.match(/CANT\.?\s*TOTAL\s*DE\s*UNIDADES:?\s*([\d.,]+)/i);
+    const cantidad=cantM?Math.round(logiParseNum(cantM[1])):0;
+
+    return {numero, fecha, mesFactura, cantidad, total};
+  }catch(e){ return null; }
+}
+
+async function spbHandleFile(input){
+  const file=input.files[0]; if(!file) return;
+  document.getElementById('spbFileName').textContent=file.name;
+  document.getElementById('spbFileName').style.display='block';
+  document.getElementById('spbZoneFile').classList.add('loaded');
+  const esPdf=file.type==='application/pdf'||/\.pdf$/i.test(file.name);
+  spbShowMsg(esPdf?'📄 Leyendo el PDF...':'🤖 Leyendo la imagen (OCR)...','ok');
+  try{
+    let rawText='';
+    if(esPdf){
+      const buf=await file.arrayBuffer();
+      const pdf=await pdfjsLib.getDocument({data:buf}).promise;
+      for(let i=1;i<=pdf.numPages;i++){
+        const pg=await pdf.getPage(i);
+        const ct=await pg.getTextContent();
+        rawText+=ct.items.map(it=>it.str).join(' ')+'\n';
+      }
+    } else {
+      const base64=await fileToBase64(file);
+      rawText=await cotoCallVisionOCR(base64, file.type||'image/jpeg');
+    }
+    const parsed=spbParseInvoiceText(rawText);
+    if(!parsed){ spbShowMsg('No se pudo leer el archivo. Completá los datos a mano.','err'); }
+
+    spbPendingFactura={
+      numero:parsed?.numero||'—',
+      fecha:parsed?.fecha||'—',
+      cantidad:Number(parsed?.cantidad)||0,
+      total:Number(parsed?.total)||0,
+      rawText,
+      _file:file,
+    };
+
+    let mesFac=spbMesActual;
+    if(parsed?.mesFactura) mesFac=parsed.mesFactura;
+    const mesOk=mesFac===spbMesActual;
+
+    spbRenderPending();
+    if(!mesOk){
+      spbShowMsg('⛔ Esta factura parece ser de '+MESES_LABEL[mesFac]+' pero estás cargando '+MESES_LABEL[spbMesActual]+'. Revisá la fecha abajo (podés corregirla si el parseo se equivocó).','err');
+    } else if(parsed?.total){
+      spbShowMsg('✓ Factura leída · Total: '+fmt(parsed.total)+(parsed.cantidad?' · '+parsed.cantidad+' unidades':' · ⚠️ no se detectó la cantidad, completala a mano')+' · revisá los datos antes de confirmar','ok');
+    } else {
+      spbShowMsg('⚠️ No se detectó el total automáticamente. Completalo a mano.','err');
+    }
+  }catch(e){
+    spbShowMsg('Error leyendo el archivo: '+e.message+' — completá los datos a mano.','err');
+    spbPendingFactura={numero:'—',fecha:'—',cantidad:0,total:0,rawText:'',_file:file};
+    spbRenderPending();
+  }
+}
+
+function spbRenderPending(){
+  const t=spbPendingFactura;
+  const wrap=document.getElementById('spbPendingWrap');
+  if(!wrap) return;
+  if(!t){ wrap.style.display='none'; wrap.innerHTML=''; return; }
+  wrap.style.display='block';
+  wrap.innerHTML=`
+    <div style="background:var(--navy-900);border:1px solid var(--border2);border-radius:10px;padding:14px;margin-top:10px">
+      <div class="ml-field-row" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+        <div>
+          <label style="font-size:10px;color:var(--text-muted);display:block;margin-bottom:3px">N° de factura</label>
+          <input type="text" value="${(t.numero||'').replace(/"/g,'&quot;')}" oninput="spbPendingFactura.numero=this.value" style="width:100%;background:var(--navy-800);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:12px;padding:6px 8px;box-sizing:border-box">
+        </div>
+        <div>
+          <label style="font-size:10px;color:var(--text-muted);display:block;margin-bottom:3px">Fecha (DD-MM-YYYY)</label>
+          <input type="text" value="${(t.fecha||'').replace(/"/g,'&quot;')}" oninput="spbPendingFactura.fecha=this.value" style="width:100%;background:var(--navy-800);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:12px;padding:6px 8px;box-sizing:border-box">
+        </div>
+        <div>
+          <label style="font-size:10px;color:var(--text-muted);display:block;margin-bottom:3px">Cantidad (unidades)</label>
+          <input type="number" step="1" value="${t.cantidad}" oninput="spbPendingFactura.cantidad=parseInt(this.value)||0" style="width:100%;background:var(--navy-800);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:12px;padding:6px 8px;box-sizing:border-box;text-align:right">
+        </div>
+        <div>
+          <label style="font-size:10px;color:var(--text-muted);display:block;margin-bottom:3px">Total ($)</label>
+          <input type="number" step="0.01" value="${t.total}" oninput="spbPendingFactura.total=parseFloat(this.value)||0" style="width:100%;background:var(--navy-800);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:12px;padding:6px 8px;box-sizing:border-box;text-align:right">
+        </div>
+      </div>
+      ${t.rawText?`<details style="margin-bottom:10px"><summary style="cursor:pointer;font-size:10px;color:var(--text-muted)">Ver texto crudo leído (por si algún dato quedó mal)</summary><pre style="white-space:pre-wrap;font-size:10px;color:var(--text-muted);background:var(--navy-800);border:1px solid var(--border2);padding:8px;border-radius:6px;margin-top:6px;max-height:180px;overflow:auto">${t.rawText.replace(/</g,'&lt;')}</pre></details>`:''}
+      <button class="btn-confirm" onclick="spbGuardar()" style="display:block">✓ Confirmar y guardar REAL</button>
+    </div>`;
+}
+
+async function spbGuardar(){
+  if(isReadonlyBlocked()) return;
+  const t=spbPendingFactura; if(!t) return;
+  if(!t.total){ spbShowMsg('El total no puede ser $0 — completalo antes de guardar.','err'); return; }
+  const facsExist=spbFacturas[spbMesActual]||[];
+  if(facsExist.find(f=>f.numero===t.numero && t.numero!=='—')){
+    spbShowMsg('⚠️ Ya cargaste la factura '+t.numero+' este mes.','err');
+    return;
+  }
+
+  let mesFac=spbMesActual;
+  const fm=(t.fecha||'').match(/^\d{2}-(\d{2})-\d{4}$/);
+  if(fm && CA_MES_MAP[fm[1]]) mesFac=CA_MES_MAP[fm[1]];
+  if(mesFac!==spbMesActual){
+    spbMesActual=mesFac;
+    document.getElementById('spbSub').textContent=MESES_LABEL[mesFac]+' 2026 · Insumos (SuperBol SRL) · (mes detectado de la fecha de la factura)';
+  }
+
+  const factura={
+    numero:t.numero, fecha:t.fecha, cantidad:t.cantidad||0, total:t.total,
+    adjuntos:await presupSubirAdjuntos([{file:t._file, etiqueta:/\.pdf$/i.test(t._file?.name||'')?'pdf':'img'}], 'superbol', spbMesActual),
+  };
+  if(!spbFacturas[spbMesActual]) spbFacturas[spbMesActual]=[];
+  spbFacturas[spbMesActual].push(factura);
+  reales['superbol_'+spbMesActual]=(spbFacturas[spbMesActual]||[]).reduce((s,f)=>s+f.total,0);
+
+  if(!currentUser){
+    spbShowMsg('⚠️ No hay sesión activa: se guardó solo en este navegador, NO en la base.','err');
+  } else {
+    const ok=await spbSaveDB(factura);
+    if(!ok){ spbShowMsg('⛔ Error al guardar en la base de datos. Revisá la consola (F12).','err'); return; }
+  }
+  showToast('✅ SuperBol '+factura.numero+' guardado · '+fmt(factura.total)+(factura.cantidad?' · '+factura.cantidad+' unid.':''));
+  spbResetForm();
+  spbRenderKPIs();
+  spbRenderFacturas();
+  render();
+}
+
+async function spbSaveDB(factura){
+  const row={
+    user_id:currentUser.id, mes:spbMesActual, proveedor:'superbol',
+    numero:factura.numero, fecha:factura.fecha, vto:factura.fecha,
+    descripcion:'SuperBol SRL · '+(factura.cantidad||0)+' unidades',
+    tc:1, subtotal_usd:factura.total, iva_usd:0, otros_imp:0, total_usd:factura.total,
+    terminales:factura.cantidad||0,
+    adjuntos:factura.adjuntos||[]
+  };
+  const {error}=await sb.from('presupuesto_facturas').upsert(row,{onConflict:'numero,mes'});
+  if(error){ console.error('SuperBol DB error:',error); return false; }
+  return true;
+}
+
+async function spbAdjuntarArchivo(numero, tipo){
+  const t=(spbFacturas[spbMesActual]||[]).find(f=>f.numero===numero);
+  if(!t) return;
+  presupAdjuntarArchivo(t, 'superbol', spbMesActual, tipo, async ()=>{
+    if(currentUser) await spbSaveDB(t);
+    spbRenderFacturas();
+  });
+}
+
+async function spbEliminarFactura(numero){
+  if(isReadonlyBlocked()) return;
+  const m=spbMesActual;
+  const facs=spbFacturas[m]||[];
+  const f=facs.find(x=>x.numero===numero);
+  if(!f) return;
+  if(!confirm('¿Eliminar la factura '+numero+' ('+fmt(f.total)+') de '+MESES_LABEL[m]+'? Esta acción no se puede deshacer.')) return;
+  if(currentUser){
+    const {error}=await sb.from('presupuesto_facturas').delete().eq('numero',numero).eq('mes',m).eq('proveedor','superbol');
+    if(error){ showToast('⛔ Error al eliminar en la base de datos. Revisá la consola (F12).'); console.error('SuperBol delete error:',error); return; }
+  }
+  spbFacturas[m]=facs.filter(x=>x.numero!==numero);
+  const real=(spbFacturas[m]||[]).reduce((s,x)=>s+x.total,0);
+  if(real>0) reales['superbol_'+m]=real; else delete reales['superbol_'+m];
+  showToast('🗑️ Factura '+numero+' eliminada');
+  spbRenderKPIs();
+  spbRenderFacturas();
+  render();
+}
+
+function spbShowMsg(txt,type){ const e=document.getElementById('spbMsgFile');if(e){e.className='up-msg '+type;e.textContent=txt;} }
+
 // ── Fin Cabify + CALOG ────────────────────────────────────────────────────────
 
 // ── Telecom Personal state ───────────────────────────────────────────────────
@@ -4216,6 +4518,24 @@ async function loadFacturasFromDB() {
     });
     mlSyncReal();
   }
+  // Cargar facturas SuperBol (guardadas en presupuesto_facturas con proveedor='superbol')
+  const { data: spbData, error: spbErr } = await sb.from('presupuesto_facturas')
+    .select('*').eq('proveedor','superbol');
+  if(!spbErr && spbData && spbData.length){
+    spbData.forEach(row=>{
+      const m=row.mes;
+      if(!spbFacturas[m]) spbFacturas[m]=[];
+      if(!spbFacturas[m].find(f=>f.numero===row.numero)){
+        spbFacturas[m].push({
+          numero:row.numero, fecha:row.fecha,
+          cantidad:row.terminales||0,
+          total:row.total_usd,
+          adjuntos:row.adjuntos||[]
+        });
+      }
+    });
+    spbSyncReal();
+  }
   render();
   postResumenAlPortal();
 }
@@ -4594,6 +4914,41 @@ logiAgregar = async function() {
 
     <div class="logi-footer">
       <button class="btn-cancel" onclick="closeMlModal()">Cerrar</button>
+    </div>
+  </div>
+</div>
+<!-- Modal SuperBol SRL / Insumos (embalaje — sobres e-commerce) -->
+<div class="claro-bg" id="spbBg">
+  <div class="claro-modal">
+    <h3>SuperBol SRL (Insumos)</h3>
+    <p class="msub" id="spbSub" style="font-size:12px;color:var(--text-muted);margin-bottom:22px"></p>
+
+    <div class="claro-kpis" id="spbKpis" style="grid-template-columns:repeat(3,1fr)"></div>
+
+    <div style="font-size:11px;color:var(--text-muted);background:var(--navy-900);border:1px solid var(--border2);border-radius:9px;padding:10px 14px;margin-bottom:16px">
+      💡 Subí la factura (PDF o foto) de SuperBol — se lee automáticamente el total y la cantidad de unidades ("CANT. TOTAL DE UNIDADES" al pie de la factura). Revisá los datos antes de confirmar.
+    </div>
+
+    <div class="up-title">📎 Factura (PDF o foto)</div>
+    <div class="up-zone" id="spbZoneFile"
+      ondragover="event.preventDefault();this.classList.add('drag')"
+      ondragleave="this.classList.remove('drag')"
+      ondrop="this.classList.remove('drag');spbHandleFile({files:event.dataTransfer.files});event.preventDefault()">
+      <input type="file" id="spbFileInp" accept="image/*,application/pdf" onchange="spbHandleFile(this)">
+      <div class="uz-icon">📦</div>
+      <div class="uz-lbl">Soltá o seleccioná la factura</div>
+      <div class="uz-sub">PDF o JPG/PNG — se lee automáticamente</div>
+      <div class="uz-fn" id="spbFileName"></div>
+    </div>
+    <div class="up-msg" id="spbMsgFile"></div>
+
+    <div id="spbPendingWrap" style="display:none"></div>
+
+    <div class="sec-lbl" id="spbFacSecLbl" style="display:none">Facturas cargadas este mes <span></span> <span id="spbFacBadge" style="background:rgba(29,191,142,.15);color:var(--teal);padding:1px 10px;border-radius:20px;font-size:10px;font-weight:700"></span></div>
+    <div id="spbFacWrap"></div>
+
+    <div class="logi-footer">
+      <button class="btn-cancel" onclick="closeSpbModal()">Cerrar</button>
     </div>
   </div>
 </div>
