@@ -2082,19 +2082,33 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
      módulo con permisos por profiles.modulos como cualquier otro, para
      poder darle acceso a Andres/Gonzalo sin exponerles Contactos/Grupos/
      Reglas de Ally. -->
-<!-- Despacho EPSA — pedido 19/08. Lista todas las OTs con logistica=EPSA y
-     status=Pre-Colecta (las que EPSA pasa a retirar). Botón FIN COLECTA solo
-     genera el Excel modelo (mismo formato que exporta Salesforce nativamente:
-     "Pre-Colecta todas EPSA") — NO cambia el estado de las OTs. -->
+<!-- Despacho EPSA — pedido 19/08, v2 pedido 19/08: el flujo real es escanear
+     el código de barras del rótulo con un lector físico (USB/BT, funciona
+     como teclado: tipea el código + Enter) a medida que se van juntando los
+     paquetes — igual que la hoja de ruta mobile, pero acá con lector físico
+     en vez de cámara. FIN COLECTA exporta SOLO lo escaneado, no todo el
+     universo de Pre-Colecta EPSA. No cambia el estado de ninguna OT. -->
 <div class="module" id="mod-despacho-epsa">
-  <div style="margin-bottom:14px;display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px">
-    <div>
-      <div class="sec-title"><div class="sec-dot" style="background:#1a9fd4"></div>📋 Despacho EPSA — colecta</div>
-      <div style="font-size:12px;color:var(--text-muted);margin-top:4px">OTs con logística EPSA en estado Pre-Colecta — las que EPSA pasa a retirar. "FIN COLECTA" genera la planilla en el mismo formato que exporta Salesforce, no cambia el estado de ninguna OT.</div>
+  <div style="margin-bottom:14px">
+    <div class="sec-title"><div class="sec-dot" style="background:#1a9fd4"></div>📋 Despacho EPSA — colecta</div>
+    <div style="font-size:12px;color:var(--text-muted);margin-top:4px">Escaneá el código de barras del rótulo con el lector a medida que juntás cada paquete — se va marcando solo. "FIN COLECTA" exporta la planilla SOLO con lo escaneado (no toca el estado de ninguna OT).</div>
+  </div>
+
+  <div class="card" style="margin-bottom:14px;background:var(--surface2)">
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <span style="font-size:20px">🔫</span>
+      <input id="depsa-scan-input" class="input" placeholder="Escaneá acá — el lector tipea el código y Enter solo"
+        style="flex:1;min-width:260px;font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:700"
+        onkeydown="if(event.key==='Enter'){event.preventDefault();depsaProcesarScan(this.value);this.value='';}"
+        autocomplete="off">
+      <span id="depsa-scan-feedback" style="font-size:13px;font-weight:700;min-width:160px"></span>
     </div>
-    <div style="display:flex;align-items:center;gap:10px">
-      <span id="depsa-count" style="font-size:13px;color:var(--text-muted)"></span>
-      <button class="btn btn-sm" onclick="cargarDespachoEpsa()" style="width:auto;background:var(--surface2);color:var(--text);border:1px solid var(--border2)">↺ Actualizar</button>
+  </div>
+
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:10px">
+    <span id="depsa-count" style="font-size:14px;font-weight:700;color:var(--text)"></span>
+    <div style="display:flex;gap:10px">
+      <button class="btn btn-sm" onclick="cargarDespachoEpsa()" style="width:auto;background:var(--surface2);color:var(--text);border:1px solid var(--border2)">↺ Actualizar lista</button>
       <button class="btn btn-sm" id="depsa-btn-fin" onclick="finColectaEpsa()" style="width:auto;background:#000;color:#fff;font-weight:900">🏁 FIN COLECTA</button>
     </div>
   </div>
@@ -2102,10 +2116,10 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     <div class="table-wrap">
     <table class="table">
       <thead><tr>
-        <th>OT</th><th>Tipo</th><th>Responsable</th><th>Cuenta</th><th>Ciudad / Provincia</th><th>Fecha creación</th>
+        <th></th><th>OT</th><th>Tipo</th><th>Responsable</th><th>Cuenta</th><th>Ciudad / Provincia</th><th>Fecha creación</th>
       </tr></thead>
       <tbody id="depsa-tbody">
-        <tr><td colspan="6" style="text-align:center;padding:30px;color:var(--text-muted)">Cargando...</td></tr>
+        <tr><td colspan="7" style="text-align:center;padding:30px;color:var(--text-muted)">Cargando...</td></tr>
       </tbody>
     </table>
     </div>
@@ -2113,6 +2127,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
 </div>
 
 <div class="module" id="mod-zonas-amba">
+
   <div style="margin-bottom:14px">
     <div class="sec-title"><div class="sec-dot" style="background:#8b5cf6"></div>📍 Zonas AMBA — correcciones manuales por CP</div>
     <div style="font-size:12px;color:var(--text-muted);margin-top:4px">Cuando el clasificador automático (rango de CP por partido + nombre de localidad) se equivoca o no reconoce un CP nuevo, cargalo acá una vez — se respeta siempre, antes que cualquier otra regla, en todo el sistema (rótulo, Desinstalaciones, monitor de entregas).</div>
@@ -14447,14 +14462,14 @@ function _puedeZonasAmba(){
   return rol==='admin' || modulos.includes('zonas-amba');
 }
 
-// ── Despacho EPSA (pedido 19/08) ─────────────────────────────────────────
-let _depsaData=[];
+// ── Despacho EPSA (pedido 19/08, v2 con lector físico pedido 19/08) ──────
+let _depsaData=[];       // universo completo: Pre-Colecta EPSA en Supabase
+let _depsaColectadas=new Set(); // ids de sf_workorders ya escaneados esta sesión
 
 async function cargarDespachoEpsa(){
   const tbody=document.getElementById('depsa-tbody');
-  const countEl=document.getElementById('depsa-count');
   if(!tbody)return;
-  tbody.innerHTML='<tr><td colspan="6" style="text-align:center;padding:30px;color:var(--text-muted)">Cargando...</td></tr>';
+  tbody.innerHTML='<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--text-muted)">Cargando...</td></tr>';
 
   const{data,error}=await sb.from('sf_workorders')
     .select('id,sf_id,workorder_number,record_type,status,responsable,propietario_cuenta,cuenta,logistica,sf_created_at,nombre_comercio,contacto_celular,horario,direccion,direccion_formula,ciudad,codigo_postal,provincia,observacion_corta,cuit,email_destino,tracking_envio,costo_envio,motivo_desinstalacion,motivo_cambio,usuario_cajero,contrasena_cajero,n_terminal,n_simcard')
@@ -14463,22 +14478,90 @@ async function cargarDespachoEpsa(){
     .order('sf_created_at',{ascending:true});
 
   if(error){
-    tbody.innerHTML=`<tr><td colspan="6" style="text-align:center;color:var(--red);padding:20px">Error: ${error.message}</td></tr>`;
+    tbody.innerHTML=`<tr><td colspan="7" style="text-align:center;color:var(--red);padding:20px">Error: ${error.message}</td></tr>`;
     return;
   }
   _depsaData=data||[];
-  if(countEl)countEl.textContent=`${_depsaData.length} OT${_depsaData.length===1?'':'s'}`;
+  // OJO: al recargar la lista (↺ Actualizar lista) se mantiene lo ya
+  // colectado — solo se pierde si esa OT desaparece del universo (por
+  // ejemplo si alguien la despachó desde otro lado mientras tanto).
+  const idsVigentes=new Set(_depsaData.map(r=>r.id));
+  _depsaColectadas=new Set([..._depsaColectadas].filter(id=>idsVigentes.has(id)));
+
+  depsaRender();
+  const input=document.getElementById('depsa-scan-input');
+  if(input) input.focus();
+}
+
+// Normaliza un N° de OT sacando ceros a la izquierda y espacios — los
+// rótulos codifican el número sin ceros (00023343 → 23343), así que hay
+// que comparar en el mismo formato sin importar qué tipeó/escaneó el lector.
+function depsaNormalizarOT(v){
+  return String(v||'').trim().replace(/^0+/,'') || '0';
+}
+
+function depsaProcesarScan(valorCrudo){
+  const feedback=document.getElementById('depsa-scan-feedback');
+  const valor=depsaNormalizarOT(valorCrudo);
+  if(!valorCrudo || !valorCrudo.trim()){ return; }
+
+  const match=_depsaData.find(r=>depsaNormalizarOT(r.workorder_number)===valor);
+  if(!match){
+    if(feedback){ feedback.textContent='❌ OT no encontrada en la lista'; feedback.style.color='#ef4444'; }
+    beepDespachoEpsa(false);
+    return;
+  }
+  if(_depsaColectadas.has(match.id)){
+    if(feedback){ feedback.textContent=`⚠️ OT ${match.workorder_number} ya estaba colectada`; feedback.style.color='#f59e0b'; }
+    beepDespachoEpsa(false);
+    return;
+  }
+  _depsaColectadas.add(match.id);
+  if(feedback){ feedback.textContent=`✅ OT ${match.workorder_number} colectada`; feedback.style.color='#1dbf8e'; }
+  beepDespachoEpsa(true);
+  depsaRender();
+}
+
+// Feedback sonoro corto — beep agudo en OK, grave en error/duplicado. Usa
+// Web Audio API nativa, sin archivos de sonido que cargar.
+function beepDespachoEpsa(ok){
+  try{
+    const ctx=new (window.AudioContext||window.webkitAudioContext)();
+    const osc=ctx.createOscillator();
+    const gain=ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.frequency.value=ok?1200:300;
+    gain.gain.setValueAtTime(0.15,ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+0.15);
+    osc.start(); osc.stop(ctx.currentTime+0.15);
+  }catch(e){/* si el navegador bloquea audio sin interacción previa, no rompe nada */}
+}
+
+function depsaRender(){
+  const tbody=document.getElementById('depsa-tbody');
+  const countEl=document.getElementById('depsa-count');
+  if(!tbody)return;
 
   if(!_depsaData.length){
-    tbody.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:20px">Sin OTs EPSA en Pre-Colecta ahora mismo 🎉</td></tr>';
+    tbody.innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:20px">Sin OTs EPSA en Pre-Colecta ahora mismo 🎉</td></tr>';
+    if(countEl)countEl.textContent='';
     return;
   }
 
-  tbody.innerHTML=_depsaData.map(r=>{
+  if(countEl)countEl.innerHTML=`<span style="color:#1dbf8e">${_depsaColectadas.size}</span> colectada${_depsaColectadas.size===1?'':'s'} de ${_depsaData.length}`;
+
+  // Colectadas primero (más reciente arriba), después pendientes en el
+  // orden de creación original.
+  const colectadas=_depsaData.filter(r=>_depsaColectadas.has(r.id));
+  const pendientes=_depsaData.filter(r=>!_depsaColectadas.has(r.id));
+
+  tbody.innerHTML=[...colectadas,...pendientes].map(r=>{
     const tipoLegible=(r.record_type||'').toUpperCase().includes('CAMBIO')?'Cambio de Terminal':'Instalación';
     const fecha=r.sf_created_at?new Date(r.sf_created_at).toLocaleDateString('es-AR'):'—';
-    return `<tr>
-      <td class="ot-num">${r.workorder_number||'—'}</td>
+    const colectada=_depsaColectadas.has(r.id);
+    return `<tr style="${colectada?'background:rgba(29,191,142,.06)':''}">
+      <td>${colectada?'<span title="Colectada" style="cursor:pointer;color:#1dbf8e;font-weight:900" onclick="depsaQuitar(\''+r.id+'\')">✅</span>':'<span style="color:var(--text-muted)">⬜</span>'}</td>
+      <td class="ot-num" style="${colectada?'color:#1dbf8e':''}">${r.workorder_number||'—'}</td>
       <td>${tipoLegible}</td>
       <td>${r.responsable||'—'}</td>
       <td>${r.cuenta||r.nombre_comercio||'—'}</td>
@@ -14486,6 +14569,15 @@ async function cargarDespachoEpsa(){
       <td>${fecha}</td>
     </tr>`;
   }).join('');
+}
+
+// Click en el ✅ de una fila colectada = deshacer (por si se escaneó por
+// error o hay que sacarla de la tanda).
+function depsaQuitar(id){
+  _depsaColectadas.delete(id);
+  depsaRender();
+  const input=document.getElementById('depsa-scan-input');
+  if(input) input.focus();
 }
 
 // Genera el Excel EXACTO al modelo que exporta Salesforce nativamente
@@ -14496,8 +14588,11 @@ async function cargarDespachoEpsa(){
 // "ENVIO / RETIRO", Instalación → "ENVIO" (pedido explícito 19/08).
 // Esto SOLO genera el archivo — no toca el estado de ninguna OT en Supabase.
 function finColectaEpsa(){
-  if(!_depsaData.length){ alert('No hay OTs para exportar.'); return; }
+  if(!_depsaColectadas.size){ alert('Todavía no escaneaste ninguna OT — no hay nada para exportar.'); return; }
   if(typeof XLSX==='undefined'){ alert('No se pudo cargar la librería de export.'); return; }
+
+  const paraExportar=_depsaData.filter(r=>_depsaColectadas.has(r.id));
+  if(!confirm(`¿Exportar planilla con las ${paraExportar.length} OT(s) colectadas?\n\nQuedan ${_depsaData.length-paraExportar.length} sin escanear en la lista.`)) return;
 
   const fmtFecha=d=>d?new Date(d).toLocaleDateString('es-AR'):'';
   const ahora=new Date();
@@ -14525,7 +14620,7 @@ function finColectaEpsa(){
     headers,
   ];
 
-  _depsaData.forEach((r,i)=>{
+  paraExportar.forEach((r,i)=>{
     const esCambio=(r.record_type||'').toUpperCase().includes('CAMBIO');
     const tipoMapeado=esCambio?'ENVIO / RETIRO':'ENVIO';
     rows.push([
