@@ -500,6 +500,12 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
   <div class="nav-item" data-mod="zonas-amba" id="nav-zonas-amba" onclick="goTo('zonas-amba')" style="display:none">
     <div class="active-bar"></div><span class="nav-icon-wrap">📍</span> Zonas AMBA
   </div>
+  <!-- Despacho EPSA — pedido 19/08: colecta de OTs que EPSA pasa a retirar
+       (logistica=EPSA, status=Pre-Colecta). Botón FIN COLECTA solo genera
+       el Excel modelo "Pre-Colecta todas EPSA" — no cambia estados. -->
+  <div class="nav-item" data-mod="despacho-epsa" id="nav-despacho-epsa" onclick="goTo('despacho-epsa')" style="display:none">
+    <div class="active-bar"></div><span class="nav-icon-wrap">📋</span> Despacho EPSA
+  </div>
   <div class="sidebar-footer">
     <div class="user-chip">
       <div class="user-avatar" id="sideUserAvatar">?</div>
@@ -2076,6 +2082,36 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
      módulo con permisos por profiles.modulos como cualquier otro, para
      poder darle acceso a Andres/Gonzalo sin exponerles Contactos/Grupos/
      Reglas de Ally. -->
+<!-- Despacho EPSA — pedido 19/08. Lista todas las OTs con logistica=EPSA y
+     status=Pre-Colecta (las que EPSA pasa a retirar). Botón FIN COLECTA solo
+     genera el Excel modelo (mismo formato que exporta Salesforce nativamente:
+     "Pre-Colecta todas EPSA") — NO cambia el estado de las OTs. -->
+<div class="module" id="mod-despacho-epsa">
+  <div style="margin-bottom:14px;display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px">
+    <div>
+      <div class="sec-title"><div class="sec-dot" style="background:#1a9fd4"></div>📋 Despacho EPSA — colecta</div>
+      <div style="font-size:12px;color:var(--text-muted);margin-top:4px">OTs con logística EPSA en estado Pre-Colecta — las que EPSA pasa a retirar. "FIN COLECTA" genera la planilla en el mismo formato que exporta Salesforce, no cambia el estado de ninguna OT.</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <span id="depsa-count" style="font-size:13px;color:var(--text-muted)"></span>
+      <button class="btn btn-sm" onclick="cargarDespachoEpsa()" style="width:auto;background:var(--surface2);color:var(--text);border:1px solid var(--border2)">↺ Actualizar</button>
+      <button class="btn btn-sm" id="depsa-btn-fin" onclick="finColectaEpsa()" style="width:auto;background:#000;color:#fff;font-weight:900">🏁 FIN COLECTA</button>
+    </div>
+  </div>
+  <div class="card" style="padding:0;overflow-x:auto">
+    <div class="table-wrap">
+    <table class="table">
+      <thead><tr>
+        <th>OT</th><th>Tipo</th><th>Responsable</th><th>Cuenta</th><th>Ciudad / Provincia</th><th>Fecha creación</th>
+      </tr></thead>
+      <tbody id="depsa-tbody">
+        <tr><td colspan="6" style="text-align:center;padding:30px;color:var(--text-muted)">Cargando...</td></tr>
+      </tbody>
+    </table>
+    </div>
+  </div>
+</div>
+
 <div class="module" id="mod-zonas-amba">
   <div style="margin-bottom:14px">
     <div class="sec-title"><div class="sec-dot" style="background:#8b5cf6"></div>📍 Zonas AMBA — correcciones manuales por CP</div>
@@ -3074,6 +3110,7 @@ async function printRotuloInstalacion(id) {
 
   const qrGeoSrc  = makeQRDataUrl(mapsUrl, 75);
   const qrRutaSrc = makeQRDataUrl(rutaUrl, 68);
+  const barcodeSrc = `https://barcode.tec-it.com/barcode.ashx?data=${encodeURIComponent(r.workorder_number||'')}&code=Code128&dpi=200&imagetype=Png`;
 
   const horario = r.horario || r.horario_entrega || '—';
   const turnos = [r.turno_manana ? 'Mañana' : '', r.turno_tarde ? 'Tarde' : ''].filter(Boolean).join(' / ');
@@ -3094,6 +3131,8 @@ async function printRotuloInstalacion(id) {
     .ot-num{font-size:28px;font-weight:900;letter-spacing:-1px;line-height:1;}
     .qr-ruta{text-align:center;flex-shrink:0;}
     .qr-ruta-lbl{font-size:6px;font-weight:700;margin-top:2px;text-transform:uppercase;}
+    .barcode-row{text-align:center;margin-bottom:2mm;}
+    .barcode-row img{display:block;height:11mm;max-width:90mm;margin:0 auto;}
     .dest{font-size:11px;font-weight:900;text-align:center;text-transform:uppercase;background:#f0f0f0 !important;padding:2mm;margin-bottom:2mm;line-height:1.3;border:1px solid #ccc;}
     .row{display:flex;align-items:baseline;gap:2mm;margin-bottom:1.2mm;}
     .lbl{font-weight:700;font-size:9px;min-width:26mm;color:#555;text-transform:uppercase;}
@@ -3128,6 +3167,7 @@ async function printRotuloInstalacion(id) {
         <div class="qr-ruta-lbl">Escanear Ruta</div>
       </div>
     </div>
+    <div class="barcode-row"><img src="${barcodeSrc}"></div>
     <div class="dest">${r.cuenta || r.nombre_comercio || '—'}</div>
     <div class="row"><span class="lbl">Dirección</span><span class="val">${dir || '—'}</span></div>
     <div class="row"><span class="lbl">C.P.</span><span class="val">${r.codigo_postal || '—'}</span></div>
@@ -3194,6 +3234,9 @@ async function printRotuloEpsa(id) {
     return `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(text)}&color=000000&bgcolor=ffffff&margin=2`;
   }
   const qrGeoSrc = makeQRDataUrl(mapsUrl, 80);
+  // Código de barras Code128 con el N° de OT (pedido 19/08) — mismo servicio
+  // de imagen por URL que ya se usa para los QR, sin agregar librerías nuevas.
+  const barcodeSrc = `https://barcode.tec-it.com/barcode.ashx?data=${encodeURIComponent(otNumero)}&code=Code128&dpi=200&imagetype=Png`;
 
   const horario = r.horario || r.horario_entrega || '—';
   const turnos = [r.turno_manana ? 'Mañana' : '', r.turno_tarde ? 'Tarde' : ''].filter(Boolean).join(' / ');
@@ -3210,8 +3253,10 @@ async function printRotuloEpsa(id) {
     .hdr-logo{font-size:16px;font-weight:900;letter-spacing:-1px;color:#1dbf8e !important;}
     .hdr-info{font-size:6.5px;line-height:1.5;color:#444;text-align:right;}
     .tipo{font-size:9px;font-weight:700;text-align:center;border:1.5px solid #000;padding:1.5mm;margin-bottom:2mm;}
-    .ot-block{display:flex;align-items:center;justify-content:center;border:2.5px solid #000;padding:2mm 3mm;margin-bottom:2mm;}
+    .ot-block{display:flex;align-items:center;justify-content:space-between;border:2.5px solid #000;padding:2mm 3mm;margin-bottom:2mm;gap:2mm;}
     .ot-num{font-size:28px;font-weight:900;letter-spacing:-1px;line-height:1;}
+    .barcode-wrap{flex-shrink:0;text-align:center;}
+    .barcode-wrap img{display:block;height:12mm;max-width:38mm;}
     .dest{font-size:11px;font-weight:900;text-align:center;text-transform:uppercase;background:#f0f0f0 !important;padding:2mm;margin-bottom:2mm;line-height:1.3;border:1px solid #ccc;}
     .row{display:flex;align-items:baseline;gap:2mm;margin-bottom:1.2mm;}
     .lbl{font-weight:700;font-size:9px;min-width:26mm;color:#555;text-transform:uppercase;}
@@ -3241,6 +3286,7 @@ async function printRotuloEpsa(id) {
     <div class="tipo">TIPO DE O.T.: &nbsp; ${tipo}</div>
     <div class="ot-block">
       <div class="ot-num">O.T.: ${otNumero}</div>
+      <div class="barcode-wrap"><img src="${barcodeSrc}"></div>
     </div>
     <div class="dest">${r.cuenta || r.nombre_comercio || '—'}</div>
     <div class="row"><span class="lbl">Dirección</span><span class="val">${dir || '—'}</span></div>
@@ -3591,7 +3637,7 @@ function toggleSidebar(){
   const sbW=sb.classList.contains('collapsed')?60:224;
   main.style.marginLeft=sbW+'px';
   // Actualizar módulos outside si hay uno activo
-  const outsideMods=new Set(['ally','retencion','distri','terminales','instalaciones','recuperadas','zonas-amba']);
+  const outsideMods=new Set(['ally','retencion','distri','terminales','instalaciones','recuperadas','zonas-amba','despacho-epsa']);
   const activeOutside=document.querySelector('.module.active');
   if(activeOutside){
     const mod=activeOutside.id.replace('mod-','');
@@ -5257,6 +5303,8 @@ function showApp(){
   // "dashboard" (pedido 19/08 — Diego entra directo acá, ver más abajo).
   const navIndicadores=document.getElementById('nav-indicadores');
   if(navIndicadores&&(isAdmin||isCeo||modulos.includes('indicadores')))navIndicadores.style.display='flex';
+  const navDespachoEpsa=document.getElementById('nav-despacho-epsa');
+  if(navDespachoEpsa&&!isCeo&&(isAdmin||modulos.includes('despacho-epsa')))navDespachoEpsa.style.display='flex';
   ['sims','envios','desinstalaciones','churn-producto','hoja-ruta','napse','store','recuperadas','rollout','rollout-piloto','retencion','terminales','zonas-amba'].forEach(mod=>{
     const el=document.getElementById('nav-'+mod);
     if(el&&!modulos.includes(mod)&&!isAdmin&&!isCeo){el.classList.add('locked');el.onclick=null;}
@@ -5327,13 +5375,13 @@ function buildDashCards(modulos,isAdmin,isCeo){
   loadOpsPanel(isAdmin, modulos);
 }
 
-const MOD_INFO={home:'Dashboard',sims:'Verificador SIMs',envios:'Envíos',rollout:'Rollout','rollout-piloto':'Rollout Piloto — Trazabilidad',desinstalaciones:'Desinstalaciones','churn-producto':'Churn Producto — NAPSE / PRISMA / Sin Perfil','hoja-ruta':'Hoja de Ruta — por chofer',napse:'NAPSE — Logs VTOL',instalaciones:'Instalaciones SF',retencion:'Retención de Cuentas',ajustes:'Ajustes',ally:'Configuración Ally',distri:'Distribuidores',terminales:'Terminales — Logicalis',store:'Bancos — Terminales disponibles',presupuesto:'Presupuesto de Operaciones','zonas-amba':'Zonas AMBA — correcciones por CP',indicadores:'Indicadores Operaciones — Logística'};
+const MOD_INFO={home:'Dashboard',sims:'Verificador SIMs',envios:'Envíos',rollout:'Rollout','rollout-piloto':'Rollout Piloto — Trazabilidad',desinstalaciones:'Desinstalaciones','churn-producto':'Churn Producto — NAPSE / PRISMA / Sin Perfil','hoja-ruta':'Hoja de Ruta — por chofer',napse:'NAPSE — Logs VTOL',instalaciones:'Instalaciones SF',retencion:'Retención de Cuentas',ajustes:'Ajustes',ally:'Configuración Ally',distri:'Distribuidores',terminales:'Terminales — Logicalis',store:'Bancos — Terminales disponibles',presupuesto:'Presupuesto de Operaciones','zonas-amba':'Zonas AMBA — correcciones por CP',indicadores:'Indicadores Operaciones — Logística','despacho-epsa':'Despacho EPSA — colecta'};
 
 function goTo(mod){
   const el=document.getElementById('nav-'+mod);
   if(el&&el.classList.contains('locked'))return;
   // Módulos que viven FUERA del .content div
-  const outsideMods=new Set(['ally','retencion','distri','terminales','instalaciones','recuperadas','zonas-amba']);
+  const outsideMods=new Set(['ally','retencion','distri','terminales','instalaciones','recuperadas','zonas-amba','despacho-epsa']);
   const contentEl=document.querySelector('.content');
   if(contentEl) contentEl.style.display=outsideMods.has(mod)?'none':'';
   document.querySelectorAll('.module').forEach(m=>{
@@ -5393,6 +5441,7 @@ function goTo(mod){
     const f=document.getElementById('indicadoresFrame');
     if(f&&f.getAttribute('src')==='about:blank') f.src=f.dataset.src;
   }
+  if(mod==='despacho-epsa')cargarDespachoEpsa();
 }
 
 function refreshCurrentModule(){
@@ -5625,6 +5674,7 @@ const ALL_MODS = [
   {id:'recuperadas',label:'🔁 Recuperadas'},
   {id:'zonas-amba', label:'📍 Zonas AMBA'},
   {id:'indicadores', label:'📊 Indicadores'},
+  {id:'despacho-epsa', label:'📋 Despacho EPSA'},
 ];
 
 async function loadUsers() {
@@ -11944,6 +11994,9 @@ function _imprimirRotuloHTML(envios) {
       qrLabel = 'Ver en Maps';
     }
     const qrGeoSrc = qrTarget ? makeQRDataUrl(qrTarget, esEpsa?80:55) : '';
+    // Código de barras Code128 con el N° de OT (pedido 19/08) — mismo servicio
+    // de imagen por URL que ya se usa para los QR, sin agregar librerías nuevas.
+    const barcodeSrc = `https://barcode.tec-it.com/barcode.ashx?data=${encodeURIComponent(e.ot_numero||'')}&code=Code128&dpi=200&imagetype=Png`;
 
     // ── Variante EPSA: sin QR de ruta, badge CT/INS en vez de zona,
     // footer con logo EPSA en vez de "Remitente" (pedido 04/08) ──────────
@@ -11960,11 +12013,12 @@ function _imprimirRotuloHTML(envios) {
           <div class="hdr-info">Andrés Moretti e Hijos S.A.<br>Logística Alleata &nbsp;·&nbsp; (+54 11) 4103-4600</div>
         </div>
         <div class="tipo">${tipoTxt}${(typeof esRollout==='function'&&esRollout(e))?' - ROLLOUT':''}</div>
-        <div class="ot-block" style="justify-content:center">
+        <div class="ot-block" style="justify-content:space-between">
           <div>
             <div class="ot-label">ORDEN DE TRABAJO</div>
             <div class="ot-num">${otNumeroLimpio}</div>
           </div>
+          <div class="barcode-wrap"><img src="${barcodeSrc}"></div>
         </div>
         <div class="dest-label">DESTINATARIO</div>
         <div class="dest">${e.cuenta || '—'}</div>
@@ -12019,6 +12073,7 @@ function _imprimirRotuloHTML(envios) {
           <div class="qr-ruta-lbl">Escanear Ruta</div>
         </div>
       </div>
+      <div class="barcode-row"><img src="${barcodeSrc}"></div>
       <div class="dest-label">DESTINATARIO</div>
       <div class="dest">${e.cuenta || '—'}</div>
       <div class="row"><span class="lbl">Nombre Comercio</span><span class="val">${e.nombre_comercio || '—'}</span></div>
@@ -12068,6 +12123,10 @@ function _imprimirRotuloHTML(envios) {
     .hdr-info { font-size: 7px; line-height: 1.5; color: #444; text-align: right; }
     .tipo { font-size: 15px; font-weight: 900; text-align: center; border: 2px solid #000; padding: 2mm; margin-bottom: 2mm; text-transform: uppercase; color: #000; letter-spacing: -0.3px; }
     .ot-block { display: flex; align-items: center; justify-content: space-between; gap: 2mm; border: 2px solid #000; padding: 2mm 3mm; margin-bottom: 2mm; }
+    .barcode-wrap { flex-shrink: 0; text-align: center; }
+    .barcode-wrap img { display: block; height: 11mm; max-width: 34mm; }
+    .barcode-row { text-align: center; margin-bottom: 2mm; }
+    .barcode-row img { display: block; height: 10mm; max-width: 90mm; margin: 0 auto; }
     .ot-label { font-size: 7.5px; font-weight: 700; text-transform: uppercase; color: #555; }
     .ot-num { font-size: 23px; font-weight: 900; letter-spacing: -1px; line-height: 1.1; }
     .track-num { font-size: 9px; font-weight: 700; font-family: 'Courier New', monospace; color: #333; margin-top: 1mm; }
@@ -14386,6 +14445,129 @@ function _puedeZonasAmba(){
   const rol = (currentProfile?.rol||'').toLowerCase();
   const modulos = currentProfile?.modulos||[];
   return rol==='admin' || modulos.includes('zonas-amba');
+}
+
+// ── Despacho EPSA (pedido 19/08) ─────────────────────────────────────────
+let _depsaData=[];
+
+async function cargarDespachoEpsa(){
+  const tbody=document.getElementById('depsa-tbody');
+  const countEl=document.getElementById('depsa-count');
+  if(!tbody)return;
+  tbody.innerHTML='<tr><td colspan="6" style="text-align:center;padding:30px;color:var(--text-muted)">Cargando...</td></tr>';
+
+  const{data,error}=await sb.from('sf_workorders')
+    .select('id,sf_id,workorder_number,record_type,status,responsable,propietario_cuenta,cuenta,logistica,sf_created_at,nombre_comercio,contacto_celular,horario,direccion,direccion_formula,ciudad,codigo_postal,provincia,observacion_corta,cuit,email_destino,tracking_envio,costo_envio,motivo_desinstalacion,motivo_cambio,usuario_cajero,contrasena_cajero,n_terminal,n_simcard')
+    .eq('logistica','EPSA')
+    .eq('status','Pre-Colecta')
+    .order('sf_created_at',{ascending:true});
+
+  if(error){
+    tbody.innerHTML=`<tr><td colspan="6" style="text-align:center;color:var(--red);padding:20px">Error: ${error.message}</td></tr>`;
+    return;
+  }
+  _depsaData=data||[];
+  if(countEl)countEl.textContent=`${_depsaData.length} OT${_depsaData.length===1?'':'s'}`;
+
+  if(!_depsaData.length){
+    tbody.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:20px">Sin OTs EPSA en Pre-Colecta ahora mismo 🎉</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML=_depsaData.map(r=>{
+    const tipoLegible=(r.record_type||'').toUpperCase().includes('CAMBIO')?'Cambio de Terminal':'Instalación';
+    const fecha=r.sf_created_at?new Date(r.sf_created_at).toLocaleDateString('es-AR'):'—';
+    return `<tr>
+      <td class="ot-num">${r.workorder_number||'—'}</td>
+      <td>${tipoLegible}</td>
+      <td>${r.responsable||'—'}</td>
+      <td>${r.cuenta||r.nombre_comercio||'—'}</td>
+      <td>${r.ciudad||'—'}${r.provincia?' · '+r.provincia:''}</td>
+      <td>${fecha}</td>
+    </tr>`;
+  }).join('');
+}
+
+// Genera el Excel EXACTO al modelo que exporta Salesforce nativamente
+// ("Pre-Colecta todas EPSA...xlsx") — mismas filas de título/filtro, mismos
+// encabezados en fila 10, datos desde fila 11, columna Logística solo en la
+// primera fila (agrupado). Columna F ("Tipo de registro de orden de trabajo")
+// NO es el record_type crudo — es el valor mapeado: Cambio de Terminal →
+// "ENVIO / RETIRO", Instalación → "ENVIO" (pedido explícito 19/08).
+// Esto SOLO genera el archivo — no toca el estado de ninguna OT en Supabase.
+function finColectaEpsa(){
+  if(!_depsaData.length){ alert('No hay OTs para exportar.'); return; }
+  if(typeof XLSX==='undefined'){ alert('No se pudo cargar la librería de export.'); return; }
+
+  const fmtFecha=d=>d?new Date(d).toLocaleDateString('es-AR'):'';
+  const ahora=new Date();
+  const fechaGenTxt=ahora.toLocaleString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit'}).replace(',','');
+
+  const headers=['','Logística','','Id. de orden de trabajo','Responsable de la OT: Nombre completo',
+    'Tipo de registro de orden de trabajo','Número de orden de trabajo','Fecha de creación',
+    'Nombre del comercio','Cuenta: Nombre de la cuenta','Contacto','Horario',
+    'Dirección de envío (Calle)','Dirección de envío (Ciudad)','Dirección de envío (Código postal/ZIP)',
+    'Dirección de envío (Estado/Provincia)','Observaciones generales','CUIT','Email',
+    'N° de seguimiento','Costo de envio','Motivo de desinstalación','Motivo del cambio',
+    'Usuario Cajero:','Contraseña Cajero','N° Terminal: N° de Serie','N° Simcard: N° de Serie',
+    'Propietario de cuenta relacionada'];
+
+  const rows=[
+    [],
+    ['','Pre-Colecta todas las Logísticas'],
+    ['',`A partir de ${fechaGenTxt} hora estándar de Argentina/ART • Generado por Sistemas Alleata • Ordenado por Fecha de creación (Ascendente)`],
+    [],
+    [],
+    ['','Filtrado por'],
+    ['','Mostrar: Todas las órdenes de trabajos'],
+    ['','Estado igual a Pre-Colecta'],
+    [],
+    headers,
+  ];
+
+  _depsaData.forEach((r,i)=>{
+    const esCambio=(r.record_type||'').toUpperCase().includes('CAMBIO');
+    const tipoMapeado=esCambio?'ENVIO / RETIRO':'ENVIO';
+    rows.push([
+      '',
+      i===0?'EPSA':'', // Logística solo en la primera fila (agrupado, igual al modelo SF)
+      '',
+      r.sf_id||'',
+      r.responsable||'',
+      tipoMapeado,
+      r.workorder_number||'',
+      fmtFecha(r.sf_created_at),
+      r.nombre_comercio||'',
+      r.cuenta||'',
+      r.contacto_celular||'',
+      r.horario||'',
+      r.direccion||r.direccion_formula||'',
+      r.ciudad||'',
+      r.codigo_postal||'',
+      r.provincia||'',
+      r.observacion_corta||'',
+      r.cuit||'',
+      r.email_destino||'',
+      r.tracking_envio||'',
+      r.costo_envio!=null?Number(r.costo_envio):'',
+      r.motivo_desinstalacion||'',
+      r.motivo_cambio||'',
+      r.usuario_cajero||'',
+      r.contrasena_cajero||'',
+      r.n_terminal||'',
+      r.n_simcard||'',
+      r.propietario_cuenta||'',
+    ]);
+  });
+
+  const ws=XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols']=[{wch:2},{wch:12},{wch:2},{wch:18},{wch:22},{wch:16},{wch:14},{wch:12},{wch:20},{wch:26},{wch:16},{wch:22},{wch:22},{wch:16},{wch:12},{wch:14},{wch:26},{wch:14},{wch:22},{wch:14},{wch:12},{wch:20},{wch:20},{wch:16},{wch:14},{wch:22},{wch:22},{wch:22}];
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Pre-Colecta todas las Logística');
+
+  const p=n=>String(n).padStart(2,'0');
+  const nombreArchivo=`Pre-Colecta_todas_EPSA-${ahora.getFullYear()}-${p(ahora.getMonth()+1)}-${p(ahora.getDate())}-${p(ahora.getHours())}-${p(ahora.getMinutes())}-${p(ahora.getSeconds())}.xlsx`;
+  XLSX.writeFile(wb,nombreArchivo);
 }
 
 async function zcpCargar(){
