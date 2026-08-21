@@ -62,6 +62,9 @@
   .stop-ot{font-family:var(--mono);font-size:16px;font-weight:800;letter-spacing:-.4px}
   .rollout-tag{font-size:9px;font-weight:800;color:var(--purple);background:rgba(139,92,246,.18);border:1px solid rgba(139,92,246,.4);padding:1px 6px;border-radius:5px;letter-spacing:.4px;flex-shrink:0}
   .stop-horario{font-family:var(--mono);font-size:10.5px;font-weight:700;color:var(--teal);background:rgba(29,191,142,.12);border:1px solid rgba(29,191,142,.3);padding:1px 7px;border-radius:6px;white-space:nowrap;flex-shrink:0}
+  .stop-horario.fuera{color:var(--red);background:rgba(239,68,68,.12);border-color:rgba(239,68,68,.35)}
+  .stop-llegada{font-family:var(--mono);font-size:10.5px;font-weight:700;color:var(--text-dim);white-space:nowrap;flex-shrink:0}
+  .col-regreso{font-size:10px;color:var(--text-dim);font-family:var(--mono);padding:4px 16px 8px;border-bottom:1px solid var(--border);flex-shrink:0}
   .stop-dir{font-size:12px;color:var(--text-dim);line-height:1.3;margin-left:26px}
   .stop-dist{font-size:9.5px;color:var(--text-dim);margin-top:2px;font-family:var(--mono);margin-left:26px}
   .sin-geo{opacity:.55}
@@ -100,7 +103,7 @@
 
 <footer>
   <span id="footLeft">Orden sugerido por zona (más cercano + horario de atención) · Rollout siempre primero</span>
-  <span id="footRight">v2.2</span>
+  <span id="footRight">v2.3</span>
 </footer>
 
 <script>
@@ -162,36 +165,41 @@ async function cargar(){
   if(_cargando)return; // por si una carga tarda más que el intervalo de refresco, no se pisan
   _cargando=true;
   try{
-  const{data,error}=await sb.from('ruta_sugerida_actual')
-    .select('*')
-    .order('zona',{ascending:true})
-    .order('orden_sugerido',{ascending:true});
+  const [{data,error}, {data:resumenZonas,error:errorResumen}] = await Promise.all([
+    sb.from('ruta_sugerida_actual').select('*')
+      .order('zona',{ascending:true}).order('orden_sugerido',{ascending:true}),
+    sb.from('ruta_sugerida_resumen_zona').select('*'),
+  ]);
 
   if(error){
     document.getElementById('lastSync').textContent='Error: '+error.message;
     return;
   }
+  if(errorResumen){ console.warn('No se pudo leer ruta_sugerida_resumen_zona:', errorResumen.message); }
 
   const generadoAt = data?.[0]?.generado_at ? new Date(data[0].generado_at) : null;
   document.getElementById('lastSync').textContent = generadoAt
     ? 'Ruta calculada '+generadoAt.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'})
     : 'Sin datos todavía';
 
-  render(data||[]);
+  render(data||[], resumenZonas||[]);
   } finally {
     _cargando=false;
   }
 }
 
-function render(lista){
+function render(lista, resumenZonas){
   const strip=document.getElementById('strip');
   const main=document.getElementById('main');
+  const resumenPorZona={};
+  (resumenZonas||[]).forEach(r=>{ resumenPorZona[r.zona]=r; });
 
   const zonasKeys=ZONAS.map(z=>z.key);
   const enLas4=lista.filter(o=>zonasKeys.includes(o.zona));
   const fueraDeLas4=lista.filter(o=>!zonasKeys.includes(o.zona));
   const rollouts=enLas4.filter(o=>o.es_rollout).length;
   const sinGeo=enLas4.filter(o=>!o.geocodificado).length;
+  const fueraDeHorario=enLas4.filter(o=>o.dentro_de_horario===false).length;
 
   strip.innerHTML=`
     <div class="strip-item">
@@ -206,6 +214,10 @@ function render(lista){
       <div class="strip-num" style="color:${sinGeo?'var(--amber)':'var(--text-dim)'}">${sinGeo}</div>
       <div class="strip-lbl">Sin ubicar<br>en el mapa</div>
     </div>
+    ${fueraDeHorario?`<div class="strip-item">
+      <div class="strip-num" style="color:var(--red)">${fueraDeHorario}</div>
+      <div class="strip-lbl">Fuera de horario<br>de atención</div>
+    </div>`:''}
     ${fueraDeLas4.length?`<div class="strip-item">
       <div class="strip-num" style="color:var(--red)">${fueraDeLas4.length}</div>
       <div class="strip-lbl">Fuera de estas 4<br>zonas — revisar</div>
@@ -224,6 +236,11 @@ function render(lista){
     const distTxt = o.distancia_prev_km!=null
       ? `~${o.distancia_prev_km} km desde la parada anterior`
       : (o.geocodificado ? 'primera parada de la ruta' : '📍 dirección no encontrada en el mapa — revisar manualmente');
+    const horarioClass = o.dentro_de_horario===false ? ' fuera' : '';
+    const horarioTag = o.horario_entrega
+      ? `<div class="stop-horario${horarioClass}">${esc(o.horario_entrega)}${o.dentro_de_horario===false?' ⚠️':''}</div>` : '';
+    const llegadaTag = o.hora_llegada_estimada
+      ? `<div class="stop-llegada">🕘 llega ~${esc(o.hora_llegada_estimada)}</div>` : '';
     return `
     <div class="stop${o.es_rollout?' stop-rollout':''}${sinGeoClass}">
       <div class="stop-top">
@@ -232,7 +249,8 @@ function render(lista){
           <span class="stop-ot">${esc(o.ot_numero)}</span>
           ${o.es_rollout?'<span class="rollout-tag">ROLLOUT</span>':''}
         </div>
-        ${o.horario_entrega?`<div class="stop-horario">${esc(o.horario_entrega)}</div>`:''}
+        ${llegadaTag}
+        ${horarioTag}
       </div>
       <div class="stop-dir">${esc(o.direccion)||'—'}${o.ciudad?' · '+esc(o.ciudad):''}</div>
       <div class="stop-dist">${distTxt}</div>
@@ -241,12 +259,17 @@ function render(lista){
 
   main.innerHTML=ZONAS.map(z=>{
     const items=lista.filter(o=>o.zona===z.key);
+    const resumen=resumenPorZona[z.key];
+    const regresoTxt = resumen?.hora_regreso_estimada
+      ? `🔁 Vuelve a California ~${resumen.hora_regreso_estimada}${resumen.km_regreso!=null?' · '+resumen.km_regreso+' km último tramo':''}`
+      : (items.length ? '🔁 Regreso: sin calcular todavía' : '');
     return `
       <div class="col">
         <div class="col-head" style="border-color:${z.color}55">
           <div class="col-name" style="color:${z.color}">${z.label}</div>
           <div class="col-count" style="color:${z.color};background:${z.color}22;border-color:${z.color}55">${items.length}</div>
         </div>
+        ${regresoTxt?`<div class="col-regreso">${regresoTxt}</div>`:''}
         <div class="col-body">
           ${items.length ? items.map(stopHtml).join('') : '<div class="empty-col">Sin entregas pendientes<br>en esta zona</div>'}
         </div>
