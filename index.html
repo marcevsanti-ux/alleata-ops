@@ -718,7 +718,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <div id="envFiltrosCard" style="display:none;margin-bottom:14px">
         <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
           <div id="envFiltroRespWrap" class="field" style="margin:0;min-width:180px;display:none">
-            <label class="label">Filtrar por responsable</label>
+            <label class="label" id="envFiltroRespLabel">Filtrar por responsable</label>
             <select class="select" id="envFiltroResp" onchange="renderEnvios()">
               <option value="">Todos</option>
             </select>
@@ -9160,7 +9160,29 @@ async function initEnvios(){
     // Admin además ve filtro de responsable
     const wrap=document.getElementById('envFiltroRespWrap');
     if(wrap) wrap.style.display='block';
+    const lbl=document.getElementById('envFiltroRespLabel');
+    if(lbl) lbl.textContent='Filtrar por responsable';
     await loadFiltroResponsables();
+  }
+  // Cobertura entre operadores (pedido 20/08): si alguien está de
+  // vacaciones/ausente, el que lo cubre necesita ver también SUS OTs, no
+  // solo las propias. Reutiliza el mismo dropdown que ya tenía admin, pero
+  // para operador es ADITIVO (suma al filtro propio, no lo reemplaza) — ver
+  // la rama "Operador" de renderEnvios().
+  if(!isAdmin && !isLogistica){
+    const wrap=document.getElementById('envFiltroRespWrap');
+    if(wrap) wrap.style.display='block';
+    const lbl=document.getElementById('envFiltroRespLabel');
+    if(lbl) lbl.textContent='+ Ver también las OT de';
+    await loadFiltroResponsables();
+    const sel=document.getElementById('envFiltroResp');
+    // Sacar al propio operador de la lista (no tiene sentido "cubrirse a
+    // sí mismo") y dejar la opción vacía como "Solo las mías".
+    if(sel){
+      const propio=(currentProfile?.nombre||'').trim();
+      [...sel.options].forEach(o=>{ if(o.value && o.value.trim()===propio) o.remove(); });
+      sel.options[0].textContent='Solo las mías';
+    }
   }
   if(isLogistica){
     const banner=document.getElementById('micorreoBanner');
@@ -9803,7 +9825,17 @@ async function renderEnvios(){
   } else {
     // Operador
     const nombre=currentProfile?.nombre||'';
-    query=query.ilike('responsable',`%${nombre}%`);
+    // Cobertura (pedido 20/08): si eligió a alguien en "+ Ver también las
+    // OT de", suma esas OTs a las propias con un OR — no reemplaza el
+    // filtro. Sirve para cuando alguien está de vacaciones/ausente y otro
+    // operador tiene que hacerse cargo de sus OTs sin perder de vista las
+    // propias.
+    const cubriendoA=document.getElementById('envFiltroResp')?.value||'';
+    if(cubriendoA){
+      query=query.or(`responsable.ilike.%${nombre}%,responsable.ilike.%${cubriendoA}%`);
+    } else {
+      query=query.ilike('responsable',`%${nombre}%`);
+    }
     if(_canalActivo !== 'TODOS' && _canalActivo !== 'OTROS') query=query.eq('logistica', LOG_MAP[_canalActivo]||_canalActivo);
     const filtroEstOp=document.getElementById('envFiltroEstado')?.value||'';
     if(filtroEstOp) query=query.eq('status',filtroEstOp);
