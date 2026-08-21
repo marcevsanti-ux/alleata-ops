@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.6.62</title>
+<title>Alleata · Operaciones v4.6.63</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -407,7 +407,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.62 · 21 ago 2026
+      v4.6.63 · 21 ago 2026
     </div>
   </div>
 </div>
@@ -516,7 +516,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.62 · 21 ago 2026
+      v4.6.63 · 21 ago 2026
     </div>
   </div>
 </nav>
@@ -556,7 +556,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.62</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.63</div>
   </div>
   <div class="content">
 
@@ -1257,6 +1257,13 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <label class="label">Chofer</label>
       <select class="select" id="hr-parada-chofer" style="width:200px">
         <option value="">Cargando choferes...</option>
+      </select>
+    </div>
+    <div>
+      <label class="label">Tipo</label>
+      <select class="select" id="hr-parada-tipo" style="width:110px">
+        <option value="retiro_proveedor">📦 Retiro</option>
+        <option value="entrega_proveedor">📤 Entrega</option>
       </select>
     </div>
     <div>
@@ -4964,7 +4971,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.6.62] OK');
+console.log('[Alleata v4.6.63] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -6310,13 +6317,14 @@ async function agregarParadaManualDesktop(){
   if(!choferId){msg.innerHTML='<span style="color:var(--red)">Elegí un chofer.</span>';return;}
   if(!proveedor&&!direccion){msg.innerHTML='<span style="color:var(--red)">Cargá al menos proveedor o dirección.</span>';return;}
   const chofer=_hrChoferesCache?.find(c=>c.id===choferId);
+  const tipo=document.getElementById('hr-parada-tipo')?.value||'retiro_proveedor';
   const btn=document.getElementById('hr-parada-btn');
   btn.disabled=true;btn.textContent='Guardando...';
   const{error}=await sb.from('hoja_ruta_paradas_manuales').insert({
     fecha:hoyArgentina(),
     chofer_user_id:choferId,
     chofer_nombre:(chofer?.nombre||chofer?.email||'—').trim(),
-    tipo:'retiro_proveedor',
+    tipo:tipo,
     proveedor_nombre:proveedor||null,
     direccion:direccion||null,
     contacto:document.getElementById('hr-parada-contacto').value.trim()||null,
@@ -6328,6 +6336,7 @@ async function agregarParadaManualDesktop(){
   if(error){msg.innerHTML=`<span style="color:var(--red)">Error: ${error.message}</span>`;return;}
   msg.innerHTML='<span style="color:var(--teal)">✅ Agregada a su ruta.</span>';
   ['hr-parada-proveedor','hr-parada-direccion','hr-parada-queretirar','hr-parada-contacto','hr-parada-telefono'].forEach(id=>{document.getElementById(id).value='';});
+  const tipoSel=document.getElementById('hr-parada-tipo'); if(tipoSel)tipoSel.value='retiro_proveedor';
   await loadHojaRuta();
 }
 

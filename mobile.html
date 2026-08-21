@@ -165,7 +165,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
       <div class="login-logo">
         <img id="loginLogo" src="" alt="Alleata">
         <div class="login-sub">Portal de Operaciones</div>
-        <div class="login-version">v2.14.47 · mobile</div>
+        <div class="login-version">v2.14.48 · mobile</div>
       </div>
       <div class="field"><label class="label">Email</label><input class="input" id="lEmail" type="email" placeholder="usuario@alleata.com" autocomplete="email"></div>
       <div class="field"><label class="label">Contraseña</label><input class="input" id="lPass" type="password" placeholder="••••••••" autocomplete="current-password"></div>
@@ -182,7 +182,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
     <img id="appLogo" src="" alt="Alleata">
     <div class="topbar-title" id="topbarTitle">Operaciones</div>
     <button id="btnSyncRapido" onclick="syncRapido()" title="Actualizar estados desde Salesforce (sin esperar los 10min)" style="background:none;border:none;color:#fff;font-size:18px;cursor:pointer;padding:4px 6px;line-height:1">🔄</button>
-    <div class="topbar-version" onclick="_tocarVersion()">v2.14.47</div>
+    <div class="topbar-version" onclick="_tocarVersion()">v2.14.48</div>
     <div class="topbar-avatar" id="topbarAvatar" onclick="openDrawer()">?</div>
   </div>
 
@@ -561,10 +561,10 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
     <div style="font-size:11px;color:var(--text-muted);margin-bottom:14px">Se agrega como una parada más de tu hoja de ruta de hoy.</div>
 
     <label class="label" style="margin-bottom:6px;display:block">Tipo de parada</label>
-    <div style="display:flex;gap:8px;margin-bottom:14px">
-      <button type="button" id="pm-tipo-retiro" onclick="setTipoParadaManual('retiro_proveedor')" class="btn" style="flex:1;padding:10px;font-size:12px">📦 Retiro</button>
-      <button type="button" id="pm-tipo-entrega" onclick="setTipoParadaManual('entrega_proveedor')" class="btn btn-cancel" style="flex:1;padding:10px;font-size:12px">📤 Entrega</button>
-    </div>
+    <select class="input" id="pm-tipo-select" onchange="setTipoParadaManual(this.value)" style="margin-bottom:14px">
+      <option value="retiro_proveedor">📦 Retiro</option>
+      <option value="entrega_proveedor">📤 Entrega</option>
+    </select>
     <input type="hidden" id="pm-tipo" value="retiro_proveedor">
 
     <label class="label" style="margin-bottom:6px;display:block">Proveedor / a quién vas a ver</label>
@@ -766,17 +766,20 @@ const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSI
 //     el producto en estado raro en SF (por eso existe la opción
 //     Reprogramar como alternativa), así que necesita aviso inmediato.
 //     No bloquea el cierre si el envío directo falla.
-// Cambios v2.14.47 (11/08):
+// Cambios v2.14.48 (11/08):
 //   - Números de OT: .ot-num y #otS-num pasan de JetBrains Mono a IBM
 //     Plex Mono bold (0 con barra diagonal — no se confunde con O).
 //     JetBrains Mono acá solo cargaba 400/500, así que el "bold" viejo
 //     era negrita sintética del navegador, no un peso real — se veía
 //     peor, no mejor.
-// Cambios v2.14.47 (21/08):
+// Cambios v2.14.48 (21/08):
 //   - Modal "Retiro/Entrega en proveedor": chip de proveedores frecuentes
 //     (Logicalis precargado — nombre + dirección) arriba del campo
 //     Proveedor. Un click completa Proveedor y Dirección, solo queda
 //     elegir Retiro/Entrega y completar los datos puntuales.
+// Cambios v2.14.48 (21/08):
+//   - Modal "Retiro/Entrega en proveedor": el toggle de 2 botones (Retiro/
+//     Entrega) pasa a ser un combo <select> — pedido explícito, más claro.
 const{createClient}=supabase;
 const sb=createClient(SUPABASE_URL,SUPABASE_KEY);
 
@@ -1563,8 +1566,8 @@ function setTipoParadaManual(tipo){
   document.getElementById('pm-title').textContent=esRetiro?'📦 Retiro en proveedor':'📤 Entrega en proveedor';
   document.getElementById('pm-queretirar-label').textContent=esRetiro?'Qué vas a retirar':'Qué vas a entregar';
   document.getElementById('pm-queretirar').placeholder=esRetiro?'Ej: 5 terminales POS, cambio de equipo...':'Ej: 5 terminales POS, insumos...';
-  document.getElementById('pm-tipo-retiro').className=esRetiro?'btn':'btn btn-cancel';
-  document.getElementById('pm-tipo-entrega').className=esRetiro?'btn btn-cancel':'btn';
+  const sel=document.getElementById('pm-tipo-select');
+  if(sel) sel.value=tipo;
 }
 function cerrarModalParadaManual(){
   document.getElementById('modalParadaManual').classList.remove('show');
