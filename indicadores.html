@@ -370,8 +370,9 @@ async function hacerLogin(){
   // Verificación de rol — admin (uso interno, embebido en el portal) o
   // auditor_externo (acceso directo vía este mismo archivo) pueden entrar.
   // Cualquier otro rol, aunque el login de Supabase haya sido válido, no pasa.
-  const{data:perfil,error:perfilErr}=await sb.from('profiles').select('nombre,rol').eq('id',data.user.id).maybeSingle();
-  if(perfilErr||!perfil||!['admin','auditor_externo','ceo'].includes(perfil.rol)){
+  const{data:perfil,error:perfilErr}=await sb.from('profiles').select('nombre,rol,modulos').eq('id',data.user.id).maybeSingle();
+  const tieneModulo=(perfil?.modulos||[]).includes('indicadores');
+  if(perfilErr||!perfil||(!['admin','auditor_externo','ceo'].includes(perfil.rol)&&!tieneModulo)){
     errEl.textContent='Esta cuenta no tiene acceso a este portal.';
     await sb.auth.signOut();
     btn.disabled=false;btn.textContent='Ingresar';
@@ -394,8 +395,9 @@ async function hacerLogout(){
 async function chequearSesionExistente(){
   const{data:{session}}=await sb.auth.getSession();
   if(!session)return;
-  const{data:perfil}=await sb.from('profiles').select('nombre,rol').eq('id',session.user.id).maybeSingle();
-  if(!perfil||!['admin','auditor_externo','ceo'].includes(perfil.rol)){ await sb.auth.signOut(); return; }
+  const{data:perfil}=await sb.from('profiles').select('nombre,rol,modulos').eq('id',session.user.id).maybeSingle();
+  const tieneModulo=(perfil?.modulos||[]).includes('indicadores');
+  if(!perfil||(!['admin','auditor_externo','ceo'].includes(perfil.rol)&&!tieneModulo)){ await sb.auth.signOut(); return; }
   document.getElementById('userLabel').textContent=perfil.nombre||session.user.email;
   document.getElementById('loginWrap').style.display='none';
   document.getElementById('dashWrap').style.display='block';

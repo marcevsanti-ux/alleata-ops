@@ -279,11 +279,13 @@ async function hacerLogin(){
     return;
   }
 
-  // Mismo criterio que indicadores.html: solo admin puede entrar acá.
-  // (Este módulo no tiene versión "auditor_externo" — es 100% operativo,
-  // con botón de recalcular en vivo contra SF.)
-  const{data:perfil,error:perfilErr}=await sb.from('profiles').select('nombre,rol').eq('id',data.user.id).maybeSingle();
-  if(perfilErr||!perfil||perfil.rol!=='admin'){
+  // Mismo criterio que el resto del portal: admin entra siempre, cualquier
+  // otro rol entra si tiene 'churn-producto' tildado en sus módulos (así
+  // era ANTES de que este módulo se independizara a este archivo — evita
+  // la regresión de dejar afuera a operadores que ya lo tenían habilitado).
+  const{data:perfil,error:perfilErr}=await sb.from('profiles').select('nombre,rol,modulos').eq('id',data.user.id).maybeSingle();
+  const tieneModulo=(perfil?.modulos||[]).includes('churn-producto');
+  if(perfilErr||!perfil||(perfil.rol!=='admin'&&!tieneModulo)){
     errEl.textContent='Esta cuenta no tiene acceso a este portal.';
     await sb.auth.signOut();
     btn.disabled=false;btn.textContent='Ingresar';
@@ -307,8 +309,9 @@ async function hacerLogout(){
 async function chequearSesionExistente(){
   const{data:{session}}=await sb.auth.getSession();
   if(!session)return;
-  const{data:perfil}=await sb.from('profiles').select('nombre,rol').eq('id',session.user.id).maybeSingle();
-  if(!perfil||perfil.rol!=='admin'){ await sb.auth.signOut(); return; }
+  const{data:perfil}=await sb.from('profiles').select('nombre,rol,modulos').eq('id',session.user.id).maybeSingle();
+  const tieneModulo=(perfil?.modulos||[]).includes('churn-producto');
+  if(!perfil||(perfil.rol!=='admin'&&!tieneModulo)){ await sb.auth.signOut(); return; }
   currentProfile=perfil;
   document.getElementById('userLabel').textContent=perfil.nombre||session.user.email;
   document.getElementById('loginWrap').style.display='none';
