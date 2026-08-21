@@ -14592,7 +14592,7 @@ function depsaRender(){
     const fecha=r.sf_created_at?new Date(r.sf_created_at).toLocaleDateString('es-AR'):'—';
     const colectada=_depsaColectadas.has(r.id);
     return `<tr style="${colectada?'background:rgba(29,191,142,.06)':''}">
-      <td>${colectada?'<span title="Colectada" style="cursor:pointer;color:#1dbf8e;font-weight:900" onclick="depsaQuitar(\''+r.id+'\')">✅</span>':'<span style="color:var(--text-muted)">⬜</span>'}</td>
+      <td><input type="checkbox" ${colectada?'checked':''} onchange="depsaToggle('${r.id}',this.checked)" style="width:18px;height:18px;cursor:pointer;accent-color:#1dbf8e"></td>
       <td class="ot-num" style="${colectada?'color:#1dbf8e':''}">${r.workorder_number||'—'}</td>
       <td>${tipoLegible}</td>
       <td>${r.responsable||'—'}</td>
@@ -14603,13 +14603,12 @@ function depsaRender(){
   }).join('');
 }
 
-// Click en el ✅ de una fila colectada = deshacer (por si se escaneó por
-// error o hay que sacarla de la tanda).
-function depsaQuitar(id){
-  _depsaColectadas.delete(id);
+// Tilde manual del checkbox (pedido 20/08 — más fácil que escanear todo si
+// hay pocas OTs o el lector no anda). Mismo efecto que un scan válido.
+function depsaToggle(id,marcado){
+  if(marcado) _depsaColectadas.add(id);
+  else _depsaColectadas.delete(id);
   depsaRender();
-  const input=document.getElementById('depsa-scan-input');
-  if(input) input.focus();
 }
 
 // Genera el Excel EXACTO al modelo que exporta Salesforce nativamente
