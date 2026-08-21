@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.6.61</title>
+<title>Alleata · Operaciones v4.6.62</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -407,7 +407,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.61 · 21 ago 2026
+      v4.6.62 · 21 ago 2026
     </div>
   </div>
 </div>
@@ -516,7 +516,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.61 · 21 ago 2026
+      v4.6.62 · 21 ago 2026
     </div>
   </div>
 </nav>
@@ -556,7 +556,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.61</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.62</div>
   </div>
   <div class="content">
 
@@ -1261,6 +1261,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <div>
       <label class="label">Proveedor</label>
+      <div id="hr-proveedores-frecuentes" style="display:flex;gap:5px;margin-bottom:5px"></div>
       <input class="input" id="hr-parada-proveedor" placeholder="A quién va a ver" style="width:180px">
     </div>
     <div>
@@ -4963,7 +4964,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.6.61] OK');
+console.log('[Alleata v4.6.62] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -5995,6 +5996,27 @@ function hoyArgentina(){
   return new Date().toLocaleDateString('en-CA',{timeZone:'America/Argentina/Buenos_Aires'});
 }
 
+// Proveedores frecuentes (pedido 21/08) — mismo dato que ya está en
+// mobile.html (PROVEEDORES_FRECUENTES), duplicado acá porque son dos
+// archivos HTML independientes sin build compartido. Si se agrega un
+// proveedor nuevo, hay que sumarlo en LOS DOS lugares.
+const HR_PROVEEDORES_FRECUENTES=[
+  {nombre:'Logicalis', direccion:'Irala 1950, CABA'},
+];
+function renderProveedoresFrecuentesDesktop(){
+  const cont=document.getElementById('hr-proveedores-frecuentes');
+  if(!cont)return;
+  cont.innerHTML=HR_PROVEEDORES_FRECUENTES.map(p=>
+    `<button type="button" onclick="seleccionarProveedorFrecuenteDesktop('${p.nombre.replace(/'/g,"\\'")}')" style="background:rgba(29,191,142,.1);border:1px solid rgba(29,191,142,.3);color:var(--teal);padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer;font-family:'Inter',sans-serif">⭐ ${p.nombre}</button>`
+  ).join('');
+}
+function seleccionarProveedorFrecuenteDesktop(nombre){
+  const p=HR_PROVEEDORES_FRECUENTES.find(x=>x.nombre===nombre);
+  if(!p)return;
+  document.getElementById('hr-parada-proveedor').value=p.nombre;
+  document.getElementById('hr-parada-direccion').value=p.direccion;
+}
+
 async function loadHojaRuta(){
   const cont=document.getElementById('hr-content');
   if(!cont)return;
@@ -6007,7 +6029,7 @@ async function loadHojaRuta(){
     const esAdmin=currentProfile?.rol==='admin';
     asignarBox.style.display=esAdmin?'flex':'none';
     if(paradaBox)paradaBox.style.display=esAdmin?'flex':'none';
-    if(esAdmin)_poblarChoferesAsignar();
+    if(esAdmin){_poblarChoferesAsignar();renderProveedoresFrecuentesDesktop();}
   }
 
   const hoy=hoyArgentina();
