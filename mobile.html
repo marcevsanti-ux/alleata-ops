@@ -165,7 +165,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
       <div class="login-logo">
         <img id="loginLogo" src="" alt="Alleata">
         <div class="login-sub">Portal de Operaciones</div>
-        <div class="login-version">v2.14.46 · mobile</div>
+        <div class="login-version">v2.14.47 · mobile</div>
       </div>
       <div class="field"><label class="label">Email</label><input class="input" id="lEmail" type="email" placeholder="usuario@alleata.com" autocomplete="email"></div>
       <div class="field"><label class="label">Contraseña</label><input class="input" id="lPass" type="password" placeholder="••••••••" autocomplete="current-password"></div>
@@ -182,7 +182,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
     <img id="appLogo" src="" alt="Alleata">
     <div class="topbar-title" id="topbarTitle">Operaciones</div>
     <button id="btnSyncRapido" onclick="syncRapido()" title="Actualizar estados desde Salesforce (sin esperar los 10min)" style="background:none;border:none;color:#fff;font-size:18px;cursor:pointer;padding:4px 6px;line-height:1">🔄</button>
-    <div class="topbar-version" onclick="_tocarVersion()">v2.14.46</div>
+    <div class="topbar-version" onclick="_tocarVersion()">v2.14.47</div>
     <div class="topbar-avatar" id="topbarAvatar" onclick="openDrawer()">?</div>
   </div>
 
@@ -568,6 +568,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
     <input type="hidden" id="pm-tipo" value="retiro_proveedor">
 
     <label class="label" style="margin-bottom:6px;display:block">Proveedor / a quién vas a ver</label>
+    <div id="pm-proveedores-frecuentes" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px"></div>
     <input class="input" id="pm-proveedor" placeholder="Ej: Newsan, depósito Vicente López..." style="margin-bottom:12px">
 
     <label class="label" style="margin-bottom:6px;display:block">Dirección</label>
@@ -765,12 +766,17 @@ const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSI
 //     el producto en estado raro en SF (por eso existe la opción
 //     Reprogramar como alternativa), así que necesita aviso inmediato.
 //     No bloquea el cierre si el envío directo falla.
-// Cambios v2.14.46 (11/08):
+// Cambios v2.14.47 (11/08):
 //   - Números de OT: .ot-num y #otS-num pasan de JetBrains Mono a IBM
 //     Plex Mono bold (0 con barra diagonal — no se confunde con O).
 //     JetBrains Mono acá solo cargaba 400/500, así que el "bold" viejo
 //     era negrita sintética del navegador, no un peso real — se veía
 //     peor, no mejor.
+// Cambios v2.14.47 (21/08):
+//   - Modal "Retiro/Entrega en proveedor": chip de proveedores frecuentes
+//     (Logicalis precargado — nombre + dirección) arriba del campo
+//     Proveedor. Un click completa Proveedor y Dirección, solo queda
+//     elegir Retiro/Entrega y completar los datos puntuales.
 const{createClient}=supabase;
 const sb=createClient(SUPABASE_URL,SUPABASE_KEY);
 
@@ -1521,9 +1527,33 @@ async function loadRuta(){
 }
 
 // ── PARADAS MANUALES — retiro en proveedor (tabla paralela, no toca sf_workorders) ──
+// Proveedores frecuentes (pedido 21/08) — fijos, para no tener que
+// retipear nombre+dirección cada vez. Con un click completan Proveedor y
+// Dirección; el operador solo tiene que elegir Retiro/Entrega y el resto
+// de los datos puntuales (contacto, qué retira/entrega, OT si aplica).
+const PROVEEDORES_FRECUENTES=[
+  {nombre:'Logicalis', direccion:'Irala 1950, CABA'},
+];
+
+function renderProveedoresFrecuentes(){
+  const cont=document.getElementById('pm-proveedores-frecuentes');
+  if(!cont)return;
+  cont.innerHTML=PROVEEDORES_FRECUENTES.map(p=>
+    `<button type="button" onclick="seleccionarProveedorFrecuente('${p.nombre.replace(/'/g,"\\'")}')" style="background:rgba(29,191,142,.1);border:1px solid rgba(29,191,142,.3);color:var(--teal);padding:6px 12px;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Inter',sans-serif">⭐ ${p.nombre}</button>`
+  ).join('');
+}
+
+function seleccionarProveedorFrecuente(nombre){
+  const p=PROVEEDORES_FRECUENTES.find(x=>x.nombre===nombre);
+  if(!p)return;
+  document.getElementById('pm-proveedor').value=p.nombre;
+  document.getElementById('pm-direccion').value=p.direccion;
+}
+
 async function abrirModalParadaManual(){
   ['pm-proveedor','pm-direccion','pm-contacto','pm-telefono','pm-queretirar','pm-ot','pm-notas'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   document.getElementById('pm-msg').textContent='';
+  renderProveedoresFrecuentes();
   setTipoParadaManual('retiro_proveedor');
   document.getElementById('modalParadaManual').classList.add('show');
 }
