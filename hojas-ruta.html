@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Alleata · Hojas de Ruta — Rollout</title>
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --bg:#070c14; --panel:#0f1a2b; --panel2:#13223a; --border:#1e3252;
+    --teal:#1dbf8e; --amber:#f5a623; --purple:#8b5cf6; --red:#ef4444;
+    --text:#eef4fb; --text-dim:#7b93b3; --mono:'JetBrains Mono','Courier New',monospace;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{min-height:100%;background:var(--bg);color:var(--text);font-family:'Inter',-apple-system,sans-serif}
+  body{display:flex;flex-direction:column}
+  header{display:flex;align-items:center;justify-content:space-between;padding:12px 30px;border-bottom:2px solid var(--border);background:linear-gradient(180deg,#0d1626,#070c14);flex-shrink:0;flex-wrap:wrap;gap:10px}
+  .brand{display:flex;align-items:center;gap:14px}
+  .brand-logo{font-size:22px;font-weight:800;letter-spacing:-1px;color:var(--teal)}
+  .brand-title{font-size:14px;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:1.6px}
+  .fecha-nav{display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:13px}
+  .fecha-nav button{background:var(--panel2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:6px 12px;cursor:pointer;font-family:inherit}
+  .fecha-nav button:hover{border-color:var(--teal)}
+  .last-sync{font-size:10.5px;color:var(--text-dim);font-family:var(--mono)}
+
+  .strip{display:flex;gap:0;border-bottom:1px solid var(--border);flex-shrink:0;flex-wrap:wrap}
+  .strip-item{flex:1;min-width:160px;padding:14px 24px;text-align:center;border-right:1px solid var(--border)}
+  .strip-num{font-size:28px;font-weight:800;font-family:var(--mono);line-height:1}
+  .strip-lbl{font-size:10.5px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.8px;margin-top:4px}
+
+  main{padding:20px 24px;display:grid;grid-template-columns:1fr 1fr;gap:20px}
+  @media(max-width:900px){main{grid-template-columns:1fr}}
+
+  .hoja{background:var(--panel);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+  .hoja-head{padding:16px 18px;border-bottom:1px solid var(--border);background:var(--panel2)}
+  .hoja-op{font-size:16px;font-weight:800}
+  .hoja-meta{font-size:11.5px;color:var(--text-dim);margin-top:4px;font-family:var(--mono)}
+  .hoja-badges{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+  .badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:6px;font-family:var(--mono)}
+  .badge-ok{background:rgba(29,191,142,.15);color:var(--teal);border:1px solid rgba(29,191,142,.35)}
+  .badge-warn{background:rgba(245,166,35,.15);color:var(--amber);border:1px solid rgba(245,166,35,.35)}
+  .badge-bad{background:rgba(239,68,68,.15);color:var(--red);border:1px solid rgba(239,68,68,.35)}
+  .badge-info{background:rgba(139,92,246,.15);color:var(--purple);border:1px solid rgba(139,92,246,.35)}
+
+  .stop{padding:11px 18px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:10px}
+  .stop:last-child{border-bottom:none}
+  .stop-ot{font-family:var(--mono);font-weight:700;font-size:13px}
+  .stop-zona{font-size:11px;color:var(--text-dim);margin-top:2px}
+  .stop-hora{font-family:var(--mono);font-size:11.5px;color:var(--text-dim);white-space:nowrap}
+
+  .panel-extra{background:var(--panel);border:1px solid var(--border);border-radius:12px;margin:0 24px 24px;overflow:hidden}
+  .panel-extra summary{padding:14px 18px;cursor:pointer;font-weight:700;font-size:13px;color:var(--text-dim);list-style:none;display:flex;justify-content:space-between}
+  .panel-extra summary::-webkit-details-marker{display:none}
+  .panel-extra[open] summary{border-bottom:1px solid var(--border)}
+  .extra-row{padding:9px 18px;border-bottom:1px solid var(--border);font-size:12.5px;display:flex;justify-content:space-between;gap:10px}
+  .extra-row:last-child{border-bottom:none}
+  .extra-ot{font-family:var(--mono);font-weight:700}
+  .extra-motivo{color:var(--text-dim);font-size:11.5px}
+
+  .empty{padding:40px 20px;text-align:center;color:var(--text-dim);font-size:13px}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="brand-logo">alleata</div>
+    <div class="brand-title">Hojas de Ruta · Rollout</div>
+  </div>
+  <div class="fecha-nav">
+    <button onclick="cambiarDia(-1)">◀</button>
+    <span id="fechaLabel">—</span>
+    <button onclick="cambiarDia(1)">▶</button>
+  </div>
+  <div class="last-sync" id="lastSync">Cargando…</div>
+</header>
+
+<div class="strip" id="strip"></div>
+<main id="main"></main>
+<div id="extras"></div>
+
+<script>
+const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
+const SUPABASE_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
+const sb=supabase.createClient(SUPABASE_URL,SUPABASE_ANON);
+
+function esc(s){ return String(s??'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+// Arranca mostrando "mañana" en ART (mismo criterio que calcularFechaRutaART()
+// del backend — ver asignarHojasRutaRunner.js). Se puede navegar con las flechas.
+function fechaMananaART(){
+  const ahoraUTC=new Date();
+  const ahoraART=new Date(ahoraUTC.getTime()-3*3600*1000);
+  const manana=new Date(Date.UTC(ahoraART.getUTCFullYear(),ahoraART.getUTCMonth(),ahoraART.getUTCDate()+1));
+  if(manana.getUTCDay()===0) manana.setUTCDate(manana.getUTCDate()+1); // domingo -> lunes
+  return manana.toISOString().slice(0,10);
+}
+
+let fechaActual = fechaMananaART();
+
+function cambiarDia(delta){
+  const d = new Date(fechaActual+'T00:00:00Z');
+  d.setUTCDate(d.getUTCDate()+delta);
+  fechaActual = d.toISOString().slice(0,10);
+  cargar();
+}
+
+let _cargando=false;
+async function cargar(){
+  if(_cargando) return;
+  _cargando=true;
+  try{
+    document.getElementById('fechaLabel').textContent = new Date(fechaActual+'T00:00:00Z')
+      .toLocaleDateString('es-AR',{weekday:'long',day:'numeric',month:'long',timeZone:'UTC'});
+
+    const [{data:asignadas,error:e1}, {data:resumen,error:e2}, {data:revision,error:e3}] = await Promise.all([
+      sb.from('hojas_ruta_asignadas').select('*').eq('fecha_ruta',fechaActual).order('operador').order('orden_sugerido'),
+      sb.from('hojas_ruta_resumen').select('*').eq('fecha_ruta',fechaActual),
+      sb.from('hojas_ruta_requieren_revision').select('*').eq('fecha_ruta',fechaActual),
+    ]);
+
+    if(e1||e2||e3){
+      document.getElementById('lastSync').textContent='Error: '+(e1||e2||e3).message;
+      return;
+    }
+
+    const generadoAt = resumen?.[0]?.generado_at ? new Date(resumen[0].generado_at) : null;
+    document.getElementById('lastSync').textContent = generadoAt
+      ? 'Asignado '+generadoAt.toLocaleString('es-AR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})
+      : 'Sin asignación calculada para este día todavía';
+
+    render(asignadas||[], resumen||[], revision||[]);
+  } finally {
+    _cargando=false;
+  }
+}
+
+function render(asignadas, resumen, revision){
+  const strip=document.getElementById('strip');
+  const main=document.getElementById('main');
+  const extras=document.getElementById('extras');
+
+  const totalAsignadas = asignadas.length;
+  const zombis = revision.filter(r=>r.motivo?.includes('D7'));
+  const sinGeo = revision.filter(r=>r.motivo?.includes('geocodificar'));
+
+  strip.innerHTML = `
+    <div class="strip-item"><div class="strip-num" style="color:var(--teal)">${totalAsignadas}</div><div class="strip-lbl">OTs asignadas hoy</div></div>
+    <div class="strip-item"><div class="strip-num" style="color:var(--purple)">${resumen.length}</div><div class="strip-lbl">Hojas armadas</div></div>
+    <div class="strip-item"><div class="strip-num" style="color:${zombis.length?'var(--red)':'var(--text-dim)'}">${zombis.length}</div><div class="strip-lbl">Requieren revisión (D7)</div></div>
+    <div class="strip-item"><div class="strip-num" style="color:${sinGeo.length?'var(--amber)':'var(--text-dim)'}">${sinGeo.length}</div><div class="strip-lbl">Sin geocodificar</div></div>
+  `;
+
+  if(!resumen.length){
+    main.innerHTML = `<div class="empty" style="grid-column:1/-1">No hay hojas de ruta calculadas para este día todavía.<br>Corré <code>POST /automations/run/asignar_hojas_ruta</code> o esperá al cron nocturno.</div>`;
+    extras.innerHTML='';
+    return;
+  }
+
+  main.innerHTML = resumen.map(r=>{
+    const ots = asignadas.filter(a=>a.operador===r.operador);
+    const badges = [];
+    badges.push(r.completa ? `<span class="badge badge-ok">${r.total_ots}/10 completa</span>` : `<span class="badge badge-warn">${r.total_ots}/10 incompleta</span>`);
+    if(r.por_envejecimiento) badges.push(`<span class="badge badge-info">por envejecimiento (D5)</span>`);
+    if(r.cruza_zonas) badges.push(`<span class="badge badge-warn">cruza zonas</span>`);
+    if(r.recortada_por_factibilidad) badges.push(`<span class="badge badge-warn">recortada por horario</span>`);
+    if(r.factible===false) badges.push(`<span class="badge badge-bad">⚠️ no entra en el día — revisar</span>`);
+
+    return `
+    <div class="hoja">
+      <div class="hoja-head">
+        <div class="hoja-op">${esc(r.operador)}</div>
+        <div class="hoja-meta">Zona objetivo: ${esc(r.zona_objetivo)||'—'}${(r.zonas_incluidas||[]).length>1?' · incluye: '+r.zonas_incluidas.join(', '):''} · vuelve ~${esc(r.hora_regreso_estimada)||'sin calcular'}</div>
+        <div class="hoja-badges">${badges.join('')}</div>
+      </div>
+      ${ots.length ? ots.map(o=>`
+        <div class="stop">
+          <div>
+            <div class="stop-ot">${esc(o.ot_numero)}</div>
+            <div class="stop-zona">${esc(o.zonas_incluidas?.[0]||'')}</div>
+          </div>
+          <div class="stop-hora">${o.hora_llegada_estimada?'llega ~'+esc(o.hora_llegada_estimada):''}${o.dentro_de_horario===false?' ⚠️':''}</div>
+        </div>`).join('') : '<div class="empty">Sin OTs</div>'}
+      ${(r.ots_recortadas||[]).length ? `<div class="extra-row"><span class="extra-motivo">Recortadas por horario, vuelven al pool:</span><span class="extra-ot">${r.ots_recortadas.join(', ')}</span></div>` : ''}
+    </div>`;
+  }).join('');
+
+  extras.innerHTML = `
+    ${revision.length ? `
+    <details class="panel-extra" open>
+      <summary><span>⚠️ Requieren revisión manual (${revision.length})</span><span>▾</span></summary>
+      ${revision.map(r=>`<div class="extra-row"><span class="extra-ot">${esc(r.ot_numero)}</span><span class="extra-motivo">${esc(r.zona)||'—'} · ${r.dias_pendiente}d · ${esc(r.motivo)}</span></div>`).join('')}
+    </details>` : ''}
+  `;
+}
+
+cargar();
+setInterval(cargar, 60000);
+</script>
+</body>
+</html>
