@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.6.64</title>
+<title>Alleata · Operaciones v4.6.65</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -407,7 +407,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.64 · 24 ago 2026
+      v4.6.65 · 24 ago 2026
     </div>
   </div>
 </div>
@@ -516,7 +516,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.64 · 24 ago 2026
+      v4.6.65 · 24 ago 2026
     </div>
   </div>
 </nav>
@@ -556,7 +556,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.64</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.65</div>
   </div>
   <div class="content">
 
@@ -2668,6 +2668,19 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
 // ══════════════════════════════════════════════════════════════
 
 const INST_TIPOS = ['Instalación Equipo + Simcard','Instalación Simcard','Asistencia Técnica'];
+// Tipos de OT que viajan por Correo Argentino. Se usa en el backfill de SLA
+// y en los KPIs de CA.
+//
+// BUG CORREGIDO 24/08: estas dos consultas listaban 'Asistencia Tecnica'
+// SIN TILDE, pero en Salesforce el valor real es 'Asistencia Técnica' CON
+// tilde (verificado: 275 OTs, todas con tilde, ninguna sin). Resultado: a
+// las Asistencias Técnicas despachadas por Correo Argentino nunca se les
+// calculaba el SLA ni aparecían en los KPIs de CA — y el error era
+// silencioso, simplemente no traía filas.
+// Se incluyen LAS DOS variantes por las dudas de que alguna carga vieja o
+// futura venga sin tilde. No hardcodear esta lista de nuevo en cada query.
+const TIPOS_ENVIO_CA = ['Instalación Equipo + Simcard','Instalación Simcard','Asistencia Técnica','Asistencia Tecnica'];
+
 
 let _instTodos    = [];
 let _instFiltrado = [];
@@ -4983,7 +4996,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.6.64] OK');
+console.log('[Alleata v4.6.65] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -10347,7 +10360,7 @@ async function backfillSLACA(){
   // Buscar todas las OTs de CA con track y sin sla_ca_dias
   const { data: pendientesRaw, error } = await sb.from('sf_workorders')
     .select('id,workorder_number,tracking_envio,status,record_type,responsable,sla_ca_dias')
-    .in('record_type',['Instalación Equipo + Simcard','Instalación Simcard','Asistencia Tecnica'])
+    .in('record_type',TIPOS_ENVIO_CA)
     .in('status',['Pre-Colecta','Despachado'])
     .eq('logistica','CORREO ARGENTINO')
     .not('tracking_envio','is',null)
@@ -10459,7 +10472,7 @@ async function loadCAKPIs(responsable=null){
 
   let q = sb.from('sf_workorders')
     .select('provincia,sla_ca_dias,sla_total_dias,cant_intentos,status,responsable')
-    .in('record_type',['Instalación Equipo + Simcard','Instalación Simcard','Asistencia Tecnica'])
+    .in('record_type',TIPOS_ENVIO_CA)
     .eq('logistica','CORREO ARGENTINO')
     .not('sla_ca_dias','is',null);
 
