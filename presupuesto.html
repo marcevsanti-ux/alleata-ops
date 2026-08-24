@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Alleata · Presupuesto Operaciones v1.14.1</title>
+<title>Alleata · Presupuesto Operaciones v1.14.2</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -200,7 +200,7 @@
   <div class="login-box">
     <h2>💰 Presupuesto</h2>
     <p class="login-sub">Alleata · Acceso restringido</p>
-    <div style="position:absolute;bottom:12px;right:16px;font-size:10px;font-family:'JetBrains Mono',monospace;color:rgba(232,237,243,.2)">v1.14.1</div>
+    <div style="position:absolute;bottom:12px;right:16px;font-size:10px;font-family:'JetBrains Mono',monospace;color:rgba(232,237,243,.2)">v1.14.2</div>
     <div class="login-field">
       <label>Email</label>
       <input type="email" id="loginEmail" placeholder="tu@email.com" onkeydown="if(event.key==='Enter')doLogin()">
@@ -216,7 +216,7 @@
 
 <div id="appContent" style="display:none">
 <h1>💰 Presupuesto Operaciones</h1>
-<p class="sub">Alleata · 2026 <span style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 8px;border-radius:4px;border:1px solid var(--border2);font-size:10px;margin-left:6px">v1.14.1</span></p>
+<p class="sub">Alleata · 2026 <span style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 8px;border-radius:4px;border:1px solid var(--border2);font-size:10px;margin-left:6px">v1.14.2</span></p>
 
 <div class="toolbar">
   <div class="mes-bar" id="mesBar"></div>
@@ -3198,12 +3198,27 @@ function mlParseInvoiceText(text){
   try{
     const joined=text.replace(/\r/g,'');
 
-    // Total: "TOTAL:" seguido de $ monto — común a (casi) todas las facturas AFIP
-    const totalM=joined.match(/TOTAL:?\s*\$\s*([\d.,]+)/i);
-    const total=totalM?logiParseNum(totalM[1]):0;
+    // Total. FIX 24/08: antes el regex exigía el signo $ después de "TOTAL:",
+    // y hay proveedores (ej. NeoFactura / NIXIE) que lo imprimen sin signo,
+    // así que el total quedaba en 0. Ahora el $ es opcional.
+    // Ojo: "SUBTOTAL:" y "Cantidad total:" contienen la misma palabra y con
+    // el flag /i matchean igual — por eso se descartan explícitamente y,
+    // entre los candidatos que quedan, se toma el MAYOR (el total final
+    // siempre es el número más grande de la factura).
+    const totalCands=[];
+    for(const m of joined.matchAll(/(SUB|Cantidad\s+)?TOTAL:?\s*\$?\s*([\d.,]+)/gi)){
+      if(m[1]) continue; // era SUBTOTAL o "Cantidad total"
+      totalCands.push(logiParseNum(m[2]));
+    }
+    const total=totalCands.length?Math.max(...totalCands):0;
 
     // N° de comprobante: letra opcional + 4-5 dígitos - 6-8 dígitos (ej: A00005-00030897, 0001-00012345)
-    const nroM=joined.match(/N[°ºo]\.?\s*([A-Za-z]?\d{4,5}-\d{6,8})/i);
+    // FIX 24/08: si el PDF tiene el layout en columnas, al extraer el texto el
+    // "Nº" queda separado del valor por otras palabras y el match pegado
+    // fallaba. Se agrega fallback al patrón suelto. No colisiona con el CUIT
+    // (30-71856449-9) porque ese tiene solo 2 dígitos antes del guion.
+    let nroM=joined.match(/N[°ºo]\.?\s*([A-Za-z]?\d{4,5}-\d{6,8})/i);
+    if(!nroM) nroM=joined.match(/\b([A-Za-z]?\d{4,5}-\d{6,8})\b/);
     const numero=nroM?nroM[1].toUpperCase():'—';
 
     // Fecha de la factura: DD-MM-YYYY o DD/MM/YYYY. NO se busca la primera
@@ -3225,19 +3240,27 @@ function mlParseInvoiceText(text){
       mesFactura=MESES_NUM[parseInt(fechaM[2],10)-1]||null;
     }
 
-    // CUIT del proveedor (emisor) — el primer "Cuit:" del documento; el del
-    // comprador (Alleata/Moretti) aparece más abajo, junto a "Razon Social:"
-    const cuitM=joined.match(/Cuit:?\s*(\d{2}-?\d{7,8}-?\d{1})/i);
-    const cuit=cuitM?cuitM[1]:'—';
+    // CUIT del proveedor. FIX 24/08: antes se tomaba el primer "Cuit:" del
+    // documento asumiendo que el emisor va primero, pero eso depende del
+    // layout: en formato NeoFactura el CUIT del comprador aparece antes.
+    // Ahora se identifica por EXCLUSIÓN: el comprador siempre es el mismo
+    // (Moretti), así que cualquier CUIT que no sea el suyo es del proveedor.
+    const CUIT_COMPRADOR=/30-?61577338-?3/;
+    const cuits=[...joined.matchAll(/(\d{2}-\d{7,8}-\d)/g)].map(m=>m[1]).filter(x=>!CUIT_COMPRADOR.test(x));
+    const cuit=cuits[0]||'—';
 
-    // Proveedor — heurística: línea con razón social (contiene S.R.L./S.A./
-    // S.A.S., etc.) antes de "Razon Social:" (que es el COMPRADOR, no confundir).
-    // Si no matchea, queda vacío y se completa a mano — no vale la pena
-    // adivinar mal el nombre del negocio.
-    let proveedor='';
-    const antesComprador=joined.split(/Razon\s*Social:/i)[0];
-    const razonM=antesComprador.match(/([A-ZÁÉÍÓÚÑ][A-Za-zÀ-ÿ0-9.,\s]{3,60}?\s(?:S\.?\s?R\.?\s?L\.?|S\.?\s?A\.?(?:\s?S\.?)?|S\.?\s?H\.?))/);
-    if(razonM) proveedor=razonM[1].trim();
+    // Proveedor. FIX 24/08: antes se cortaba el texto en "Razon Social:" para
+    // separar emisor de comprador, pero ese literal no existe en todos los
+    // formatos — cuando falta, el corte no hace nada y agarraba la primera
+    // razón social del documento, que en el formato NeoFactura es la del
+    // COMPRADOR. Resultado: facturas de gasto cargadas a nombre de
+    // "ANDRES MORETTI E HIJOS S A", un error silencioso (no falla, carga mal).
+    // Ahora se listan todas las razones sociales y se descarta al comprador,
+    // que siempre es el mismo — mucho más robusto que depender del layout.
+    const RAZON_SOCIAL=/([A-ZÁÉÍÓÚÑ][A-Za-zÀ-ÿ0-9.,&\s]{2,60}?\s(?:S\.?\s?R\.?\s?L\.?|S\.?\s?A\.?(?:\s?S\.?)?|S\.?\s?H\.?))(?=\s|$)/g;
+    const NOMBRE_COMPRADOR=/MORETTI|ALLEATA/i;
+    const razones=[...joined.matchAll(RAZON_SOCIAL)].map(m=>m[1].trim()).filter(r=>!NOMBRE_COMPRADOR.test(r));
+    const proveedor=razones[0]||'';
 
     return {numero, fecha, mesFactura, cuit, proveedor, total};
   }catch(e){ return null; }
