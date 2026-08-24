@@ -6667,9 +6667,16 @@ async function loadRolloutPiloto(){
 // Terminal), separado en 2 filas: AMBA (logística Alleata + Cabify) e
 // Interior (EPSA + Correo Argentino). "Instala Ventas" queda afuera de
 // las dos — a revisar caso por caso (pedido explícito, no asumir).
-// Totales validados 1:1 contra el reporte real de SF antes de construir
-// esto (62/164/41 por mes, filtro por esos 3 estados).
-const CAMBIOS_ZONA_ESTADOS = ['Despachado', 'Exitoso', 'Retirar Terminal'];
+// CAMBIO 23/08 (marcelos): estas tarjetas miden TERMINALES ENTREGADAS, así
+// que el único estado que cuenta es 'Exitoso'. Antes incluían también
+// 'Despachado' (salió del depósito pero NO llegó todavía) y 'Retirar
+// Terminal' (logística inversa — la terminal vuelve, es lo contrario a una
+// entrega). Eso inflaba Interior un 29% en junio: mostraba 31 cuando las
+// entregas reales eran 24.
+// Los estados de problema (Fallido, Cancelado, Terminal con Error) quedan
+// afuera a propósito — pedido explícito: "si están fallidas no importa el
+// motivo, es un dato que hoy no me sirve".
+const CAMBIOS_ZONA_ESTADOS = ['Exitoso'];
 const CAMBIOS_ZONA_MESES = [
   { key: '2026-06', label: 'JUNIO' },
   { key: '2026-07', label: 'JULIO' },
@@ -6685,7 +6692,10 @@ async function cargarCambiosPorZona() {
   const { data, error } = await sb.from('sf_workorders')
     .select('workorder_number,sf_created_at,status,logistica')
     .eq('record_type', 'Cambio de Terminal')
-    .in('status', CAMBIOS_ZONA_ESTADOS)
+    // NO se filtra por status en la query: se traen todos y se filtra en JS.
+    // Así la dona muestra solo las entregadas (CAMBIOS_ZONA_ESTADOS) pero
+    // igual sabemos el total de OTs del mes para mostrarlo como contexto y
+    // que nadie lea el número de la dona como "el total de junio".
     .gte('sf_created_at', '2026-06-01')
     .lte('sf_created_at', '2026-08-31T23:59:59');
   if (error) {
@@ -6697,16 +6707,19 @@ async function cargarCambiosPorZona() {
   const INTERIOR_LOGS = ['EPSA', 'CORREO ARGENTINO'];
   const agrupar = logs => {
     const porMes = {}; CAMBIOS_ZONA_MESES.forEach(m => porMes[m.key] = {});
+    const totalMes = {}; CAMBIOS_ZONA_MESES.forEach(m => totalMes[m.key] = 0);
     (data || []).forEach(r => {
       if (!logs.includes((r.logistica || '').toUpperCase())) return;
       const mes = String(r.sf_created_at).slice(0, 7);
       if (!porMes[mes]) return;
+      totalMes[mes]++;                                    // todas las OTs del mes, sin importar estado
+      if (!CAMBIOS_ZONA_ESTADOS.includes(r.status)) return; // la dona solo cuenta entregadas
       porMes[mes][r.status] = (porMes[mes][r.status] || 0) + 1;
     });
-    return porMes;
+    return { porMes, totalMes };
   };
-  const ambaPorMes = agrupar(AMBA_LOGS);
-  const interiorPorMes = agrupar(INTERIOR_LOGS);
+  const { porMes: ambaPorMes, totalMes: ambaTotalMes } = agrupar(AMBA_LOGS);
+  const { porMes: interiorPorMes, totalMes: interiorTotalMes } = agrupar(INTERIOR_LOGS);
 
   // Lo que no entra en ninguno de los 2 grupos (hoy: "Instala Ventas" —
   // pedido 12/08 de marcelos, "lo tengo que ver caso por caso", así que
@@ -6717,6 +6730,7 @@ async function cargarCambiosPorZona() {
   (data || []).forEach(r => {
     const log = (r.logistica || '').toUpperCase();
     if (AMBA_LOGS.includes(log) || INTERIOR_LOGS.includes(log)) return;
+    if (!CAMBIOS_ZONA_ESTADOS.includes(r.status)) return; // mismo criterio que las donas, para que la reconciliación cierre
     const mes = String(r.sf_created_at).slice(0, 7);
     if (!sinClasificarPorMes[mes]) return;
     sinClasificarPorMes[mes].total++;
@@ -6732,22 +6746,30 @@ async function cargarCambiosPorZona() {
   ).join('');
 
   cont.innerHTML = `
-    <div style="font-size:13px;font-weight:700;margin-bottom:8px">🏙️ AMBA — Cambios de Terminal (Alleata + Cabify)</div>
+    <div style="font-size:13px;font-weight:700;margin-bottom:8px">🏙️ AMBA — Terminales entregadas · Cambios (Alleata + Cabify)</div>
     <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px">${filaHtml('donut-amba')}</div>
-    <div style="font-size:13px;font-weight:700;margin-bottom:8px">📦 Interior — Cambios de Terminal (EPSA + Correo Argentino)</div>
+    <div style="font-size:13px;font-weight:700;margin-bottom:8px">📦 Interior — Terminales entregadas · Cambios (EPSA + Correo Argentino)</div>
     <div style="display:flex;gap:12px;flex-wrap:wrap">${filaHtml('donut-interior')}</div>`;
 
   CAMBIOS_ZONA_MESES.forEach(m => {
     const dA = ambaPorMes[m.key] || {};
-    renderChartDona(`donut-amba-${m.key}`, `CAMBIOS ${m.label} 2026`, dA, CAMBIOS_ZONA_COLORES, Object.values(dA).reduce((a, b) => a + b, 0));
+    const entregadasA = Object.values(dA).reduce((a, b) => a + b, 0);
+    renderChartDona(`donut-amba-${m.key}`, `ENTREGADAS ${m.label} 2026`, dA, CAMBIOS_ZONA_COLORES, entregadasA);
     const dI = interiorPorMes[m.key] || {};
-    renderChartDona(`donut-interior-${m.key}`, `CAMBIOS ${m.label} 2026`, dI, CAMBIOS_ZONA_COLORES, Object.values(dI).reduce((a, b) => a + b, 0));
+    const entregadasI = Object.values(dI).reduce((a, b) => a + b, 0);
+    renderChartDona(`donut-interior-${m.key}`, `ENTREGADAS ${m.label} 2026`, dI, CAMBIOS_ZONA_COLORES, entregadasI);
     const sinClas = sinClasificarPorMes[m.key] || { total: 0, logs: new Set(), ots: [] };
-    const notaTxt = sinClas.total>0 ? `⚠️ OT ${sinClas.ots.join(', ')} — logística "${Array.from(sinClas.logs).join('", "')}", no está en AMBA ni Interior, revisar caso por caso` : '';
+    const notaSinClas = sinClas.total>0 ? `⚠️ OT ${sinClas.ots.join(', ')} — logística "${Array.from(sinClas.logs).join('", "')}", no está en AMBA ni Interior, revisar caso por caso` : '';
+    // Contexto: cuántas OTs de cambio hubo en el mes en total. Sin esto, el
+    // número de la dona se lee como "el total del mes", cuando en realidad
+    // son solo las entregadas (quedan afuera despachadas, fallidas, etc).
+    const ctx = (entregadas, total) => total > entregadas
+      ? `${entregadas} entregadas de ${total} OTs de cambio en el mes`
+      : `${entregadas} entregadas`;
     const notaA = document.getElementById(`donut-amba-${m.key}-nota`);
     const notaI = document.getElementById(`donut-interior-${m.key}-nota`);
-    if(notaA) notaA.textContent = notaTxt;
-    if(notaI) notaI.textContent = notaTxt;
+    if(notaA) notaA.textContent = [ctx(entregadasA, ambaTotalMes[m.key]||0), notaSinClas].filter(Boolean).join(' · ');
+    if(notaI) notaI.textContent = [ctx(entregadasI, interiorTotalMes[m.key]||0), notaSinClas].filter(Boolean).join(' · ');
   });
 }
 
