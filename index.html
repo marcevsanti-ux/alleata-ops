@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.6.63</title>
+<title>Alleata · Operaciones v4.6.64</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -407,7 +407,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.63 · 21 ago 2026
+      v4.6.64 · 24 ago 2026
     </div>
   </div>
 </div>
@@ -516,7 +516,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.63 · 21 ago 2026
+      v4.6.64 · 24 ago 2026
     </div>
   </div>
 </nav>
@@ -556,7 +556,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.63</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.64</div>
   </div>
   <div class="content">
 
@@ -2986,7 +2986,7 @@ function instBodyModal(r) {
       f('Ciudad', r.ciudad),
       f('Provincia', r.provincia),
       f('Código Postal', r.codigo_postal, true),
-      f('Horario', r.horario || r.horario_entrega),
+      f('Horario', r.horario), // Horario__c — ver nota en generarRotulo()
       f('Contacto', r.contacto_celular),
       f('Tel. secundario', r.telefono_secundario),
       f('Email', r.email_destino)
@@ -3135,7 +3135,13 @@ async function printRotuloInstalacion(id) {
   const qrRutaSrc = makeQRDataUrl(rutaUrl, 68);
   const barcodeSrc = `https://barcode.tec-it.com/barcode.ashx?data=${encodeURIComponent(r.workorder_number||'')}&code=Code128&dpi=200&imagetype=Png`;
 
-  const horario = r.horario || r.horario_entrega || '—';
+  // CAMBIO 24/08 (marcelos): el rótulo debe mostrar SIEMPRE el campo
+  // Horario__c de Salesforce (columna `horario`), nunca Horario_de_Entrega__c
+  // (columna `horario_entrega`), que es un campo distinto. Antes había
+  // fallback a horario_entrega y en el rótulo de logística propia se
+  // imprimían las DOS líneas ("Entrega:" y "Horario:"), lo que hacía que
+  // cuando los campos diferían se imprimiera el dato equivocado.
+  const horario = r.horario || '—';
   const turnos = [r.turno_manana ? 'Mañana' : '', r.turno_tarde ? 'Tarde' : ''].filter(Boolean).join(' / ');
 
   const w = window.open('', '_blank', 'width=430,height=700');
@@ -3261,7 +3267,13 @@ async function printRotuloEpsa(id) {
   // de imagen por URL que ya se usa para los QR, sin agregar librerías nuevas.
   const barcodeSrc = `https://barcode.tec-it.com/barcode.ashx?data=${encodeURIComponent(otNumero)}&code=Code128&dpi=200&imagetype=Png`;
 
-  const horario = r.horario || r.horario_entrega || '—';
+  // CAMBIO 24/08 (marcelos): el rótulo debe mostrar SIEMPRE el campo
+  // Horario__c de Salesforce (columna `horario`), nunca Horario_de_Entrega__c
+  // (columna `horario_entrega`), que es un campo distinto. Antes había
+  // fallback a horario_entrega y en el rótulo de logística propia se
+  // imprimían las DOS líneas ("Entrega:" y "Horario:"), lo que hacía que
+  // cuando los campos diferían se imprimiera el dato equivocado.
+  const horario = r.horario || '—';
   const turnos = [r.turno_manana ? 'Mañana' : '', r.turno_tarde ? 'Tarde' : ''].filter(Boolean).join(' / ');
 
   const w = window.open('', '_blank', 'width=430,height=700');
@@ -4971,7 +4983,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.6.63] OK');
+console.log('[Alleata v4.6.64] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -6667,7 +6679,7 @@ async function loadRolloutPiloto(){
 // Terminal), separado en 2 filas: AMBA (logística Alleata + Cabify) e
 // Interior (EPSA + Correo Argentino). "Instala Ventas" queda afuera de
 // las dos — a revisar caso por caso (pedido explícito, no asumir).
-// CAMBIO 23/08 (marcelos): estas tarjetas miden TERMINALES ENTREGADAS, así
+// CAMBIO 24/08 (marcelos): estas tarjetas miden TERMINALES ENTREGADAS, así
 // que el único estado que cuenta es 'Exitoso'. Antes incluían también
 // 'Despachado' (salió del depósito pero NO llegó todavía) y 'Retirar
 // Terminal' (logística inversa — la terminal vuelve, es lo contrario a una
@@ -12192,7 +12204,10 @@ function _imprimirRotuloHTML(envios) {
         <div class="obs-wrap">
           <div class="obs-lbl">Obs.</div>
           <div class="obs-val">${[
-            e.horario_entrega ? `<b>Entrega:</b> ${e.horario_entrega}` : '',
+            // Solo Horario__c (columna `horario`). Antes se imprimía también
+            // "Entrega:" desde horario_entrega (Horario_de_Entrega__c) — dos
+            // campos distintos en la misma etiqueta, confuso y con riesgo de
+            // mostrar el dato equivocado cuando no coinciden.
             e.horario ? `<b>Horario:</b> ${e.horario}` : '',
             e.notas || ''
           ].filter(Boolean).join('<br>') || '—'}</div>
