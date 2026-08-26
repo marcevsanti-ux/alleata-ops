@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.6.79</title>
+<title>Alleata · Operaciones v4.6.80</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -407,7 +407,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.79 · 26 ago 2026
+      v4.6.80 · 26 ago 2026
     </div>
   </div>
 </div>
@@ -516,7 +516,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.79 · 26 ago 2026
+      v4.6.80 · 26 ago 2026
     </div>
   </div>
 </nav>
@@ -561,7 +561,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.79</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.80</div>
   </div>
   <div class="content">
 
@@ -5079,7 +5079,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.6.79] OK');
+console.log('[Alleata v4.6.80] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -7500,7 +7500,18 @@ async function cargarPendienteRetiroExitosa() {
   };
   const exitosaPorDia = armarPorDia('Exitoso', 'fecha_exitoso');
   const pendRetiroPorDia = armarPorDia('Retirar Terminal', 'sf_last_modified');
-  const totalSemana = porDia => Object.values(porDia).reduce((a, v) => a + v.cambio + v.rollout, 0);
+  // Total acotado a los 7 días de UNA semana puntual (no todo lo traído por
+  // la query, que puede abarcar más rango) — pedido 26/08: agregar el
+  // mismo totalizador también para "semana anterior".
+  const totalSemana = (porDia, lunesBase) => {
+    let t = 0;
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(lunesBase); d.setDate(lunesBase.getDate() + i);
+      const v = porDia[d.toLocaleDateString('en-CA')];
+      if (v) t += v.cambio + v.rollout;
+    }
+    return t;
+  };
 
   // Celda combinada por día (pedido 26/08 — "en una sola fecha mostrar
   // ambas", estilo agenda/Outlook): cada columna es un día, y adentro se
@@ -7543,14 +7554,20 @@ async function cargarPendienteRetiroExitosa() {
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
       <div style="font-size:15px;font-weight:700">📦 Cambio de Terminal — por día</div>
       <div style="display:flex;gap:18px">
-        <span style="font-size:13px"><span style="color:var(--teal);font-weight:800;font-size:18px">${totalSemana(exitosaPorDia)}</span> exitosas</span>
-        <span style="font-size:13px"><span style="color:#f59e0b;font-weight:800;font-size:18px">${totalSemana(pendRetiroPorDia)}</span> pend. retiro</span>
+        <span style="font-size:13px"><span style="color:var(--teal);font-weight:800;font-size:18px">${totalSemana(exitosaPorDia, lunes)}</span> exitosas</span>
+        <span style="font-size:13px"><span style="color:#f59e0b;font-weight:800;font-size:18px">${totalSemana(pendRetiroPorDia, lunes)}</span> pend. retiro</span>
       </div>
     </div>
     <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px">semana del ${fmtCorto(lunes.toLocaleDateString('en-CA'))}</div>
     <div style="display:flex;gap:8px">${filaSemana(lunes, false)}</div>
 
-    <div style="font-size:11px;color:var(--text-muted);margin:16px 0 10px;padding-top:12px;border-top:1px dashed var(--border)">semana anterior (${fmtCorto(lunesAnt.toLocaleDateString('en-CA'))} – ${fmtCorto(new Date(lunes.getTime()-86400000).toLocaleDateString('en-CA'))})</div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin:16px 0 10px;padding-top:12px;border-top:1px dashed var(--border);flex-wrap:wrap;gap:8px">
+      <span style="font-size:11px;color:var(--text-muted)">semana anterior (${fmtCorto(lunesAnt.toLocaleDateString('en-CA'))} – ${fmtCorto(new Date(lunes.getTime()-86400000).toLocaleDateString('en-CA'))})</span>
+      <div style="display:flex;gap:16px">
+        <span style="font-size:12px"><span style="color:var(--teal);font-weight:800;font-size:15px">${totalSemana(exitosaPorDia, lunesAnt)}</span> exitosas</span>
+        <span style="font-size:12px"><span style="color:#f59e0b;font-weight:800;font-size:15px">${totalSemana(pendRetiroPorDia, lunesAnt)}</span> pend. retiro</span>
+      </div>
+    </div>
     <div style="display:flex;gap:8px;opacity:.85">${filaSemana(lunesAnt, true)}</div>
 
     <div style="font-size:10px;color:var(--text-muted);margin-top:12px">⚠️ "Pend. Retiro" usa la última modificación en SF como fecha aproximada — no hay campo exacto de "entrada a Retirar Terminal".</div>
