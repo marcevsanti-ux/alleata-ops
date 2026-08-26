@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.6.73</title>
+<title>Alleata · Operaciones v4.6.74</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -407,7 +407,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.73 · 26 ago 2026
+      v4.6.74 · 26 ago 2026
     </div>
   </div>
 </div>
@@ -516,7 +516,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.73 · 26 ago 2026
+      v4.6.74 · 26 ago 2026
     </div>
   </div>
 </nav>
@@ -556,7 +556,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.73</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.74</div>
   </div>
   <div class="content">
 
@@ -5066,7 +5066,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.6.73] OK');
+console.log('[Alleata v4.6.74] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -8313,6 +8313,19 @@ async function loadNapseDesinstPanel(){
 // Arma el texto del tooltip con fiscal/ppto de venta/transacciones/estado
 // de la cuenta — se ve al pasar el mouse sobre la celda de volumen, sin
 // llenar la tabla de columnas de más. Pedido 01/08 (análisis de producto NAPSE).
+// Links directos a Salesforce Lightning (pedido 26/08) — mismo patrón que
+// Misión Rollout / Churn Producto. o.sf_id = WorkOrder Id, o.account_id =
+// Account Id, ambos vienen del endpoint /sf-stats/desinstalaciones.
+function _napseLinkOT(o){
+  return o.sf_id
+    ? `<a href="https://alleata.lightning.force.com/lightning/r/WorkOrder/${o.sf_id}/view" target="_blank" rel="noopener" style="color:inherit;text-decoration:none" title="Abrir OT en Salesforce" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">${o.ot} ↗</a>`
+    : (o.ot || '—');
+}
+function _napseLinkCuenta(o){
+  return o.account_id
+    ? `<a href="https://alleata.lightning.force.com/lightning/r/Account/${o.account_id}/view" target="_blank" rel="noopener" style="color:#e5e7eb;text-decoration:none" title="Abrir cuenta en Salesforce" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">${o.cuenta||'—'} ↗</a>`
+    : `<span style="color:#e5e7eb">${o.cuenta||'—'}</span>`;
+}
 function _napseVolTooltip(an){
   if(!an)return'';
   const fmt=v=>v!=null?'$'+Number(v).toLocaleString('es-AR'):'—';
@@ -8343,10 +8356,10 @@ function toggleNapseEstado(eid,estado){
         <th style="padding:4px 8px">CUIT</th>
         <th style="padding:4px 8px">Comercio</th>
         <th style="padding:4px 8px">Propietario cta.</th>
-        <th style="padding:4px 8px">Contacto</th>
         <th style="padding:4px 8px">Terminal ID</th>
         <th style="padding:4px 8px">Ciudad</th>
         <th style="padding:4px 8px">Motivo</th>
+        <th style="padding:4px 8px">Submotivo</th>
         <th style="padding:4px 8px">Días c/terminal</th>
         <th style="padding:4px 0">Vol. 30d antes</th>
       </tr></thead>
@@ -8354,15 +8367,15 @@ function toggleNapseEstado(eid,estado){
         ${lista.map(o=>{
           const an=(window._napseAnalisisPorOt||{})[o.ot];
           return`<tr style="border-top:1px solid var(--border)">
-          <td style="padding:5px 8px 5px 0;font-family:'JetBrains Mono',monospace;font-weight:700">${o.ot}</td>
-          <td style="padding:5px 8px">${celda(o.cuenta)}</td>
+          <td style="padding:5px 8px 5px 0;font-family:'JetBrains Mono',monospace;font-weight:700">${_napseLinkOT(o)}</td>
+          <td style="padding:5px 8px">${_napseLinkCuenta(o)}</td>
           <td style="padding:5px 8px;font-family:'JetBrains Mono',monospace">${celda(o.cuit)}</td>
           <td style="padding:5px 8px">${celda(o.comercio)}</td>
           <td style="padding:5px 8px">${o.propietario?`<span style="color:#9ca3af">${o.propietario}</span>`:`<span style="color:var(--text-muted)">—</span>`}</td>
-          <td style="padding:5px 8px">${celda(o.contacto)}</td>
           <td style="padding:5px 8px">${celda(o.terminal_id)}</td>
           <td style="padding:5px 8px">${celda(o.ciudad)}</td>
           <td style="padding:5px 8px">${celda(o.motivo)}</td>
+          <td style="padding:5px 8px">${celda(o.sub_motivo)}</td>
           <td style="padding:5px 8px">${an?.dias_con_terminal!=null?an.dias_con_terminal+'d':`<span style="color:var(--text-muted)">—</span>`}</td>
           <td style="padding:5px 0" title="${_napseVolTooltip(an)}">${an?.volumen_30d_antes!=null?'$'+Number(an.volumen_30d_antes).toLocaleString('es-AR')+' <span style="font-size:9px;color:var(--text-muted)">ℹ️</span>':`<span style="color:var(--text-muted)">—</span>`}</td>
         </tr>`;}).join('')}
@@ -8393,9 +8406,9 @@ function toggleNapseMotivo(mid,motivo){
         <th style="padding:4px 8px">CUIT</th>
         <th style="padding:4px 8px">Comercio</th>
         <th style="padding:4px 8px">Propietario cta.</th>
-        <th style="padding:4px 8px">Contacto</th>
         <th style="padding:4px 8px">Terminal ID</th>
         <th style="padding:4px 8px">Ciudad</th>
+        <th style="padding:4px 8px">Submotivo</th>
         <th style="padding:4px 8px">Estado</th>
         <th style="padding:4px 8px">Días c/terminal</th>
         <th style="padding:4px 0">Vol. 30d antes</th>
@@ -8404,14 +8417,14 @@ function toggleNapseMotivo(mid,motivo){
         ${lista.map(o=>{
           const an=(window._napseAnalisisPorOt||{})[o.ot];
           return`<tr style="border-top:1px solid var(--border)">
-          <td style="padding:5px 8px 5px 0;font-family:'JetBrains Mono',monospace;font-weight:700">${o.ot}</td>
-          <td style="padding:5px 8px">${celda(o.cuenta)}</td>
+          <td style="padding:5px 8px 5px 0;font-family:'JetBrains Mono',monospace;font-weight:700">${_napseLinkOT(o)}</td>
+          <td style="padding:5px 8px">${_napseLinkCuenta(o)}</td>
           <td style="padding:5px 8px;font-family:'JetBrains Mono',monospace">${celda(o.cuit)}</td>
           <td style="padding:5px 8px">${celda(o.comercio)}</td>
           <td style="padding:5px 8px">${o.propietario?`<span style="color:#9ca3af">${o.propietario}</span>`:`<span style="color:var(--text-muted)">—</span>`}</td>
-          <td style="padding:5px 8px">${celda(o.contacto)}</td>
           <td style="padding:5px 8px">${celda(o.terminal_id)}</td>
           <td style="padding:5px 8px">${celda(o.ciudad)}</td>
+          <td style="padding:5px 8px">${celda(o.sub_motivo)}</td>
           <td style="padding:5px 8px;color:${ESTADO_COLORS_NAPSE[o.status]||'#6b7280'};font-weight:600">${o.status}</td>
           <td style="padding:5px 8px">${an?.dias_con_terminal!=null?an.dias_con_terminal+'d':`<span style="color:var(--text-muted)">—</span>`}</td>
           <td style="padding:5px 0" title="${_napseVolTooltip(an)}">${an?.volumen_30d_antes!=null?'$'+Number(an.volumen_30d_antes).toLocaleString('es-AR')+' <span style="font-size:9px;color:var(--text-muted)">ℹ️</span>':`<span style="color:var(--text-muted)">—</span>`}</td>
