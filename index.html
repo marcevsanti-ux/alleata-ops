@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.6.67</title>
+<title>Alleata · Operaciones v4.6.68</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -407,7 +407,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.67 · 25 ago 2026
+      v4.6.68 · 26 ago 2026
     </div>
   </div>
 </div>
@@ -516,7 +516,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.67 · 25 ago 2026
+      v4.6.68 · 26 ago 2026
     </div>
   </div>
 </nav>
@@ -556,7 +556,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.67</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.68</div>
   </div>
   <div class="content">
 
@@ -1168,8 +1168,20 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     <div class="stat-box s-blue" id="mr-card-despachado" style="cursor:pointer" onclick="mrToggleDesglose('despachado')" title="Ver desglose por mes"><div class="stat-num" id="mr-stat-despachado">—</div><div class="stat-label">Despachadas</div></div>
     <div class="stat-box s-green" id="mr-card-exitoso" style="cursor:pointer" onclick="mrToggleDesglose('exitoso')" title="Ver desglose por mes"><div class="stat-num" id="mr-stat-exitoso">—</div><div class="stat-label">Exitosas</div></div>
     <div class="stat-box s-teal" id="mr-card-costo" style="cursor:pointer" onclick="mrToggleDesglose('costo')" title="Ver desglose por mes"><div class="stat-num" id="mr-stat-costo" style="font-size:20px">—</div><div class="stat-label">Costo total</div></div>
+    <div class="stat-box" id="mr-card-otros" style="cursor:pointer;border-color:rgba(255,255,255,.18)" onclick="mrToggleDesglose('otros')" title="Estados que no son Pre-Colecta / Despachadas / Exitosas (Configurar Terminal, En Proceso, Retirar Terminal, Fallidas, etc.) — click para el detalle"><div class="stat-num" id="mr-stat-otros" style="color:var(--text-muted)">—</div><div class="stat-label">Otros estados</div></div>
   </div>
+  <div style="font-size:10px;color:var(--text-muted);margin:-4px 0 12px 2px">Total OTs = En Pre-Colecta + Despachadas + Exitosas + Otros estados — si no cierra, revisar la card "Otros estados".</div>
   <div id="mrDesgloseMes" style="display:none;margin-bottom:16px"></div>
+
+  <!-- Distribución geográfica (pedido 26/08) — CABA / AMBA (GBA) / Resto
+       del país, con desglose por provincia para "Resto del país". Reusa
+       detectarZona() (mismo criterio que el módulo Envíos) agrupando Norte
+       + Sur + Oeste en "AMBA (GBA)". -->
+  <div class="card" style="margin-bottom:16px">
+    <div style="font-size:13px;font-weight:700;margin-bottom:12px">📍 Distribución geográfica — Cambio de Terminal</div>
+    <div id="mrGeoResumen"><div style="text-align:center;padding:20px;color:var(--text-muted)">Cargando...</div></div>
+    <div id="mrGeoProvincias" style="margin-top:14px"></div>
+  </div>
 
   <!-- Indicadores Misión Rollout (pedido 25/08) — recorte del módulo
        Indicadores, acotado a OTs Cambio de Terminal (incluye Rollout, que
@@ -1180,17 +1192,20 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
        (confirmado con historial real de SF — no existe un campo separado
        que guarde la fecha de ENTRADA a Credenciales Pendientes). Si esto
        no es lo que se necesita, avisar para sincronizar ese campo nuevo
-       desde salesforce.js en alleata-agent. -->
+       desde salesforce.js en alleata-agent.
+       26/08: la tabla mrIndTabla queda OCULTA a pedido — quedó redundante
+       con las cards de arriba + el desglose por mes de cada card
+       (mrToggleDesglose). El cálculo sigue corriendo igual, solo se oculta
+       la salida visual (no se borra por si hace falta reactivarla). El
+       desglose de costo por logística SÍ queda visible: es información que
+       no está en ningún otro lado. -->
   <div class="card" style="margin-bottom:16px">
     <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px">
-      <div>
-        <div style="font-size:14px;font-weight:700">📊 Indicadores — Cambio de Terminal</div>
-        <div style="font-size:11px;color:var(--text-muted);margin-top:2px">Desde Configurar Terminal ≥ 01/06/2026 · incluye Rollout · fuente: sf_workorders</div>
-      </div>
+      <div style="font-size:14px;font-weight:700">💰 Costo de envíos por logística — Cambio de Terminal</div>
       <button class="btn btn-sm" onclick="cargarIndicadoresMisionRollout()">🔄 Actualizar</button>
     </div>
-    <div id="mrIndTabla"><div style="text-align:center;padding:20px;color:var(--text-muted)">Cargando...</div></div>
-    <div id="mrIndCostos" style="margin-top:18px"></div>
+    <div id="mrIndTabla" style="display:none"></div>
+    <div id="mrIndCostos"></div>
   </div>
 
   <div class="row" style="margin-bottom:12px;gap:10px">
@@ -5030,7 +5045,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.6.67] OK');
+console.log('[Alleata v4.6.68] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -6706,7 +6721,14 @@ const MR_METRICAS={
   despachado: {label:'Despachadas',         getter:m=>m.despachado},
   exitoso:    {label:'Exitosas',            getter:m=>m.exitoso, color:'var(--teal)'},
   costo:      {label:'Costo total',         getter:m=>m.costo_total, esMoneda:true, color:'var(--teal)'},
+  otros:      {label:'Otros estados',       getter:m=>m.otros, color:'var(--text-muted)'},
 };
+// Estados que agrupa "Otros" — lo que queda de Total OTs una vez restados
+// Pre-Colecta/Despachadas/Exitosas: Configurar Terminal, En Proceso,
+// Retirar Terminal, Fallida, Cancelada, etc. Se guarda el detalle real
+// (status → cantidad) para la card, no un número ciego (pedido 26/08: la
+// suma tiene que cerrar contra Total OTs y tiene que poder verse por qué).
+let _mrOtrosDetalle={};
 
 function mrFmt$(n){ return n?'$'+Math.round(n).toLocaleString('es-AR'):'$0'; }
 
@@ -6756,6 +6778,14 @@ function mrRenderDesgloseMes(metrica){
         <div style="font-size:20px;font-weight:800;margin-top:2px;color:var(--teal)">${fmt(totalMetrica)}</div>
       </div>
     </div>
+    ${metrica==='otros'?`<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+      <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Detalle por estado (todos los meses)</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        ${Object.entries(_mrOtrosDetalle).sort((a,b)=>b[1]-a[1]).map(([st,n])=>
+          `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-size:12px"><b>${n}</b> · ${st||'(sin estado)'}</div>`
+        ).join('')||'<span style="color:var(--text-muted);font-size:12px">Sin registros</span>'}
+      </div>
+    </div>`:''}
   </div>`;
 }
 
@@ -6766,7 +6796,7 @@ async function cargarIndicadoresMisionRollout(){
   if(contCostos)contCostos.innerHTML='';
 
   const{data,error}=await sb.from('sf_workorders')
-    .select('workorder_number,status,rollout,logistica,costo_envio,fecha_configurar_terminal,cuenta')
+    .select('workorder_number,status,rollout,logistica,costo_envio,fecha_configurar_terminal,cuenta,ciudad,provincia,codigo_postal')
     .eq('record_type','Cambio de Terminal')
     .not('fecha_configurar_terminal','is',null)
     .gte('fecha_configurar_terminal',MR_FECHA_CORTE);
@@ -6787,15 +6817,19 @@ function renderIndicadoresMisionRollout(){
   if(!data.length){
     cont.innerHTML='<div style="text-align:center;padding:20px;color:var(--text-muted)">Sin OTs de Cambio de Terminal con Configurar Terminal ≥ 01/06/2026</div>';
     if(contCostos)contCostos.innerHTML='';
+    const geoResumen=document.getElementById('mrGeoResumen'), geoProv=document.getElementById('mrGeoProvincias');
+    if(geoResumen)geoResumen.innerHTML='<div style="text-align:center;padding:10px;color:var(--text-muted)">Sin datos</div>';
+    if(geoProv)geoProv.innerHTML='';
     return;
   }
 
   const porMes={};
+  _mrOtrosDetalle={};
   data.forEach(r=>{
     const d=new Date(r.fecha_configurar_terminal);
     const key=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
     if(!porMes[key])porMes[key]={key,label:MR_MESES_NOMBRE[d.getMonth()]+' '+d.getFullYear(),
-      total:0,cambio:0,rollout:0,precolecta:0,despachado:0,exitoso:0,costo_total:0,logs:{}};
+      total:0,cambio:0,rollout:0,precolecta:0,despachado:0,exitoso:0,otros:0,costo_total:0,logs:{}};
     const m=porMes[key];
     m.total+=1;
     if(r.rollout===true)m.rollout+=1; else m.cambio+=1;
@@ -6803,6 +6837,15 @@ function renderIndicadoresMisionRollout(){
     if(st==='Pre-Colecta')m.precolecta+=1;
     else if(st==='Despachado')m.despachado+=1;
     else if(st==='Exitoso')m.exitoso+=1;
+    else {
+      // Todo lo que NO es Pre-Colecta/Despachado/Exitoso: Configurar
+      // Terminal, En Proceso, Retirar Terminal, Fallida, Cancelada, etc.
+      // Esto es lo que hace que Total OTs SÍ cierre contra la suma de las
+      // 4 cards de estado (pedido 26/08 — antes faltaban 66 OTs sin bucket).
+      m.otros+=1;
+      const stLabel=st||'(sin estado)';
+      _mrOtrosDetalle[stLabel]=(_mrOtrosDetalle[stLabel]||0)+1;
+    }
 
     const log=(r.logistica||'OTROS').toUpperCase().trim();
     if(!m.logs[log])m.logs[log]={ots:0,costo:0};
@@ -6816,8 +6859,8 @@ function renderIndicadoresMisionRollout(){
   const tot=meses.reduce((a,m)=>({
     total:a.total+m.total, cambio:a.cambio+m.cambio, rollout:a.rollout+m.rollout,
     precolecta:a.precolecta+m.precolecta, despachado:a.despachado+m.despachado,
-    exitoso:a.exitoso+m.exitoso, costo_total:a.costo_total+m.costo_total,
-  }),{total:0,cambio:0,rollout:0,precolecta:0,despachado:0,exitoso:0,costo_total:0});
+    exitoso:a.exitoso+m.exitoso, otros:a.otros+m.otros, costo_total:a.costo_total+m.costo_total,
+  }),{total:0,cambio:0,rollout:0,precolecta:0,despachado:0,exitoso:0,otros:0,costo_total:0});
 
   // Guardado para que las cards de arriba (botones) armen su desglose por
   // mes sin tener que recalcular todo de nuevo — ver mrToggleDesglose().
@@ -6830,16 +6873,19 @@ function renderIndicadoresMisionRollout(){
   setStat('mr-stat-despachado',tot.despachado);
   setStat('mr-stat-exitoso',tot.exitoso);
   setStat('mr-stat-costo',mrFmt$(tot.costo_total));
+  setStat('mr-stat-otros',tot.otros);
   // Si había un desglose abierto, se refresca con los datos nuevos en vez
   // de quedar mostrando un snapshot viejo tras un 🔄 Actualizar.
   if(_mrMetricaActiva) mrRenderDesgloseMes(_mrMetricaActiva);
+
+  renderDistribucionGeoMisionRollout(data);
 
   cont.innerHTML=`<div style="overflow-x:auto"><table class="table">
     <thead><tr>
       <th>Mes (Configurar Terminal)</th><th style="text-align:right">Total OTs</th>
       <th style="text-align:right">Cambio</th><th style="text-align:right">Rollout</th>
       <th style="text-align:right">En Pre-Colecta hoy</th><th style="text-align:right">Despachadas</th>
-      <th style="text-align:right">Exitosas</th><th style="text-align:right">Costo total</th>
+      <th style="text-align:right">Exitosas</th><th style="text-align:right">Otros</th><th style="text-align:right">Costo total</th>
     </tr></thead>
     <tbody>${meses.map(m=>`<tr>
       <td style="font-weight:700">${m.label}</td>
@@ -6849,6 +6895,7 @@ function renderIndicadoresMisionRollout(){
       <td style="text-align:right;color:${m.precolecta?'#f59e0b':'var(--text-muted)'}">${m.precolecta}</td>
       <td style="text-align:right">${m.despachado}</td>
       <td style="text-align:right;color:var(--teal);font-weight:600">${m.exitoso}</td>
+      <td style="text-align:right;color:var(--text-muted)">${m.otros}</td>
       <td style="text-align:right;font-family:'JetBrains Mono',monospace">${mrFmt$(m.costo_total)}</td>
     </tr>`).join('')}
     <tr style="border-top:2px solid var(--border2)">
@@ -6859,6 +6906,7 @@ function renderIndicadoresMisionRollout(){
       <td style="text-align:right;font-weight:700;color:#f59e0b">${tot.precolecta}</td>
       <td style="text-align:right;font-weight:700">${tot.despachado}</td>
       <td style="text-align:right;font-weight:700;color:var(--teal)">${tot.exitoso}</td>
+      <td style="text-align:right;font-weight:700;color:var(--text-muted)">${tot.otros}</td>
       <td style="text-align:right;font-weight:800;font-family:'JetBrains Mono',monospace">${mrFmt$(tot.costo_total)}</td>
     </tr>
     </tbody>
@@ -6896,6 +6944,75 @@ function renderIndicadoresMisionRollout(){
         <div style="font-size:11px;color:var(--text-muted);margin-top:2px">${totalGeneralOts} envíos</div>
       </div>
     </div>`;
+}
+
+// ── Distribución geográfica — CABA / AMBA / Resto del país (pedido 26/08) ──
+// Reusa detectarZona() (mismo criterio que el módulo Envíos): agrupa Zona
+// Norte + Zona Sur + Zona Oeste en "AMBA (GBA)". Todo lo que no es CABA ni
+// AMBA (incluye "Fuera AMBA" — provincia de Buenos Aires fuera del GBA — y
+// "Interior") se agrupa como "Resto del país" con desglose por provincia.
+function renderDistribucionGeoMisionRollout(data){
+  const contResumen=document.getElementById('mrGeoResumen');
+  const contProv=document.getElementById('mrGeoProvincias');
+  if(!contResumen)return;
+  if(!data.length){
+    contResumen.innerHTML='<div style="text-align:center;padding:10px;color:var(--text-muted)">Sin datos</div>';
+    if(contProv)contProv.innerHTML='';
+    return;
+  }
+
+  let caba=0, amba=0, resto=0, sinDato=0;
+  const porProvincia={};
+  data.forEach(r=>{
+    const z=detectarZona(r.ciudad,r.provincia,r.codigo_postal);
+    if(z.zona==='CABA')caba+=1;
+    else if(['Zona Norte','Zona Sur','Zona Oeste'].includes(z.zona))amba+=1;
+    else if(z.zona==='—'){ sinDato+=1; }
+    else {
+      resto+=1;
+      const prov=(r.provincia||'').trim()||'(sin provincia)';
+      porProvincia[prov]=(porProvincia[prov]||0)+1;
+    }
+  });
+
+  const total=data.length;
+  const pct=n=>total?Math.round(n/total*100):0;
+
+  contResumen.innerHTML=`<div style="display:flex;gap:12px;flex-wrap:wrap">
+    <div class="card" style="flex:1;min-width:150px;border-color:#1a9fd455">
+      <div style="font-size:11px;font-weight:700;color:#1a9fd4;text-transform:uppercase;letter-spacing:.5px">🏙️ CABA</div>
+      <div style="font-size:24px;font-weight:800;margin-top:4px">${caba}</div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:2px">${pct(caba)}% del total</div>
+    </div>
+    <div class="card" style="flex:1;min-width:150px;border-color:#10b98155">
+      <div style="font-size:11px;font-weight:700;color:#10b981;text-transform:uppercase;letter-spacing:.5px">🔵 AMBA (GBA)</div>
+      <div style="font-size:24px;font-weight:800;margin-top:4px">${amba}</div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:2px">${pct(amba)}% del total</div>
+    </div>
+    <div class="card" style="flex:1;min-width:150px;border-color:#f59e0b55">
+      <div style="font-size:11px;font-weight:700;color:#f59e0b;text-transform:uppercase;letter-spacing:.5px">📍 Resto del país</div>
+      <div style="font-size:24px;font-weight:800;margin-top:4px">${resto}</div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:2px">${pct(resto)}% del total</div>
+    </div>
+    ${sinDato?`<div class="card" style="flex:1;min-width:150px;border-color:var(--border2)">
+      <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px">Sin ciudad/provincia</div>
+      <div style="font-size:24px;font-weight:800;margin-top:4px">${sinDato}</div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:2px">${pct(sinDato)}% del total</div>
+    </div>`:''}
+  </div>`;
+
+  if(contProv){
+    const filas=Object.entries(porProvincia).sort((a,b)=>b[1]-a[1]);
+    contProv.innerHTML = filas.length ? `
+      <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Resto del país — por provincia</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        ${filas.map(([prov,n])=>`
+          <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 14px">
+            <div style="font-size:16px;font-weight:800">${n}</div>
+            <div style="font-size:10px;color:var(--text-muted);margin-top:1px">${prov}</div>
+          </div>`).join('')}
+      </div>` : '';
+  }
 }
 
 async function loadRolloutPiloto(){
