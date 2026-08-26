@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.6.70</title>
+<title>Alleata · Operaciones v4.6.71</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -407,7 +407,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.70 · 26 ago 2026
+      v4.6.71 · 26 ago 2026
     </div>
   </div>
 </div>
@@ -516,7 +516,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.70 · 26 ago 2026
+      v4.6.71 · 26 ago 2026
     </div>
   </div>
 </nav>
@@ -556,7 +556,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.70</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.71</div>
   </div>
   <div class="content">
 
@@ -574,9 +574,17 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <div id="objSemanalCard" style="display:none"></div>
 
       <!-- 🏙️📦 Cambios de Terminal por zona (AMBA/Interior), por mes —
-           pedido 12/08, mismo criterio de visibilidad que el card de
-           arriba (solo marcelos, ver cargarCambiosPorZona()). -->
+           pedido 12/08. OCULTO a pedido 26/08 (marcelos: sacar esta vista
+           de mi dash). Código y función cargarCambiosPorZona() intactos
+           por si hace falta reactivarla — solo se dejó de togglear a
+           'block' y de llamarla, ver mostrarKPIs()/cargarDatosOperador(). -->
       <div id="cambiosZonaCard" style="display:none;margin-bottom:18px"></div>
+
+      <!-- 👷 Cambios de Terminal por responsable (Marce/Nacho), por mes —
+           pedido 26/08, mismo criterio de visibilidad que el card de
+           arriba (solo marcelos, ver cargarCambiosPorResponsable()).
+           Reemplaza al de AMBA/Interior en el dash. -->
+      <div id="cambiosResponsableCard" style="display:none;margin-bottom:18px"></div>
 
       <!-- Paso 1 (vamos por partes, pedido 27/07): antes de meter prioridad,
            mostrar simplemente TODAS las OTs en estado "Configurar Terminal"
@@ -5058,7 +5066,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.6.70] OK');
+console.log('[Alleata v4.6.71] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -7184,6 +7192,14 @@ function renderIndicadoresMisionRollout(){
 }
 
 async function loadRolloutPiloto(){
+  // Auto-refresh cada 10 min (pedido 26/08) — mismo intervalo que el cron
+  // de sync SF→sf_workorders (ver topbar "Sync OTs (SF)... cada 10min"),
+  // así los datos de Misión Rollout siempre están frescos sin depender de
+  // que alguien apriete 🔄 Actualizar. Guard con window._mrAutoRefreshInterval
+  // para no crear un timer nuevo cada vez que se entra al módulo.
+  if(!window._mrAutoRefreshInterval){
+    window._mrAutoRefreshInterval = setInterval(()=>{ cargarIndicadoresMisionRollout(); }, 600000);
+  }
   const tbody=document.getElementById('rp-tbody');
   if(tbody)tbody.innerHTML='<tr><td colspan="9" style="text-align:center;padding:30px;color:var(--text-muted)">Cargando...</td></tr>';
   const{data,error}=await sb.from('rollout_piloto').select('*').order('cliente',{ascending:true});
@@ -7336,6 +7352,77 @@ async function cargarCambiosPorZona() {
     const notaI = document.getElementById(`donut-interior-${m.key}-nota`);
     if(notaA) notaA.textContent = [ctx(entregadasA, ambaTotalMes[m.key]||0), notaSinClas].filter(Boolean).join(' · ');
     if(notaI) notaI.textContent = [ctx(entregadasI, interiorTotalMes[m.key]||0), notaSinClas].filter(Boolean).join(' · ');
+  });
+}
+
+// ── Cambios de Terminal por responsable (Marce/Nacho), por mes — pedido
+// 26/08. Reemplaza en el dash a la vista por zona (AMBA/Interior, arriba,
+// ahora oculta). Mismo criterio de "terminales entregadas" (solo Exitoso).
+// Match por nombre sobre `responsable` (no hay campo separado "operador
+// logístico" en sf_workorders) — si el nombre real difiere de "Marce"/
+// "Ignacio", ajustar _mrEsMarce/_mrEsNacho de abajo.
+function _normResponsable(v){ return String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().trim(); }
+const _mrEsMarce = n => _normResponsable(n).includes('MARCE');
+const _mrEsNacho = n => _normResponsable(n).includes('NACHO') || _normResponsable(n).includes('IGNACIO');
+
+async function cargarCambiosPorResponsable() {
+  const cont = document.getElementById('cambiosResponsableCard');
+  if (!cont) return;
+  cont.innerHTML = '<div class="card" style="padding:16px;color:var(--text-muted);font-size:12px">Cargando cambios de terminal por responsable...</div>';
+
+  const { data, error } = await sb.from('sf_workorders')
+    .select('workorder_number,sf_created_at,status,responsable')
+    .eq('record_type', 'Cambio de Terminal')
+    .gte('sf_created_at', '2026-06-01')
+    .lte('sf_created_at', '2026-08-31T23:59:59');
+  if (error) {
+    cont.innerHTML = `<div class="card" style="padding:16px;color:var(--red);font-size:12px">No se pudo cargar Cambios por responsable: ${error.message}</div>`;
+    return;
+  }
+
+  const agrupar = matchFn => {
+    const porMes = {}; CAMBIOS_ZONA_MESES.forEach(m => porMes[m.key] = {});
+    const totalMes = {}; CAMBIOS_ZONA_MESES.forEach(m => totalMes[m.key] = 0);
+    (data || []).forEach(r => {
+      if (!matchFn(r.responsable)) return;
+      const mes = String(r.sf_created_at).slice(0, 7);
+      if (!porMes[mes]) return;
+      totalMes[mes]++;
+      if (!CAMBIOS_ZONA_ESTADOS.includes(r.status)) return; // solo entregadas (Exitoso)
+      porMes[mes][r.status] = (porMes[mes][r.status] || 0) + 1;
+    });
+    return { porMes, totalMes };
+  };
+  const { porMes: marcePorMes, totalMes: marceTotalMes } = agrupar(_mrEsMarce);
+  const { porMes: nachoPorMes, totalMes: nachoTotalMes } = agrupar(_mrEsNacho);
+
+  const filaHtml = (idPrefix) => CAMBIOS_ZONA_MESES.map(m =>
+    `<div class="card" style="flex:1;min-width:220px;display:flex;flex-direction:column">
+      <div id="${idPrefix}-${m.key}" style="display:flex;flex-direction:column;flex:1"></div>
+      <div id="${idPrefix}-${m.key}-nota" style="font-size:10px;color:var(--text-muted);border-top:1px solid var(--border);margin-top:8px;padding-top:6px"></div>
+    </div>`
+  ).join('');
+
+  cont.innerHTML = `
+    <div style="font-size:13px;font-weight:700;margin-bottom:8px">👷 Marce — Terminales entregadas · Cambio/Rollout</div>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px">${filaHtml('donut-marce')}</div>
+    <div style="font-size:13px;font-weight:700;margin-bottom:8px">👷 Nacho — Terminales entregadas · Cambio/Rollout</div>
+    <div style="display:flex;gap:12px;flex-wrap:wrap">${filaHtml('donut-nacho')}</div>`;
+
+  CAMBIOS_ZONA_MESES.forEach(m => {
+    const dM = marcePorMes[m.key] || {};
+    const entregadasM = Object.values(dM).reduce((a, b) => a + b, 0);
+    renderChartDona(`donut-marce-${m.key}`, `ENTREGADAS ${m.label} 2026`, dM, CAMBIOS_ZONA_COLORES, entregadasM);
+    const dN = nachoPorMes[m.key] || {};
+    const entregadasN = Object.values(dN).reduce((a, b) => a + b, 0);
+    renderChartDona(`donut-nacho-${m.key}`, `ENTREGADAS ${m.label} 2026`, dN, CAMBIOS_ZONA_COLORES, entregadasN);
+    const ctx = (entregadas, total) => total > entregadas
+      ? `${entregadas} entregadas de ${total} OTs de cambio/rollout en el mes`
+      : `${entregadas} entregadas`;
+    const notaM = document.getElementById(`donut-marce-${m.key}-nota`);
+    const notaN = document.getElementById(`donut-nacho-${m.key}-nota`);
+    if(notaM) notaM.textContent = ctx(entregadasM, marceTotalMes[m.key]||0);
+    if(notaN) notaN.textContent = ctx(entregadasN, nachoTotalMes[m.key]||0);
   });
 }
 
@@ -9211,16 +9298,16 @@ async function loadOpsPanel(isAdmin, modulos){
   // explícito 28/07: no lo quiere en Rollout Piloto (Diego mira esa
   // pantalla) y sin desglose por chofer, esto es aparte, privado, agregado.
   const objCard = document.getElementById('objSemanalCard');
-  const cambiosZonaCard = document.getElementById('cambiosZonaCard');
+  const cambiosRespCard = document.getElementById('cambiosResponsableCard');
   if(objCard){
     const esMarcelos = (currentProfile?.email||currentUser?.email||'').trim().toLowerCase()==='marcelos@moretti.com.ar';
     if(esMarcelos){
       objCard.style.display='block';
       cargarObjetivoSemanalRollout();
-      if(cambiosZonaCard){ cambiosZonaCard.style.display='block'; cargarCambiosPorZona(); }
+      if(cambiosRespCard){ cambiosRespCard.style.display='block'; cargarCambiosPorResponsable(); }
     } else {
       objCard.style.display='none';
-      if(cambiosZonaCard) cambiosZonaCard.style.display='none';
+      if(cambiosRespCard) cambiosRespCard.style.display='none';
     }
   }
 
