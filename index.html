@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.6.77</title>
+<title>Alleata · Operaciones v4.6.78</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -407,7 +407,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.77 · 26 ago 2026
+      v4.6.78 · 26 ago 2026
     </div>
   </div>
 </div>
@@ -516,7 +516,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.77 · 26 ago 2026
+      v4.6.78 · 26 ago 2026
     </div>
   </div>
 </nav>
@@ -561,7 +561,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.77</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.78</div>
   </div>
   <div class="content">
 
@@ -5079,7 +5079,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.6.77] OK');
+console.log('[Alleata v4.6.78] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -7500,44 +7500,56 @@ async function cargarPendienteRetiroExitosa() {
   };
   const exitosaPorDia = armarPorDia('Exitoso', 'fecha_exitoso');
   const pendRetiroPorDia = armarPorDia('Retirar Terminal', 'sf_last_modified');
-
-  // Tira de una semana (lunes dado) — celda con total grande + Cambio/Rollout chico.
-  const tiraSemana = (lunesBase, porDia, color, chico) => {
-    return NOMBRES_DIA.map((nombre, i) => {
-      const d = new Date(lunesBase); d.setDate(lunesBase.getDate() + i);
-      const key = d.toLocaleDateString('en-CA');
-      const v = porDia[key] || { cambio: 0, rollout: 0 };
-      const total = v.cambio + v.rollout;
-      const esHoy = key === hoyStr;
-      const esFuturo = key > hoyStr;
-      const tam = chico ? 26 : 30;
-      return `<div style="flex:1;text-align:center;min-width:0">
-        <div style="font-size:9px;color:var(--text-muted);font-weight:700;letter-spacing:.03em">${nombre}</div>
-        <div style="width:${tam}px;height:${tam}px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:3px auto;background:${esHoy && !chico ? color : 'transparent'};border:1px solid ${esHoy ? color : 'var(--border2)'};color:${esHoy && !chico ? '#08160f' : 'var(--text-muted)'};font-size:${chico ? 11 : 12}px;font-weight:700">${d.getDate()}</div>
-        <div style="font-size:${chico ? 12 : 13}px;font-weight:800;color:${esFuturo ? 'var(--text-muted)' : (total > 0 ? color : 'var(--text-muted)')}">${esFuturo ? '—' : total}</div>
-        ${!esFuturo && total > 0 ? `<div style="font-size:8px;color:var(--text-muted);margin-top:1px">C:${v.cambio} R:${v.rollout}</div>` : ''}
-      </div>`;
-    }).join('');
-  };
-
   const totalSemana = porDia => Object.values(porDia).reduce((a, v) => a + v.cambio + v.rollout, 0);
 
-  const bloque = (titulo, color, porDia, notaFecha) => `
-    <div class="card" style="flex:1;min-width:320px;border-left:4px solid ${color}">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-        <div style="font-size:13px;font-weight:700">${titulo}</div>
-        <span style="font-size:18px;font-weight:800;color:${color}">${totalSemana(porDia)}</span>
-      </div>
-      <div style="display:flex;gap:4px">${tiraSemana(lunes, porDia, color, false)}</div>
-      <div style="font-size:9px;color:var(--text-muted);margin-top:8px">${notaFecha}</div>
+  // Celda combinada por día (pedido 26/08 — "en una sola fecha mostrar
+  // ambas", estilo agenda/Outlook): cada columna es un día, y adentro se
+  // apilan las 2 líneas de evento (Exitosa arriba en verde, Pendiente
+  // Retiro abajo en ámbar) — en vez de 2 tiras de calendario separadas.
+  const lineaEvento = (label, color, v) => {
+    const total = v.cambio + v.rollout;
+    if (!total) return `<div style="font-size:9px;color:var(--border2);padding:3px 4px">—</div>`;
+    return `<div style="background:${color}18;border-left:2px solid ${color};border-radius:3px;padding:3px 5px;text-align:left">
+      <div style="font-size:11px;font-weight:800;color:${color}">${total} <span style="font-size:8px;font-weight:600;opacity:.8">${label}</span></div>
+      <div style="font-size:8px;color:var(--text-muted)">C:${v.cambio} R:${v.rollout}</div>
     </div>`;
+  };
 
-  cont.innerHTML = `
-    <div style="font-size:13px;font-weight:700;margin-bottom:10px">📦 Cambio de Terminal — por día (semana del ${fmtCorto(lunes.toLocaleDateString('en-CA'))})</div>
-    <div style="display:flex;gap:12px;flex-wrap:wrap">
-      ${bloque('Exitosa', 'var(--teal)', exitosaPorDia, 'Por fecha de Exitoso (Exitoso_Fecha__c)')}
-      ${bloque('Pendiente Retiro', '#f59e0b', pendRetiroPorDia, '⚠️ Por última modificación en SF (no hay fecha exacta de entrada a este estado — puede no ser el día real)')}
+  const filaSemana = (lunesBase, chico) => NOMBRES_DIA.map((nombre, i) => {
+    const d = new Date(lunesBase); d.setDate(lunesBase.getDate() + i);
+    const key = d.toLocaleDateString('en-CA');
+    const esHoy = key === hoyStr;
+    const esFuturo = key > hoyStr;
+    const ve = exitosaPorDia[key] || { cambio: 0, rollout: 0 };
+    const vp = pendRetiroPorDia[key] || { cambio: 0, rollout: 0 };
+    return `<div style="flex:1;min-width:0;background:${esHoy ? 'rgba(29,191,142,.06)' : 'transparent'};border:1px solid ${esHoy ? 'var(--teal)' : 'var(--border)'};border-radius:8px;padding:6px;display:flex;flex-direction:column;gap:4px">
+      <div style="text-align:center">
+        <div style="font-size:9px;color:var(--text-muted);font-weight:700;letter-spacing:.03em">${nombre}</div>
+        <div style="font-size:${chico ? 12 : 13}px;font-weight:800;color:${esHoy ? 'var(--teal)' : 'var(--text)'}">${d.getDate()}</div>
+      </div>
+      ${esFuturo ? '<div style="font-size:9px;color:var(--border2);text-align:center">—</div>' : `
+        ${lineaEvento('Exitosa', 'var(--teal)', ve)}
+        ${lineaEvento('Pend. Retiro', '#f59e0b', vp)}
+      `}
     </div>`;
+  }).join('');
+
+  cont.innerHTML = `<div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <div style="font-size:13px;font-weight:700">📦 Cambio de Terminal — por día</div>
+      <div style="display:flex;gap:14px;font-size:11px">
+        <span><span style="color:var(--teal);font-weight:800">${totalSemana(exitosaPorDia)}</span> exitosas</span>
+        <span><span style="color:#f59e0b;font-weight:800">${totalSemana(pendRetiroPorDia)}</span> pend. retiro</span>
+      </div>
+    </div>
+    <div style="font-size:10px;color:var(--text-muted);margin-bottom:8px">semana del ${fmtCorto(lunes.toLocaleDateString('en-CA'))}</div>
+    <div style="display:flex;gap:6px">${filaSemana(lunes, false)}</div>
+
+    <div style="font-size:10px;color:var(--text-muted);margin:14px 0 8px;padding-top:10px;border-top:1px dashed var(--border)">semana anterior (${fmtCorto(lunesAnt.toLocaleDateString('en-CA'))} – ${fmtCorto(new Date(lunes.getTime()-86400000).toLocaleDateString('en-CA'))})</div>
+    <div style="display:flex;gap:6px;opacity:.8">${filaSemana(lunesAnt, true)}</div>
+
+    <div style="font-size:9px;color:var(--text-muted);margin-top:10px">⚠️ "Pend. Retiro" usa la última modificación en SF como fecha aproximada — no hay campo exacto de "entrada a Retirar Terminal".</div>
+  </div>`;
 }
 
 
@@ -9423,24 +9435,21 @@ async function loadOpsPanel(isAdmin, modulos){
     }
   }
 
-  // 🎯 Objetivo semanal del equipo (Rollout) — SOLO marcelos. Pedido
-  // explícito 28/07: no lo quiere en Rollout Piloto (Diego mira esa
-  // pantalla) y sin desglose por chofer, esto es aparte, privado, agregado.
+  // 🎯 Objetivo semanal del equipo (Rollout) — OCULTO a pedido 26/08 (quedó
+  // redundante con la nueva vista "Cambio de Terminal — por día" de abajo).
+  // Código y función cargarObjetivoSemanalRollout() intactos por si hace
+  // falta reactivarlo — solo se dejó de togglear a 'block' y de llamarlo.
   const objCard = document.getElementById('objSemanalCard');
   const cambiosRespCard = document.getElementById('cambiosResponsableCard');
   const pendRetiroCard = document.getElementById('pendRetiroExitosaCard');
-  if(objCard){
-    const esMarcelos = (currentProfile?.email||currentUser?.email||'').trim().toLowerCase()==='marcelos@moretti.com.ar';
-    if(esMarcelos){
-      objCard.style.display='block';
-      cargarObjetivoSemanalRollout();
-      if(cambiosRespCard){ cambiosRespCard.style.display='block'; cargarCambiosPorResponsable(); }
-      if(pendRetiroCard){ pendRetiroCard.style.display='block'; cargarPendienteRetiroExitosa(); }
-    } else {
-      objCard.style.display='none';
-      if(cambiosRespCard) cambiosRespCard.style.display='none';
-      if(pendRetiroCard) pendRetiroCard.style.display='none';
-    }
+  if(objCard) objCard.style.display='none';
+  const esMarcelos = (currentProfile?.email||currentUser?.email||'').trim().toLowerCase()==='marcelos@moretti.com.ar';
+  if(esMarcelos){
+    if(cambiosRespCard){ cambiosRespCard.style.display='block'; cargarCambiosPorResponsable(); }
+    if(pendRetiroCard){ pendRetiroCard.style.display='block'; cargarPendienteRetiroExitosa(); }
+  } else {
+    if(cambiosRespCard) cambiosRespCard.style.display='none';
+    if(pendRetiroCard) pendRetiroCard.style.display='none';
   }
 
   // QUERIES — admin ve todo, operador filtra por su nombre
