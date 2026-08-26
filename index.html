@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.6.68</title>
+<title>Alleata · Operaciones v4.6.69</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -407,7 +407,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.68 · 26 ago 2026
+      v4.6.69 · 26 ago 2026
     </div>
   </div>
 </div>
@@ -516,7 +516,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.68 · 26 ago 2026
+      v4.6.69 · 26 ago 2026
     </div>
   </div>
 </nav>
@@ -556,7 +556,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.68</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.69</div>
   </div>
   <div class="content">
 
@@ -1176,11 +1176,17 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
   <!-- Distribución geográfica (pedido 26/08) — CABA / AMBA (GBA) / Resto
        del país, con desglose por provincia para "Resto del país". Reusa
        detectarZona() (mismo criterio que el módulo Envíos) agrupando Norte
-       + Sur + Oeste en "AMBA (GBA)". -->
+       + Sur + Oeste en "AMBA (GBA)". Filtro en cascada ("mamushka de
+       filtros" — drill-down): métrica (cards de arriba) → mes → zona →
+       provincia → listado de OTs. Ver mrRenderExplorador()/mrRenderGeoDrilldown(). -->
   <div class="card" style="margin-bottom:16px">
-    <div style="font-size:13px;font-weight:700;margin-bottom:12px">📍 Distribución geográfica — Cambio de Terminal</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px">
+      <div style="font-size:13px;font-weight:700">📍 Distribución geográfica — Cambio de Terminal</div>
+      <button class="btn btn-sm" onclick="cargarIndicadoresMisionRollout()">🔄 Actualizar</button>
+    </div>
     <div id="mrGeoResumen"><div style="text-align:center;padding:20px;color:var(--text-muted)">Cargando...</div></div>
     <div id="mrGeoProvincias" style="margin-top:14px"></div>
+    <div id="mrGeoOtsList"></div>
   </div>
 
   <!-- Indicadores Misión Rollout (pedido 25/08) — recorte del módulo
@@ -1193,18 +1199,15 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
        que guarde la fecha de ENTRADA a Credenciales Pendientes). Si esto
        no es lo que se necesita, avisar para sincronizar ese campo nuevo
        desde salesforce.js en alleata-agent.
-       26/08: la tabla mrIndTabla queda OCULTA a pedido — quedó redundante
-       con las cards de arriba + el desglose por mes de cada card
-       (mrToggleDesglose). El cálculo sigue corriendo igual, solo se oculta
-       la salida visual (no se borra por si hace falta reactivarla). El
-       desglose de costo por logística SÍ queda visible: es información que
-       no está en ningún otro lado. -->
-  <div class="card" style="margin-bottom:16px">
+       26/08: mrIndTabla y el desglose de costo por logística (mrIndCostos)
+       quedan OCULTOS a pedido — redundantes con las cards de arriba + el
+       drill-down. El cálculo sigue corriendo igual (por si hace falta
+       reactivarlos), solo se oculta la salida visual. -->
+  <div class="card" style="margin-bottom:16px;display:none">
     <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px">
       <div style="font-size:14px;font-weight:700">💰 Costo de envíos por logística — Cambio de Terminal</div>
-      <button class="btn btn-sm" onclick="cargarIndicadoresMisionRollout()">🔄 Actualizar</button>
     </div>
-    <div id="mrIndTabla" style="display:none"></div>
+    <div id="mrIndTabla"></div>
     <div id="mrIndCostos"></div>
   </div>
 
@@ -5045,7 +5048,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.6.68] OK');
+console.log('[Alleata v4.6.69] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -6711,39 +6714,73 @@ const MR_LOGISTICAS=[
 const MR_COSTO_FIJO_ALLEATA=1;
 const MR_FECHA_CORTE='2026-06-01';
 let _mrIndData=[];
-let _mrMesesData=[];
-let _mrMetricaActiva='';
+// Estado del filtro en cascada ("mamushka de filtros" — drill-down / filtros
+// anidados, pedido 26/08): metrica → mes → zona → provincia. Cada nivel
+// filtra sobre el resultado del nivel anterior; limpiar un nivel limpia
+// todos los que dependen de él.
+let _mrFiltro={metrica:'',mes:'',zona:'',provincia:''};
 const MR_METRICAS={
-  total:      {label:'Total OTs',           getter:m=>m.total},
-  cambio:     {label:'Cambio',              getter:m=>m.cambio},
-  rollout:    {label:'Rollout',             getter:m=>m.rollout, color:'#8b5cf6'},
-  precolecta: {label:'En Pre-Colecta hoy',  getter:m=>m.precolecta, color:'#f59e0b'},
-  despachado: {label:'Despachadas',         getter:m=>m.despachado},
-  exitoso:    {label:'Exitosas',            getter:m=>m.exitoso, color:'var(--teal)'},
-  costo:      {label:'Costo total',         getter:m=>m.costo_total, esMoneda:true, color:'var(--teal)'},
-  otros:      {label:'Otros estados',       getter:m=>m.otros, color:'var(--text-muted)'},
+  total:      {label:'Total OTs',           color:null},
+  cambio:     {label:'Cambio',              color:null},
+  rollout:    {label:'Rollout',             color:'#8b5cf6'},
+  precolecta: {label:'En Pre-Colecta hoy',  color:'#f59e0b'},
+  despachado: {label:'Despachadas',         color:null},
+  exitoso:    {label:'Exitosas',            color:'var(--teal)'},
+  costo:      {label:'Costo total',         color:'var(--teal)', esMoneda:true},
+  otros:      {label:'Otros estados',       color:'var(--text-muted)'},
 };
-// Estados que agrupa "Otros" — lo que queda de Total OTs una vez restados
-// Pre-Colecta/Despachadas/Exitosas: Configurar Terminal, En Proceso,
-// Retirar Terminal, Fallida, Cancelada, etc. Se guarda el detalle real
-// (status → cantidad) para la card, no un número ciego (pedido 26/08: la
-// suma tiene que cerrar contra Total OTs y tiene que poder verse por qué).
-let _mrOtrosDetalle={};
+// Predicado por métrica — define qué fila de sf_workorders entra en cada
+// balde. "otros" = lo que no es Pre-Colecta/Despachado/Exitoso (Configurar
+// Terminal, En Proceso, Retirar Terminal, Fallida, Cancelada, etc.) — esto
+// es lo que hace que Total OTs cierre contra la suma de las demás cards.
+const MR_METRICA_PREDICADO={
+  total:      r=>true,
+  cambio:     r=>r.rollout!==true,
+  rollout:    r=>r.rollout===true,
+  precolecta: r=>(r.status||'').trim()==='Pre-Colecta',
+  despachado: r=>(r.status||'').trim()==='Despachado',
+  exitoso:    r=>(r.status||'').trim()==='Exitoso',
+  otros:      r=>!['Pre-Colecta','Despachado','Exitoso'].includes((r.status||'').trim()),
+  costo:      r=>true,
+};
 
 function mrFmt$(n){ return n?'$'+Math.round(n).toLocaleString('es-AR'):'$0'; }
+function mrMesKeyDe(r){ const d=new Date(r.fecha_configurar_terminal); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
+function mrMesLabelDe(key){ const [y,mo]=key.split('-'); return MR_MESES_NOMBRE[Number(mo)-1]+' '+y; }
+function mrZonaBucketDe(r){
+  const z=detectarZona(r.ciudad,r.provincia,r.codigo_postal);
+  if(z.zona==='CABA')return 'CABA';
+  if(['Zona Norte','Zona Sur','Zona Oeste'].includes(z.zona))return 'AMBA';
+  if(z.zona==='—')return 'SIN_DATO';
+  return 'RESTO';
+}
+function mrCostoDe(r){ return (r.logistica||'').toUpperCase().trim()==='ALLEATA'?MR_COSTO_FIJO_ALLEATA:(Number(r.costo_envio)||0); }
 
-// Botón de card → desglose mes a mes de esa métrica puntual, debajo de las
-// cards (pedido 25/08). Click de nuevo sobre la misma card = colapsar.
+// Click en una card de arriba = nivel 1 del filtro (la métrica). Click de
+// nuevo sobre la misma card = limpiar todo el filtro.
 function mrToggleDesglose(metrica){
-  if(_mrMetricaActiva===metrica){
-    _mrMetricaActiva='';
-    const cont=document.getElementById('mrDesgloseMes');
-    if(cont){cont.style.display='none';cont.innerHTML='';}
-    mrMarcarCardActiva('');
-    return;
-  }
-  _mrMetricaActiva=metrica;
-  mrRenderDesgloseMes(metrica);
+  _mrFiltro = (_mrFiltro.metrica===metrica) ? {metrica:'',mes:'',zona:'',provincia:''} : {metrica,mes:'',zona:'',provincia:''};
+  mrMarcarCardActiva(_mrFiltro.metrica);
+  mrRenderExplorador();
+}
+function mrSeleccionarMes(key){
+  _mrFiltro.mes=(_mrFiltro.mes===key)?'':key;
+  _mrFiltro.zona=''; _mrFiltro.provincia='';
+  mrRenderExplorador();
+}
+function mrSeleccionarZona(zona){
+  _mrFiltro.zona=(_mrFiltro.zona===zona)?'':zona;
+  _mrFiltro.provincia='';
+  mrRenderExplorador();
+}
+function mrSeleccionarProvincia(prov){
+  _mrFiltro.provincia=(_mrFiltro.provincia===prov)?'':prov;
+  mrRenderExplorador();
+}
+function mrLimpiarFiltros(){
+  _mrFiltro={metrica:'',mes:'',zona:'',provincia:''};
+  mrMarcarCardActiva('');
+  mrRenderExplorador();
 }
 
 function mrMarcarCardActiva(metrica){
@@ -6753,39 +6790,161 @@ function mrMarcarCardActiva(metrica){
   });
 }
 
-function mrRenderDesgloseMes(metrica){
-  const cont=document.getElementById('mrDesgloseMes');
-  if(!cont)return;
-  const cfg=MR_METRICAS[metrica];
-  if(!cfg||!_mrMesesData.length){ cont.style.display='none'; return; }
-  mrMarcarCardActiva(metrica);
+function mrDetalleEstadosHtml(datos){
+  const detalle={};
+  datos.forEach(r=>{ const st=(r.status||'').trim()||'(sin estado)'; detalle[st]=(detalle[st]||0)+1; });
+  const filas=Object.entries(detalle).sort((a,b)=>b[1]-a[1]);
+  if(!filas.length)return '';
+  return `<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+    <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Detalle por estado</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      ${filas.map(([st,n])=>`<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-size:12px"><b>${n}</b> · ${st}</div>`).join('')}
+    </div>
+  </div>`;
+}
 
-  const filas=_mrMesesData.map(m=>({label:m.label,valor:cfg.getter(m)}));
-  const totalMetrica=filas.reduce((a,f)=>a+f.valor,0);
-  const fmt=v=>cfg.esMoneda?mrFmt$(v):v;
+// Motor central del drill-down: arma nivel 1 (mes) a partir de la métrica
+// elegida, y dispara nivel 2/3 (zona/provincia/listado de OTs) con lo que
+// haya quedado filtrado hasta ahí. Se llama tanto al clickear cualquier
+// card/nivel como al terminar un 🔄 Actualizar (para no perder el filtro).
+function mrRenderExplorador(){
+  const contMes=document.getElementById('mrDesgloseMes');
+  const contGeoResumen=document.getElementById('mrGeoResumen');
+  const contGeoProv=document.getElementById('mrGeoProvincias');
+  const contOts=document.getElementById('mrGeoOtsList');
+  if(!contMes)return;
 
-  cont.style.display='block';
-  cont.innerHTML=`<div class="card" style="padding:14px 18px">
-    <div style="font-size:12px;font-weight:700;color:${cfg.color||'var(--text)'};margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px">${cfg.label} — por mes</div>
+  if(!_mrFiltro.metrica){
+    contMes.style.display='none'; contMes.innerHTML='';
+    if(contGeoResumen)contGeoResumen.innerHTML='<div style="text-align:center;padding:16px;color:var(--text-muted);font-size:12px">Elegí una card de arriba (ej. "Total OTs") para ver el desglose por mes y la distribución geográfica.</div>';
+    if(contGeoProv)contGeoProv.innerHTML='';
+    if(contOts)contOts.innerHTML='';
+    return;
+  }
+
+  const cfg=MR_METRICAS[_mrFiltro.metrica];
+  const dataMetrica=_mrIndData.filter(MR_METRICA_PREDICADO[_mrFiltro.metrica]);
+  const esCosto=_mrFiltro.metrica==='costo';
+
+  const porMes={};
+  dataMetrica.forEach(r=>{
+    const key=mrMesKeyDe(r);
+    if(!porMes[key])porMes[key]={key,label:mrMesLabelDe(key),n:0,costo:0};
+    porMes[key].n+=1;
+    porMes[key].costo+=mrCostoDe(r);
+  });
+  const mesesArr=Object.values(porMes).sort((a,b)=>b.key.localeCompare(a.key));
+  const valorDe=m=>esCosto?m.costo:m.n;
+  const totalMetrica=mesesArr.reduce((a,m)=>a+valorDe(m),0);
+  const fmtV=v=>esCosto?mrFmt$(v):v;
+
+  contMes.style.display='block';
+  contMes.innerHTML=`<div class="card" style="padding:14px 18px">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;margin-bottom:10px">
+      <div style="font-size:12px;font-weight:700;color:${cfg.color||'var(--text)'};text-transform:uppercase;letter-spacing:.5px">${cfg.label} — por mes (click para filtrar)</div>
+      <button class="btn btn-sm" style="padding:4px 10px;font-size:11px" onclick="mrLimpiarFiltros()">✕ Limpiar filtros</button>
+    </div>
     <div style="display:flex;gap:10px;flex-wrap:wrap">
-      ${filas.map(f=>`
-        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 16px;min-width:110px">
-          <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.4px">${f.label}</div>
-          <div style="font-size:20px;font-weight:800;margin-top:2px;color:${cfg.color||'var(--text)'}">${fmt(f.valor)}</div>
+      ${mesesArr.map(m=>`
+        <div onclick="mrSeleccionarMes('${m.key}')" style="cursor:pointer;background:var(--surface2);border:1px solid ${_mrFiltro.mes===m.key?'var(--teal)':'var(--border)'};border-radius:10px;padding:10px 16px;min-width:110px">
+          <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.4px">${m.label}</div>
+          <div style="font-size:20px;font-weight:800;margin-top:2px;color:${cfg.color||'var(--text)'}">${fmtV(valorDe(m))}</div>
         </div>`).join('')}
-      <div style="background:var(--surface2);border:1px solid var(--teal);border-radius:10px;padding:10px 16px;min-width:110px">
+      <div onclick="mrSeleccionarMes('')" style="cursor:pointer;background:var(--surface2);border:1px solid ${_mrFiltro.mes===''?'var(--teal)':'var(--border)'};border-radius:10px;padding:10px 16px;min-width:110px">
         <div style="font-size:10px;color:var(--teal);text-transform:uppercase;letter-spacing:.4px">Total</div>
-        <div style="font-size:20px;font-weight:800;margin-top:2px;color:var(--teal)">${fmt(totalMetrica)}</div>
+        <div style="font-size:20px;font-weight:800;margin-top:2px;color:var(--teal)">${fmtV(totalMetrica)}</div>
       </div>
     </div>
-    ${metrica==='otros'?`<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
-      <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Detalle por estado (todos los meses)</div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">
-        ${Object.entries(_mrOtrosDetalle).sort((a,b)=>b[1]-a[1]).map(([st,n])=>
-          `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-size:12px"><b>${n}</b> · ${st||'(sin estado)'}</div>`
-        ).join('')||'<span style="color:var(--text-muted);font-size:12px">Sin registros</span>'}
-      </div>
-    </div>`:''}
+    ${_mrFiltro.metrica==='otros'?mrDetalleEstadosHtml(_mrFiltro.mes?dataMetrica.filter(r=>mrMesKeyDe(r)===_mrFiltro.mes):dataMetrica):''}
+  </div>`;
+
+  const dataMes=_mrFiltro.mes ? dataMetrica.filter(r=>mrMesKeyDe(r)===_mrFiltro.mes) : dataMetrica;
+  mrRenderGeoDrilldown(dataMes);
+}
+
+// Nivel 2 (zona) + nivel 3 (provincia, dentro de "Resto del país") + nivel
+// 4 (listado de OTs) — todo sobre el subconjunto que ya viene filtrado por
+// métrica + mes desde mrRenderExplorador().
+function mrRenderGeoDrilldown(dataMes){
+  const contGeoResumen=document.getElementById('mrGeoResumen');
+  const contGeoProv=document.getElementById('mrGeoProvincias');
+  const contOts=document.getElementById('mrGeoOtsList');
+  if(!contGeoResumen)return;
+
+  if(!dataMes.length){
+    contGeoResumen.innerHTML='<div style="text-align:center;padding:16px;color:var(--text-muted);font-size:12px">Sin OTs para este filtro</div>';
+    if(contGeoProv)contGeoProv.innerHTML='';
+    if(contOts)contOts.innerHTML='';
+    return;
+  }
+
+  const buckets={CABA:[],AMBA:[],RESTO:[],SIN_DATO:[]};
+  dataMes.forEach(r=>buckets[mrZonaBucketDe(r)].push(r));
+  const total=dataMes.length;
+  const pct=n=>total?Math.round(n/total*100):0;
+  const cardZona=(key,label,icon,color)=>{
+    const n=buckets[key].length;
+    const activo=_mrFiltro.zona===key;
+    return `<div onclick="mrSeleccionarZona('${key}')" class="card" style="cursor:pointer;flex:1;min-width:150px;border-color:${activo?'var(--teal)':color+'55'}">
+      <div style="font-size:11px;font-weight:700;color:${color};text-transform:uppercase;letter-spacing:.5px">${icon} ${label}</div>
+      <div style="font-size:24px;font-weight:800;margin-top:4px">${n}</div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:2px">${pct(n)}% de este filtro</div>
+    </div>`;
+  };
+  contGeoResumen.innerHTML=`<div style="display:flex;gap:12px;flex-wrap:wrap">
+    ${cardZona('CABA','CABA','🏙️','#1a9fd4')}
+    ${cardZona('AMBA','AMBA (GBA)','🔵','#10b981')}
+    ${cardZona('RESTO','Resto del país','📍','#f59e0b')}
+    ${buckets.SIN_DATO.length?cardZona('SIN_DATO','Sin ciudad/provincia','—','var(--text-muted)'):''}
+  </div>`;
+
+  if(contGeoProv){
+    if(_mrFiltro.zona==='RESTO'){
+      const porProv={};
+      buckets.RESTO.forEach(r=>{ const prov=(r.provincia||'').trim()||'(sin provincia)'; (porProv[prov]=porProv[prov]||[]).push(r); });
+      const filas=Object.entries(porProv).sort((a,b)=>b[1].length-a[1].length);
+      contGeoProv.innerHTML=`<div style="margin-top:14px">
+        <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Resto del país — por provincia (click para filtrar)</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          ${filas.map(([prov,arr])=>`
+            <div onclick="mrSeleccionarProvincia('${prov.replace(/'/g,"\\'")}')" style="cursor:pointer;background:var(--surface2);border:1px solid ${_mrFiltro.provincia===prov?'var(--teal)':'var(--border)'};border-radius:8px;padding:8px 14px">
+              <div style="font-size:16px;font-weight:800">${arr.length}</div>
+              <div style="font-size:10px;color:var(--text-muted);margin-top:1px">${prov}</div>
+            </div>`).join('')}
+        </div>
+      </div>`;
+    } else {
+      contGeoProv.innerHTML='';
+    }
+  }
+
+  if(contOts){
+    if(!_mrFiltro.zona){ contOts.innerHTML=''; return; }
+    let lista=buckets[_mrFiltro.zona]||[];
+    if(_mrFiltro.zona==='RESTO' && _mrFiltro.provincia){
+      lista=lista.filter(r=>((r.provincia||'').trim()||'(sin provincia)')===_mrFiltro.provincia);
+    }
+    contOts.innerHTML=mrRenderTablaOts(lista);
+  }
+}
+
+function mrRenderTablaOts(lista){
+  if(!lista.length) return '<div style="text-align:center;padding:16px;color:var(--text-muted);font-size:12px">Sin OTs para este filtro</div>';
+  const ordenadas=lista.slice().sort((a,b)=>(a.workorder_number||'').localeCompare(b.workorder_number||''));
+  return `<div class="card" style="margin-top:14px;padding:0;overflow-x:auto">
+    <div style="padding:12px 16px;font-size:12px;font-weight:700;color:var(--text-muted);border-bottom:1px solid var(--border)">📋 OTs (${lista.length})</div>
+    <table class="table">
+      <thead><tr><th>OT</th><th>Cuenta</th><th>Ciudad</th><th>Provincia</th><th>Estado</th><th>Logística</th><th style="text-align:right">Costo</th></tr></thead>
+      <tbody>${ordenadas.map(r=>`<tr>
+        <td style="font-family:'JetBrains Mono',monospace;font-weight:700">${r.workorder_number||'—'}</td>
+        <td>${r.cuenta||'—'}</td>
+        <td>${r.ciudad||'—'}</td>
+        <td>${r.provincia||'—'}</td>
+        <td>${r.status||'—'}</td>
+        <td>${r.logistica||'—'}</td>
+        <td style="text-align:right;font-family:'JetBrains Mono',monospace">${r.costo_envio!=null?mrFmt$(Number(r.costo_envio)):'—'}</td>
+      </tr>`).join('')}</tbody>
+    </table>
   </div>`;
 }
 
@@ -6824,7 +6983,6 @@ function renderIndicadoresMisionRollout(){
   }
 
   const porMes={};
-  _mrOtrosDetalle={};
   data.forEach(r=>{
     const d=new Date(r.fecha_configurar_terminal);
     const key=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
@@ -6843,8 +7001,6 @@ function renderIndicadoresMisionRollout(){
       // Esto es lo que hace que Total OTs SÍ cierre contra la suma de las
       // 4 cards de estado (pedido 26/08 — antes faltaban 66 OTs sin bucket).
       m.otros+=1;
-      const stLabel=st||'(sin estado)';
-      _mrOtrosDetalle[stLabel]=(_mrOtrosDetalle[stLabel]||0)+1;
     }
 
     const log=(r.logistica||'OTROS').toUpperCase().trim();
@@ -6862,9 +7018,6 @@ function renderIndicadoresMisionRollout(){
     exitoso:a.exitoso+m.exitoso, otros:a.otros+m.otros, costo_total:a.costo_total+m.costo_total,
   }),{total:0,cambio:0,rollout:0,precolecta:0,despachado:0,exitoso:0,otros:0,costo_total:0});
 
-  // Guardado para que las cards de arriba (botones) armen su desglose por
-  // mes sin tener que recalcular todo de nuevo — ver mrToggleDesglose().
-  _mrMesesData=meses;
   const setStat=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v;};
   setStat('mr-stat-total',tot.total);
   setStat('mr-stat-cambio',tot.cambio);
@@ -6874,11 +7027,9 @@ function renderIndicadoresMisionRollout(){
   setStat('mr-stat-exitoso',tot.exitoso);
   setStat('mr-stat-costo',mrFmt$(tot.costo_total));
   setStat('mr-stat-otros',tot.otros);
-  // Si había un desglose abierto, se refresca con los datos nuevos en vez
-  // de quedar mostrando un snapshot viejo tras un 🔄 Actualizar.
-  if(_mrMetricaActiva) mrRenderDesgloseMes(_mrMetricaActiva);
-
-  renderDistribucionGeoMisionRollout(data);
+  // Si había un filtro (mamushka) abierto, se refresca con los datos
+  // nuevos en vez de quedar mostrando un snapshot viejo tras 🔄 Actualizar.
+  mrRenderExplorador();
 
   cont.innerHTML=`<div style="overflow-x:auto"><table class="table">
     <thead><tr>
@@ -6944,75 +7095,6 @@ function renderIndicadoresMisionRollout(){
         <div style="font-size:11px;color:var(--text-muted);margin-top:2px">${totalGeneralOts} envíos</div>
       </div>
     </div>`;
-}
-
-// ── Distribución geográfica — CABA / AMBA / Resto del país (pedido 26/08) ──
-// Reusa detectarZona() (mismo criterio que el módulo Envíos): agrupa Zona
-// Norte + Zona Sur + Zona Oeste en "AMBA (GBA)". Todo lo que no es CABA ni
-// AMBA (incluye "Fuera AMBA" — provincia de Buenos Aires fuera del GBA — y
-// "Interior") se agrupa como "Resto del país" con desglose por provincia.
-function renderDistribucionGeoMisionRollout(data){
-  const contResumen=document.getElementById('mrGeoResumen');
-  const contProv=document.getElementById('mrGeoProvincias');
-  if(!contResumen)return;
-  if(!data.length){
-    contResumen.innerHTML='<div style="text-align:center;padding:10px;color:var(--text-muted)">Sin datos</div>';
-    if(contProv)contProv.innerHTML='';
-    return;
-  }
-
-  let caba=0, amba=0, resto=0, sinDato=0;
-  const porProvincia={};
-  data.forEach(r=>{
-    const z=detectarZona(r.ciudad,r.provincia,r.codigo_postal);
-    if(z.zona==='CABA')caba+=1;
-    else if(['Zona Norte','Zona Sur','Zona Oeste'].includes(z.zona))amba+=1;
-    else if(z.zona==='—'){ sinDato+=1; }
-    else {
-      resto+=1;
-      const prov=(r.provincia||'').trim()||'(sin provincia)';
-      porProvincia[prov]=(porProvincia[prov]||0)+1;
-    }
-  });
-
-  const total=data.length;
-  const pct=n=>total?Math.round(n/total*100):0;
-
-  contResumen.innerHTML=`<div style="display:flex;gap:12px;flex-wrap:wrap">
-    <div class="card" style="flex:1;min-width:150px;border-color:#1a9fd455">
-      <div style="font-size:11px;font-weight:700;color:#1a9fd4;text-transform:uppercase;letter-spacing:.5px">🏙️ CABA</div>
-      <div style="font-size:24px;font-weight:800;margin-top:4px">${caba}</div>
-      <div style="font-size:11px;color:var(--text-muted);margin-top:2px">${pct(caba)}% del total</div>
-    </div>
-    <div class="card" style="flex:1;min-width:150px;border-color:#10b98155">
-      <div style="font-size:11px;font-weight:700;color:#10b981;text-transform:uppercase;letter-spacing:.5px">🔵 AMBA (GBA)</div>
-      <div style="font-size:24px;font-weight:800;margin-top:4px">${amba}</div>
-      <div style="font-size:11px;color:var(--text-muted);margin-top:2px">${pct(amba)}% del total</div>
-    </div>
-    <div class="card" style="flex:1;min-width:150px;border-color:#f59e0b55">
-      <div style="font-size:11px;font-weight:700;color:#f59e0b;text-transform:uppercase;letter-spacing:.5px">📍 Resto del país</div>
-      <div style="font-size:24px;font-weight:800;margin-top:4px">${resto}</div>
-      <div style="font-size:11px;color:var(--text-muted);margin-top:2px">${pct(resto)}% del total</div>
-    </div>
-    ${sinDato?`<div class="card" style="flex:1;min-width:150px;border-color:var(--border2)">
-      <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px">Sin ciudad/provincia</div>
-      <div style="font-size:24px;font-weight:800;margin-top:4px">${sinDato}</div>
-      <div style="font-size:11px;color:var(--text-muted);margin-top:2px">${pct(sinDato)}% del total</div>
-    </div>`:''}
-  </div>`;
-
-  if(contProv){
-    const filas=Object.entries(porProvincia).sort((a,b)=>b[1]-a[1]);
-    contProv.innerHTML = filas.length ? `
-      <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Resto del país — por provincia</div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">
-        ${filas.map(([prov,n])=>`
-          <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 14px">
-            <div style="font-size:16px;font-weight:800">${n}</div>
-            <div style="font-size:10px;color:var(--text-muted);margin-top:1px">${prov}</div>
-          </div>`).join('')}
-      </div>` : '';
-  }
 }
 
 async function loadRolloutPiloto(){
