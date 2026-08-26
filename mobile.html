@@ -165,7 +165,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
       <div class="login-logo">
         <img id="loginLogo" src="" alt="Alleata">
         <div class="login-sub">Portal de Operaciones</div>
-        <div class="login-version">v2.14.48 · mobile</div>
+        <div class="login-version">v2.14.49 · mobile</div>
       </div>
       <div class="field"><label class="label">Email</label><input class="input" id="lEmail" type="email" placeholder="usuario@alleata.com" autocomplete="email"></div>
       <div class="field"><label class="label">Contraseña</label><input class="input" id="lPass" type="password" placeholder="••••••••" autocomplete="current-password"></div>
@@ -182,7 +182,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
     <img id="appLogo" src="" alt="Alleata">
     <div class="topbar-title" id="topbarTitle">Operaciones</div>
     <button id="btnSyncRapido" onclick="syncRapido()" title="Actualizar estados desde Salesforce (sin esperar los 10min)" style="background:none;border:none;color:#fff;font-size:18px;cursor:pointer;padding:4px 6px;line-height:1">🔄</button>
-    <div class="topbar-version" onclick="_tocarVersion()">v2.14.48</div>
+    <div class="topbar-version" onclick="_tocarVersion()">v2.14.49</div>
     <div class="topbar-avatar" id="topbarAvatar" onclick="openDrawer()">?</div>
   </div>
 
@@ -766,18 +766,18 @@ const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSI
 //     el producto en estado raro en SF (por eso existe la opción
 //     Reprogramar como alternativa), así que necesita aviso inmediato.
 //     No bloquea el cierre si el envío directo falla.
-// Cambios v2.14.48 (11/08):
+// Cambios v2.14.49 (11/08):
 //   - Números de OT: .ot-num y #otS-num pasan de JetBrains Mono a IBM
 //     Plex Mono bold (0 con barra diagonal — no se confunde con O).
 //     JetBrains Mono acá solo cargaba 400/500, así que el "bold" viejo
 //     era negrita sintética del navegador, no un peso real — se veía
 //     peor, no mejor.
-// Cambios v2.14.48 (21/08):
+// Cambios v2.14.49 (21/08):
 //   - Modal "Retiro/Entrega en proveedor": chip de proveedores frecuentes
 //     (Logicalis precargado — nombre + dirección) arriba del campo
 //     Proveedor. Un click completa Proveedor y Dirección, solo queda
 //     elegir Retiro/Entrega y completar los datos puntuales.
-// Cambios v2.14.48 (21/08):
+// Cambios v2.14.49 (21/08):
 //   - Modal "Retiro/Entrega en proveedor": el toggle de 2 botones (Retiro/
 //     Entrega) pasa a ser un combo <select> — pedido explícito, más claro.
 const{createClient}=supabase;
@@ -2602,6 +2602,16 @@ function esRolloutOT(ot){
   return tipo.includes('cambio') && perfil==='NAPSE' && ot.rollout===true && logistica==='ALLEATA';
 }
 
+// Pedido 26/08 (caso OT 23523, reporte Ignacio Maciel): a diferencia de
+// esRolloutOT(), esto es CUALQUIER OT de Cambio de Terminal — no hace
+// falta que sea Rollout ni logística Alleata. Se usa para saber si hay que
+// actualizar la terminal (Product2) al marcar Reprogramar.
+function esCambioDeTerminalOT(ot){
+  if(!ot) return false;
+  const tipo=(ot.record_type||ot.tipo||'').toLowerCase();
+  return tipo.includes('cambio');
+}
+
 function openCierreModal(id,resultado){
   document.getElementById('modalCierre-id').value=id;
   document.getElementById('modalCierre-resultado').value=resultado;
@@ -2900,11 +2910,32 @@ async function confirmarCierreOT(){
     }catch(e){ rolloutSimError=e.message; }
   }
 
+  // Reprogramar en Cambio de Terminal (pedido 26/08, caso OT 23523): la
+  // terminal (Product2 en N_Terminal_Nueva__c) sigue en poder del chofer,
+  // así que se marca Ubicacion__c=COMERCIO / Estado__c=ASIGNADA / cuenta =
+  // la de la OT — para que no quede con un estado viejo tipo "ENVIO
+  // FALLIDO" de un intento anterior. No bloquea el cierre si falla, solo
+  // avisa (mismo criterio que el error de SIM de arriba).
+  let terminalReprogramarError=null;
+  if(!error&&resultado==='Reprogramar'&&esCambioDeTerminalOT(_otCierreActual)){
+    try{
+      const resTerm=await railwayFetch('/automations/terminal-reprogramar',{
+        method:'POST',
+        body:JSON.stringify({ sf_id: _otCierreActual?.sf_id })
+      });
+      const dataTerm=await resTerm.json();
+      if(!dataTerm.ok) terminalReprogramarError=dataTerm.error||'Error al actualizar la terminal';
+    }catch(e){ terminalReprogramarError=e.message; }
+  }
+
   btn.disabled=false;btn.textContent='Confirmar';
   if(error){alert('Error: '+error.message);return;}
   closeModalCierre();
   if(rolloutSimError){
     alert('⚠️ La OT se cerró bien, pero falló la actualización de la SIM en Salesforce: '+rolloutSimError+'\n\nAvisá para que lo corrijan a mano.');
+  }
+  if(terminalReprogramarError){
+    alert('⚠️ La OT se reprogramó bien, pero falló la actualización de la terminal en Salesforce: '+terminalReprogramarError+'\n\nAvisá para que lo corrijan a mano.');
   }
   registrarCierreResumen({
     tipo:      'envio',
