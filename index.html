@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.6.74</title>
+<title>Alleata · Operaciones v4.6.75</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -407,7 +407,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.74 · 26 ago 2026
+      v4.6.75 · 26 ago 2026
     </div>
   </div>
 </div>
@@ -516,7 +516,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.74 · 26 ago 2026
+      v4.6.75 · 26 ago 2026
     </div>
   </div>
 </nav>
@@ -544,6 +544,11 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <svg id="global-sf-sync-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
         Full Sync
       </button>
+      <button id="global-sf-force-one-btn" onclick="forzarSyncUnaOT()" title="Fuerza el sync de UNA OT puntual, saltando el filtro de &quot;OT activa&quot; que usa el sync general — para cuando una OT específica no actualiza ni con el cron ni con Full Sync."
+        style="display:flex;align-items:center;gap:5px;background:rgba(139,92,246,.1);border:1px solid rgba(139,92,246,.3);color:#8b5cf6;border-radius:7px;padding:5px 10px;cursor:pointer;font-size:11px;font-weight:600;white-space:nowrap;transition:all .2s;margin-left:6px"
+        onmouseover="this.style.background='rgba(139,92,246,.2)'" onmouseout="this.style.background='rgba(139,92,246,.1)'">
+        ⚡ Forzar OT
+      </button>
       <div id="sf-sync-progress-panel" style="display:none;position:fixed;top:48px;right:12px;z-index:9999;background:var(--navy-800);border:1px solid rgba(29,191,142,.3);border-radius:10px;padding:14px 16px;min-width:260px;box-shadow:0 8px 32px rgba(0,0,0,.5);">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
           <span style="font-size:12px;font-weight:700;color:var(--teal);">Full Sync en curso</span>
@@ -556,7 +561,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.74</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.75</div>
   </div>
   <div class="content">
 
@@ -5066,7 +5071,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.6.74] OK');
+console.log('[Alleata v4.6.75] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -13513,6 +13518,32 @@ async function sfCargarLogs() {
     }).join('');
   } catch(err) {
     tbody.innerHTML = `<tr><td colspan="8" style="padding:20px;text-align:center;color:var(--red)">${err.message}</td></tr>`;
+  }
+}
+
+// ── Forzar sync de UNA OT puntual (pedido 26/08, caso OT 23553) ────────────
+// Salta el filtro de "OT activa" que usa syncActiveOTs()/Full Sync — para
+// cuando una OT específica quedó afuera de ese filtro y por eso nunca
+// actualiza, ni con el cron cada 10min ni con Full Sync (que usa el mismo
+// filtro). Ver salesforce.js → syncOneOT() para el detalle de por qué pasa.
+async function forzarSyncUnaOT(){
+  const ot = prompt('Número de OT a forzar (con o sin ceros a la izquierda):');
+  if(!ot || !ot.trim()) return;
+  const btn = document.getElementById('global-sf-force-one-btn');
+  const textoOriginal = btn ? btn.innerHTML : '';
+  if(btn){ btn.disabled=true; btn.innerHTML='⏳ Forzando...'; }
+  try{
+    const r = await railwayFetch('/automations/sync-one-ot', { method:'POST', body: JSON.stringify({ ot: ot.trim() }) });
+    const j = await r.json();
+    if(j.ok){
+      alert(`✅ OT ${ot.trim()} sincronizada — ${j.actualizadas} fila(s) actualizada(s) en sf_workorders.\n\nRefrescá la pantalla donde la estabas mirando (o esperá el auto-refresh) para verla actualizada.`);
+    } else {
+      alert(`❌ No se pudo forzar la OT ${ot.trim()}:\n${j.mensaje||j.error||'Error desconocido'}`);
+    }
+  }catch(err){
+    alert(`❌ Error de red forzando la OT ${ot.trim()}: ${err.message}`);
+  }finally{
+    if(btn){ btn.disabled=false; btn.innerHTML=textoOriginal; }
   }
 }
 
