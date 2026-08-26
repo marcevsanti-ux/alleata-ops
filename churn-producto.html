@@ -109,7 +109,7 @@ table.table tr:hover td{background:var(--surface2);}
   <header>
     <div class="brand">
       <div class="brand-logo">alleata</div>
-      <div class="brand-sub">· Churn Producto <span style="opacity:.5">v1.7.0</span></div>
+      <div class="brand-sub">· Churn Producto <span style="opacity:.5">v1.8.0</span></div>
     </div>
     <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
       <div style="font-size:11px;color:var(--text-muted);text-align:right;line-height:1.4">
@@ -444,6 +444,10 @@ async function loadChurnProductoResumen(){
     // la diferencia de forma explícita en vez de que la cuenta no cierre
     // en silencio — ver cpRenderDesgloseLogistica().
     _cpRecuperadaSFTotal = j.totalPorEstado?.['Recuperada'] ?? null;
+    // Se guarda el detalle completo (OT, cuenta, sf_id, etc.) de las
+    // Recuperadas en vivo — necesario para poder mostrar CUÁLES OTs son
+    // las que faltan en el análisis de producto, no solo cuántas.
+    _cpRecuperadaSFDetalle = j.estadoDetalle?.['Recuperada'] || [];
     cont.innerHTML=`<div class="card">
       <div style="display:flex;align-items:flex-end;gap:10px;margin-bottom:10px">
         <button onclick="cpFiltrarPorEstado(null)" style="background:none;border:none;cursor:pointer;display:flex;align-items:flex-end;gap:10px;padding:0" title="Ver todas">
@@ -475,10 +479,12 @@ async function loadChurnProductoResumen(){
 // (ya cargada de Supabase), no de la consulta en vivo a SF.
 // TODO: el campo de $ todavía no está confirmado — falta ver qué columna de
 // costo tiene desinst_analisis_producto (o si hay que traerla de otra tabla).
-// Guardado por loadChurnProductoResumen() — total "Recuperada" EN VIVO desde
-// SF, para poder mostrar la diferencia contra el desglose por logística
-// (que sale de una tabla precalculada más estricta). Ver comentario ahí.
+// Guardado por loadChurnProductoResumen() — total y detalle "Recuperada" EN
+// VIVO desde SF, para poder mostrar la diferencia (y CUÁLES OTs faltan)
+// contra el desglose por logística (que sale de una tabla precalculada más
+// estricta). Ver comentario ahí.
 let _cpRecuperadaSFTotal = null;
+let _cpRecuperadaSFDetalle = [];
 
 function cpRenderDesgloseLogistica(){
   const cont=document.getElementById('cp-logistica-cards');
@@ -500,15 +506,28 @@ function cpRenderDesgloseLogistica(){
 
   const LABELS={ALLEATA:'Alleata',CA:'Correo Argentino',OTRA:'Otra logística'};
   const COLORS={ALLEATA:'#38bdf8',CA:'#e74c3c',OTRA:'#6b7280'};
-  // Aviso de reconciliación (pedido 26/08): si el total en vivo de SF trae
-  // más "Recuperada" que las que hay acá, mostrarlo explícito — esos casos
-  // existen en SF pero el job de análisis de producto no pudo matchearlos
-  // (sin OT de instalación encontrada, sin Terminal_ID, etc.), así que no
-  // tienen logística/costo calculado. No es un error de esta pantalla.
-  const faltantes = (_cpRecuperadaSFTotal!=null && _cpRecuperadaSFTotal>recuperadas.length)
-    ? _cpRecuperadaSFTotal-recuperadas.length : 0;
+  // Reconciliación (pedido 26/08): OTs "Recuperada" en vivo en SF que NO
+  // aparecen en desinst_analisis_producto (o sí aparecen pero con otro
+  // estado_desinst — se cruza por ot_desinstalacion = OT, no por SF vivo,
+  // así que cualquier mismatch cae acá). Se guarda la lista completa (no
+  // solo el número) para poder mostrarla y que se pueda ir a mirar cada
+  // OT puntual en SF.
+  const otsAnalizadas = new Set(recuperadas.map(r=>r.ot_desinstalacion).filter(Boolean));
+  const faltantesOTs = _cpRecuperadaSFDetalle.filter(o=>!otsAnalizadas.has(o.ot));
+  const faltantes = faltantesOTs.length;
   const avisoFaltantes = faltantes>0
-    ? `<div style="font-size:11px;color:var(--yellow);margin-top:8px">⚠️ ${_cpRecuperadaSFTotal} Recuperadas en vivo en SF, pero solo ${recuperadas.length} tienen datos suficientes para clasificar por logística (faltan ${faltantes} — sin match de OT de instalación o sin Terminal_ID en el análisis de producto).</div>`
+    ? `<div style="margin-top:10px">
+        <div style="font-size:11px;color:var(--yellow)">⚠️ ${_cpRecuperadaSFTotal} Recuperadas en vivo en SF, pero solo ${recuperadas.length} tienen datos suficientes para clasificar por logística. Faltan ${faltantes} (sin match de OT de instalación o sin Terminal_ID en el análisis de producto):</div>
+        <div style="display:flex;flex-direction:column;gap:4px;margin-top:6px">
+          ${faltantesOTs.map(o=>`
+            <div style="font-size:11px;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;padding:5px 8px;display:flex;gap:8px;flex-wrap:wrap">
+              <span style="font-family:'JetBrains Mono',monospace;font-weight:700">${o.sf_id?`<a href="https://alleata.lightning.force.com/lightning/r/WorkOrder/${o.sf_id}/view" target="_blank" rel="noopener" style="color:var(--teal);text-decoration:none">${o.ot} ↗</a>`:o.ot}</span>
+              <span style="color:var(--text-muted)">${o.cuenta||'—'}</span>
+              <span style="color:var(--text-muted)">${o.terminal_id?`Terminal: ${o.terminal_id}`:'⚠️ sin Terminal_ID'}</span>
+              <span style="color:var(--text-muted)">${o.logistica||'—'}</span>
+            </div>`).join('')}
+        </div>
+      </div>`
     : '';
   cont.innerHTML=`<div class="card" style="margin-top:10px">
     <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:10px">📦 Por logística — solo Recuperadas (${recuperadas.length}${faltantes>0?` de ${_cpRecuperadaSFTotal}`:''})</div>
