@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.6.66</title>
+<title>Alleata · Operaciones v4.6.67</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -407,7 +407,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.66 · 25 ago 2026
+      v4.6.67 · 25 ago 2026
     </div>
   </div>
 </div>
@@ -516,7 +516,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.66 · 25 ago 2026
+      v4.6.67 · 25 ago 2026
     </div>
   </div>
 </nav>
@@ -556,7 +556,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.66</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.67</div>
   </div>
   <div class="content">
 
@@ -1149,15 +1149,27 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
 </div>
 
 <div class="module" id="mod-rollout-piloto">
-  <div class="stats-row" style="margin-bottom:16px">
-    <div class="stat-box s-purple" id="rp-card-total" style="cursor:pointer" onclick="filtrarPiloto('')" title="Ver todos"><div class="stat-num" id="rp-total">50</div><div class="stat-label">Total piloto</div></div>
-    <div class="stat-box" id="rp-card-sincontactar" style="cursor:pointer" onclick="filtrarPiloto('Sin contactar')" title="Filtrar por Sin contactar"><div class="stat-num" id="rp-sincontactar">0</div><div class="stat-label">Sin contactar</div></div>
-    <div class="stat-box s-teal" id="rp-card-contactado" style="cursor:pointer" onclick="filtrarPiloto('__notificados_acum')" title="Ver notificados que todavía no confirmaron"><div class="stat-num" id="rp-contactados">0</div><div class="stat-label">Notificados</div></div>
-    <div class="stat-box s-blue" id="rp-card-confirmado" style="cursor:pointer" onclick="filtrarPiloto('__confirmados_acum')" title="Filtrar por Confirmado (incluye OT creada y Exitoso)"><div class="stat-num" id="rp-confirmados">0</div><div class="stat-label">Confirmados</div></div>
-    <div class="stat-box s-blue" id="rp-card-otcreada" style="cursor:pointer" onclick="filtrarPiloto('OT creada')" title="Filtrar por OT creada"><div class="stat-num" id="rp-ot">0</div><div class="stat-label">OT creada</div></div>
-    <div class="stat-box s-green" id="rp-card-cerrado" style="cursor:pointer" onclick="filtrarPiloto('Cerrado')" title="Filtrar por Exitoso"><div class="stat-num" id="rp-cerrados">0</div><div class="stat-label">Exitosas</div></div>
-    <div class="stat-box"><div class="stat-num" id="rp-sla">—</div><div class="stat-label">SLA promedio (días)</div><div style="font-size:9px;color:var(--text-muted);margin-top:2px">desde fecha de creación de la OT</div></div>
+  <!-- Cards de resumen (pedido 25/08): el tracking manual vía planilla
+       (Sin contactar/Notificados/Confirmados/OT creada — tabla
+       rollout_piloto) quedó atrás, era la etapa piloto. Se reusa el estilo
+       visual de card pero ahora atado a los datos reales de sf_workorders
+       (misma cohorte que la tabla de Indicadores de abajo: Cambio de
+       Terminal, Configurar Terminal ≥ 1/6). Cada card es un botón: al
+       clickearla despliega el desglose mes a mes de ESA métrica puntual
+       (ver mrToggleDesglose()). IDs viejos (rp-total, rp-card-sincontactar,
+       etc.) se sacan de acá — renderRolloutPiloto() ya hace setTxt() con
+       chequeo `if(el)`, así que no rompe aunque esos ids ya no existan.
+  -->
+  <div class="stats-row" style="margin-bottom:8px">
+    <div class="stat-box s-purple" id="mr-card-total" style="cursor:pointer" onclick="mrToggleDesglose('total')" title="Ver desglose por mes"><div class="stat-num" id="mr-stat-total">—</div><div class="stat-label">Total OTs</div></div>
+    <div class="stat-box" id="mr-card-cambio" style="cursor:pointer" onclick="mrToggleDesglose('cambio')" title="Ver desglose por mes"><div class="stat-num" id="mr-stat-cambio">—</div><div class="stat-label">Cambio</div></div>
+    <div class="stat-box" id="mr-card-rollout" style="cursor:pointer;border-color:rgba(139,92,246,.35)" onclick="mrToggleDesglose('rollout')" title="Ver desglose por mes"><div class="stat-num" id="mr-stat-rollout" style="color:#8b5cf6">—</div><div class="stat-label">Rollout</div></div>
+    <div class="stat-box" id="mr-card-precolecta" style="cursor:pointer" onclick="mrToggleDesglose('precolecta')" title="Ver desglose por mes"><div class="stat-num" id="mr-stat-precolecta" style="color:#f59e0b">—</div><div class="stat-label">En Pre-Colecta hoy</div></div>
+    <div class="stat-box s-blue" id="mr-card-despachado" style="cursor:pointer" onclick="mrToggleDesglose('despachado')" title="Ver desglose por mes"><div class="stat-num" id="mr-stat-despachado">—</div><div class="stat-label">Despachadas</div></div>
+    <div class="stat-box s-green" id="mr-card-exitoso" style="cursor:pointer" onclick="mrToggleDesglose('exitoso')" title="Ver desglose por mes"><div class="stat-num" id="mr-stat-exitoso">—</div><div class="stat-label">Exitosas</div></div>
+    <div class="stat-box s-teal" id="mr-card-costo" style="cursor:pointer" onclick="mrToggleDesglose('costo')" title="Ver desglose por mes"><div class="stat-num" id="mr-stat-costo" style="font-size:20px">—</div><div class="stat-label">Costo total</div></div>
   </div>
+  <div id="mrDesgloseMes" style="display:none;margin-bottom:16px"></div>
 
   <!-- Indicadores Misión Rollout (pedido 25/08) — recorte del módulo
        Indicadores, acotado a OTs Cambio de Terminal (incluye Rollout, que
@@ -5018,7 +5030,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.6.66] OK');
+console.log('[Alleata v4.6.67] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -6684,8 +6696,68 @@ const MR_LOGISTICAS=[
 const MR_COSTO_FIJO_ALLEATA=1;
 const MR_FECHA_CORTE='2026-06-01';
 let _mrIndData=[];
+let _mrMesesData=[];
+let _mrMetricaActiva='';
+const MR_METRICAS={
+  total:      {label:'Total OTs',           getter:m=>m.total},
+  cambio:     {label:'Cambio',              getter:m=>m.cambio},
+  rollout:    {label:'Rollout',             getter:m=>m.rollout, color:'#8b5cf6'},
+  precolecta: {label:'En Pre-Colecta hoy',  getter:m=>m.precolecta, color:'#f59e0b'},
+  despachado: {label:'Despachadas',         getter:m=>m.despachado},
+  exitoso:    {label:'Exitosas',            getter:m=>m.exitoso, color:'var(--teal)'},
+  costo:      {label:'Costo total',         getter:m=>m.costo_total, esMoneda:true, color:'var(--teal)'},
+};
 
 function mrFmt$(n){ return n?'$'+Math.round(n).toLocaleString('es-AR'):'$0'; }
+
+// Botón de card → desglose mes a mes de esa métrica puntual, debajo de las
+// cards (pedido 25/08). Click de nuevo sobre la misma card = colapsar.
+function mrToggleDesglose(metrica){
+  if(_mrMetricaActiva===metrica){
+    _mrMetricaActiva='';
+    const cont=document.getElementById('mrDesgloseMes');
+    if(cont){cont.style.display='none';cont.innerHTML='';}
+    mrMarcarCardActiva('');
+    return;
+  }
+  _mrMetricaActiva=metrica;
+  mrRenderDesgloseMes(metrica);
+}
+
+function mrMarcarCardActiva(metrica){
+  Object.keys(MR_METRICAS).forEach(k=>{
+    const el=document.getElementById('mr-card-'+k);
+    if(el)el.style.outline=(k===metrica)?'2px solid var(--teal)':'';
+  });
+}
+
+function mrRenderDesgloseMes(metrica){
+  const cont=document.getElementById('mrDesgloseMes');
+  if(!cont)return;
+  const cfg=MR_METRICAS[metrica];
+  if(!cfg||!_mrMesesData.length){ cont.style.display='none'; return; }
+  mrMarcarCardActiva(metrica);
+
+  const filas=_mrMesesData.map(m=>({label:m.label,valor:cfg.getter(m)}));
+  const totalMetrica=filas.reduce((a,f)=>a+f.valor,0);
+  const fmt=v=>cfg.esMoneda?mrFmt$(v):v;
+
+  cont.style.display='block';
+  cont.innerHTML=`<div class="card" style="padding:14px 18px">
+    <div style="font-size:12px;font-weight:700;color:${cfg.color||'var(--text)'};margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px">${cfg.label} — por mes</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      ${filas.map(f=>`
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 16px;min-width:110px">
+          <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.4px">${f.label}</div>
+          <div style="font-size:20px;font-weight:800;margin-top:2px;color:${cfg.color||'var(--text)'}">${fmt(f.valor)}</div>
+        </div>`).join('')}
+      <div style="background:var(--surface2);border:1px solid var(--teal);border-radius:10px;padding:10px 16px;min-width:110px">
+        <div style="font-size:10px;color:var(--teal);text-transform:uppercase;letter-spacing:.4px">Total</div>
+        <div style="font-size:20px;font-weight:800;margin-top:2px;color:var(--teal)">${fmt(totalMetrica)}</div>
+      </div>
+    </div>
+  </div>`;
+}
 
 async function cargarIndicadoresMisionRollout(){
   const cont=document.getElementById('mrIndTabla');
@@ -6746,6 +6818,21 @@ function renderIndicadoresMisionRollout(){
     precolecta:a.precolecta+m.precolecta, despachado:a.despachado+m.despachado,
     exitoso:a.exitoso+m.exitoso, costo_total:a.costo_total+m.costo_total,
   }),{total:0,cambio:0,rollout:0,precolecta:0,despachado:0,exitoso:0,costo_total:0});
+
+  // Guardado para que las cards de arriba (botones) armen su desglose por
+  // mes sin tener que recalcular todo de nuevo — ver mrToggleDesglose().
+  _mrMesesData=meses;
+  const setStat=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v;};
+  setStat('mr-stat-total',tot.total);
+  setStat('mr-stat-cambio',tot.cambio);
+  setStat('mr-stat-rollout',tot.rollout);
+  setStat('mr-stat-precolecta',tot.precolecta);
+  setStat('mr-stat-despachado',tot.despachado);
+  setStat('mr-stat-exitoso',tot.exitoso);
+  setStat('mr-stat-costo',mrFmt$(tot.costo_total));
+  // Si había un desglose abierto, se refresca con los datos nuevos en vez
+  // de quedar mostrando un snapshot viejo tras un 🔄 Actualizar.
+  if(_mrMetricaActiva) mrRenderDesgloseMes(_mrMetricaActiva);
 
   cont.innerHTML=`<div style="overflow-x:auto"><table class="table">
     <thead><tr>
