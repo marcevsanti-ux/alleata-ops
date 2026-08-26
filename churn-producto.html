@@ -109,7 +109,7 @@ table.table tr:hover td{background:var(--surface2);}
   <header>
     <div class="brand">
       <div class="brand-logo">alleata</div>
-      <div class="brand-sub">· Churn Producto <span style="opacity:.5">v1.5.0</span></div>
+      <div class="brand-sub">· Churn Producto <span style="opacity:.5">v1.6.0</span></div>
     </div>
     <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
       <div style="font-size:11px;color:var(--text-muted);text-align:right;line-height:1.4">
@@ -156,7 +156,7 @@ table.table tr:hover td{background:var(--surface2);}
         <th class="cp-sortable" data-key="cuenta" onclick="cpOrdenarPor('cuenta')" style="cursor:pointer">Cuenta <span id="cp-sort-cuenta" class="cp-sort-arrow"></span></th>
         <th class="cp-sortable" data-key="propietario_cuenta" onclick="cpOrdenarPor('propietario_cuenta')" style="cursor:pointer">Propietario cta. <span id="cp-sort-propietario_cuenta" class="cp-sort-arrow"></span></th>
         <th class="cp-sortable" data-key="fecha_instalacion_cuenta" onclick="cpOrdenarPor('fecha_instalacion_cuenta')" style="cursor:pointer">Fecha Instalación <span id="cp-sort-fecha_instalacion_cuenta" class="cp-sort-arrow"></span></th>
-        <th class="cp-sortable" data-key="fecha_baja_cuenta" onclick="cpOrdenarPor('fecha_baja_cuenta')" style="cursor:pointer">Fecha de baja <span id="cp-sort-fecha_baja_cuenta" class="cp-sort-arrow"></span></th>
+        <th class="cp-sortable" data-key="fecha_baja_cuenta" onclick="cpOrdenarPor('fecha_baja_cuenta')" style="cursor:pointer" title="Recuperada: Fecha_de_baja__c (baja confirmada). Resto de los estados: Fecha_de_Pedido_de_Baja__c (todavía no hay baja definitiva, solo el pedido)">Fecha de baja <span id="cp-sort-fecha_baja_cuenta" class="cp-sort-arrow"></span></th>
         <th class="cp-sortable" data-key="terminal_id" onclick="cpOrdenarPor('terminal_id')" style="cursor:pointer">Terminal <span id="cp-sort-terminal_id" class="cp-sort-arrow"></span></th>
         <th class="cp-sortable" data-key="motivo" onclick="cpOrdenarPor('motivo')" style="cursor:pointer">Motivo <span id="cp-sort-motivo" class="cp-sort-arrow"></span></th>
         <th class="cp-sortable" data-key="dias_con_terminal" onclick="cpOrdenarPor('dias_con_terminal')" style="cursor:pointer">Días con terminal <span id="cp-sort-dias_con_terminal" class="cp-sort-arrow"></span></th>
@@ -587,7 +587,10 @@ function cpRenderTabla(){
       <td>${nombreCuenta}<div style="font-size:10px;color:var(--text-muted);font-family:'JetBrains Mono',monospace">${r.cuit||'—'}${r.ot_desinstalacion?` <span class="ot-num" style="font-size:10px">· ${r.sf_id_desinstalacion?`<a href="https://alleata.lightning.force.com/lightning/r/WorkOrder/${r.sf_id_desinstalacion}/view" target="_blank" rel="noopener" style="color:inherit;text-decoration:none" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'" title="Abrir OT en Salesforce">OT ${r.ot_desinstalacion} ↗</a>`:`OT ${r.ot_desinstalacion}`}</span>`:''}</div>${r.comercio?`<div style="font-size:10px;color:var(--text-muted)">${r.comercio}</div>`:''}</td>
       <td style="font-size:11px">${r.propietario_cuenta||'<span style="color:var(--text-muted)">—</span>'}</td>
       <td>${fmtFechaCP(r.fecha_instalacion_cuenta)}</td>
-      <td>${fmtFechaCP(r.fecha_baja_cuenta)}</td>
+      <td>${r.estado_desinst==='Recuperada'
+        ? fmtFechaCP(r.fecha_baja_cuenta)
+        : `${fmtFechaCP(r.fecha_pedido_baja_cuenta)}${r.fecha_pedido_baja_cuenta?'<div style="font-size:9px;color:var(--text-muted)">(pedido de baja)</div>':''}`
+      }</td>
       <td style="font-size:11px;font-family:'JetBrains Mono',monospace">${r.terminal_id||'—'}</td>
       <td style="font-size:11px;max-width:180px">${r.motivo||'—'}${r.sub_motivo?`<div style="font-size:10px;color:var(--text-muted);margin-top:2px">${r.sub_motivo}</div>`:''}</td>
       <td style="text-align:center;font-weight:700">${r.dias_con_terminal!=null?r.dias_con_terminal+' días':'—'}</td>
