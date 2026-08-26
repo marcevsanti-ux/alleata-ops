@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.6.76</title>
+<title>Alleata · Operaciones v4.6.77</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -407,7 +407,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.76 · 26 ago 2026
+      v4.6.77 · 26 ago 2026
     </div>
   </div>
 </div>
@@ -516,7 +516,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.76 · 26 ago 2026
+      v4.6.77 · 26 ago 2026
     </div>
   </div>
 </nav>
@@ -561,7 +561,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.76</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.77</div>
   </div>
   <div class="content">
 
@@ -5079,7 +5079,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.6.76] OK');
+console.log('[Alleata v4.6.77] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -7449,48 +7449,97 @@ async function cargarCambiosPorResponsable() {
   });
 }
 
-// ── Pendiente Retiro / Exitosa — Cambio de Terminal (pedido 26/08) ─────────
-// Foto actual (no por período): cuántas OT de Cambio de Terminal están HOY
-// en "Retirar Terminal" (nombre operativo: Pendiente Retiro) o "Exitoso",
-// diferenciado Cambio vs Rollout dentro de cada estado (campo `rollout`).
+// ── Pendiente Retiro / Exitosa — Cambio de Terminal, calendario día a día
+// (pedido 26/08, reemplaza la versión de totales planos por una tira de
+// calendario como "Objetivo semanal del equipo" — mismo patrón visual y
+// misma semana actual + semana anterior). Diferenciado Cambio vs Rollout
+// dentro de cada día (campo `rollout`).
+//
+// Fechas usadas para "qué día pasó esto":
+//   Exitosa          → fecha_exitoso (Exitoso_Fecha__c, ya sincronizada)
+//   Pendiente Retiro → NO hay campo dedicado "fecha en que entró a Retirar
+//     Terminal" en sf_workorders. Se usa sf_last_modified como mejor proxy
+//     disponible (día en que SF actualizó la OT por última vez). Puede no
+//     ser 100% exacto si la OT tuvo otro cambio menor después de entrar a
+//     ese estado — se avisa en el pie de la tira. Si hace falta precisión
+//     real, hay que sincronizar un campo nuevo desde salesforce.js.
 async function cargarPendienteRetiroExitosa() {
   const cont = document.getElementById('pendRetiroExitosaCard');
   if (!cont) return;
   cont.innerHTML = '<div class="card" style="padding:16px;color:var(--text-muted);font-size:12px">Cargando Pendiente Retiro / Exitosa...</div>';
 
+  const hoyStr = hoyArgentina();
+  const hoy = new Date(hoyStr + 'T12:00:00');
+  const diaSemana = (hoy.getDay() + 6) % 7;
+  const lunes = new Date(hoy); lunes.setDate(hoy.getDate() - diaSemana);
+  const lunesAnt = new Date(lunes); lunesAnt.setDate(lunes.getDate() - 7);
+  const lunesAntStr = lunesAnt.toLocaleDateString('en-CA');
+  const NOMBRES_DIA = ['LU', 'MA', 'MI', 'JU', 'VI', 'SA', 'DO'];
+  const fmtCorto = d => new Date(d).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' });
+
   const { data, error } = await sb.from('sf_workorders')
-    .select('status,rollout')
+    .select('status,rollout,fecha_exitoso,sf_last_modified')
     .eq('record_type', 'Cambio de Terminal')
-    .in('status', ['Retirar Terminal', 'Exitoso']);
+    .in('status', ['Retirar Terminal', 'Exitoso'])
+    .or(`fecha_exitoso.gte.${lunesAntStr},sf_last_modified.gte.${lunesAntStr}`);
   if (error) {
     cont.innerHTML = `<div class="card" style="padding:16px;color:var(--red);font-size:12px">No se pudo cargar Pendiente Retiro / Exitosa: ${error.message}</div>`;
     return;
   }
 
-  const contar = status => {
-    const filas = (data || []).filter(r => r.status === status);
-    return { total: filas.length, cambio: filas.filter(r => r.rollout !== true).length, rollout: filas.filter(r => r.rollout === true).length };
+  // Arma { 'YYYY-MM-DD': {cambio,rollout} } para un estado+campo de fecha dado.
+  const armarPorDia = (status, campoFecha) => {
+    const porDia = {};
+    (data || []).forEach(r => {
+      if (r.status !== status || !r[campoFecha]) return;
+      const key = String(r[campoFecha]).slice(0, 10);
+      if (!porDia[key]) porDia[key] = { cambio: 0, rollout: 0 };
+      if (r.rollout === true) porDia[key].rollout++; else porDia[key].cambio++;
+    });
+    return porDia;
   };
-  const pendRetiro = contar('Retirar Terminal');
-  const exitosa = contar('Exitoso');
+  const exitosaPorDia = armarPorDia('Exitoso', 'fecha_exitoso');
+  const pendRetiroPorDia = armarPorDia('Retirar Terminal', 'sf_last_modified');
 
-  const card = (titulo, color, d) => `
-    <div class="card" style="flex:1;min-width:220px;border-color:${color}55">
-      <div style="font-size:11px;font-weight:700;color:${color};text-transform:uppercase;letter-spacing:.5px">${titulo}</div>
-      <div style="font-size:32px;font-weight:800;margin-top:4px">${d.total}</div>
-      <div style="display:flex;gap:14px;margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
-        <div><div style="font-size:16px;font-weight:700;color:var(--text-muted)">${d.cambio}</div><div style="font-size:9px;color:var(--text-muted);text-transform:uppercase">Cambio</div></div>
-        <div><div style="font-size:16px;font-weight:700;color:#8b5cf6">${d.rollout}</div><div style="font-size:9px;color:var(--text-muted);text-transform:uppercase">Rollout</div></div>
+  // Tira de una semana (lunes dado) — celda con total grande + Cambio/Rollout chico.
+  const tiraSemana = (lunesBase, porDia, color, chico) => {
+    return NOMBRES_DIA.map((nombre, i) => {
+      const d = new Date(lunesBase); d.setDate(lunesBase.getDate() + i);
+      const key = d.toLocaleDateString('en-CA');
+      const v = porDia[key] || { cambio: 0, rollout: 0 };
+      const total = v.cambio + v.rollout;
+      const esHoy = key === hoyStr;
+      const esFuturo = key > hoyStr;
+      const tam = chico ? 26 : 30;
+      return `<div style="flex:1;text-align:center;min-width:0">
+        <div style="font-size:9px;color:var(--text-muted);font-weight:700;letter-spacing:.03em">${nombre}</div>
+        <div style="width:${tam}px;height:${tam}px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:3px auto;background:${esHoy && !chico ? color : 'transparent'};border:1px solid ${esHoy ? color : 'var(--border2)'};color:${esHoy && !chico ? '#08160f' : 'var(--text-muted)'};font-size:${chico ? 11 : 12}px;font-weight:700">${d.getDate()}</div>
+        <div style="font-size:${chico ? 12 : 13}px;font-weight:800;color:${esFuturo ? 'var(--text-muted)' : (total > 0 ? color : 'var(--text-muted)')}">${esFuturo ? '—' : total}</div>
+        ${!esFuturo && total > 0 ? `<div style="font-size:8px;color:var(--text-muted);margin-top:1px">C:${v.cambio} R:${v.rollout}</div>` : ''}
+      </div>`;
+    }).join('');
+  };
+
+  const totalSemana = porDia => Object.values(porDia).reduce((a, v) => a + v.cambio + v.rollout, 0);
+
+  const bloque = (titulo, color, porDia, notaFecha) => `
+    <div class="card" style="flex:1;min-width:320px;border-left:4px solid ${color}">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div style="font-size:13px;font-weight:700">${titulo}</div>
+        <span style="font-size:18px;font-weight:800;color:${color}">${totalSemana(porDia)}</span>
       </div>
+      <div style="display:flex;gap:4px">${tiraSemana(lunes, porDia, color, false)}</div>
+      <div style="font-size:9px;color:var(--text-muted);margin-top:8px">${notaFecha}</div>
     </div>`;
 
   cont.innerHTML = `
-    <div style="font-size:13px;font-weight:700;margin-bottom:10px">📦 Cambio de Terminal — Pendiente Retiro / Exitosa</div>
+    <div style="font-size:13px;font-weight:700;margin-bottom:10px">📦 Cambio de Terminal — por día (semana del ${fmtCorto(lunes.toLocaleDateString('en-CA'))})</div>
     <div style="display:flex;gap:12px;flex-wrap:wrap">
-      ${card('Pendiente Retiro', '#f59e0b', pendRetiro)}
-      ${card('Exitosa', 'var(--teal)', exitosa)}
+      ${bloque('Exitosa', 'var(--teal)', exitosaPorDia, 'Por fecha de Exitoso (Exitoso_Fecha__c)')}
+      ${bloque('Pendiente Retiro', '#f59e0b', pendRetiroPorDia, '⚠️ Por última modificación en SF (no hay fecha exacta de entrada a este estado — puede no ser el día real)')}
     </div>`;
 }
+
 
 
 // ── Objetivo semanal del equipo (Rollout) — SOLO en el dashboard de
