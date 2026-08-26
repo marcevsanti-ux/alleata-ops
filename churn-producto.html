@@ -109,7 +109,7 @@ table.table tr:hover td{background:var(--surface2);}
   <header>
     <div class="brand">
       <div class="brand-logo">alleata</div>
-      <div class="brand-sub">· Churn Producto <span style="opacity:.5">v1.6.0</span></div>
+      <div class="brand-sub">· Churn Producto <span style="opacity:.5">v1.7.0</span></div>
     </div>
     <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
       <div style="font-size:11px;color:var(--text-muted);text-align:right;line-height:1.4">
@@ -436,6 +436,14 @@ async function loadChurnProductoResumen(){
     if(!r.ok||!j.ok)throw new Error(j.error||'Respuesta no OK');
     const total=j.totalGeneral||0;
     const entries=Object.entries(j.totalPorEstado||{}).sort((a,b)=>b[1]-a[1]);
+    // Pedido 26/08: la card "Recuperada" de acá arriba es en vivo desde SF
+    // (fuente de verdad). El desglose por logística de más abajo usa la
+    // tabla precalculada desinst_analisis_producto, que puede tener MENOS
+    // casos (matching más estricto, requiere encontrar la OT de
+    // instalación + Terminal_ID). Se guarda este número para poder mostrar
+    // la diferencia de forma explícita en vez de que la cuenta no cierre
+    // en silencio — ver cpRenderDesgloseLogistica().
+    _cpRecuperadaSFTotal = j.totalPorEstado?.['Recuperada'] ?? null;
     cont.innerHTML=`<div class="card">
       <div style="display:flex;align-items:flex-end;gap:10px;margin-bottom:10px">
         <button onclick="cpFiltrarPorEstado(null)" style="background:none;border:none;cursor:pointer;display:flex;align-items:flex-end;gap:10px;padding:0" title="Ver todas">
@@ -467,6 +475,11 @@ async function loadChurnProductoResumen(){
 // (ya cargada de Supabase), no de la consulta en vivo a SF.
 // TODO: el campo de $ todavía no está confirmado — falta ver qué columna de
 // costo tiene desinst_analisis_producto (o si hay que traerla de otra tabla).
+// Guardado por loadChurnProductoResumen() — total "Recuperada" EN VIVO desde
+// SF, para poder mostrar la diferencia contra el desglose por logística
+// (que sale de una tabla precalculada más estricta). Ver comentario ahí.
+let _cpRecuperadaSFTotal = null;
+
 function cpRenderDesgloseLogistica(){
   const cont=document.getElementById('cp-logistica-cards');
   if(!cont)return;
@@ -487,8 +500,18 @@ function cpRenderDesgloseLogistica(){
 
   const LABELS={ALLEATA:'Alleata',CA:'Correo Argentino',OTRA:'Otra logística'};
   const COLORS={ALLEATA:'#38bdf8',CA:'#e74c3c',OTRA:'#6b7280'};
+  // Aviso de reconciliación (pedido 26/08): si el total en vivo de SF trae
+  // más "Recuperada" que las que hay acá, mostrarlo explícito — esos casos
+  // existen en SF pero el job de análisis de producto no pudo matchearlos
+  // (sin OT de instalación encontrada, sin Terminal_ID, etc.), así que no
+  // tienen logística/costo calculado. No es un error de esta pantalla.
+  const faltantes = (_cpRecuperadaSFTotal!=null && _cpRecuperadaSFTotal>recuperadas.length)
+    ? _cpRecuperadaSFTotal-recuperadas.length : 0;
+  const avisoFaltantes = faltantes>0
+    ? `<div style="font-size:11px;color:var(--yellow);margin-top:8px">⚠️ ${_cpRecuperadaSFTotal} Recuperadas en vivo en SF, pero solo ${recuperadas.length} tienen datos suficientes para clasificar por logística (faltan ${faltantes} — sin match de OT de instalación o sin Terminal_ID en el análisis de producto).</div>`
+    : '';
   cont.innerHTML=`<div class="card" style="margin-top:10px">
-    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:10px">📦 Por logística — solo Recuperadas (${recuperadas.length})</div>
+    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:10px">📦 Por logística — solo Recuperadas (${recuperadas.length}${faltantes>0?` de ${_cpRecuperadaSFTotal}`:''})</div>
     <div style="display:flex;flex-wrap:wrap;gap:8px">
       ${Object.entries(grupos).map(([cat,v])=>`
         <div onclick="cpVerListadoLogistica('${cat}')" style="cursor:pointer;background:${COLORS[cat]}18;border:1px solid ${COLORS[cat]}40;border-radius:10px;padding:8px 14px;min-width:140px" title="Click para ver el listado de OTs">
@@ -498,6 +521,7 @@ function cpRenderDesgloseLogistica(){
         </div>`).join('')}
     </div>
     <div style="font-size:10px;color:var(--text-muted);margin-top:8px">* Gasto = sf_workorders.costo_envio de la OT de desinstalación (cruce por ot_desinstalacion = workorder_number).</div>
+    ${avisoFaltantes}
   </div>`;
 }
 
