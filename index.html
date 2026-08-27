@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.6.82</title>
+<title>Alleata · Operaciones v4.6.83</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -407,7 +407,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.82 · 26 ago 2026
+      v4.6.83 · 26 ago 2026
     </div>
   </div>
 </div>
@@ -516,7 +516,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.82 · 26 ago 2026
+      v4.6.83 · 26 ago 2026
     </div>
   </div>
 </nav>
@@ -561,7 +561,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.82</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.83</div>
   </div>
   <div class="content">
 
@@ -1016,6 +1016,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
               <option value="logistica">Logística</option>
               <option value="admin">Administrador</option>
               <option value="ceo">CEO (solo dashboard, lectura)</option>
+              <option value="customer">Customer (solo Desinstalaciones)</option>
             </select>
           </div>
         </div>
@@ -5112,7 +5113,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.6.82] OK');
+console.log('[Alleata v4.6.83] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -5416,9 +5417,15 @@ function showApp(){
   const isAdmin=currentProfile.rol==='admin';
   const isLogistica=currentProfile.rol==='logistica';
   const isCeo=currentProfile.rol==='ceo';
+  // Rol "Customer" (pedido 26/08, alta de Rosario + Juan Ignacio): mismo
+  // patrón que CEO (nav mínimo, aterriza directo en un módulo puntual) pero
+  // apuntando a Desinstalaciones → pestaña Backlog histórico en vez de
+  // Indicadores — es el trabajo que hacen ellos, análogo a lo que hace
+  // Angel pero sobre las OTs de antes del 1/4.
+  const isCustomer=currentProfile.rol==='customer';
   const modulos=currentProfile.modulos||['sims','envios','desinstalaciones'];
   document.getElementById('sideUserName').textContent=nombre;
-  const rolLabel={'admin':'Administrador','logistica':'Logística','operador':'Operador','ceo':'CEO'}[currentProfile.rol]||'Operador';
+  const rolLabel={'admin':'Administrador','logistica':'Logística','operador':'Operador','ceo':'CEO','customer':'Customer'}[currentProfile.rol]||'Operador';
   document.getElementById('sideUserRole').textContent=rolLabel;
   setTimeout(()=>{ if(window._drawQR) window._drawQR(); },400);
   if(isAdmin){
@@ -5438,7 +5445,8 @@ function showApp(){
   const navPresupuesto=document.getElementById('nav-presupuesto');
   // Vista CEO: sidebar colapsado por defecto — tiene poco contenido (solo
   // Dashboard + Presupuesto), conviene ganar ancho para las cards del dashboard.
-  if(isCeo){
+  // Mismo criterio para Customer (nav mínimo, un solo módulo real).
+  if(isCeo||isCustomer){
     const sbEl=document.getElementById('mainSidebar');
     const mainEl=document.querySelector('.main');
     if(sbEl&&!sbEl.classList.contains('collapsed')){
@@ -5452,6 +5460,17 @@ function showApp(){
     ['nav-sims','nav-envios','nav-rollout','nav-desinstalaciones','nav-store','nav-recuperadas',
      'nav-ally','nav-distri','nav-ajustes','nav-retencion','nav-terminales','nav-section-config','nav-napse']
       .forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display='none'; });
+  }
+  // ── Vista Customer: SOLO Desinstalaciones, nada más en el nav (pedido
+  // 26/08) — Rosario/Juan Ignacio no necesitan ver el resto del portal. ──
+  if(isCustomer){
+    ['nav-sims','nav-envios','nav-rollout','nav-rollout-piloto','nav-store','nav-recuperadas',
+     'nav-ally','nav-distri','nav-ajustes','nav-retencion','nav-terminales','nav-section-config',
+     'nav-napse','nav-churn-producto','nav-hoja-ruta','nav-zonas-amba','nav-indicadores',
+     'nav-despacho-epsa','nav-presupuesto','nav-auditoria']
+      .forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display='none'; });
+    const navDesinst=document.getElementById('nav-desinstalaciones');
+    if(navDesinst){ navDesinst.style.display='flex'; navDesinst.classList.remove('locked'); navDesinst.onclick=()=>goTo('desinstalaciones'); }
   }
   const navStore=document.getElementById('nav-store');
   if(navStore&&!isCeo&&(isAdmin||modulos.includes('store')))navStore.style.display='flex';
@@ -5471,7 +5490,7 @@ function showApp(){
   if(navDespachoEpsa&&!isCeo&&(isAdmin||modulos.includes('despacho-epsa')))navDespachoEpsa.style.display='flex';
   ['sims','envios','desinstalaciones','churn-producto','hoja-ruta','napse','store','recuperadas','rollout','rollout-piloto','retencion','terminales','zonas-amba'].forEach(mod=>{
     const el=document.getElementById('nav-'+mod);
-    if(el&&!modulos.includes(mod)&&!isAdmin&&!isCeo){el.classList.add('locked');el.onclick=null;}
+    if(el&&!modulos.includes(mod)&&!isAdmin&&!isCeo&&!isCustomer){el.classList.add('locked');el.onclick=null;}
   });
   buildDashCards(modulos,isAdmin,isCeo);
   loadConfigSLA(); // cargar config SLA al inicio
@@ -5482,6 +5501,12 @@ function showApp(){
   // aterrizaba en un Dashboard genérico sin definir (ver nota del 12/07).
   // Ya no hace falta seguir armando esa vista neutra: entra directo acá.
   if(isCeo) goTo('indicadores');
+  // Vista Customer (pedido 26/08): aterriza directo en Desinstalaciones →
+  // pestaña Backlog histórico, que es el único trabajo que tienen que ver.
+  if(isCustomer){
+    goTo('desinstalaciones');
+    setTimeout(()=>{ if(typeof dsTabSwitch==='function') dsTabSwitch('backlog'); }, 300);
+  }
 
   // ── Realtime: refrescar módulo activo cuando el sync de Railway actualiza sf_workorders ──
   // FIX parpadeo: los eventos postgres_changes llegan uno POR FILA modificada. Un Full
@@ -5966,6 +5991,7 @@ function editUser(u) {
             <option value="logistica">Logística</option>
             <option value="admin">Administrador</option>
             <option value="ceo">CEO (solo dashboard, lectura)</option>
+            <option value="customer">Customer (solo Desinstalaciones)</option>
           </select>
         </div>
         <div style="margin-bottom:18px">
