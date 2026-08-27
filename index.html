@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.6.85</title>
+<title>Alleata · Operaciones v4.6.86</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -407,7 +407,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.85 · 26 ago 2026
+      v4.6.86 · 26 ago 2026
     </div>
   </div>
 </div>
@@ -516,7 +516,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.85 · 26 ago 2026
+      v4.6.86 · 26 ago 2026
     </div>
   </div>
 </nav>
@@ -561,7 +561,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.85</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.86</div>
   </div>
   <div class="content">
 
@@ -1383,7 +1383,14 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
 </div>
 
 <div class="module" id="mod-desinstalaciones">
-  <!-- TOTAL destacado -->
+  <!-- TOTAL destacado + KPIs — OCULTO a pedido 26/08: quedó redundante con
+       los totales propios de cada pestaña (Gestión OPS / Backlog histórico,
+       que ya muestran su propio desglose por estado). Código y funciones
+       (dsFiltrarKPI, dsLimpiarFiltros, etc.) intactos por si hace falta
+       reactivarlo — ojo que esto también alimentaba el filtro por estado
+       de la pestaña "Listado OTs": esa pestaña pierde el atajo visual de
+       click-para-filtrar, pero el buscador y el resto siguen funcionando. -->
+  <div style="display:none">
   <div onclick="dsLimpiarFiltros()" style="cursor:pointer;background:var(--navy-800);border:1px solid rgba(29,191,142,.25);border-left:4px solid var(--teal);border-radius:12px;padding:14px 24px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between">
     <div>
       <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:2px">DESINSTALACIONES PENDIENTES</div>
@@ -1408,6 +1415,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <div class="stat-num" id="ds-num-extraviada">—</div>
       <div class="stat-label">EXTRAVIADAS</div>
     </div>
+  </div>
   </div>
   <!-- Subestados EN PROCESO — visible solo al filtrar por ese estado -->
   <div id="ds-subestados" style="display:none;margin-bottom:12px">
@@ -5113,7 +5121,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.6.85] OK');
+console.log('[Alleata v4.6.86] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -9016,11 +9024,17 @@ function dsEnProcesoRenderFiltrado(filtro, el){
             <td style="padding:4px 8px;font-size:10px;font-weight:600">${celda(ev.historia)}</td>
             <td style="padding:4px 0;font-size:10px">${celda(ev.estadoCA)}</td>
           </tr>`).join('');
+        const linkOT=o.sf_id
+          ? `<a href="https://alleata.lightning.force.com/lightning/r/WorkOrder/${o.sf_id}/view" target="_blank" rel="noopener" style="color:var(--teal);text-decoration:none" title="Abrir OT en Salesforce">${o.ot} ↗</a>`
+          : o.ot;
+        const linkCuenta=o.account_id
+          ? `<a href="https://alleata.lightning.force.com/lightning/r/Account/${o.account_id}/view" target="_blank" rel="noopener" style="color:inherit;text-decoration:none" title="Abrir cuenta en Salesforce" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">${celda(o.cuenta)} ↗</a>`
+          : celda(o.cuenta);
         return `<div style="background:var(--surface2);border:1px solid ${fase==='caduco'?'#ef444470':'var(--border2)'};border-radius:10px;padding:10px 14px;margin-bottom:8px">
           <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
             <div>
               <div style="font-weight:700;font-size:13px">${celda(o.comercio||o.cuenta)}</div>
-              <div style="font-size:10px;color:var(--text-muted);margin-top:1px">OT ${o.ot} · ${celda(o.cuenta)}</div>
+              <div style="font-size:10px;color:var(--text-muted);margin-top:1px">OT ${linkOT} · ${linkCuenta}</div>
               <div style="font-size:10px;color:var(--text-muted);margin-top:1px">👤 Responsable: ${celda(o.responsable)}</div>
             </div>
             <div style="text-align:right">
