@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.6.86</title>
+<title>Alleata · Operaciones v4.6.87</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -407,7 +407,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.86 · 26 ago 2026
+      v4.6.87 · 26 ago 2026
     </div>
   </div>
 </div>
@@ -516,7 +516,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.86 · 26 ago 2026
+      v4.6.87 · 26 ago 2026
     </div>
   </div>
 </nav>
@@ -561,7 +561,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.86</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.87</div>
   </div>
   <div class="content">
 
@@ -1524,7 +1524,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
   <div class="card">
     <div style="margin-bottom:14px">
       <!-- Buscador -->
-      <div style="display:flex;gap:8px;align-items:center;width:100%">
+      <div id="ds-buscador-row" style="display:flex;gap:8px;align-items:center;width:100%">
         <div style="position:relative;flex:1">
           <svg style="position:absolute;left:10px;top:50%;transform:translateY(-50%);opacity:0.4;pointer-events:none" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
           <input id="ds-buscar" class="input" style="padding-left:32px;width:100%" placeholder="Buscar OT, comercio, ciudad, seguimiento..." oninput="filtrarDesins()">
@@ -1545,7 +1545,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
 
     <!-- Tabs: Listado / Distribución Geográfica / Gestión OPS -->
-    <div style="display:flex;gap:0;margin-bottom:14px;border-bottom:1px solid var(--border)">
+    <div id="ds-tabs-row" style="display:flex;gap:0;margin-bottom:14px;border-bottom:1px solid var(--border)">
       <button id="ds-tab-listado" onclick="dsTabSwitch('listado')" style="background:none;border:none;border-bottom:2px solid transparent;color:var(--text-muted);font-size:12px;font-weight:600;padding:7px 18px;cursor:pointer;margin-bottom:-1px;transition:all .15s">📋 Listado OTs</button>
       <button id="ds-tab-geo" onclick="dsTabSwitch('geo')" style="display:none">📍 Distribución Geográfica</button>
       <button id="ds-tab-gestionops" onclick="dsTabSwitch('gestionops')" style="background:none;border:none;border-bottom:2px solid var(--teal);color:var(--text);font-size:12px;font-weight:600;padding:7px 18px;cursor:pointer;margin-bottom:-1px;transition:all .15s">🗂️ Gestión OPS (desde 1/4)</button>
@@ -1637,10 +1637,19 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
          — el backlog que van a laburar Rosario y Juan Ignacio, igual que
          Angel labura el "desde 1/4". Ver dsBacklogCargar(). -->
     <div id="ds-backlog-panel" style="margin-bottom:16px;display:none">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+      <div id="ds-backlog-header-row" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
         <div style="font-size:12px;color:var(--text-muted)">OTs de Desinstalación creadas <b style="color:var(--text)">antes del 1/4/2026</b> — en vivo desde Salesforce, agrupadas por estado.</div>
-        <button class="btn btn-sm" onclick="dsBacklogCargar()">↺ Actualizar</button>
+        <div style="display:flex;gap:8px">
+          <button class="btn-ghost btn-sm" onclick="dsBacklogPreviewSimplificada()" title="Ver exactamente lo que ven Rosario/Juan Ignacio, sin cambiar de usuario">👁 Vista Rosario/Juani</button>
+          <button class="btn btn-sm" onclick="dsBacklogCargar()">↺ Actualizar</button>
+        </div>
       </div>
+      <!-- Vista simplificada (pedido 26/08, rol Customer — Rosario/Juan
+           Ignacio): card "En Proceso" + buscador + cards por Responsable.
+           Se llena SOLO cuando window._isCustomerRole — ver
+           dsBacklogRenderSimplificado(). Para el resto de los roles esto
+           queda vacío/oculto y se usa el flujo de chips de siempre. -->
+      <div id="ds-backlog-simple" style="display:none"></div>
       <div id="ds-backlog-resumen" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px"></div>
       <div id="ds-backlog-grupos"><div style="text-align:center;padding:30px;color:var(--text-muted)">Cargando...</div></div>
     </div>
@@ -3848,6 +3857,17 @@ function dsTabSwitch(tab){
       if(!backlogPanel.dataset.cargado){ backlogPanel.dataset.cargado='1'; dsBacklogCargar(); }
     }
     setBtnOn(btnBacklog);
+    // Vista simplificada para rol Customer (pedido 26/08): oculta la tira
+    // de tabs, el buscador genérico de arriba y el header/descripción de
+    // este panel — Rosario/Juan Ignacio no necesitan nada de eso.
+    if(window._isCustomerRole){
+      const tabsRow=document.getElementById('ds-tabs-row');
+      const buscadorRow=document.getElementById('ds-buscador-row');
+      const headerRow=document.getElementById('ds-backlog-header-row');
+      if(tabsRow)tabsRow.style.display='none';
+      if(buscadorRow)buscadorRow.style.display='none';
+      if(headerRow)headerRow.style.display='none';
+    }
   } else {
     geoPanel.style.display='none';
     if(gestionOpsPanel)gestionOpsPanel.style.display='none';
@@ -5121,7 +5141,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.6.86] OK');
+console.log('[Alleata v4.6.87] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -5431,6 +5451,7 @@ function showApp(){
   // Indicadores — es el trabajo que hacen ellos, análogo a lo que hace
   // Angel pero sobre las OTs de antes del 1/4.
   const isCustomer=currentProfile.rol==='customer';
+  window._isCustomerRole=isCustomer;
   const modulos=currentProfile.modulos||['sims','envios','desinstalaciones'];
   document.getElementById('sideUserName').textContent=nombre;
   const rolLabel={'admin':'Administrador','logistica':'Logística','operador':'Operador','ceo':'CEO','customer':'Customer'}[currentProfile.rol]||'Operador';
@@ -8757,6 +8778,42 @@ function dsToggleEstadoGenerico(estado, estadoDetalleObj, detalleElId){
 // creación de la OT — apenas esta pestaña registra una guía nueva (mismo
 // alta perezosa que ya usa "En Proceso"), el cron existente la toma sola
 // en su próxima corrida (cada 1h).
+// ── Preview admin: "Vista Rosario/Juani" (pedido 26/08) — muestra la vista
+// simplificada sin necesidad de loguearse como Customer. Agrega un botón
+// flotante para volver a la vista normal.
+function dsBacklogPreviewSimplificada(){
+  const tabsRow=document.getElementById('ds-tabs-row');
+  const buscadorRow=document.getElementById('ds-buscador-row');
+  const headerRow=document.getElementById('ds-backlog-header-row');
+  const resumenEl=document.getElementById('ds-backlog-resumen');
+  const gruposEl=document.getElementById('ds-backlog-grupos');
+  const simpleEl=document.getElementById('ds-backlog-simple');
+  if(tabsRow)tabsRow.style.display='none';
+  if(buscadorRow)buscadorRow.style.display='none';
+  if(headerRow)headerRow.style.display='none';
+  if(resumenEl)resumenEl.style.display='none';
+  if(gruposEl)gruposEl.innerHTML='';
+  if(simpleEl)simpleEl.style.display='block';
+  const lista=(window._backlogEstadoDetalle||{})['En Proceso']||[];
+  window._backlogEnProcesoLista=lista;
+  dsBacklogRenderSimplificado(lista);
+  if(!document.getElementById('ds-backlog-preview-exit')){
+    const exitBtn=document.createElement('button');
+    exitBtn.id='ds-backlog-preview-exit';
+    exitBtn.textContent='✕ Salir de vista previa';
+    exitBtn.style.cssText='position:fixed;bottom:20px;right:20px;z-index:999;background:#ef4444;border:none;color:#fff;padding:10px 16px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,.3)';
+    exitBtn.onclick=()=>{
+      exitBtn.remove();
+      if(tabsRow)tabsRow.style.display='flex';
+      if(buscadorRow)buscadorRow.style.display='flex';
+      if(headerRow)headerRow.style.display='flex';
+      if(simpleEl)simpleEl.style.display='none';
+      dsBacklogCargar();
+    };
+    document.body.appendChild(exitBtn);
+  }
+}
+
 async function dsBacklogCargar(){
   const resumenEl=document.getElementById('ds-backlog-resumen');
   const gruposEl=document.getElementById('ds-backlog-grupos');
@@ -8786,7 +8843,21 @@ async function dsBacklogCargar(){
     const entries=Object.entries(totalPorEstado)
       .sort((a,b)=> ORDEN_ESTADOS_GESTIONOPS.indexOf(a[0]) - ORDEN_ESTADOS_GESTIONOPS.indexOf(b[0]) || b[1]-a[1]);
 
+    // Vista simplificada — SOLO rol Customer (Rosario/Juan Ignacio, pedido
+    // 26/08): "En Proceso" (cantidad) + buscador + cards por Responsable,
+    // click en un responsable lista sus OTs. Para el resto de los roles
+    // sigue el flujo de chips de siempre (resumenEl + dsBacklogToggleEstado).
+    if(window._isCustomerRole){
+      if(resumenEl) resumenEl.style.display='none';
+      const simpleEl=document.getElementById('ds-backlog-simple');
+      if(simpleEl) simpleEl.style.display='block';
+      gruposEl.innerHTML='';
+      window._backlogEnProcesoLista=estadoDetalle['En Proceso']||[];
+      dsBacklogRenderSimplificado(window._backlogEnProcesoLista);
+      return;
+    }
     if(resumenEl){
+      resumenEl.style.display='flex';
       const entriesPerfil=Object.entries(j.totalPorPerfil||{}).sort((a,b)=>b[1]-a[1]);
       resumenEl.innerHTML=`<div style="width:100%;display:flex;flex-wrap:wrap;align-items:center;gap:8px">`+
         `<div style="font-size:22px;font-weight:800;color:var(--teal);margin-right:6px">${j.totalGeneral}</div>`+
@@ -8806,13 +8877,107 @@ async function dsBacklogCargar(){
     }
 
     gruposEl.innerHTML=`<div id="ds-backlog-detalle"></div>`;
-    // Pedido 26/08: la vista por default de este tab (el que usan Rosario/
-    // Juan Ignacio) tiene que ser directamente "En Proceso" con guías CA
+    // Pedido 26/08: la vista por default de este tab (para el resto de los
+    // roles) tiene que ser directamente "En Proceso" con guías CA
     // rastreadas — no la fila de chips de resumen esperando un click.
     dsBacklogToggleEstado('En Proceso');
   }catch(e){
     gruposEl.innerHTML=`<div style="text-align:center;padding:30px;color:var(--red)">⚠️ Error consultando SF: ${e.message}</div>`;
   }
+}
+
+// ── Vista simplificada Customer — "En Proceso" agrupado por Responsable
+// (pedido 26/08). `lista` ya viene con las OTs de Angel excluidas (ver
+// dsBacklogCargar). Buscador filtra por OT/comercio/cuenta/ciudad/tracking
+// sobre TODA la lista (cruza responsables); si no hay texto, se ve la
+// grilla de responsables.
+function dsBacklogRenderSimplificado(lista){
+  const cont=document.getElementById('ds-backlog-simple');
+  if(!cont)return;
+
+  const porResp={};
+  lista.forEach(o=>{
+    const resp=(o.responsable||'Sin asignar').trim()||'Sin asignar';
+    (porResp[resp]=porResp[resp]||[]).push(o);
+  });
+  const respsOrdenados=Object.entries(porResp).sort((a,b)=>b[1].length-a[1].length);
+
+  const celda=v=>v?`<span>${v}</span>`:`<span style="color:var(--text-muted)">—</span>`;
+  const linkOT=o=>o.sf_id
+    ? `<a href="https://alleata.lightning.force.com/lightning/r/WorkOrder/${o.sf_id}/view" target="_blank" rel="noopener" style="color:var(--teal);text-decoration:none">${o.ot} ↗</a>`
+    : o.ot;
+  const linkCuenta=o=>o.account_id
+    ? `<a href="https://alleata.lightning.force.com/lightning/r/Account/${o.account_id}/view" target="_blank" rel="noopener" style="color:inherit;text-decoration:none">${celda(o.cuenta)} ↗</a>`
+    : celda(o.cuenta);
+
+  const tablaOts=items=>`<div class="card" style="margin-top:14px;padding:0;overflow-x:auto">
+    <div style="padding:10px 14px;font-size:12px;font-weight:700;color:var(--text-muted);border-bottom:1px solid var(--border)">📋 OTs (${items.length})</div>
+    <table style="width:100%;border-collapse:collapse;font-size:11px;white-space:nowrap">
+      <thead><tr style="text-align:left;color:var(--text-muted);text-transform:uppercase;font-size:9px;letter-spacing:.03em">
+        <th style="padding:6px 8px 6px 0">OT</th><th style="padding:6px 8px">Cuenta</th><th style="padding:6px 8px">Comercio</th>
+        <th style="padding:6px 8px">Logística</th><th style="padding:6px 8px">Seguimiento</th><th style="padding:6px 0">Ciudad</th>
+      </tr></thead>
+      <tbody>${items.map(o=>`<tr style="border-top:1px solid var(--border)">
+        <td style="padding:6px 8px 6px 0;font-family:'JetBrains Mono',monospace;font-weight:700">${linkOT(o)}</td>
+        <td style="padding:6px 8px">${linkCuenta(o)}</td>
+        <td style="padding:6px 8px">${celda(o.comercio)}</td>
+        <td style="padding:6px 8px">${celda(o.logistica)}</td>
+        <td style="padding:6px 8px;font-family:'JetBrains Mono',monospace;font-size:10px">${celda(o.tracking)}</td>
+        <td style="padding:6px 0">${celda(o.ciudad)}</td>
+      </tr>`).join('')}</tbody>
+    </table>
+  </div>`;
+
+  const cardsResp=respsOrdenados.map(([resp,items])=>`
+    <div onclick="dsBacklogVerResponsable('${resp.replace(/'/g,"\\'")}')" style="cursor:pointer;background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:14px 18px;min-width:180px;transition:all .15s" onmouseover="this.style.borderColor='var(--teal)'" onmouseout="this.style.borderColor='var(--border2)'">
+      <div style="font-size:24px;font-weight:800;color:var(--teal)">${items.length}</div>
+      <div style="font-size:12px;color:var(--text);margin-top:2px;font-weight:600">👤 ${resp}</div>
+    </div>`).join('');
+
+  cont.innerHTML=`
+    <div class="card" style="border-left:4px solid #1a9fd4;margin-bottom:16px">
+      <div style="font-size:11px;font-weight:700;color:#1a9fd4;text-transform:uppercase;letter-spacing:.06em">En Proceso</div>
+      <div style="font-size:40px;font-weight:900;color:#1a9fd4;font-family:'JetBrains Mono',monospace;line-height:1;margin-top:4px">${lista.length}</div>
+    </div>
+    <div style="position:relative;margin-bottom:16px">
+      <svg style="position:absolute;left:10px;top:50%;transform:translateY(-50%);opacity:0.4;pointer-events:none" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      <input id="ds-backlog-buscar" class="input" style="padding-left:32px;width:100%" placeholder="Buscar OT, comercio, cuenta, ciudad, seguimiento..." oninput="dsBacklogBuscar(this.value)">
+    </div>
+    <div id="ds-backlog-respcards" style="display:flex;gap:10px;flex-wrap:wrap">${cardsResp}</div>
+    <div id="ds-backlog-simple-resultado"></div>`;
+
+  window._dsBacklogPorResp=porResp;
+  window._dsBacklogTablaOts=tablaOts;
+}
+
+function dsBacklogVerResponsable(resp){
+  const porResp=window._dsBacklogPorResp||{};
+  const tablaOts=window._dsBacklogTablaOts;
+  const resEl=document.getElementById('ds-backlog-simple-resultado');
+  if(!resEl||!tablaOts)return;
+  const items=porResp[resp]||[];
+  resEl.innerHTML=`<div style="font-size:13px;font-weight:700;margin-top:16px">👤 ${resp}</div>`+tablaOts(items);
+}
+
+// Buscador de la vista simplificada: filtra sobre TODA la lista (cruza
+// responsables) y muestra el resultado plano; si el campo queda vacío,
+// vuelve a mostrar las cards por responsable.
+function dsBacklogBuscar(q){
+  const respCards=document.getElementById('ds-backlog-respcards');
+  const resEl=document.getElementById('ds-backlog-simple-resultado');
+  const tablaOts=window._dsBacklogTablaOts;
+  const lista=window._backlogEnProcesoLista||[];
+  const texto=(q||'').trim().toLowerCase();
+  if(!texto){
+    if(respCards)respCards.style.display='flex';
+    if(resEl)resEl.innerHTML='';
+    return;
+  }
+  if(respCards)respCards.style.display='none';
+  const filtradas=lista.filter(o=>
+    [o.ot,o.comercio,o.cuenta,o.ciudad,o.tracking].some(v=>String(v||'').toLowerCase().includes(texto))
+  );
+  if(resEl&&tablaOts) resEl.innerHTML=tablaOts(filtradas);
 }
 
 function dsBacklogToggleEstado(estado){
