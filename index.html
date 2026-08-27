@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.6.89</title>
+<title>Alleata · Operaciones v4.6.90</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -407,7 +407,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.89 · 27 ago 2026
+      v4.6.90 · 27 ago 2026
     </div>
   </div>
 </div>
@@ -516,7 +516,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.89 · 27 ago 2026
+      v4.6.90 · 27 ago 2026
     </div>
   </div>
 </nav>
@@ -549,6 +549,14 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         onmouseover="this.style.background='rgba(139,92,246,.2)'" onmouseout="this.style.background='rgba(139,92,246,.1)'">
         ⚡ Forzar OT
       </button>
+      <!-- Reparar Terminales (pedido 27/08, caso OT 23467) — SOLO admin, ver
+           mostrarSFSyncSiAdmin(). Corre repararTerminalesReprogramar() a
+           demanda; el mismo chequeo también corre solo cada 2h por cron. -->
+      <button id="global-reparar-terminales-btn" onclick="repararTerminalesAhora()" title="Escanea todas las OTs Cambio de Terminal + NAPSE en Reprogramar y corrige cualquier terminal que haya quedado con Ubicación/Estado/Cuenta desactualizados (ej: por una falla de red del chofer en el momento del cierre). También corre solo cada 2h por cron — esto es para forzarlo ahora."
+        style="display:none;align-items:center;gap:5px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);color:#f59e0b;border-radius:7px;padding:5px 10px;cursor:pointer;font-size:11px;font-weight:600;white-space:nowrap;transition:all .2s;margin-left:6px"
+        onmouseover="this.style.background='rgba(245,158,11,.2)'" onmouseout="this.style.background='rgba(245,158,11,.1)'">
+        🔧 Reparar Terminales
+      </button>
       <div id="sf-sync-progress-panel" style="display:none;position:fixed;top:48px;right:12px;z-index:9999;background:var(--navy-800);border:1px solid rgba(29,191,142,.3);border-radius:10px;padding:14px 16px;min-width:260px;box-shadow:0 8px 32px rgba(0,0,0,.5);">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
           <span style="font-size:12px;font-weight:700;color:var(--teal);">Full Sync en curso</span>
@@ -561,7 +569,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.89</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.90</div>
   </div>
   <div class="content">
 
@@ -5141,7 +5149,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.6.89] OK');
+console.log('[Alleata v4.6.90] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -14112,6 +14120,31 @@ async function forzarSyncUnaOT(){
   }
 }
 
+// Reparar Terminales (pedido 27/08, caso OT 23467) — corre a demanda la
+// misma lógica que ya corre sola cada 2h por cron (repararTerminalesReprogramar
+// en salesforce.js). Confirma antes de disparar porque puede tocar varias
+// OTs de una — no es tan puntual como "Forzar OT".
+async function repararTerminalesAhora(){
+  if(!confirm('Esto va a revisar TODAS las OTs Cambio de Terminal + NAPSE en estado "Reprogramar" y corregir cualquier terminal con datos desactualizados en Salesforce.\n\n¿Confirmás?')) return;
+  const btn = document.getElementById('global-reparar-terminales-btn');
+  const textoOriginal = btn ? btn.innerHTML : '';
+  if(btn){ btn.disabled=true; btn.innerHTML='⏳ Revisando...'; }
+  try{
+    const r = await railwayFetch('/automations/reparar-terminales-reprogramar', { method:'POST' });
+    const j = await r.json();
+    if(j.ok){
+      const detalleTxt = (j.detalle||[]).map(d=>`• OT ${d.ot} — ${d.cuenta||'—'}`).join('\n');
+      alert(`✅ Listo — revisadas: ${j.revisadas}, reparadas: ${j.reparadas}, errores: ${j.errores}.`+(detalleTxt?`\n\nCorregidas:\n${detalleTxt}`:''));
+    } else {
+      alert(`❌ Error: ${j.error||'Error desconocido'}`);
+    }
+  }catch(err){
+    alert(`❌ Error de red: ${err.message}`);
+  }finally{
+    if(btn){ btn.disabled=false; btn.innerHTML=textoOriginal; }
+  }
+}
+
 // ── SF Sync Global (topbar) ──────────────────────────────────
 async function globalSFSync() {
   const btn    = document.getElementById('global-sf-sync-btn');
@@ -14331,6 +14364,10 @@ function mostrarSFSyncSiAdmin() {
   const modulos = currentProfile?.modulos || [];
   const puedeVerSync = isAdmin || modulos.includes('envios');
   wrap.style.display = puedeVerSync ? 'flex' : 'none';
+  // Reparar Terminales (pedido 27/08) — SOLO admin, más restrictivo que el
+  // resto de este bloque (que también lo ven los que tienen módulo Envíos).
+  const btnReparar = document.getElementById('global-reparar-terminales-btn');
+  if (btnReparar) btnReparar.style.display = isAdmin ? 'flex' : 'none';
   // Arrancar el cron de próximo sync si puede ver el panel
   if (puedeVerSync && !window._sfCronInterval) {
     sfActualizarProximoCron();
