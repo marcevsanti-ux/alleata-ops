@@ -165,7 +165,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
       <div class="login-logo">
         <img id="loginLogo" src="" alt="Alleata">
         <div class="login-sub">Portal de Operaciones</div>
-        <div class="login-version">v2.14.50 · mobile</div>
+        <div class="login-version">v2.14.51 · mobile</div>
       </div>
       <div class="field"><label class="label">Email</label><input class="input" id="lEmail" type="email" placeholder="usuario@alleata.com" autocomplete="email"></div>
       <div class="field"><label class="label">Contraseña</label><input class="input" id="lPass" type="password" placeholder="••••••••" autocomplete="current-password"></div>
@@ -182,7 +182,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
     <img id="appLogo" src="" alt="Alleata">
     <div class="topbar-title" id="topbarTitle">Operaciones</div>
     <button id="btnSyncRapido" onclick="syncRapido()" title="Actualizar estados desde Salesforce (sin esperar los 10min)" style="background:none;border:none;color:#fff;font-size:18px;cursor:pointer;padding:4px 6px;line-height:1">🔄</button>
-    <div class="topbar-version" onclick="_tocarVersion()">v2.14.50</div>
+    <div class="topbar-version" onclick="_tocarVersion()">v2.14.51</div>
     <div class="topbar-avatar" id="topbarAvatar" onclick="openDrawer()">?</div>
   </div>
 
@@ -766,18 +766,18 @@ const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSI
 //     el producto en estado raro en SF (por eso existe la opción
 //     Reprogramar como alternativa), así que necesita aviso inmediato.
 //     No bloquea el cierre si el envío directo falla.
-// Cambios v2.14.50 (11/08):
+// Cambios v2.14.51 (11/08):
 //   - Números de OT: .ot-num y #otS-num pasan de JetBrains Mono a IBM
 //     Plex Mono bold (0 con barra diagonal — no se confunde con O).
 //     JetBrains Mono acá solo cargaba 400/500, así que el "bold" viejo
 //     era negrita sintética del navegador, no un peso real — se veía
 //     peor, no mejor.
-// Cambios v2.14.50 (21/08):
+// Cambios v2.14.51 (21/08):
 //   - Modal "Retiro/Entrega en proveedor": chip de proveedores frecuentes
 //     (Logicalis precargado — nombre + dirección) arriba del campo
 //     Proveedor. Un click completa Proveedor y Dirección, solo queda
 //     elegir Retiro/Entrega y completar los datos puntuales.
-// Cambios v2.14.50 (21/08):
+// Cambios v2.14.51 (21/08):
 //   - Modal "Retiro/Entrega en proveedor": el toggle de 2 botones (Retiro/
 //     Entrega) pasa a ser un combo <select> — pedido explícito, más claro.
 const{createClient}=supabase;
@@ -1523,10 +1523,20 @@ async function loadRuta(){
   const pendientesLocal=cargarRutaPendienteLocal();
   let otsHoyDeSupabase=[];
   if(rutaHoy?.ots_ids?.length){
+    // Pedido 28/08: antes solo traía id,workorder_number,ciudad — por eso
+    // el mensaje "Salida de ruta" mostraba "— — —" en casi todas las OTs
+    // (tipo/comercio/cuenta vacíos). Se amplía para traer todo lo que
+    // generarMensajeSalidaRuta() necesita, más sf_id y rollout — estos dos
+    // últimos para poder buscar "Solicitado por" (Task RollOut.../Prioridad).
     const{data:otsPrevias}=await sb.from('sf_workorders')
-      .select('id,workorder_number,ciudad').in('id',rutaHoy.ots_ids);
+      .select('id,sf_id,workorder_number,record_type,cuenta,nombre_comercio,propietario_cuenta,ciudad,rollout')
+      .in('id',rutaHoy.ots_ids);
     if(otsPrevias?.length){
-      otsHoyDeSupabase=otsPrevias.map(o=>({id:o.id,ot_numero:o.workorder_number,ciudad:o.ciudad}));
+      otsHoyDeSupabase=otsPrevias.map(o=>({
+        id:o.id, sf_id:o.sf_id, ot_numero:o.workorder_number, tipo:o.record_type,
+        cuenta:o.cuenta, nombre_comercio:o.nombre_comercio,
+        propietario_cuenta:o.propietario_cuenta, ciudad:o.ciudad, rollout:o.rollout,
+      }));
     }
   }
   const otsPrueba=rutaDelDia.filter(o=>o._esPrueba); // conservar las de prueba de la sesión actual, nunca van a Supabase/localStorage
@@ -1879,13 +1889,34 @@ async function allyRuta_enviarMensaje(mensaje,contexto){
   }catch(e){ console.warn('[ALLY RUTA] error general:',e.message); return false; }
 }
 
-function generarMensajeSalidaRuta(){
+async function generarMensajeSalidaRuta(){
   const nombreCompleto=(currentProfile?.nombre||currentUser?.email||'Operador').trim();
   const primerNombre=nombreCompleto.split(' ')[0];
   const fecha=new Date().toLocaleDateString('es-AR',{weekday:'long',day:'2-digit',month:'2-digit'});
+
+  // Pedido 28/08: "Solicitado por" — Asignado a (OwnerId) de la tarea
+  // "RollOut <ZONA> - Prioridad <N>" relacionada a cada OT Rollout. Mismo
+  // endpoint que ya usa avisarRolloutCierreRuta(). Fire-and-forget con el
+  // resto del mensaje: si falla, el aviso sale igual sin ese dato.
+  let solicitantePorSfId={};
+  try{
+    const sfIdsRollout=rutaDelDia.filter(ot=>ot.rollout&&ot.sf_id).map(ot=>ot.sf_id);
+    if(sfIdsRollout.length){
+      const rSol=await railwayFetch('/automations/tareas-rollout-solicitante',{
+        method:'POST', body:JSON.stringify({sf_ids:sfIdsRollout})
+      });
+      const jSol=await rSol.json();
+      if(jSol.ok) solicitantePorSfId=jSol.porOt||{};
+    }
+  }catch(e){
+    console.warn('[generarMensajeSalidaRuta] no se pudo traer "Solicitado por":',e);
+  }
+
   const lineas=rutaDelDia.map(ot=>{
     const prop=ot.propietario_cuenta?` — *${ot.propietario_cuenta}*`:'';
-    return `• OT ${ot.ot_numero} — ${ot.tipo||'—'} — ${ot.nombre_comercio||ot.cuenta||'—'} (${ot.ciudad||'—'})${prop}`;
+    const solicitante=solicitantePorSfId[ot.sf_id]?.solicitante;
+    const lineaSolicitante=solicitante?`\n  📋 Solicitado por: ${solicitante}`:'';
+    return `• OT ${ot.ot_numero} — ${ot.tipo||'—'} — ${ot.nombre_comercio||ot.cuenta||'—'} (${ot.ciudad||'—'})${prop}${lineaSolicitante}`;
   });
   return [
     `📦 Salida de ruta — Logística Alleata`,
@@ -1902,7 +1933,7 @@ function generarMensajeSalidaRuta(){
 
 async function enviarAvisoSalidaRuta(){
   try{
-    const msg=generarMensajeSalidaRuta();
+    const msg=await generarMensajeSalidaRuta();
     const ok=await allyRuta_enviarMensaje(msg,'salida_ruta');
     if(ok) showScanFeedback('📲 Aviso de salida de ruta enviado a Ops/Sales','ok');
   }catch(e){ console.warn('[enviarAvisoSalidaRuta] error:',e.message); }
