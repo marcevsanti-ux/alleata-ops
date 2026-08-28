@@ -1787,6 +1787,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     <button id="napse-tab-tickets" class="napse-subtab" onclick="napseSetView('tickets')">🎫 Tickets Payway <span id="ticket-count-badge" style="font-size:9px;padding:1px 6px;background:rgba(239,68,68,.15);color:#fca5a5;border-radius:8px;font-family:'JetBrains Mono',monospace;margin-left:4px"></span></button>
     <button id="napse-tab-historial" class="napse-subtab" onclick="napseSetView('historial')">🗄️ Historial</button>
     <button id="napse-tab-errores" class="napse-subtab" onclick="napseSetView('errores')">⚡ Errores sistema</button>
+    <button id="napse-tab-lotes" class="napse-subtab" onclick="napseSetView('lotes')">📦 Lotes pendientes</button>
   </div>
   <div>
 <div id="view-upload" class="napse-view active">
@@ -2004,6 +2005,32 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
           </div>
         </div>
         <div id="errores-content"></div>
+      </div>
+
+      <!-- LOTES PENDIENTES (pedido 28/08) — Terminal null (bug ticket Napse
+           230363: cambio de terminal post-ticket) y/o Monto_Total < umbral.
+           Consulta EN VIVO al API Gateway de Napse vía Railway
+           (/automations/napse-lote-null/casos, solo lectura) — no toca el
+           log local que usa el resto del módulo Napse. -->
+      <div id="view-lotes" class="napse-view">
+        <div class="napse-banner">
+          <div class="banner-icon">📦</div>
+          <div class="banner-text">
+            <h2>Lotes pendientes de cierre — a revisar antes de las 23:00</h2>
+            <p>Terminal NULL (bug cambio de terminal post-ticket, ticket Napse 230363) y lotes con movimiento &lt; $100</p>
+          </div>
+        </div>
+        <div class="card">
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px">
+            <div style="display:flex;gap:10px;flex-wrap:wrap">
+              <button class="btn btn-sm" onclick="napseLotesConsultar()">🔄 Consultar ahora</button>
+              <button class="btn-ghost btn-sm" id="napseLotesBtnWsp" onclick="napseLotesEnviarWhatsapp()" style="display:none">📲 Enviar alerta por WhatsApp</button>
+            </div>
+            <div id="napseLotesMeta" style="font-size:11px;color:var(--text-muted)"></div>
+          </div>
+          <div id="napseLotesResumen" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px"></div>
+          <div id="napseLotesTabla"><div style="text-align:center;padding:30px;color:var(--text-muted)">Tocá "Consultar ahora" para traer los lotes pendientes en vivo.</div></div>
+        </div>
       </div>
 
     </div>
@@ -15370,7 +15397,7 @@ async function napseInitApp(){
 
 // ── NAPSE setView ─────────────────────────────────────────────────────────
 function napseSetView(v){
-  const views=['upload','buscar','tickets','historial','errores'];
+  const views=['upload','buscar','tickets','historial','errores','lotes'];
   views.forEach(id=>{
     const el=document.getElementById('view-'+id);
     const btn=document.getElementById('napse-tab-'+id);
@@ -15381,6 +15408,111 @@ function napseSetView(v){
   if(v==='tickets') renderTickets();
   if(v==='historial') napseRefreshHistorial();
   if(v==='errores') renderErrores();
+}
+
+// ── Lotes pendientes de cierre NAPSE (pedido 28/08) ─────────────────────────
+// Terminal null (ticket Napse 230363) y/o Monto_Total < umbral. Solo lectura
+// hasta que el operador aprieta "Enviar alerta por WhatsApp" a propósito —
+// nunca se dispara solo al entrar al tab.
+let _napseLotesUltimaConsulta=null;
+
+async function napseLotesConsultar(){
+  const meta=document.getElementById('napseLotesMeta');
+  const resumen=document.getElementById('napseLotesResumen');
+  const tabla=document.getElementById('napseLotesTabla');
+  const btnWsp=document.getElementById('napseLotesBtnWsp');
+  if(meta)meta.textContent='Consultando...';
+  if(tabla)tabla.innerHTML='<div style="text-align:center;padding:30px;color:var(--text-muted)">Consultando API Gateway de Napse en vivo...</div>';
+  if(resumen)resumen.innerHTML='';
+  if(btnWsp)btnWsp.style.display='none';
+  try{
+    const r=await railwayFetch('/automations/napse-lote-null/casos');
+    const j=await r.json();
+    if(!r.ok||!j.ok) throw new Error(j.error||'Respuesta no OK');
+    _napseLotesUltimaConsulta=j;
+    napseLotesRender(j);
+  }catch(e){
+    if(tabla)tabla.innerHTML=`<div style="text-align:center;padding:30px;color:var(--red)">⚠️ Error consultando Napse: ${e.message}</div>`;
+    if(meta)meta.textContent='';
+  }
+}
+
+function napseLotesRender(j){
+  const meta=document.getElementById('napseLotesMeta');
+  const resumen=document.getElementById('napseLotesResumen');
+  const tabla=document.getElementById('napseLotesTabla');
+  const btnWsp=document.getElementById('napseLotesBtnWsp');
+  const casos=j.casos||[];
+
+  if(meta)meta.textContent=`Consultado ${new Date().toLocaleTimeString('es-AR')} · ${j.totalLotes} lote(s) pendientes de cierre en total`;
+
+  const nNull=casos.filter(c=>c.motivos.includes('terminal_null')).length;
+  const nMonto=casos.filter(c=>c.motivos.includes('monto_bajo')).length;
+  if(resumen)resumen.innerHTML=`
+    <div class="stat-box" style="border-left:3px solid var(--teal)"><div class="stat-num">${j.totalLotes}</div><div class="stat-label">Total pendientes</div></div>
+    <div class="stat-box" style="border-left:3px solid #ef4444"><div class="stat-num" style="color:#ef4444">${nNull}</div><div class="stat-label">Terminal NULL</div></div>
+    <div class="stat-box" style="border-left:3px solid #f59e0b"><div class="stat-num" style="color:#f59e0b">${nMonto}</div><div class="stat-label">Monto &lt; ${napseFmtMoneda(j.montoMinimo)}</div></div>
+    <div class="stat-box" style="border-left:3px solid var(--blue)"><div class="stat-num">${casos.length}</div><div class="stat-label">Casos a revisar</div></div>`;
+
+  if(btnWsp)btnWsp.style.display=casos.length?'inline-flex':'none';
+
+  if(!casos.length){
+    if(tabla)tabla.innerHTML=`<div style="text-align:center;padding:30px;color:var(--green)">✅ Sin casos — ninguno de los ${j.totalLotes} lote(s) pendientes tiene Terminal null ni monto &lt; ${napseFmtMoneda(j.montoMinimo)}.</div>`;
+    return;
+  }
+
+  const badge=m=>m==='terminal_null'
+    ?'<span class="badge" style="background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.4);color:#fca5a5">⚠️ Terminal NULL</span>'
+    :'<span class="badge" style="background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.4);color:#fcd34d">🔻 Monto bajo</span>';
+
+  tabla.innerHTML=`<div style="overflow-x:auto">
+    <table style="width:100%;border-collapse:collapse;font-size:11px;white-space:nowrap">
+      <thead><tr style="text-align:left;color:var(--text-muted);text-transform:uppercase;font-size:9px;letter-spacing:.03em">
+        <th style="padding:5px 8px 5px 0">Motivo</th>
+        <th style="padding:5px 8px">Tienda</th>
+        <th style="padding:5px 8px">Lote</th>
+        <th style="padding:5px 8px">Terminal</th>
+        <th style="padding:5px 8px">Comercio cierre</th>
+        <th style="padding:5px 8px">Caja</th>
+        <th style="padding:5px 8px">Cant. Op</th>
+        <th style="padding:5px 0">Monto</th>
+      </tr></thead>
+      <tbody>
+        ${casos.map(c=>`<tr style="border-top:1px solid var(--border)">
+          <td style="padding:6px 8px 6px 0">${c.motivos.map(badge).join(' ')}</td>
+          <td style="padding:6px 8px">${c.Tienda||'—'} <span style="color:var(--text-muted)">(#${c.Id_Tienda??'—'})</span></td>
+          <td style="padding:6px 8px">${c.Numero_Lote??'—'}</td>
+          <td style="padding:6px 8px;font-family:'JetBrains Mono',monospace">${c.Terminal??'<span style="color:#ef4444;font-weight:700">NULL</span>'}</td>
+          <td style="padding:6px 8px">${c.Numero_Comercio_Cierre??'—'}</td>
+          <td style="padding:6px 8px">${c.Id_Caja??'—'}</td>
+          <td style="padding:6px 8px">${c.Cantidad_De_Op??'—'}</td>
+          <td style="padding:6px 0">${napseFmtMoneda(c.Monto_Total)}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>
+  </div>`;
+}
+
+function napseFmtMoneda(v){
+  return '$'+Number(v||0).toLocaleString('es-AR');
+}
+
+async function napseLotesEnviarWhatsapp(){
+  const casos=(_napseLotesUltimaConsulta&&_napseLotesUltimaConsulta.casos)||[];
+  if(!casos.length)return;
+  if(!confirm(`¿Enviar alerta por WhatsApp con ${casos.length} caso(s) al grupo configurado?`))return;
+  const btn=document.getElementById('napseLotesBtnWsp');
+  if(btn){btn.disabled=true;btn.textContent='Enviando...';}
+  try{
+    const r=await railwayFetch('/automations/napse-lote-null/run',{method:'POST'});
+    const j=await r.json();
+    if(!r.ok||!j.ok) throw new Error(j.error||'Respuesta no OK');
+    alert(j.enviado?`✅ Alerta enviada — ${j.casos} caso(s).`:'✅ Sin casos al momento del envío.');
+  }catch(e){
+    alert('⚠️ Error enviando: '+e.message);
+  }finally{
+    if(btn){btn.disabled=false;btn.textContent='📲 Enviar alerta por WhatsApp';}
+  }
 }
 
 // ── NAPSE drop zone setup ─────────────────────────────────────────────────
