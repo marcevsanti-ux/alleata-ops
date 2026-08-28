@@ -8417,6 +8417,16 @@ const ESTADO_COLORS_NAPSE={
   'Extraviada':'#6b7280','Reprogramar':'#f97316',
 };
 const MESES_CORTOS_NAPSE=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+
+// Pedido 28/08: los cards de mes (JUN/JUL/AGO) pasan a ser botones — al
+// clickear uno, el ranking por motivo y la tabla de análisis se recalculan
+// SOLO con las OT de ese mes (fecha_creacion), para poder ver qué motivos
+// pesan más mes a mes. `_napseData` guarda lo que ya trae el endpoint
+// (nada de fetch nuevo: motivoDetalle ya trae fecha_creacion por OT — ver
+// automationsRouter.js). `_napseMesActivo=null` = sin filtrar (todas).
+let _napseData=null;
+let _napseMesActivo=null;
+
 async function loadNapseDesinstPanel(){
   const panel=document.getElementById('napseDesinstPanel');
   if(!panel)return;
@@ -8426,16 +8436,13 @@ async function loadNapseDesinstPanel(){
   // Consulta EN VIVO a SF (vía Railway), no la caché sf_workorders — se
   // detectó que esa caché puede quedar temporalmente incompleta entre
   // sincronizaciones (ver hallazgo 21/07: mostraba 5 de 8 OTs reales).
-  let total=0, porEstado={}, porMotivo={}, motivoDetalle={}, estadoDetalle={}, meses=[], fuente='vivo', errMsg=null;
+  let total=0, motivoDetalle={}, meses=[], fuente='vivo', errMsg=null;
   try{
     const r=await railwayFetch('/automations/sf-stats/desinstalaciones?perfil=NAPSE&todas=1');
     const j=await r.json();
     if(r.ok&&j.ok){
       total=j.totalGeneral;
-      porEstado=j.totalPorEstado||{};
-      porMotivo=j.totalPorMotivo||{};
       motivoDetalle=j.motivoDetalle||{};
-      estadoDetalle=j.estadoDetalle||{};
       meses=j.meses||[];
     }else{
       errMsg=j.error||'Respuesta no OK';
@@ -8446,18 +8453,16 @@ async function loadNapseDesinstPanel(){
 
   // Respaldo: si SF/Railway no respondió, cae a la caché de Supabase con
   // aviso explícito de que puede estar desactualizada — mejor mostrar algo
-  // aproximado que dejar el widget vacío. (La caché no tiene motivo, así
-  // que esa sección queda vacía en modo respaldo.)
+  // aproximado que dejar el widget vacío. (La caché no tiene motivo ni
+  // fecha_creacion por OT, así que en modo respaldo no hay filtro por mes.)
   if(errMsg){
     fuente='caché (SF no respondió: '+errMsg+')';
     const{data}=await sb.from('sf_workorders').select('status,perfil,record_type').ilike('record_type','%esinstala%');
     const napse=(data||[]).filter(e=>(e.perfil||'').trim().toUpperCase()==='NAPSE');
     total=napse.length;
-    napse.forEach(e=>{const s=e.status||'Sin estado';porEstado[s]=(porEstado[s]||0)+1;});
+    motivoDetalle={'Sin motivo (caché)':napse.map(e=>({ot:null,status:e.status||'Sin estado',motivo:'Sin motivo (caché)',fecha_creacion:null}))};
+    meses=[];
   }
-
-  window._napseMotivoDetalle=motivoDetalle; // leído por toggleNapseMotivo()
-  window._napseEstadoDetalle=estadoDetalle; // leído por toggleNapseEstado()
 
   // Análisis de producto (días con terminal + volumen antes de la
   // devolución) — se calcula aparte en Railway (cruza 3 objetos de SF por
@@ -8471,7 +8476,47 @@ async function loadNapseDesinstPanel(){
       (jAn.datos||[]).forEach(a=>{analisisPorOt[a.ot_desinstalacion]=a;});
     }
   }catch(e){}
+
+  // motivoDetalle ya trae UNA fila por OT (cada OT cae en un solo motivo),
+  // así que aplanarlo da la lista completa de OT — de ahí se recalcula todo
+  // (estados, motivos, análisis) al filtrar por mes, sin pedir nada nuevo.
+  const allRows=Object.values(motivoDetalle).flat();
+
+  _napseData={total,meses,fuente,allRows,analisisPorOt};
+  _napseMesActivo=null; // cada recarga arranca sin filtro de mes
+  napseRenderPanel();
+}
+
+function toggleNapseMes(mes){
+  _napseMesActivo=(_napseMesActivo===mes)?null:mes; // click de nuevo = quitar filtro
+  napseRenderPanel();
+}
+
+function napseRenderPanel(){
+  const panel=document.getElementById('napseDesinstPanel');
+  if(!panel||!_napseData)return;
+  const{total,meses,fuente,allRows,analisisPorOt}=_napseData;
+
+  const rows=_napseMesActivo
+    ? allRows.filter(o=>o.fecha_creacion && (new Date(o.fecha_creacion).getMonth()+1)===_napseMesActivo)
+    : allRows;
+
+  const porEstado={}, porMotivo={}, motivoDetalle={}, estadoDetalle={};
+  rows.forEach(o=>{
+    porEstado[o.status]=(porEstado[o.status]||0)+1;
+    porMotivo[o.motivo]=(porMotivo[o.motivo]||0)+1;
+    (motivoDetalle[o.motivo]=motivoDetalle[o.motivo]||[]).push(o);
+    (estadoDetalle[o.status]=estadoDetalle[o.status]||[]).push(o);
+  });
+  window._napseMotivoDetalle=motivoDetalle; // leído por toggleNapseMotivo()
+  window._napseEstadoDetalle=estadoDetalle; // leído por toggleNapseEstado()
   window._napseAnalisisPorOt=analisisPorOt;
+
+  // Cambió el universo de datos (se filtró/desfiltró por mes) — si había
+  // un detalle de estado/motivo abierto, se cierra para no mostrar OT que
+  // ya no corresponden al filtro actual.
+  const eDet=document.getElementById('napseEstadoDetalle'); if(eDet){eDet.innerHTML='';eDet.dataset.actual='';}
+  const mDet=document.getElementById('napseMotivoDetalle'); if(mDet){mDet.innerHTML='';mDet.dataset.actual='';}
 
   const entries=Object.entries(porEstado).sort((a,b)=>b[1]-a[1]);
   const entriesMotivo=Object.entries(porMotivo).sort((a,b)=>b[1]-a[1]);
@@ -8492,6 +8537,8 @@ async function loadNapseDesinstPanel(){
       diasProm:promedio(dias),volProm:promedio(vols),conDatos:otsDeEsteMotivo.length,sinMatch};
   });
 
+  const mesLabel=_napseMesActivo?MESES_CORTOS_NAPSE[_napseMesActivo-1]:null;
+
   panel.innerHTML=`<div class="card" style="margin-top:16px">
     <div class="sec-title"><div class="sec-dot" style="background:#8b5cf6"></div>🔍 Desinstalaciones NAPSE</div>
     <div style="display:flex;align-items:flex-end;gap:16px;margin:10px 0 14px;flex-wrap:wrap">
@@ -8500,13 +8547,16 @@ async function loadNapseDesinstPanel(){
         <div style="font-size:12px;color:var(--text-muted);padding-bottom:5px">total (Desinstalación · Perfil NAPSE) — en vivo desde Salesforce</div>
       </div>
       ${meses.length?`<div style="display:flex;gap:6px;flex-wrap:wrap;padding-bottom:2px">
-        ${meses.map(m=>`
-          <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:5px 10px;text-align:center;min-width:56px" title="${Object.entries(m.estados).map(([e,n])=>`${e}: ${n}`).join(' · ')}">
-            <div style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em">${MESES_CORTOS_NAPSE[m.mes-1]}</div>
+        ${meses.map(m=>{
+          const activo=_napseMesActivo===m.mes;
+          return`<button onclick="toggleNapseMes(${m.mes})" title="${Object.entries(m.estados).map(([e,n])=>`${e}: ${n}`).join(' · ')} — click para ver el ranking por motivo de este mes" style="cursor:pointer;font-family:'Inter',sans-serif;background:${activo?'rgba(139,92,246,.22)':'var(--surface2)'};border:1px solid ${activo?'#8b5cf6':'var(--border2)'};border-radius:8px;padding:5px 10px;text-align:center;min-width:56px">
+            <div style="font-size:9px;color:${activo?'#c4b5fd':'var(--text-muted)'};text-transform:uppercase;letter-spacing:.03em">${MESES_CORTOS_NAPSE[m.mes-1]}</div>
             <div style="font-size:16px;font-weight:800;color:#8b5cf6">${m.total}</div>
-          </div>`).join('')}
+          </button>`;
+        }).join('')}
       </div>`:''}
     </div>
+    ${_napseMesActivo?`<div style="font-size:11px;color:#c4b5fd;margin:-8px 0 12px;display:flex;align-items:center;gap:10px">🔍 Filtrando por <b>${mesLabel}</b> (${rows.length} OT${rows.length===1?'':'s'}) <span onclick="toggleNapseMes(${_napseMesActivo})" style="cursor:pointer;color:var(--text-muted);text-decoration:underline">✕ quitar filtro</span></div>`:''}
     <div style="display:flex;flex-wrap:wrap;gap:8px">
       ${entries.map(([estado,cant])=>{
         const color=ESTADO_COLORS_NAPSE[estado]||'#6b7280';
@@ -8515,11 +8565,11 @@ async function loadNapseDesinstPanel(){
           <div style="font-size:20px;font-weight:800;color:${color}">${cant}</div>
           <div style="font-size:10px;color:var(--text-muted);white-space:nowrap">${estado}</div>
         </button>`;
-      }).join('')||'<div style="font-size:12px;color:var(--text-muted)">Sin OTs NAPSE</div>'}
+      }).join('')||'<div style="font-size:12px;color:var(--text-muted)">Sin OTs NAPSE'+(mesLabel?` en ${mesLabel}`:'')+'</div>'}
     </div>
     <div id="napseEstadoDetalle" style="margin-top:10px"></div>
     ${entriesMotivo.length?`
-    <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em;margin:16px 0 8px">Ranking por motivo — click para ver las OT</div>
+    <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em;margin:16px 0 8px">Ranking por motivo${mesLabel?` — ${mesLabel}`:''} — click para ver las OT</div>
     <div style="display:flex;flex-wrap:wrap;gap:8px">
       ${entriesMotivo.map(([motivo,cant],i)=>{
         const color=MOTIVO_COLORS[i%MOTIVO_COLORS.length];
@@ -8529,7 +8579,7 @@ async function loadNapseDesinstPanel(){
     </div>
     <div id="napseMotivoDetalle" style="margin-top:10px"></div>
 
-    <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em;margin:16px 0 8px">📊 Análisis por motivo — días con terminal y volumen antes de devolver</div>
+    <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em;margin:16px 0 8px">📊 Análisis por motivo${mesLabel?` — ${mesLabel}`:''} — días con terminal y volumen antes de devolver</div>
     <div style="overflow-x:auto">
       <table style="width:100%;border-collapse:collapse;font-size:11px;white-space:nowrap">
         <thead><tr style="text-align:left;color:var(--text-muted);text-transform:uppercase;font-size:9px;letter-spacing:.03em">
@@ -8557,7 +8607,7 @@ async function loadNapseDesinstPanel(){
           }).join('')}
         </tbody>
       </table>
-    </div>`:''}
+    </div>`:`<div style="font-size:12px;color:var(--text-muted);margin-top:12px">Sin OTs NAPSE${mesLabel?` en ${mesLabel}`:''}.</div>`}
     ${avisoCache}
   </div>`;
 }
@@ -8850,21 +8900,25 @@ async function dsBacklogCargar(){
     const j=await r.json();
     if(!r.ok||!j.ok) throw new Error(j.error||'Respuesta no OK');
 
-    // Pedido 26/08: este backlog es el trabajo de Rosario/Juan Ignacio, NO
-    // el de Angel — así que "En Proceso" acá tiene que excluir las OTs
-    // donde Responsable de la OT (Asignado_a__c) es Angel, tanto en el
-    // número del chip como en el detalle/tracking de guías CA de abajo.
-    // El resto de los estados (Pendiente, NO RESPONDE, etc.) sigue sin
-    // filtrar — solo "En Proceso" es lo que pidió filtrar puntualmente.
+    // Pedido 26/08 + 28/08: este backlog es el trabajo de Rosario/Juan
+    // Ignacio, NO el de Angel — así que "En Proceso" y "Pendiente" acá
+    // tienen que excluir las OTs donde Responsable de la OT (Asignado_a__c)
+    // es Angel, tanto en el número del chip como en el detalle/tracking de
+    // guías CA de abajo. El resto de los estados (NO RESPONDE, etc.) sigue
+    // sin filtrar.
     const esAngelResp=r=>String(r||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().includes('ANGEL');
     const estadoDetalle=j.estadoDetalle||{};
-    if(Array.isArray(estadoDetalle['En Proceso'])){
-      estadoDetalle['En Proceso']=estadoDetalle['En Proceso'].filter(o=>!esAngelResp(o.responsable));
-    }
+    ['En Proceso','Pendiente'].forEach(est=>{
+      if(Array.isArray(estadoDetalle[est])){
+        estadoDetalle[est]=estadoDetalle[est].filter(o=>!esAngelResp(o.responsable));
+      }
+    });
     window._backlogEstadoDetalle=estadoDetalle;
 
     const totalPorEstado={...(j.totalPorEstado||{})};
-    if(estadoDetalle['En Proceso']) totalPorEstado['En Proceso']=estadoDetalle['En Proceso'].length;
+    ['En Proceso','Pendiente'].forEach(est=>{
+      if(estadoDetalle[est]) totalPorEstado[est]=estadoDetalle[est].length;
+    });
     const entries=Object.entries(totalPorEstado)
       .sort((a,b)=> ORDEN_ESTADOS_GESTIONOPS.indexOf(a[0]) - ORDEN_ESTADOS_GESTIONOPS.indexOf(b[0]) || b[1]-a[1]);
 
