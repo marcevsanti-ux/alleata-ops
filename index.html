@@ -8821,9 +8821,7 @@ function dsBacklogPreviewSimplificada(){
   if(resumenEl)resumenEl.style.display='none';
   if(gruposEl)gruposEl.innerHTML='';
   if(simpleEl)simpleEl.style.display='block';
-  const lista=(window._backlogEstadoDetalle||{})['En Proceso']||[];
-  window._backlogEnProcesoLista=lista;
-  dsBacklogRenderSimplificado(lista);
+  dsBacklogSimpleSetEstado('En Proceso');
   if(!document.getElementById('ds-backlog-preview-exit')){
     const exitBtn=document.createElement('button');
     exitBtn.id='ds-backlog-preview-exit';
@@ -8879,8 +8877,7 @@ async function dsBacklogCargar(){
       const simpleEl=document.getElementById('ds-backlog-simple');
       if(simpleEl) simpleEl.style.display='block';
       gruposEl.innerHTML='';
-      window._backlogEnProcesoLista=estadoDetalle['En Proceso']||[];
-      dsBacklogRenderSimplificado(window._backlogEnProcesoLista);
+      dsBacklogSimpleSetEstado('En Proceso');
       return;
     }
     if(resumenEl){
@@ -8927,7 +8924,23 @@ let _dsBacklogGuias={};
 let _dsBacklogSortKey='dias';
 let _dsBacklogSortDir='desc';
 
-async function dsBacklogRenderSimplificado(lista){
+// Pedido 28/08 (perfil Customer): "En Proceso" pasa a ser un card/botón, y
+// se agrega al lado un card/botón "Pendiente" — mismo comportamiento (misma
+// tabla/buscador/cards por responsable), solo cambia qué estado de
+// window._backlogEstadoDetalle se usa como `lista`. Estado activo persiste
+// en _dsBacklogSimpleEstadoActivo para poder resaltar el card correspondiente.
+let _dsBacklogSimpleEstadoActivo='En Proceso';
+
+function dsBacklogSimpleSetEstado(estado){
+  _dsBacklogSimpleEstadoActivo=estado;
+  const lista=(window._backlogEstadoDetalle||{})[estado]||[];
+  window._backlogEnProcesoLista=lista;
+  dsBacklogRenderSimplificado(lista, estado);
+}
+
+async function dsBacklogRenderSimplificado(lista, estado){
+  estado=estado||_dsBacklogSimpleEstadoActivo||'En Proceso';
+  _dsBacklogSimpleEstadoActivo=estado;
   const cont=document.getElementById('ds-backlog-simple');
   if(!cont)return;
   cont.innerHTML='<div style="text-align:center;padding:30px;color:var(--text-muted)">Cargando tracking de guías CA...</div>';
@@ -8976,10 +8989,18 @@ async function dsBacklogRenderSimplificado(lista){
       <div style="font-size:12px;color:var(--text);margin-top:2px;font-weight:600">👤 ${resp}</div>
     </div>`).join('');
 
+  const detalleEstados=window._backlogEstadoDetalle||{};
+  const nEnProceso=(detalleEstados['En Proceso']||[]).length;
+  const nPendiente=(detalleEstados['Pendiente']||[]).length;
+  const cardEstado=(key,label,color,n)=>`
+    <div onclick="dsBacklogSimpleSetEstado('${key}')" class="card" style="cursor:pointer;border-left:4px solid ${color};flex:1;min-width:140px;${estado===key?`background:${color}18;box-shadow:0 0 0 1px ${color}55 inset`:''}">
+      <div style="font-size:11px;font-weight:700;color:${color};text-transform:uppercase;letter-spacing:.06em">${label}</div>
+      <div style="font-size:40px;font-weight:900;color:${color};font-family:'JetBrains Mono',monospace;line-height:1;margin-top:4px">${n}</div>
+    </div>`;
   cont.innerHTML=`
-    <div class="card" style="border-left:4px solid #1a9fd4;margin-bottom:16px">
-      <div style="font-size:11px;font-weight:700;color:#1a9fd4;text-transform:uppercase;letter-spacing:.06em">En Proceso</div>
-      <div style="font-size:40px;font-weight:900;color:#1a9fd4;font-family:'JetBrains Mono',monospace;line-height:1;margin-top:4px">${lista.length}</div>
+    <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap">
+      ${cardEstado('En Proceso','En Proceso','#1a9fd4',nEnProceso)}
+      ${cardEstado('Pendiente','Pendiente','#f59e0b',nPendiente)}
     </div>
     <div style="position:relative;margin-bottom:16px">
       <svg style="position:absolute;left:10px;top:50%;transform:translateY(-50%);opacity:0.4;pointer-events:none" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
