@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.6.92</title>
+<title>Alleata · Operaciones v4.6.93</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -407,7 +407,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.92 · 27 ago 2026
+      v4.6.93 · 29 ago 2026
     </div>
   </div>
 </div>
@@ -516,7 +516,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.92 · 27 ago 2026
+      v4.6.93 · 29 ago 2026
     </div>
   </div>
 </nav>
@@ -569,7 +569,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.92</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.93</div>
   </div>
   <div class="content">
 
@@ -5176,7 +5176,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.6.92] OK');
+console.log('[Alleata v4.6.93] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -6402,7 +6402,20 @@ async function loadHojaRuta(){
     (paradasPorNombre[key]=paradasPorNombre[key]||[]).push(p);
   });
 
-  const ESTADOS_CERRADOS=['Exitoso','Exitosa','Entregado','Fallido'];
+  // FIX 29/08 (caso real: Marcelo Jimenez reprogramó 2 OTs desde mobile —
+  // Salesforce y Supabase quedaron perfectos, status='Reprogramar' en
+  // sf_workorders — pero acá "Reprogramar" NO estaba en ESTADOS_CERRADOS,
+  // así que esta pantalla seguía mostrando los 3 botones de acción como si
+  // nada se hubiera hecho. El backend (/entregar-ot) ya trata Reprogramar
+  // "mismo patrón que Fallido" — acá tenía que ser igual.
+  const ESTADOS_CERRADOS=['Exitoso','Exitosa','Entregado','Fallido','Reprogramar'];
+  // Reprogramar y Fallido comparten el mismo trato de "no pide más acción
+  // hoy", pero visualmente conviene distinguirlos de Exitoso — mismo color
+  // naranja/rojo que ya se usa en el resto del portal para estos estados.
+  const ESTADO_HR_COLOR={
+    'Reprogramar': {bg:'rgba(249,115,22,.12)', fg:'#f97316', bd:'rgba(249,115,22,.3)'},
+    'Fallido':     {bg:'rgba(239,68,68,.12)',  fg:'var(--red)', bd:'rgba(239,68,68,.3)'},
+  };
   let totalAbiertas=0;
 
   // Las desinstalaciones/retiros que llegan acá ya vienen filtradas por
@@ -6457,7 +6470,7 @@ async function loadHojaRuta(){
           <div style="font-size:11px;color:var(--text-muted)">${dir}${ot.ciudad?' · '+ot.ciudad:''}</div>
         </div>
         <div style="display:flex;align-items:center;gap:8px">
-          <span class="badge" style="background:${cerrada?'rgba(29,191,142,.12)':'rgba(107,114,128,.15)'};color:${cerrada?'var(--teal)':'var(--text-muted)'};border:1px solid ${cerrada?'rgba(29,191,142,.3)':'var(--border2)'}">${ot.status}</span>
+          <span class="badge" style="background:${ESTADO_HR_COLOR[ot.status]?.bg||(cerrada?'rgba(29,191,142,.12)':'rgba(107,114,128,.15)')};color:${ESTADO_HR_COLOR[ot.status]?.fg||(cerrada?'var(--teal)':'var(--text-muted)')};border:1px solid ${ESTADO_HR_COLOR[ot.status]?.bd||(cerrada?'rgba(29,191,142,.3)':'var(--border2)')}">${ot.status}</span>
           ${cerrada?'':`
             <button class="btn-sm" style="background:var(--teal);color:#fff;border:none" onclick="cerrarOTHojaRuta('${ot.sf_id||''}','${choferJs}',this,'Entregado','${ot.workorder_number}','${(ot.cuenta||'').replace(/'/g,"\\'")}', '${(ot.perfil||'').replace(/'/g,"\\'")}')">✅ Entregado</button>
             <button class="btn-sm" style="background:none;border:1px solid #f59e0b;color:#f59e0b" onclick="cerrarOTHojaRuta('${ot.sf_id||''}','${choferJs}',this,'Reprogramar','${ot.workorder_number}','${(ot.cuenta||'').replace(/'/g,"\\'")}', '${(ot.perfil||'').replace(/'/g,"\\'")}')">🔄 Reprogramar</button>
