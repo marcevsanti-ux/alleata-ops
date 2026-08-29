@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.6.93</title>
+<title>Alleata · Operaciones v4.6.95</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -221,6 +221,7 @@ tr:hover td{background:var(--surface2);}
 .stats-row{display:flex;gap:10px;flex-wrap:wrap;margin:14px 0;}
 .stat-box{background:var(--surface);border:1px solid var(--border2);border-radius:12px;padding:10px 14px;flex:1;min-width:90px;}
 .stat-num{font-size:24px;font-weight:700;font-family:'JetBrains Mono',monospace;line-height:1.1;}
+.stat-pct{font-size:10px;color:var(--text-muted);margin-top:2px;font-family:'JetBrains Mono',monospace;}
 .stat-box.s-teal .stat-num{color:var(--teal);}
 .stat-box.s-green .stat-num{color:var(--green);}
 .stat-box.s-red .stat-num{color:var(--red);}
@@ -407,7 +408,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.93 · 29 ago 2026
+      v4.6.95 · 29 ago 2026
     </div>
   </div>
 </div>
@@ -516,7 +517,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.93 · 29 ago 2026
+      v4.6.95 · 29 ago 2026
     </div>
   </div>
 </nav>
@@ -569,7 +570,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.93</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.95</div>
   </div>
   <div class="content">
 
@@ -1195,14 +1196,18 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
        chequeo `if(el)`, así que no rompe aunque esos ids ya no existan.
   -->
   <div class="stats-row" style="margin-bottom:8px">
-    <div class="stat-box s-purple" id="mr-card-total" style="cursor:pointer" onclick="mrToggleDesglose('total')" title="Ver desglose por mes"><div class="stat-num" id="mr-stat-total">—</div><div class="stat-label">Total OTs</div></div>
-    <div class="stat-box" id="mr-card-cambio" style="cursor:pointer" onclick="mrToggleDesglose('cambio')" title="Ver desglose por mes"><div class="stat-num" id="mr-stat-cambio">—</div><div class="stat-label">Cambio</div></div>
-    <div class="stat-box" id="mr-card-rollout" style="cursor:pointer;border-color:rgba(139,92,246,.35)" onclick="mrToggleDesglose('rollout')" title="Ver desglose por mes"><div class="stat-num" id="mr-stat-rollout" style="color:#8b5cf6">—</div><div class="stat-label">Rollout</div></div>
-    <div class="stat-box" id="mr-card-precolecta" style="cursor:pointer" onclick="mrToggleDesglose('precolecta')" title="Ver desglose por mes"><div class="stat-num" id="mr-stat-precolecta" style="color:#f59e0b">—</div><div class="stat-label">En Pre-Colecta hoy</div></div>
-    <div class="stat-box s-blue" id="mr-card-despachado" style="cursor:pointer" onclick="mrToggleDesglose('despachado')" title="Ver desglose por mes"><div class="stat-num" id="mr-stat-despachado">—</div><div class="stat-label">Despachadas</div></div>
-    <div class="stat-box s-green" id="mr-card-exitoso" style="cursor:pointer" onclick="mrToggleDesglose('exitoso')" title="Ver desglose por mes"><div class="stat-num" id="mr-stat-exitoso">—</div><div class="stat-label">Exitosas</div><div id="mr-stat-exitoso-nota" style="font-size:9px;color:var(--text-muted);margin-top:2px"></div></div>
-    <div class="stat-box s-teal" id="mr-card-costo" style="cursor:pointer" onclick="mrToggleDesglose('costo')" title="Ver desglose por mes"><div class="stat-num" id="mr-stat-costo" style="font-size:20px">—</div><div class="stat-label">Costo total</div></div>
-    <div class="stat-box" id="mr-card-otros" style="cursor:pointer;border-color:rgba(255,255,255,.18)" onclick="mrToggleDesglose('otros')" title="Estados que no son Pre-Colecta / Despachadas / Exitosas (Configurar Terminal, En Proceso, Retirar Terminal, Fallidas, etc.) — click para el detalle"><div class="stat-num" id="mr-stat-otros" style="color:var(--text-muted)">—</div><div class="stat-label">Otros estados</div></div>
+    <div class="stat-box s-purple" id="mr-card-total" style="cursor:pointer" onclick="mrToggleDesglose('total')" title="Ver desglose por mes"><div class="stat-num" id="mr-stat-total">—</div><div class="stat-label">Total OTs</div><div class="stat-pct" id="mr-stat-total-pct"></div></div>
+    <div class="stat-box" id="mr-card-cambio" style="cursor:pointer" onclick="mrToggleDesglose('cambio')" title="Ver desglose por mes"><div class="stat-num" id="mr-stat-cambio" style="color:#fff">—</div><div class="stat-label">Cambio</div><div class="stat-pct" id="mr-stat-cambio-pct"></div></div>
+    <div class="stat-box" id="mr-card-rollout" style="cursor:pointer;border-color:rgba(139,92,246,.35)" onclick="mrToggleDesglose('rollout')" title="Ver desglose por mes"><div class="stat-num" id="mr-stat-rollout" style="color:#fff">—</div><div class="stat-label">Rollout</div><div class="stat-pct" id="mr-stat-rollout-pct"></div></div>
+    <div class="stat-box" id="mr-card-precolecta" style="cursor:pointer" onclick="mrToggleDesglose('precolecta')" title="Ver desglose por mes"><div class="stat-num" id="mr-stat-precolecta" style="color:#f59e0b">—</div><div class="stat-label">En Pre-Colecta hoy</div><div class="stat-pct" id="mr-stat-precolecta-pct"></div></div>
+    <div class="stat-box s-blue" id="mr-card-despachado" style="cursor:pointer" onclick="mrToggleDesglose('despachado')" title="Ver desglose por mes"><div class="stat-num" id="mr-stat-despachado">—</div><div class="stat-label">Despachadas</div><div class="stat-pct" id="mr-stat-despachado-pct"></div></div>
+    <div class="stat-box" id="mr-card-otros" style="cursor:pointer;border-color:rgba(255,255,255,.18)" onclick="mrToggleDesglose('otros')" title="Estados que no son Pre-Colecta / Despachadas / Exitosas (Configurar Terminal, En Proceso, Retirar Terminal, Fallidas, etc.) — click para el detalle"><div class="stat-num" id="mr-stat-otros" style="color:var(--text-muted)">—</div><div class="stat-label">Otros estados</div><div class="stat-pct" id="mr-stat-otros-pct"></div></div>
+    <div class="stat-box s-green" id="mr-card-exitoso" style="cursor:pointer" onclick="mrToggleDesglose('exitoso')" title="Ver desglose por mes"><div class="stat-num" id="mr-stat-exitoso">—</div><div class="stat-label">Exitosas</div><div class="stat-pct" id="mr-stat-exitoso-pct"></div><div id="mr-stat-exitoso-nota" style="font-size:9px;color:var(--text-muted);margin-top:2px"></div></div>
+    <!-- Costo Total oculta (pedido 29/08) — se mantiene en el DOM (oculta)
+         para no romper mrToggleDesglose('costo') ni el resto de la lógica
+         que la referencia; si se necesita mostrar de nuevo, sacar el
+         display:none. -->
+    <div class="stat-box s-teal" id="mr-card-costo" style="cursor:pointer;display:none" onclick="mrToggleDesglose('costo')" title="Ver desglose por mes"><div class="stat-num" id="mr-stat-costo" style="font-size:20px">—</div><div class="stat-label">Costo total</div></div>
   </div>
   <div style="font-size:10px;color:var(--text-muted);margin:-4px 0 12px 2px">Total OTs = En Pre-Colecta + Despachadas + Exitosas + Otros estados — si no cierra, revisar la card "Otros estados".</div>
   <div id="mrDesgloseMes" style="display:none;margin-bottom:16px"></div>
@@ -5176,7 +5181,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.6.93] OK');
+console.log('[Alleata v4.6.95] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -7271,6 +7276,13 @@ function renderIndicadoresMisionRollout(){
   }),{total:0,cambio:0,rollout:0,precolecta:0,despachado:0,exitoso:0,otros:0,retirarTerminal:0,costo_total:0});
 
   const setStat=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v;};
+  // % de cada card sobre Total OTs (pedido 29/08) — protegido contra
+  // división por cero (tot.total=0 cuando no hay datos aún / filtro vacío).
+  const setPct=(id,v)=>{
+    const el=document.getElementById(id);
+    if(!el)return;
+    el.textContent = tot.total ? Math.round(v/tot.total*100)+'%' : '—';
+  };
   setStat('mr-stat-total',tot.total);
   setStat('mr-stat-cambio',tot.cambio);
   setStat('mr-stat-rollout',tot.rollout);
@@ -7279,6 +7291,13 @@ function renderIndicadoresMisionRollout(){
   setStat('mr-stat-exitoso',tot.exitoso);
   setStat('mr-stat-costo',mrFmt$(tot.costo_total));
   setStat('mr-stat-otros',tot.otros);
+  setPct('mr-stat-total-pct',tot.total);
+  setPct('mr-stat-cambio-pct',tot.cambio);
+  setPct('mr-stat-rollout-pct',tot.rollout);
+  setPct('mr-stat-precolecta-pct',tot.precolecta);
+  setPct('mr-stat-despachado-pct',tot.despachado);
+  setPct('mr-stat-exitoso-pct',tot.exitoso);
+  setPct('mr-stat-otros-pct',tot.otros);
   setStat('mr-stat-exitoso-nota', tot.retirarTerminal ? `+${tot.retirarTerminal} en Retirar Terminal (terminal nueva ya entregada, resta el retorno de la vieja)` : '');
   // Si había un filtro (mamushka) abierto, se refresca con los datos
   // nuevos en vez de quedar mostrando un snapshot viejo tras 🔄 Actualizar.
@@ -15428,6 +15447,10 @@ function napseSetView(v){
 // hasta que el operador aprieta "Enviar alerta por WhatsApp" a propósito —
 // nunca se dispara solo al entrar al tab.
 let _napseLotesUltimaConsulta=null;
+// Filtro activo de las 4 cards — 'casos' (default, = lo que ya se mandaría
+// por WhatsApp) | 'total' (los 31, incluye los que no matchean ningún
+// motivo) | 'terminal_null' | 'monto_bajo'. Pedido 29/08.
+let _napseLotesFiltro='casos';
 
 async function napseLotesConsultar(){
   const meta=document.getElementById('napseLotesMeta');
@@ -15438,6 +15461,7 @@ async function napseLotesConsultar(){
   if(tabla)tabla.innerHTML='<div style="text-align:center;padding:30px;color:var(--text-muted)">Consultando API Gateway de Napse en vivo...</div>';
   if(resumen)resumen.innerHTML='';
   if(btnWsp)btnWsp.style.display='none';
+  _napseLotesFiltro='casos'; // cada consulta nueva arranca en la vista por default
   try{
     const r=await railwayFetch('/automations/napse-lote-null/casos');
     const j=await r.json();
@@ -15450,33 +15474,60 @@ async function napseLotesConsultar(){
   }
 }
 
+function napseLotesSetFiltro(f){
+  if(!_napseLotesUltimaConsulta)return;
+  _napseLotesFiltro=f;
+  napseLotesRender(_napseLotesUltimaConsulta);
+}
+
 function napseLotesRender(j){
   const meta=document.getElementById('napseLotesMeta');
   const resumen=document.getElementById('napseLotesResumen');
   const tabla=document.getElementById('napseLotesTabla');
   const btnWsp=document.getElementById('napseLotesBtnWsp');
   const casos=j.casos||[];
+  const todos=j.todos||casos; // fallback por si pega contra un backend viejo sin `todos`
 
   if(meta)meta.textContent=`Consultado ${new Date().toLocaleTimeString('es-AR')} · ${j.totalLotes} lote(s) pendientes de cierre en total`;
 
   const nNull=casos.filter(c=>c.motivos.includes('terminal_null')).length;
   const nMonto=casos.filter(c=>c.motivos.includes('monto_bajo')).length;
-  if(resumen)resumen.innerHTML=`
-    <div class="stat-box" style="border-left:3px solid var(--teal)"><div class="stat-num">${j.totalLotes}</div><div class="stat-label">Total pendientes</div></div>
-    <div class="stat-box" style="border-left:3px solid #ef4444"><div class="stat-num" style="color:#ef4444">${nNull}</div><div class="stat-label">Terminal NULL</div></div>
-    <div class="stat-box" style="border-left:3px solid #f59e0b"><div class="stat-num" style="color:#f59e0b">${nMonto}</div><div class="stat-label">Monto &lt; ${napseFmtMoneda(j.montoMinimo)}</div></div>
-    <div class="stat-box" style="border-left:3px solid var(--blue)"><div class="stat-num">${casos.length}</div><div class="stat-label">Casos a revisar</div></div>`;
+
+  const card=(filtro,color,valor,label)=>{
+    const activo=_napseLotesFiltro===filtro;
+    return `<div class="stat-box" style="cursor:pointer;border-left:3px solid ${color};${activo?`background:${color}18;box-shadow:0 0 0 1px ${color}55 inset`:''}" onclick="napseLotesSetFiltro('${filtro}')">
+      <div class="stat-num" style="color:${color}">${valor}</div>
+      <div class="stat-label">${label}</div>
+    </div>`;
+  };
+  if(resumen)resumen.innerHTML=
+    card('total','var(--teal)',j.totalLotes,'Total pendientes')+
+    card('terminal_null','#ef4444',nNull,'Terminal NULL')+
+    card('monto_bajo','#f59e0b',nMonto,`Monto &lt; ${napseFmtMoneda(j.montoMinimo)}`)+
+    card('casos','var(--blue)',casos.length,'Casos a revisar');
 
   if(btnWsp)btnWsp.style.display=casos.length?'inline-flex':'none';
 
-  if(!casos.length){
-    if(tabla)tabla.innerHTML=`<div style="text-align:center;padding:30px;color:var(--green)">✅ Sin casos — ninguno de los ${j.totalLotes} lote(s) pendientes tiene Terminal null ni monto &lt; ${napseFmtMoneda(j.montoMinimo)}.</div>`;
+  // Universo de filas según la card activa. 'total' es el único que puede
+  // incluir lotes SIN ningún motivo (los "limpios", ni NULL ni monto bajo)
+  // — el resto de las vistas son subconjuntos de `casos`.
+  const rows = _napseLotesFiltro==='total' ? todos
+    : _napseLotesFiltro==='casos' ? casos
+    : casos.filter(c=>c.motivos.includes(_napseLotesFiltro));
+
+  if(!rows.length){
+    const motivo = _napseLotesFiltro==='total' ? `no hay lotes pendientes en este momento`
+      : _napseLotesFiltro==='casos' ? `ninguno de los ${j.totalLotes} lote(s) pendientes tiene Terminal null ni monto &lt; ${napseFmtMoneda(j.montoMinimo)}`
+      : _napseLotesFiltro==='terminal_null' ? `ningún lote tiene Terminal null`
+      : `ningún lote tiene monto &lt; ${napseFmtMoneda(j.montoMinimo)}`;
+    if(tabla)tabla.innerHTML=`<div style="text-align:center;padding:30px;color:var(--green)">✅ Sin casos — ${motivo}.</div>`;
     return;
   }
 
   const badge=m=>m==='terminal_null'
     ?'<span class="badge" style="background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.4);color:#fca5a5">⚠️ Terminal NULL</span>'
     :'<span class="badge" style="background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.4);color:#fcd34d">🔻 Monto bajo</span>';
+  const badgeOk='<span class="badge" style="background:rgba(29,191,142,.12);border:1px solid rgba(29,191,142,.3);color:var(--teal)">✅ OK</span>';
 
   tabla.innerHTML=`<div style="overflow-x:auto">
     <table style="width:100%;border-collapse:collapse;font-size:11px;white-space:nowrap">
@@ -15491,8 +15542,8 @@ function napseLotesRender(j){
         <th style="padding:5px 0">Monto</th>
       </tr></thead>
       <tbody>
-        ${casos.map(c=>`<tr style="border-top:1px solid var(--border)">
-          <td style="padding:6px 8px 6px 0">${c.motivos.map(badge).join(' ')}</td>
+        ${rows.map(c=>`<tr style="border-top:1px solid var(--border)">
+          <td style="padding:6px 8px 6px 0">${c.motivos.length?c.motivos.map(badge).join(' '):badgeOk}</td>
           <td style="padding:6px 8px">${c.Tienda||'—'} <span style="color:var(--text-muted)">(#${c.Id_Tienda??'—'})</span></td>
           <td style="padding:6px 8px">${c.Numero_Lote??'—'}</td>
           <td style="padding:6px 8px;font-family:'JetBrains Mono',monospace">${c.Terminal??'<span style="color:#ef4444;font-weight:700">NULL</span>'}</td>
