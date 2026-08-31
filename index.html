@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.6.97</title>
+<title>Alleata · Operaciones v4.6.98</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -408,7 +408,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.97 · 29 ago 2026
+      v4.6.98 · 29 ago 2026
     </div>
   </div>
 </div>
@@ -517,7 +517,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.97 · 29 ago 2026
+      v4.6.98 · 29 ago 2026
     </div>
   </div>
 </nav>
@@ -570,7 +570,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.97</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.98</div>
   </div>
   <div class="content">
 
@@ -5181,7 +5181,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.6.97] OK');
+console.log('[Alleata v4.6.98] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -8799,19 +8799,21 @@ function napseExportarExcel(){
 
   // ── Hoja 5: Detalle completo (una fila por OT, lista para armar
   //    tablas dinámicas / gráficos propios en Excel con todo el detalle) ──
-  const detalleHeaders=['OT','Cuenta','CUIT','Fecha Alta','Propietario cta.','Contacto','Terminal ID','Ciudad','Provincia',
+  const detalleHeaders=['OT','Cuenta','CUIT','Fecha Alta','Solicitud baja','Resp. pedido baja','Descripción pedido baja','Obs. pedido baja',
+    'Propietario cta.','Contacto','Terminal ID','Ciudad','Provincia',
     'Motivo','Submotivo','Estado','Logística','Fecha creación','Días c/terminal','Volumen 30d antes ($)'];
   const detalleAOA=[detalleHeaders];
   allRows.forEach(o=>{
     const an=analisisPorOt[o.ot];
     detalleAOA.push([
-      o.ot||'', o.cuenta||'', o.cuit||'', fechaFmt(o.fecha_alta), o.propietario||'', o.contacto||'',
+      o.ot||'', o.cuenta||'', o.cuit||'', fechaFmt(o.fecha_alta), fechaFmt(o.solicitud_baja_fecha),
+      o.pedido_baja_owner||'', o.pedido_baja_desc||'', o.pedido_baja_obs||'', o.propietario||'', o.contacto||'',
       o.terminal_id||'', o.ciudad||'', o.provincia||'', o.motivo||'', o.sub_motivo||'', o.status||'',
       o.logistica||'', fechaFmt(o.fecha_creacion), an?.dias_con_terminal??'', an?.volumen_30d_antes??'',
     ]);
   });
   const wsDetalle=XLSX.utils.aoa_to_sheet(detalleAOA);
-  wsDetalle['!cols']=[{wch:10},{wch:32},{wch:14},{wch:11},{wch:22},{wch:16},{wch:14},{wch:18},{wch:10},
+  wsDetalle['!cols']=[{wch:10},{wch:32},{wch:14},{wch:11},{wch:12},{wch:20},{wch:40},{wch:30},{wch:22},{wch:16},{wch:14},{wch:18},{wch:10},
     {wch:16},{wch:32},{wch:14},{wch:11},{wch:11},{wch:11},{wch:16}];
   wsDetalle['!autofilter']={ref:XLSX.utils.encode_range({s:{r:0,c:0},e:{r:0,c:detalleHeaders.length-1}})};
   // Formato fecha (dd/mm/aaaa) y moneda en las columnas que corresponden.
@@ -8825,9 +8827,11 @@ function napseExportarExcel(){
   for(let r=1;r<detalleAOA.length;r++){
     const cFechaAlta=wsDetalle[XLSX.utils.encode_cell({r,c:3})];
     if(cFechaAlta) cFechaAlta.z='dd/mm/yyyy';
-    const cFechaCreacion=wsDetalle[XLSX.utils.encode_cell({r,c:13})];
+    const cSolicitudBaja=wsDetalle[XLSX.utils.encode_cell({r,c:4})];
+    if(cSolicitudBaja) cSolicitudBaja.z='dd/mm/yyyy';
+    const cFechaCreacion=wsDetalle[XLSX.utils.encode_cell({r,c:17})];
     if(cFechaCreacion) cFechaCreacion.z='dd/mm/yyyy';
-    const cVol=wsDetalle[XLSX.utils.encode_cell({r,c:15})];
+    const cVol=wsDetalle[XLSX.utils.encode_cell({r,c:19})];
     if(cVol && typeof cVol.v==='number') cVol.z='$#,##0';
   }
 
@@ -8861,6 +8865,79 @@ function _napseLinkCuenta(o){
     ? `<a href="https://alleata.lightning.force.com/lightning/r/Account/${o.account_id}/view" target="_blank" rel="noopener" style="color:#e5e7eb;text-decoration:none" title="Abrir cuenta en Salesforce" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">${o.cuenta||'—'} ↗</a>`
     : `<span style="color:#e5e7eb">${o.cuenta||'—'}</span>`;
 }
+// Pedido 31/08: CUIT ya no va en columna aparte — va debajo del nombre de
+// cuenta, en chiquito, para poder liberar una columna (la ocupa "Solicitud
+// baja" ahora).
+function _napseCeldaCuenta(o){
+  return `<div>${_napseLinkCuenta(o)}</div>${o.cuit?`<div style="font-size:9px;color:var(--text-muted);font-family:'JetBrains Mono',monospace;margin-top:1px">${o.cuit}</div>`:''}`;
+}
+// Pedido 31/08: columna "Solicitud baja" — fecha de Fecha_de_Pedido_de_Baja__c
+// (Cuenta) + la tarea "PEDIDO DE BAJA" de Actividades (Owner/Description/
+// Observaciones__c) como tooltip, para no ensuciar la tabla con texto largo
+// pero sin perder el detalle — pasa el mouse por arriba de la fecha.
+function _napseCeldaSolicitudBaja(o){
+  const fecha=o.solicitud_baja_fecha?new Date(o.solicitud_baja_fecha).toLocaleDateString('es-AR'):null;
+  if(!fecha) return '<span style="color:var(--text-muted)">—</span>';
+  const tieneTarea=o.pedido_baja_owner||o.pedido_baja_desc||o.pedido_baja_obs;
+  if(!tieneTarea) return fecha;
+  const tooltip=[
+    o.pedido_baja_owner?`Responsable: ${o.pedido_baja_owner}`:null,
+    o.pedido_baja_desc?`\n${o.pedido_baja_desc}`:null,
+    o.pedido_baja_obs?`\nObs: ${o.pedido_baja_obs}`:null,
+  ].filter(Boolean).join('').replace(/"/g,'&quot;');
+  return `<span title="${tooltip}" style="cursor:help;border-bottom:1px dotted var(--text-muted)">${fecha} <span style="font-size:9px">ℹ️</span></span>`;
+}
+
+// ── Orden de columnas para las tablas de detalle NAPSE (pedido 31/08) ──────
+// Un solo motor genérico reusado por toggleNapseEstado() y toggleNapseMotivo()
+// — cada tabla guarda su propio estado de orden (clave + dirección) así no
+// se pisan entre sí si las dos están abiertas a la vez.
+const _napseSortState={ estado:{key:null,dir:1}, motivo:{key:null,dir:1} };
+const _napseSortTipoNumerico=new Set(['dias_con_terminal','vol30d']);
+const _napseSortTipoFecha=new Set(['fecha_alta','solicitud_baja_fecha']);
+function _napseOrdenarLista(lista, tipo){
+  const st=_napseSortState[tipo];
+  if(!st.key) return lista;
+  const k=st.key;
+  return [...lista].sort((a,b)=>{
+    let va,vb;
+    if(_napseSortTipoNumerico.has(k)){
+      const an=(window._napseAnalisisPorOt||{});
+      va=k==='dias_con_terminal'?an[a.ot]?.dias_con_terminal:an[a.ot]?.volumen_30d_antes;
+      vb=k==='dias_con_terminal'?an[b.ot]?.dias_con_terminal:an[b.ot]?.volumen_30d_antes;
+      va=va==null?-Infinity:va; vb=vb==null?-Infinity:vb;
+    }else if(_napseSortTipoFecha.has(k)){
+      va=a[k]?new Date(a[k]).getTime():-Infinity;
+      vb=b[k]?new Date(b[k]).getTime():-Infinity;
+    }else{
+      va=(a[k]||'').toString().toLowerCase();
+      vb=(b[k]||'').toString().toLowerCase();
+    }
+    if(va<vb)return -1*st.dir;
+    if(va>vb)return 1*st.dir;
+    return 0;
+  });
+}
+function napseToggleSort(tipo,key){
+  const st=_napseSortState[tipo];
+  st.dir = (st.key===key) ? st.dir*-1 : 1;
+  st.key = key;
+  if(tipo==='estado'){
+    const el=document.getElementById('napseEstadoDetalle');
+    if(el?.dataset.actual) toggleNapseEstado(null, el.dataset.actual, true);
+  }else{
+    const el=document.getElementById('napseMotivoDetalle');
+    if(el?.dataset.actual) toggleNapseMotivo(null, el.dataset.actual, true);
+  }
+}
+// Header <th> clickeable con indicador ▲▼ de la columna activa.
+function _napseTh(tipo,key,label,extraStyle){
+  const st=_napseSortState[tipo];
+  const activo=st.key===key;
+  const flecha=activo?(st.dir===1?' ▲':' ▼'):'';
+  return `<th style="padding:4px 8px;cursor:pointer;user-select:none;${extraStyle||''}" onclick="napseToggleSort('${tipo}','${key}')" title="Ordenar por ${label}">${label}${flecha}</th>`;
+}
+
 function _napseVolTooltip(an){
   if(!an)return'';
   const fmt=v=>v!=null?'$'+Number(v).toLocaleString('es-AR'):'—';
@@ -8875,36 +8952,41 @@ function _napseVolTooltip(an){
   ].filter(Boolean).join('\n');
 }
 
-function toggleNapseEstado(eid,estado){
+// Pedido 31/08: `forzar` (3er param) permite re-renderizar sin disparar el
+// toggle-cierre — lo usa napseToggleSort() cuando cambia el orden con la
+// tabla ya abierta (si no, un click en un header de orden cerraría la
+// tabla en vez de reordenarla, porque dataset.actual ya matchea el estado).
+function toggleNapseEstado(eid,estado,forzar){
   const el=document.getElementById('napseEstadoDetalle');
   if(!el)return;
-  if(el.dataset.actual===estado){ el.innerHTML=''; el.dataset.actual=''; return; } // toggle: click de nuevo = cerrar
-  const lista=(window._napseEstadoDetalle||{})[estado]||[];
+  if(!forzar && el.dataset.actual===estado){ el.innerHTML=''; el.dataset.actual=''; return; } // toggle: click de nuevo = cerrar
+  const lista=_napseOrdenarLista((window._napseEstadoDetalle||{})[estado]||[], 'estado');
   el.dataset.actual=estado;
   const celda=v=>v?`<span style="color:#e5e7eb">${v}</span>`:`<span style="color:var(--text-muted)">—</span>`;
+  const th=(key,label,extra)=>_napseTh('estado',key,label,extra);
   el.innerHTML=`<div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:10px 12px;overflow-x:auto">
     <div style="font-size:11px;font-weight:700;color:var(--text-muted);margin-bottom:8px">${estado} (${lista.length})</div>
     <table style="width:100%;border-collapse:collapse;font-size:11px;white-space:nowrap">
       <thead><tr style="text-align:left;color:var(--text-muted);text-transform:uppercase;font-size:9px;letter-spacing:.03em">
-        <th style="padding:4px 8px 4px 0">OT</th>
-        <th style="padding:4px 8px">Cuenta</th>
-        <th style="padding:4px 8px">CUIT</th>
-        <th style="padding:4px 8px">Fecha Alta</th>
-        <th style="padding:4px 8px">Propietario cta.</th>
-        <th style="padding:4px 8px">Terminal ID</th>
-        <th style="padding:4px 8px">Ciudad</th>
-        <th style="padding:4px 8px">Motivo</th>
-        <th style="padding:4px 8px">Submotivo</th>
-        <th style="padding:4px 8px">Días c/terminal</th>
-        <th style="padding:4px 0">Vol. 30d antes</th>
+        ${th('ot','OT','padding-left:0')}
+        ${th('cuenta','Cuenta')}
+        ${th('solicitud_baja_fecha','Solicitud baja')}
+        ${th('fecha_alta','Fecha Alta')}
+        ${th('propietario','Propietario cta.')}
+        ${th('terminal_id','Terminal ID')}
+        ${th('ciudad','Ciudad')}
+        ${th('motivo','Motivo')}
+        ${th('sub_motivo','Submotivo')}
+        ${th('dias_con_terminal','Días c/terminal')}
+        ${th('vol30d','Vol. 30d antes','padding-right:0')}
       </tr></thead>
       <tbody>
         ${lista.map(o=>{
           const an=(window._napseAnalisisPorOt||{})[o.ot];
           return`<tr style="border-top:1px solid var(--border)">
           <td style="padding:5px 8px 5px 0;font-family:'JetBrains Mono',monospace;font-weight:700">${_napseLinkOT(o)}</td>
-          <td style="padding:5px 8px">${_napseLinkCuenta(o)}</td>
-          <td style="padding:5px 8px;font-family:'JetBrains Mono',monospace">${celda(o.cuit)}</td>
+          <td style="padding:5px 8px">${_napseCeldaCuenta(o)}</td>
+          <td style="padding:5px 8px">${_napseCeldaSolicitudBaja(o)}</td>
           <td style="padding:5px 8px">${o.fecha_alta?new Date(o.fecha_alta).toLocaleDateString('es-AR'):'<span style="color:var(--text-muted)">—</span>'}</td>
           <td style="padding:5px 8px">${o.propietario?`<span style="color:#9ca3af">${o.propietario}</span>`:`<span style="color:var(--text-muted)">—</span>`}</td>
           <td style="padding:5px 8px">${celda(o.terminal_id)}</td>
@@ -8928,36 +9010,37 @@ function toggleNapseEstado(eid,estado){
 // Pedido 31/08: columna "Comercio" reemplazada por "Fecha Alta"
 // (Fecha_de_Venta__c de la Cuenta — la fecha que se ve en SF arriba de la
 // Cuenta como "Fecha de Alta").
-function toggleNapseMotivo(mid,motivo){
+function toggleNapseMotivo(mid,motivo,forzar){
   const el=document.getElementById('napseMotivoDetalle');
   if(!el)return;
-  if(el.dataset.actual===motivo){ el.innerHTML=''; el.dataset.actual=''; return; } // toggle: click de nuevo = cerrar
-  const lista=(window._napseMotivoDetalle||{})[motivo]||[];
+  if(!forzar && el.dataset.actual===motivo){ el.innerHTML=''; el.dataset.actual=''; return; } // toggle: click de nuevo = cerrar
+  const lista=_napseOrdenarLista((window._napseMotivoDetalle||{})[motivo]||[], 'motivo');
   el.dataset.actual=motivo;
   const celda=v=>v?`<span>${v}</span>`:`<span style="color:var(--text-muted)">—</span>`;
+  const th=(key,label,extra)=>_napseTh('motivo',key,label,extra);
   el.innerHTML=`<div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:10px 12px;overflow-x:auto">
     <div style="font-size:11px;font-weight:700;color:var(--text-muted);margin-bottom:8px">${motivo} (${lista.length})</div>
     <table style="width:100%;border-collapse:collapse;font-size:11px;white-space:nowrap">
       <thead><tr style="text-align:left;color:var(--text-muted);text-transform:uppercase;font-size:9px;letter-spacing:.03em">
-        <th style="padding:4px 8px 4px 0">OT</th>
-        <th style="padding:4px 8px">Cuenta</th>
-        <th style="padding:4px 8px">CUIT</th>
-        <th style="padding:4px 8px">Fecha Alta</th>
-        <th style="padding:4px 8px">Propietario cta.</th>
-        <th style="padding:4px 8px">Terminal ID</th>
-        <th style="padding:4px 8px">Ciudad</th>
-        <th style="padding:4px 8px">Submotivo</th>
-        <th style="padding:4px 8px">Estado</th>
-        <th style="padding:4px 8px">Días c/terminal</th>
-        <th style="padding:4px 0">Vol. 30d antes</th>
+        ${th('ot','OT','padding-left:0')}
+        ${th('cuenta','Cuenta')}
+        ${th('solicitud_baja_fecha','Solicitud baja')}
+        ${th('fecha_alta','Fecha Alta')}
+        ${th('propietario','Propietario cta.')}
+        ${th('terminal_id','Terminal ID')}
+        ${th('ciudad','Ciudad')}
+        ${th('sub_motivo','Submotivo')}
+        ${th('status','Estado')}
+        ${th('dias_con_terminal','Días c/terminal')}
+        ${th('vol30d','Vol. 30d antes','padding-right:0')}
       </tr></thead>
       <tbody>
         ${lista.map(o=>{
           const an=(window._napseAnalisisPorOt||{})[o.ot];
           return`<tr style="border-top:1px solid var(--border)">
           <td style="padding:5px 8px 5px 0;font-family:'JetBrains Mono',monospace;font-weight:700">${_napseLinkOT(o)}</td>
-          <td style="padding:5px 8px">${_napseLinkCuenta(o)}</td>
-          <td style="padding:5px 8px;font-family:'JetBrains Mono',monospace">${celda(o.cuit)}</td>
+          <td style="padding:5px 8px">${_napseCeldaCuenta(o)}</td>
+          <td style="padding:5px 8px">${_napseCeldaSolicitudBaja(o)}</td>
           <td style="padding:5px 8px">${o.fecha_alta?new Date(o.fecha_alta).toLocaleDateString('es-AR'):'<span style="color:var(--text-muted)">—</span>'}</td>
           <td style="padding:5px 8px">${o.propietario?`<span style="color:#9ca3af">${o.propietario}</span>`:`<span style="color:var(--text-muted)">—</span>`}</td>
           <td style="padding:5px 8px">${celda(o.terminal_id)}</td>
