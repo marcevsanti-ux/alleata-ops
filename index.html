@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.6.98</title>
+<title>Alleata · Operaciones v4.7.0</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -408,7 +408,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.98 · 29 ago 2026
+      v4.7.0 · 31 ago 2026
     </div>
   </div>
 </div>
@@ -517,7 +517,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.98 · 29 ago 2026
+      v4.7.0 · 31 ago 2026
     </div>
   </div>
 </nav>
@@ -570,7 +570,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.98</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.0</div>
   </div>
   <div class="content">
 
@@ -5181,7 +5181,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.6.98] OK');
+console.log('[Alleata v4.7.0] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -5671,7 +5671,15 @@ function goTo(mod){
   if(mod==='home'){setTimeout(()=>{if(window._drawQR)window._drawQR();},200);loadOpsPanel(currentProfile?.rol==='admin');}
   if(mod==='rollout')initRollout();
   if(mod==='rollout-piloto')loadRolloutPiloto();
-  if(mod==='desinstalaciones'){if(window.cargarDesinstalaciones&&!(window.DesinModule?.cargado))window.cargarDesinstalaciones();if(typeof dsTabSwitch==='function')dsTabSwitch('gestionops');}
+  // Pedido 31/08: este `goTo()` forzaba SIEMPRE la pestaña "Gestión OPS"
+  // al entrar a Desinstalaciones, sin importar el rol — por eso a Rosario
+  // (rol customer) le dejó de aparecer su vista simplificada (backlog) y
+  // en su lugar veía el panel completo de Gestión OPS (todos los perfiles,
+  // 1294 OTs). Para el rol customer tiene que ir siempre a 'backlog'.
+  if(mod==='desinstalaciones'){
+    if(window.cargarDesinstalaciones&&!(window.DesinModule?.cargado))window.cargarDesinstalaciones();
+    if(typeof dsTabSwitch==='function')dsTabSwitch(window._isCustomerRole?'backlog':'gestionops');
+  }
   if(mod==='churn-producto'){
     const f=document.getElementById('churnProductoFrame');
     if(f&&f.getAttribute('src')==='about:blank') f.src=f.dataset.src;
@@ -8970,8 +8978,8 @@ function toggleNapseEstado(eid,estado,forzar){
       <thead><tr style="text-align:left;color:var(--text-muted);text-transform:uppercase;font-size:9px;letter-spacing:.03em">
         ${th('ot','OT','padding-left:0')}
         ${th('cuenta','Cuenta')}
-        ${th('solicitud_baja_fecha','Solicitud baja')}
         ${th('fecha_alta','Fecha Alta')}
+        ${th('solicitud_baja_fecha','Solicitud baja')}
         ${th('propietario','Propietario cta.')}
         ${th('terminal_id','Terminal ID')}
         ${th('ciudad','Ciudad')}
@@ -8986,8 +8994,8 @@ function toggleNapseEstado(eid,estado,forzar){
           return`<tr style="border-top:1px solid var(--border)">
           <td style="padding:5px 8px 5px 0;font-family:'JetBrains Mono',monospace;font-weight:700">${_napseLinkOT(o)}</td>
           <td style="padding:5px 8px">${_napseCeldaCuenta(o)}</td>
-          <td style="padding:5px 8px">${_napseCeldaSolicitudBaja(o)}</td>
           <td style="padding:5px 8px">${o.fecha_alta?new Date(o.fecha_alta).toLocaleDateString('es-AR'):'<span style="color:var(--text-muted)">—</span>'}</td>
+          <td style="padding:5px 8px">${_napseCeldaSolicitudBaja(o)}</td>
           <td style="padding:5px 8px">${o.propietario?`<span style="color:#9ca3af">${o.propietario}</span>`:`<span style="color:var(--text-muted)">—</span>`}</td>
           <td style="padding:5px 8px">${celda(o.terminal_id)}</td>
           <td style="padding:5px 8px">${celda(o.ciudad)}</td>
@@ -9024,8 +9032,8 @@ function toggleNapseMotivo(mid,motivo,forzar){
       <thead><tr style="text-align:left;color:var(--text-muted);text-transform:uppercase;font-size:9px;letter-spacing:.03em">
         ${th('ot','OT','padding-left:0')}
         ${th('cuenta','Cuenta')}
-        ${th('solicitud_baja_fecha','Solicitud baja')}
         ${th('fecha_alta','Fecha Alta')}
+        ${th('solicitud_baja_fecha','Solicitud baja')}
         ${th('propietario','Propietario cta.')}
         ${th('terminal_id','Terminal ID')}
         ${th('ciudad','Ciudad')}
@@ -9040,8 +9048,8 @@ function toggleNapseMotivo(mid,motivo,forzar){
           return`<tr style="border-top:1px solid var(--border)">
           <td style="padding:5px 8px 5px 0;font-family:'JetBrains Mono',monospace;font-weight:700">${_napseLinkOT(o)}</td>
           <td style="padding:5px 8px">${_napseCeldaCuenta(o)}</td>
-          <td style="padding:5px 8px">${_napseCeldaSolicitudBaja(o)}</td>
           <td style="padding:5px 8px">${o.fecha_alta?new Date(o.fecha_alta).toLocaleDateString('es-AR'):'<span style="color:var(--text-muted)">—</span>'}</td>
+          <td style="padding:5px 8px">${_napseCeldaSolicitudBaja(o)}</td>
           <td style="padding:5px 8px">${o.propietario?`<span style="color:#9ca3af">${o.propietario}</span>`:`<span style="color:var(--text-muted)">—</span>`}</td>
           <td style="padding:5px 8px">${celda(o.terminal_id)}</td>
           <td style="padding:5px 8px">${celda(o.ciudad)}</td>
@@ -10286,6 +10294,21 @@ async function loadOpsPanel(isAdmin, modulos){
   // KPIs operativos todavía: se van a definir con Marcelo más adelante.
   // Vista CEO: KPIs de Gestión NAPSE en vivo, directo en el dashboard (sin sección aparte)
   if(currentProfile?.rol==='ceo'){ loadCeoDashKpis(); loadCeoPresupuestoBridge(); return; }
+
+  // Vista Customer (pedido 31/08): "Dashboard" no tiene que mostrarle a
+  // Rosario/Juan Ignacio ningún KPI operativo ni la grilla de módulos —
+  // solo el mismo widget "Desinstalaciones NAPSE" que ve marcelos en el
+  // suyo. Antes esta función seguía de largo y terminaba corriendo TODAS
+  // las queries de admin (envíos, SLA de desinstalaciones, gráficos) sin
+  // mostrarlas realmente, gastando llamadas de más para nada — con este
+  // return temprano ni siquiera se disparan.
+  if(window._isCustomerRole){
+    if(wm) wm.textContent='Hola, '+nombre+' 👋';
+    const dashGridEl=document.getElementById('dashGrid');
+    if(dashGridEl) dashGridEl.style.display='none';
+    loadNapseDesinstPanel();
+    return;
+  }
 
   // Dashboard personal para operadores
   const opCard=document.getElementById('envStatsOperador');
