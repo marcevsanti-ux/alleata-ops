@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.6.96</title>
+<title>Alleata · Operaciones v4.6.97</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -408,7 +408,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.96 · 29 ago 2026
+      v4.6.97 · 29 ago 2026
     </div>
   </div>
 </div>
@@ -517,7 +517,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.6.96 · 29 ago 2026
+      v4.6.97 · 29 ago 2026
     </div>
   </div>
 </nav>
@@ -570,7 +570,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.96</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.6.97</div>
   </div>
   <div class="content">
 
@@ -5181,7 +5181,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.6.96] OK');
+console.log('[Alleata v4.6.97] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -8599,7 +8599,10 @@ function napseRenderPanel(){
   const mesLabel=_napseMesActivo?MESES_CORTOS_NAPSE[_napseMesActivo-1]:null;
 
   panel.innerHTML=`<div class="card" style="margin-top:16px">
-    <div class="sec-title"><div class="sec-dot" style="background:#8b5cf6"></div>🔍 Desinstalaciones NAPSE</div>
+    <div class="sec-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+      <div style="display:flex;align-items:center"><div class="sec-dot" style="background:#8b5cf6"></div>🔍 Desinstalaciones NAPSE</div>
+      <button class="btn-sm" style="background:#1d6f42;color:#fff;border:1px solid #1d6f42" onclick="napseExportarExcel()" title="Exporta TODO el histórico (no solo el mes filtrado) a un Excel con varias hojas: resumen, tablas dinámicas y detalle completo">📊 Exportar a Excel</button>
+    </div>
     <div style="display:flex;align-items:flex-end;gap:16px;margin:10px 0 14px;flex-wrap:wrap">
       <div style="display:flex;align-items:flex-end;gap:10px">
         <div style="font-size:34px;font-weight:800;color:#8b5cf6;line-height:1">${total}</div>
@@ -8669,6 +8672,174 @@ function napseRenderPanel(){
     </div>`:`<div style="font-size:12px;color:var(--text-muted);margin-top:12px">Sin OTs NAPSE${mesLabel?` en ${mesLabel}`:''}.</div>`}
     ${avisoCache}
   </div>`;
+}
+
+// ── Exportar a Excel — Desinstalaciones NAPSE (pedido 31/08) ───────────────
+// OJO / limitación real: la librería SheetJS que ya usa el resto del portal
+// (xlsx.full.min.js, edición Community/gratuita) NO soporta escribir
+// gráficos nativos de Excel ni colores de celda — eso es exclusivo de
+// SheetJS Pro (pago), que este proyecto no tiene contratado. Para que el
+// export sea "profesional" dentro de esa limitación real, se arma un libro
+// de varias hojas ya con la data cruzada en formato tabla dinámica (Estado
+// x Mes, Motivo x Estado, Análisis por motivo) — al abrirlo en Excel, con
+// la data ya organizada así, el gráfico se inserta con Insertar → Gráfico
+// recomendado en 2 clicks, sin tener que armar nada a mano. Si en algún
+// momento se contrata SheetJS Pro (o se agrega una lib tipo ExcelJS), esto
+// se puede ampliar para insertar el gráfico ya embebido.
+function napseExportarExcel(){
+  if(!_napseData){ alert('Todavía no cargaron los datos de Desinstalaciones NAPSE.'); return; }
+  const{allRows,analisisPorOt,meses}=_napseData;
+  if(!allRows.length){ alert('No hay datos para exportar.'); return; }
+
+  const mesNombre=m=>MESES_CORTOS_NAPSE[m-1];
+  // Blindado contra fechas mal formadas: un Date inválido escrito en una
+  // celda numérica de Excel corrompe el archivo (serial NaN en el XML) —
+  // mejor dejar la celda vacía que romper el export entero.
+  const fechaFmt=v=>{
+    if(!v)return null;
+    const d=new Date(v);
+    return isNaN(d.getTime())?null:d;
+  };
+
+  // ── Hoja 1: Resumen ────────────────────────────────────────────────────
+  const porEstadoTotal={}, porMotivoTotal={};
+  allRows.forEach(o=>{
+    porEstadoTotal[o.status]=(porEstadoTotal[o.status]||0)+1;
+    porMotivoTotal[o.motivo]=(porMotivoTotal[o.motivo]||0)+1;
+  });
+  const estadoEntries=Object.entries(porEstadoTotal).sort((a,b)=>b[1]-a[1]);
+  const motivoEntries=Object.entries(porMotivoTotal).sort((a,b)=>b[1]-a[1]);
+  // Índices de fila calculados en vez de hardcodeados — así los merges de
+  // los títulos de sección (POR ESTADO / POR MOTIVO / POR MES) siempre
+  // caen bien sin importar cuántas filas tenga cada bloque.
+  const rowPorEstado=5;
+  const rowPorMotivo=rowPorEstado+1+estadoEntries.length+1;
+  const rowPorMes=rowPorMotivo+1+motivoEntries.length+1;
+  const resumenAOA=[
+    ['DESINSTALACIONES NAPSE — RESUMEN'],
+    [`Exportado ${new Date().toLocaleString('es-AR')}`],
+    [],
+    ['Total histórico', allRows.length],
+    [],
+    ['POR ESTADO'],
+    ...estadoEntries,
+    [],
+    ['POR MOTIVO'],
+    ...motivoEntries,
+    [],
+    ['POR MES'],
+    ...meses.map(m=>[mesNombre(m.mes), m.total]),
+  ];
+  const wsResumen=XLSX.utils.aoa_to_sheet(resumenAOA);
+  wsResumen['!cols']=[{wch:28},{wch:14}];
+  wsResumen['!merges']=[
+    {s:{r:0,c:0},e:{r:0,c:1}},
+    {s:{r:rowPorEstado,c:0},e:{r:rowPorEstado,c:1}},
+    {s:{r:rowPorMotivo,c:0},e:{r:rowPorMotivo,c:1}},
+    {s:{r:rowPorMes,c:0},e:{r:rowPorMes,c:1}},
+  ];
+
+  // ── Hoja 2: Tabla dinámica Estado x Mes ─────────────────────────────────
+  const mesesNums=meses.map(m=>m.mes).sort((a,b)=>a-b);
+  const estados=[...new Set(allRows.map(o=>o.status))].sort();
+  const tdEstadoMesAOA=[['Estado', ...mesesNums.map(mesNombre), 'Total']];
+  estados.forEach(est=>{
+    const fila=[est];
+    let totalFila=0;
+    mesesNums.forEach(m=>{
+      const cant=allRows.filter(o=>o.status===est && o.fecha_creacion && (new Date(o.fecha_creacion).getMonth()+1)===m).length;
+      fila.push(cant); totalFila+=cant;
+    });
+    fila.push(totalFila);
+    tdEstadoMesAOA.push(fila);
+  });
+  const totalPorMesRow=['TOTAL', ...mesesNums.map(m=>allRows.filter(o=>o.fecha_creacion && (new Date(o.fecha_creacion).getMonth()+1)===m).length), allRows.length];
+  tdEstadoMesAOA.push(totalPorMesRow);
+  const wsTdEstadoMes=XLSX.utils.aoa_to_sheet(tdEstadoMesAOA);
+  wsTdEstadoMes['!cols']=[{wch:16},...mesesNums.map(()=>({wch:8})),{wch:10}];
+  wsTdEstadoMes['!autofilter']={ref:XLSX.utils.encode_range({s:{r:0,c:0},e:{r:0,c:mesesNums.length+1}})};
+
+  // ── Hoja 3: Tabla dinámica Motivo x Estado ──────────────────────────────
+  const motivos=[...new Set(allRows.map(o=>o.motivo))].sort();
+  const tdMotivoEstadoAOA=[['Motivo', ...estados, 'Total']];
+  motivos.forEach(mot=>{
+    const fila=[mot];
+    let totalFila=0;
+    estados.forEach(est=>{
+      const cant=allRows.filter(o=>o.motivo===mot && o.status===est).length;
+      fila.push(cant); totalFila+=cant;
+    });
+    fila.push(totalFila);
+    tdMotivoEstadoAOA.push(fila);
+  });
+  tdMotivoEstadoAOA.push(['TOTAL', ...estados.map(est=>allRows.filter(o=>o.status===est).length), allRows.length]);
+  const wsTdMotivoEstado=XLSX.utils.aoa_to_sheet(tdMotivoEstadoAOA);
+  wsTdMotivoEstado['!cols']=[{wch:16},...estados.map(()=>({wch:12})),{wch:10}];
+  wsTdMotivoEstado['!autofilter']={ref:XLSX.utils.encode_range({s:{r:0,c:0},e:{r:0,c:estados.length+1}})};
+
+  // ── Hoja 4: Análisis por motivo (días con terminal + volumen 30d antes) ─
+  const promedio=arr=>arr.length?Math.round(arr.reduce((a,b)=>a+b,0)/arr.length):null;
+  const motivoDetalleTotal={};
+  allRows.forEach(o=>{(motivoDetalleTotal[o.motivo]=motivoDetalleTotal[o.motivo]||[]).push(o);});
+  const analisisAOA=[['Motivo','Cantidad','Días prom. con terminal','Volumen prom. 30d antes ($)','OT con datos','OT sin matchear']];
+  motivos.forEach(mot=>{
+    const ots=(motivoDetalleTotal[mot]||[]).map(o=>analisisPorOt[o.ot]).filter(Boolean);
+    const dias=ots.map(a=>a.dias_con_terminal).filter(d=>d!=null);
+    const vols=ots.map(a=>a.volumen_30d_antes).filter(v=>v!=null);
+    analisisAOA.push([mot, (motivoDetalleTotal[mot]||[]).length, promedio(dias), promedio(vols), ots.length, (motivoDetalleTotal[mot]||[]).length-dias.length]);
+  });
+  const wsAnalisis=XLSX.utils.aoa_to_sheet(analisisAOA);
+  wsAnalisis['!cols']=[{wch:16},{wch:11},{wch:20},{wch:22},{wch:13},{wch:15}];
+  wsAnalisis['!autofilter']={ref:XLSX.utils.encode_range({s:{r:0,c:0},e:{r:0,c:5}})};
+  // Formato moneda para la columna de volumen
+  for(let r=1;r<analisisAOA.length;r++){
+    const cell=wsAnalisis[XLSX.utils.encode_cell({r,c:3})];
+    if(cell && typeof cell.v==='number') cell.z='$#,##0';
+  }
+
+  // ── Hoja 5: Detalle completo (una fila por OT, lista para armar
+  //    tablas dinámicas / gráficos propios en Excel con todo el detalle) ──
+  const detalleHeaders=['OT','Cuenta','CUIT','Fecha Alta','Propietario cta.','Contacto','Terminal ID','Ciudad','Provincia',
+    'Motivo','Submotivo','Estado','Logística','Fecha creación','Días c/terminal','Volumen 30d antes ($)'];
+  const detalleAOA=[detalleHeaders];
+  allRows.forEach(o=>{
+    const an=analisisPorOt[o.ot];
+    detalleAOA.push([
+      o.ot||'', o.cuenta||'', o.cuit||'', fechaFmt(o.fecha_alta), o.propietario||'', o.contacto||'',
+      o.terminal_id||'', o.ciudad||'', o.provincia||'', o.motivo||'', o.sub_motivo||'', o.status||'',
+      o.logistica||'', fechaFmt(o.fecha_creacion), an?.dias_con_terminal??'', an?.volumen_30d_antes??'',
+    ]);
+  });
+  const wsDetalle=XLSX.utils.aoa_to_sheet(detalleAOA);
+  wsDetalle['!cols']=[{wch:10},{wch:32},{wch:14},{wch:11},{wch:22},{wch:16},{wch:14},{wch:18},{wch:10},
+    {wch:16},{wch:32},{wch:14},{wch:11},{wch:11},{wch:11},{wch:16}];
+  wsDetalle['!autofilter']={ref:XLSX.utils.encode_range({s:{r:0,c:0},e:{r:0,c:detalleHeaders.length-1}})};
+  // Formato fecha (dd/mm/aaaa) y moneda en las columnas que corresponden.
+  // OJO: aoa_to_sheet ya convirtió los Date a número de serie de Excel acá
+  // adentro (cell.v pasa a ser number, no Date) — por eso NO se puede
+  // chequear "instanceof Date" en este punto (esa comprobación siempre da
+  // false y el formato de fecha nunca se aplicaba). Como ya sabemos qué
+  // columnas son fecha por índice, se asigna directo si la celda existe
+  // (si fechaFmt() devolvió null por dato faltante/inválido, aoa_to_sheet
+  // no crea la celda, así que el chequeo de existencia ya cubre eso).
+  for(let r=1;r<detalleAOA.length;r++){
+    const cFechaAlta=wsDetalle[XLSX.utils.encode_cell({r,c:3})];
+    if(cFechaAlta) cFechaAlta.z='dd/mm/yyyy';
+    const cFechaCreacion=wsDetalle[XLSX.utils.encode_cell({r,c:13})];
+    if(cFechaCreacion) cFechaCreacion.z='dd/mm/yyyy';
+    const cVol=wsDetalle[XLSX.utils.encode_cell({r,c:15})];
+    if(cVol && typeof cVol.v==='number') cVol.z='$#,##0';
+  }
+
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,wsResumen,'Resumen');
+  XLSX.utils.book_append_sheet(wb,wsTdEstadoMes,'Pivot Estado x Mes');
+  XLSX.utils.book_append_sheet(wb,wsTdMotivoEstado,'Pivot Motivo x Estado');
+  XLSX.utils.book_append_sheet(wb,wsAnalisis,'Analisis por motivo');
+  XLSX.utils.book_append_sheet(wb,wsDetalle,'Detalle completo');
+
+  const nombreArchivo=`Desinstalaciones_NAPSE_${new Date().toISOString().slice(0,10)}.xlsx`;
+  XLSX.writeFile(wb,nombreArchivo);
 }
 
 // Despliega/oculta la lista de OT puntuales para el estado clickeado (cards
