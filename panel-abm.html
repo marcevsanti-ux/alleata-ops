@@ -61,7 +61,7 @@
       <h1>Panel ABM — Operaciones<span>Reporte de transacciones (panel.alleata.co) sincronizado en vivo</span></h1>
     </div>
     <a class="back" href="index.html">← Volver al portal</a>
-    <div class="version-tag">v1.1.0</div>
+    <div class="version-tag">v1.2.0</div>
   </header>
 
   <div class="card">
@@ -89,6 +89,31 @@
     <div class="estado-box" id="estado" style="display:none"></div>
   </div>
 
+  <!-- Pedido 01/09: panel de administración para disparar el sync a
+       Supabase (backfill histórico + un día puntual) sin tener que usar
+       Postman. Son las mismas 2 acciones que ya probamos por curl:
+       /operaciones-alleata/backfill (background, no espera) y
+       /operaciones-alleata/sync-dia (espera la respuesta, un día es
+       rápido — ~19s visto en producción). -->
+  <div class="card">
+    <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;font-weight:700;letter-spacing:.03em;margin-bottom:12px">⚙️ Sincronización a Supabase (admin)</div>
+    <div class="filtros">
+      <div class="campo">
+        <label>Backfill desde</label>
+        <input type="date" id="sync-backfill-desde" value="2026-06-01">
+        <small>Hasta = ayer. Corre en background, puede tardar horas — no bloquea esta pantalla.</small>
+      </div>
+      <button class="ghost" id="btn-backfill" onclick="lanzarBackfill()">🔄 Iniciar backfill</button>
+      <div class="campo">
+        <label>Sincronizar un día puntual</label>
+        <input type="date" id="sync-dia-fecha">
+        <small>Espera la respuesta (un día suele tardar 15-30s)</small>
+      </div>
+      <button class="ghost" id="btn-sync-dia" onclick="lanzarSyncDia()">📅 Sincronizar este día</button>
+    </div>
+    <div class="estado-box" id="sync-estado" style="display:none"></div>
+  </div>
+
   <div class="card" id="resultados-card" style="display:none">
     <div class="resumen" id="resumen"></div>
     <div class="toolbar">
@@ -108,7 +133,7 @@
 <script>
 const RAILWAY_BASE = 'https://alleata-agent-production.up.railway.app';
 const AUTOMATION_SECRET = '123456'; // mismo secret compartido que usa railwayFetch() en index.html
-const PANEL_VERSION = 'v1.1.0';
+const PANEL_VERSION = 'v1.2.0';
 console.log('[Panel ABM] ' + PANEL_VERSION);
 
 // Mismo proyecto/key de Supabase que index.html — al inicializar el
@@ -320,6 +345,67 @@ function descargarExcel(){
   const desde = document.getElementById('f-desde').value;
   const hasta = document.getElementById('f-hasta').value;
   XLSX.writeFile(wb, `operaciones_${desde}_${hasta}.xlsx`);
+}
+
+// ── Sincronización a Supabase (admin) ───────────────────────────────────
+function mostrarSyncEstado(msg, tipo){
+  const el = document.getElementById('sync-estado');
+  el.style.display = 'flex';
+  el.className = 'estado-box' + (tipo==='error' ? ' error' : '');
+  el.innerHTML = tipo==='loading' ? `<div class="spinner"></div><span>${msg}</span>` : `<span>${msg}</span>`;
+}
+
+async function lanzarBackfill(){
+  const token = await requiereSesion();
+  if(!token) return;
+  const desde = document.getElementById('sync-backfill-desde').value;
+  if(!desde){ alert('Elegí una fecha de inicio para el backfill.'); return; }
+  if(!confirm(`¿Iniciar backfill desde ${desde} hasta ayer? Corre en background — puede tardar horas, no hace falta dejar esta pantalla abierta.`)) return;
+
+  const btn = document.getElementById('btn-backfill');
+  btn.disabled = true;
+  mostrarSyncEstado('Iniciando backfill...', 'loading');
+  try{
+    const r = await fetch(`${RAILWAY_BASE}/automations/operaciones-alleata/backfill`, {
+      method: 'POST',
+      headers: { 'Content-Type':'application/json', 'Authorization':'Bearer '+token, 'x-automation-secret': AUTOMATION_SECRET },
+      body: JSON.stringify({ desde }),
+    });
+    const j = await r.json();
+    if(!r.ok || !j.ok) throw new Error(j.error || `HTTP ${r.status}`);
+    mostrarSyncEstado('✅ ' + j.mensaje, 'ok');
+  }catch(e){
+    mostrarSyncEstado('⚠️ Error: ' + e.message, 'error');
+  }finally{
+    btn.disabled = false;
+  }
+}
+
+async function lanzarSyncDia(){
+  const token = await requiereSesion();
+  if(!token) return;
+  const fecha = document.getElementById('sync-dia-fecha').value;
+  if(!fecha){ alert('Elegí una fecha.'); return; }
+
+  const btn = document.getElementById('btn-sync-dia');
+  btn.disabled = true;
+  // Este SÍ espera la respuesta (no es background) — un día suele tardar
+  // 15-30s, no hace falta el patrón de polling que usa "Consultar".
+  mostrarSyncEstado(`Sincronizando ${fecha}... (puede tardar 15-30s)`, 'loading');
+  try{
+    const r = await fetch(`${RAILWAY_BASE}/automations/operaciones-alleata/sync-dia`, {
+      method: 'POST',
+      headers: { 'Content-Type':'application/json', 'Authorization':'Bearer '+token, 'x-automation-secret': AUTOMATION_SECRET },
+      body: JSON.stringify({ fecha }),
+    });
+    const j = await r.json();
+    if(!r.ok || !j.ok) throw new Error(j.error || `HTTP ${r.status}`);
+    mostrarSyncEstado(`✅ ${fecha}: ${j.filasInsertadas} filas insertadas en ${j.segundos}s`, 'ok');
+  }catch(e){
+    mostrarSyncEstado('⚠️ Error: ' + e.message, 'error');
+  }finally{
+    btn.disabled = false;
+  }
 }
 </script>
 </body>
