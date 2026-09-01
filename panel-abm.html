@@ -62,7 +62,7 @@
       <h1>Panel ABM — Operaciones<span>Reporte de transacciones (panel.alleata.co) sincronizado en vivo</span></h1>
     </div>
     <a class="back" href="index.html">← Volver al portal</a>
-    <div class="version-tag">v1.3.0</div>
+    <div class="version-tag">v1.4.0</div>
   </header>
 
   <div class="card">
@@ -140,16 +140,6 @@
         <div><canvas id="chartMedioPago"></canvas></div>
       </div>
     </div>
-
-    <div style="margin-top:20px;border-top:1px solid var(--border);padding-top:16px">
-      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:10px">
-        <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;font-weight:700;letter-spacing:.03em">⚠️ Discrepancias con Salesforce (por CUIT)</div>
-        <button class="ghost" id="btn-cruce-sf" onclick="cargarCruceSF()">🔍 Cruzar con Salesforce</button>
-      </div>
-      <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px">Cuentas que facturaron en el rango pero en Salesforce figuran "de baja", o CUITs sin cuenta encontrada en SF. Puede tardar — consulta Salesforce en vivo.</div>
-      <div class="estado-box" id="cruce-sf-estado" style="display:none"></div>
-      <div id="cruce-sf-tabla"></div>
-    </div>
   </div>
 
   <div class="card" id="resultados-card" style="display:none">
@@ -171,7 +161,7 @@
 <script>
 const RAILWAY_BASE = 'https://alleata-agent-production.up.railway.app';
 const AUTOMATION_SECRET = '123456'; // mismo secret compartido que usa railwayFetch() en index.html
-const PANEL_VERSION = 'v1.3.0';
+const PANEL_VERSION = 'v1.4.0';
 console.log('[Panel ABM] ' + PANEL_VERSION);
 
 // Mismo proyecto/key de Supabase que index.html — al inicializar el
@@ -603,67 +593,6 @@ function renderChartMedioPago(pm){
       },
     },
   });
-}
-
-// ── Cruce con Salesforce ──────────────────────────────────────────────────
-async function cargarCruceSF(){
-  const token = await requiereSesion();
-  if(!token) return;
-  const desde = document.getElementById('f-desde').value;
-  const hasta = document.getElementById('f-hasta').value;
-  if(!desde || !hasta){ alert('Completá Desde y Hasta (arriba) primero.'); return; }
-
-  const btn = document.getElementById('btn-cruce-sf');
-  btn.disabled = true;
-  const elEstado = document.getElementById('cruce-sf-estado');
-  elEstado.style.display = 'flex'; elEstado.className = 'estado-box';
-  elEstado.innerHTML = '<div class="spinner"></div><span>Consultando Salesforce por cada CUIT con ventas en el rango...</span>';
-  document.getElementById('cruce-sf-tabla').innerHTML = '';
-
-  try{
-    const qs = new URLSearchParams({ desde, hasta });
-    const r = await fetch(`${RAILWAY_BASE}/automations/operaciones-alleata/cruce-sf?${qs}`, {
-      headers: { 'Authorization': 'Bearer ' + token, 'x-automation-secret': AUTOMATION_SECRET },
-    });
-    const j = await r.json();
-    if(!r.ok || !j.ok) throw new Error(j.error || `HTTP ${r.status}`);
-
-    elEstado.style.display = 'none';
-    if(!j.discrepancias.length){
-      document.getElementById('cruce-sf-tabla').innerHTML = `<div style="color:var(--green);font-size:12px">✅ Sin discrepancias — los ${j.totalCuits} CUIT(s) con ventas en el rango están bien en Salesforce.</div>`;
-      return;
-    }
-    const badge = a => a==='FACTURA_CON_CUENTA_DE_BAJA'
-      ? '<span style="background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.4);color:#fca5a5;padding:3px 8px;border-radius:6px;font-size:10px">⚠️ Factura con cuenta de baja</span>'
-      : '<span style="background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.4);color:#fcd34d;padding:3px 8px;border-radius:6px;font-size:10px">❓ Sin match en SF</span>';
-    document.getElementById('cruce-sf-tabla').innerHTML = `
-      <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px">${j.discrepancias.length} de ${j.totalCuits} CUIT(s) con alguna discrepancia:</div>
-      <div class="tabla-wrap" style="max-height:40vh">
-        <table>
-          <thead><tr>
-            <th>Alerta</th><th>CUIT</th><th>Razón social (Alleata)</th><th>Nombre en SF</th>
-            <th>Estado SF</th><th>Fecha baja SF</th><th>Ventas</th><th>Última venta</th>
-          </tr></thead>
-          <tbody>
-            ${j.discrepancias.map(d => `<tr>
-              <td>${badge(d.alerta)}</td>
-              <td class="num">${d.cuit}</td>
-              <td>${d.razon_social||'—'}</td>
-              <td>${d.sf_nombre||'—'}</td>
-              <td>${d.sf_estado||'—'}</td>
-              <td>${d.sf_fecha_baja||'—'}</td>
-              <td class="num">$${Number(d.total_ventas).toLocaleString('es-AR')}</td>
-              <td>${d.ultima_venta||'—'}</td>
-            </tr>`).join('')}
-          </tbody>
-        </table>
-      </div>`;
-  }catch(e){
-    elEstado.className = 'estado-box error';
-    elEstado.innerHTML = `<span>⚠️ Error: ${e.message}</span>`;
-  }finally{
-    btn.disabled = false;
-  }
 }
 </script>
 </body>
