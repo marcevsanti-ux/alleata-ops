@@ -6,6 +6,7 @@
 <title>Panel ABM — Operaciones</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 <style>
   :root{
     --navy:#0f172a; --navy-700:#1e293b; --navy-800:#1e2d4a;
@@ -61,7 +62,7 @@
       <h1>Panel ABM — Operaciones<span>Reporte de transacciones (panel.alleata.co) sincronizado en vivo</span></h1>
     </div>
     <a class="back" href="index.html">← Volver al portal</a>
-    <div class="version-tag">v1.2.1</div>
+    <div class="version-tag">v1.3.0</div>
   </header>
 
   <div class="card">
@@ -74,19 +75,22 @@
         <label>Hasta *</label>
         <input type="date" id="f-hasta">
       </div>
-      <div class="campo">
-        <label>Contrato ID</label>
-        <input type="text" id="f-contrato" placeholder="(todos)">
-        <small>Opcional — dejar vacío trae todos los contratos disponibles</small>
+      <div class="campo" style="min-width:240px">
+        <label>Buscar</label>
+        <input type="text" id="f-buscar" placeholder="Tienda, razón social o CUIT...">
+        <small>Opcional — busca en las 3 columnas a la vez</small>
       </div>
-      <div class="campo">
-        <label>Tienda ID</label>
-        <input type="text" id="f-tienda" placeholder="(todas)">
-        <small>Opcional — dejar vacío trae todas las tiendas</small>
-      </div>
-      <button id="btn-consultar" onclick="consultar()">🔍 Consultar</button>
+      <button id="btn-consultar" onclick="consultar()">🔍 Consultar (Supabase, instantáneo)</button>
     </div>
     <div class="estado-box" id="estado" style="display:none"></div>
+    <!-- Pedido 01/09: "Consultar" ahora lee de Supabase (instantáneo, ya
+         sincronizado por el cron/backfill) en vez de pegarle en vivo al
+         gateway cada vez (eso podía tardar minutos con rangos grandes).
+         Se deja esta opción secundaria para el caso puntual de necesitar
+         datos de HOY antes de que corra el cron de la 1am. -->
+    <div style="margin-top:10px;font-size:11px;color:var(--text-muted)">
+      ¿Necesitás datos de hoy que todavía no se sincronizaron? <a href="#" onclick="consultarEnVivo();return false;" style="color:var(--teal)">Consultar en vivo desde Alleata (más lento)</a>
+    </div>
   </div>
 
   <!-- Pedido 01/09: panel de administración para disparar el sync a
@@ -118,6 +122,36 @@
     <div class="estado-box" id="sync-estado" style="display:none"></div>
   </div>
 
+  <!-- Pedido 01/09: Dashboard — agregados calculados en Postgres (ver
+       setup_operaciones_alleata_funciones.sql), rápido aunque el rango
+       sean miles de filas. Reusa el mismo Desde/Hasta de arriba. -->
+  <div class="card">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px">
+      <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;font-weight:700;letter-spacing:.03em">📊 Dashboard (usa el Desde/Hasta de arriba)</div>
+      <button class="ghost" id="btn-dashboard" onclick="cargarDashboard()">🔄 Actualizar dashboard</button>
+    </div>
+    <div class="estado-box" id="dash-estado" style="display:none"></div>
+    <div id="dash-contenido" style="display:none">
+      <div style="display:grid;grid-template-columns:1fr;gap:20px;margin-bottom:20px">
+        <div><canvas id="chartPorDia" height="80"></canvas></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1.3fr 1fr;gap:20px;margin-bottom:20px">
+        <div><canvas id="chartTopTiendas"></canvas></div>
+        <div><canvas id="chartMedioPago"></canvas></div>
+      </div>
+    </div>
+
+    <div style="margin-top:20px;border-top:1px solid var(--border);padding-top:16px">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:10px">
+        <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;font-weight:700;letter-spacing:.03em">⚠️ Discrepancias con Salesforce (por CUIT)</div>
+        <button class="ghost" id="btn-cruce-sf" onclick="cargarCruceSF()">🔍 Cruzar con Salesforce</button>
+      </div>
+      <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px">Cuentas que facturaron en el rango pero en Salesforce figuran "de baja", o CUITs sin cuenta encontrada en SF. Puede tardar — consulta Salesforce en vivo.</div>
+      <div class="estado-box" id="cruce-sf-estado" style="display:none"></div>
+      <div id="cruce-sf-tabla"></div>
+    </div>
+  </div>
+
   <div class="card" id="resultados-card" style="display:none">
     <div class="resumen" id="resumen"></div>
     <div class="toolbar">
@@ -137,7 +171,7 @@
 <script>
 const RAILWAY_BASE = 'https://alleata-agent-production.up.railway.app';
 const AUTOMATION_SECRET = '123456'; // mismo secret compartido que usa railwayFetch() en index.html
-const PANEL_VERSION = 'v1.2.1';
+const PANEL_VERSION = 'v1.3.0';
 console.log('[Panel ABM] ' + PANEL_VERSION);
 
 // Mismo proyecto/key de Supabase que index.html — al inicializar el
@@ -190,23 +224,68 @@ function ocultarEstado(){
   document.getElementById('estado').style.display = 'none';
 }
 
+// Pedido 01/09: "Consultar" ahora lee de Supabase — instantáneo, ya no
+// depende de generar un reporte nuevo en Alleata cada vez.
 async function consultar(){
   const token = await requiereSesion();
   if(!token) return;
   const desde = document.getElementById('f-desde').value;
   const hasta = document.getElementById('f-hasta').value;
-  const contractId = document.getElementById('f-contrato').value.trim();
-  const storeId = document.getElementById('f-tienda').value.trim();
+  const buscar = document.getElementById('f-buscar').value.trim();
   if(!desde || !hasta){ alert('Completá Desde y Hasta.'); return; }
 
   const btn = document.getElementById('btn-consultar');
   btn.disabled = true;
   document.getElementById('resultados-card').style.display = 'none';
+  mostrarEstado('Consultando Supabase...', 'loading');
 
-  // Pedido 01/09: 10 días ya tardó ~95s — 30 días puede irse a varios
-  // minutos. En vez de un solo request bloqueado (riesgo de timeout del
-  // navegador/proxy), se dispara el reporte (iniciar) y se hace polling
-  // liviano al estado cada 3s, mostrando el tiempo transcurrido en vivo.
+  try{
+    const qs = new URLSearchParams({ desde, hasta });
+    if(buscar) qs.set('buscar', buscar);
+    const r = await fetch(`${RAILWAY_BASE}/automations/operaciones-alleata/query?${qs}`, {
+      headers: { 'Authorization': 'Bearer ' + token, 'x-automation-secret': AUTOMATION_SECRET },
+    });
+    const j = await r.json();
+    if(!r.ok || !j.ok) throw new Error(j.error || `Respuesta no OK (HTTP ${r.status})`);
+
+    _filas = j.filas || [];
+    _tiempos = null;
+    _columnas = _filas.length ? Object.keys(_filas[0]) : [];
+    _pagina = 1;
+    _sortCol = null;
+    document.getElementById('buscar').value = '';
+    if(j.truncado){
+      mostrarEstado(`⚠️ Hay ${j.total.toLocaleString('es-AR')} filas en ese rango — mostrando las primeras ${_filas.length.toLocaleString('es-AR')}. Achicá el rango de fechas o la búsqueda para ver todo.`, 'error');
+    }else{
+      ocultarEstado();
+    }
+    document.getElementById('resultados-card').style.display = 'block';
+    renderResumen();
+    renderTabla();
+  }catch(e){
+    mostrarEstado('⚠️ Error: ' + e.message, 'error');
+  }finally{
+    btn.disabled = false;
+  }
+}
+
+// Fallback: consulta en vivo directo al gateway de Alleata (todos los
+// contratos/tiendas del rango) — para cuando necesitás datos de HOY que
+// el cron de la 1am todavía no sincronizó. Es el flujo original completo
+// (iniciar + polling de estado), lento con rangos grandes a propósito
+// para no duplicar esta lógica en ningún otro lado.
+async function consultarEnVivo(){
+  const token = await requiereSesion();
+  if(!token) return;
+  const desde = document.getElementById('f-desde').value;
+  const hasta = document.getElementById('f-hasta').value;
+  if(!desde || !hasta){ alert('Completá Desde y Hasta.'); return; }
+  if(!confirm('Esto consulta a Alleata en vivo — puede tardar desde segundos hasta varios minutos según el rango. ¿Continuar?')) return;
+
+  const btn = document.getElementById('btn-consultar');
+  btn.disabled = true;
+  document.getElementById('resultados-card').style.display = 'none';
+
   const headersAuth = {
     'Content-Type': 'application/json',
     'Authorization': 'Bearer ' + token,
@@ -217,7 +296,7 @@ async function consultar(){
     mostrarEstado('Iniciando la generación del reporte...', 'loading');
     const rIni = await fetch(`${RAILWAY_BASE}/automations/operaciones-alleata/iniciar`, {
       method: 'POST', headers: headersAuth,
-      body: JSON.stringify({ desde, hasta, contractId, storeId }),
+      body: JSON.stringify({ desde, hasta, contractId: '', storeId: '' }),
     });
     const jIni = await rIni.json();
     if(!rIni.ok || !jIni.ok) throw new Error(jIni.error || `Respuesta no OK (HTTP ${rIni.status})`);
@@ -411,6 +490,177 @@ async function lanzarSyncDia(){
     mostrarSyncEstado(`✅ ${fecha}: ${j.filasInsertadas} filas insertadas en ${j.segundos}s`, 'ok');
   }catch(e){
     mostrarSyncEstado('⚠️ Error: ' + e.message, 'error');
+  }finally{
+    btn.disabled = false;
+  }
+}
+
+// ── Dashboard (Chart.js) ─────────────────────────────────────────────────
+let _chartPorDia = null, _chartTopTiendas = null, _chartMedioPago = null;
+const COLOR_TEAL = '#1dbf8e', COLOR_BLUE = '#1a9fd4', COLOR_YELLOW = '#f59e0b', COLOR_RED = '#ef4444', COLOR_MUTED = '#94a3b8';
+
+function mostrarDashEstado(msg, tipo){
+  const el = document.getElementById('dash-estado');
+  el.style.display = 'flex';
+  el.className = 'estado-box' + (tipo==='error' ? ' error' : '');
+  el.innerHTML = tipo==='loading' ? `<div class="spinner"></div><span>${msg}</span>` : `<span>${msg}</span>`;
+}
+
+async function cargarDashboard(){
+  const token = await requiereSesion();
+  if(!token) return;
+  const desde = document.getElementById('f-desde').value;
+  const hasta = document.getElementById('f-hasta').value;
+  if(!desde || !hasta){ alert('Completá Desde y Hasta (arriba) primero.'); return; }
+
+  const btn = document.getElementById('btn-dashboard');
+  btn.disabled = true;
+  document.getElementById('dash-contenido').style.display = 'none';
+  mostrarDashEstado('Calculando agregados en Supabase...', 'loading');
+
+  try{
+    const qs = new URLSearchParams({ desde, hasta });
+    const r = await fetch(`${RAILWAY_BASE}/automations/operaciones-alleata/resumen?${qs}`, {
+      headers: { 'Authorization': 'Bearer ' + token, 'x-automation-secret': AUTOMATION_SECRET },
+    });
+    const j = await r.json();
+    if(!r.ok || !j.ok) throw new Error(j.error || `HTTP ${r.status}`);
+
+    renderChartPorDia(j.porDia || []);
+    renderChartTopTiendas(j.topTiendas || []);
+    renderChartMedioPago(j.porMedioPago);
+
+    document.getElementById('dash-estado').style.display = 'none';
+    document.getElementById('dash-contenido').style.display = 'block';
+  }catch(e){
+    mostrarDashEstado('⚠️ Error: ' + e.message, 'error');
+  }finally{
+    btn.disabled = false;
+  }
+}
+
+function renderChartPorDia(porDia){
+  const ctx = document.getElementById('chartPorDia');
+  if(_chartPorDia) _chartPorDia.destroy();
+  _chartPorDia = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: porDia.map(d => d.dia),
+      datasets: [{
+        label: 'Ventas totales',
+        data: porDia.map(d => Number(d.total_ventas) || 0),
+        borderColor: COLOR_TEAL, backgroundColor: COLOR_TEAL+'22',
+        fill: true, tension: 0.25, pointRadius: 2,
+      }],
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false }, title: { display: true, text: 'Ventas por día', color: '#f1f5f9' } },
+      scales: {
+        x: { ticks: { color: COLOR_MUTED }, grid: { color: '#334155' } },
+        y: { ticks: { color: COLOR_MUTED, callback: v => '$'+v.toLocaleString('es-AR') }, grid: { color: '#334155' } },
+      },
+    },
+  });
+}
+
+function renderChartTopTiendas(topTiendas){
+  const ctx = document.getElementById('chartTopTiendas');
+  if(_chartTopTiendas) _chartTopTiendas.destroy();
+  _chartTopTiendas = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: topTiendas.map(t => t.nombre_tienda || t.razon_social || '—'),
+      datasets: [{ label: 'Ventas', data: topTiendas.map(t => Number(t.total_ventas)||0), backgroundColor: COLOR_BLUE }],
+    },
+    options: {
+      indexAxis: 'y', responsive: true,
+      plugins: { legend: { display: false }, title: { display: true, text: 'Top tiendas por ventas', color: '#f1f5f9' } },
+      scales: {
+        x: { ticks: { color: COLOR_MUTED, callback: v => '$'+v.toLocaleString('es-AR') }, grid: { color: '#334155' } },
+        y: { ticks: { color: COLOR_MUTED }, grid: { display: false } },
+      },
+    },
+  });
+}
+
+function renderChartMedioPago(pm){
+  const ctx = document.getElementById('chartMedioPago');
+  if(_chartMedioPago) _chartMedioPago.destroy();
+  if(!pm){ return; }
+  const datos = [Number(pm.efectivo)||0, Number(pm.debito)||0, Number(pm.credito)||0, Number(pm.codigo_qr)||0, Number(pm.otros)||0];
+  _chartMedioPago = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: ['Efectivo','Débito','Crédito','Código QR','Otros'],
+      datasets: [{ data: datos, backgroundColor: [COLOR_TEAL, COLOR_BLUE, COLOR_YELLOW, '#8b5cf6', COLOR_MUTED] }],
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { position: 'bottom', labels: { color: '#f1f5f9' } },
+        title: { display: true, text: 'Por medio de pago', color: '#f1f5f9' },
+      },
+    },
+  });
+}
+
+// ── Cruce con Salesforce ──────────────────────────────────────────────────
+async function cargarCruceSF(){
+  const token = await requiereSesion();
+  if(!token) return;
+  const desde = document.getElementById('f-desde').value;
+  const hasta = document.getElementById('f-hasta').value;
+  if(!desde || !hasta){ alert('Completá Desde y Hasta (arriba) primero.'); return; }
+
+  const btn = document.getElementById('btn-cruce-sf');
+  btn.disabled = true;
+  const elEstado = document.getElementById('cruce-sf-estado');
+  elEstado.style.display = 'flex'; elEstado.className = 'estado-box';
+  elEstado.innerHTML = '<div class="spinner"></div><span>Consultando Salesforce por cada CUIT con ventas en el rango...</span>';
+  document.getElementById('cruce-sf-tabla').innerHTML = '';
+
+  try{
+    const qs = new URLSearchParams({ desde, hasta });
+    const r = await fetch(`${RAILWAY_BASE}/automations/operaciones-alleata/cruce-sf?${qs}`, {
+      headers: { 'Authorization': 'Bearer ' + token, 'x-automation-secret': AUTOMATION_SECRET },
+    });
+    const j = await r.json();
+    if(!r.ok || !j.ok) throw new Error(j.error || `HTTP ${r.status}`);
+
+    elEstado.style.display = 'none';
+    if(!j.discrepancias.length){
+      document.getElementById('cruce-sf-tabla').innerHTML = `<div style="color:var(--green);font-size:12px">✅ Sin discrepancias — los ${j.totalCuits} CUIT(s) con ventas en el rango están bien en Salesforce.</div>`;
+      return;
+    }
+    const badge = a => a==='FACTURA_CON_CUENTA_DE_BAJA'
+      ? '<span style="background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.4);color:#fca5a5;padding:3px 8px;border-radius:6px;font-size:10px">⚠️ Factura con cuenta de baja</span>'
+      : '<span style="background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.4);color:#fcd34d;padding:3px 8px;border-radius:6px;font-size:10px">❓ Sin match en SF</span>';
+    document.getElementById('cruce-sf-tabla').innerHTML = `
+      <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px">${j.discrepancias.length} de ${j.totalCuits} CUIT(s) con alguna discrepancia:</div>
+      <div class="tabla-wrap" style="max-height:40vh">
+        <table>
+          <thead><tr>
+            <th>Alerta</th><th>CUIT</th><th>Razón social (Alleata)</th><th>Nombre en SF</th>
+            <th>Estado SF</th><th>Fecha baja SF</th><th>Ventas</th><th>Última venta</th>
+          </tr></thead>
+          <tbody>
+            ${j.discrepancias.map(d => `<tr>
+              <td>${badge(d.alerta)}</td>
+              <td class="num">${d.cuit}</td>
+              <td>${d.razon_social||'—'}</td>
+              <td>${d.sf_nombre||'—'}</td>
+              <td>${d.sf_estado||'—'}</td>
+              <td>${d.sf_fecha_baja||'—'}</td>
+              <td class="num">$${Number(d.total_ventas).toLocaleString('es-AR')}</td>
+              <td>${d.ultima_venta||'—'}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>`;
+  }catch(e){
+    elEstado.className = 'estado-box error';
+    elEstado.innerHTML = `<span>⚠️ Error: ${e.message}</span>`;
   }finally{
     btn.disabled = false;
   }
