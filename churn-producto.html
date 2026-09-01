@@ -109,7 +109,7 @@ table.table tr:hover td{background:var(--surface2);}
   <header>
     <div class="brand">
       <div class="brand-logo">alleata</div>
-      <div class="brand-sub">· Churn Producto <span style="opacity:.5">v1.8.0</span></div>
+      <div class="brand-sub">· Churn Producto <span style="opacity:.5">v1.9.0</span></div>
     </div>
     <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
       <div style="font-size:11px;color:var(--text-muted);text-align:right;line-height:1.4">
@@ -143,8 +143,6 @@ table.table tr:hover td{background:var(--surface2);}
     <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:10px">TOTAL GENERAL — todos los perfiles</div>
     <div style="font-size:12px;color:var(--text-muted)">Consultando Salesforce en vivo...</div>
   </div>
-
-  <div id="cp-tabs-perfil" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px"></div>
 
   <div id="cp-detalle-perfil" style="display:none">
     <div id="cp-resumen-cards" style="margin-bottom:8px"></div>
@@ -365,9 +363,15 @@ const CP_PERFIL_LABEL = { NAPSE: 'NAPSE', PRISMA: 'PRISMA', SIN_PERFIL: 'Sin Per
 // para tener la foto completa antes de elegir con cuál profundizar. Hace
 // 3 llamadas en paralelo (una por perfil) porque el endpoint de stats no
 // tiene un modo "todos los perfiles juntos".
+// Pedido 01/09: unifica todo (total + estados + tabs de perfil) en UNA sola
+// card en vez de dos elementos separados (antes los tabs de perfil quedaban
+// "flotando" abajo, visualmente desconectados del total). Además guarda el
+// detalle completo de "Recuperada" de los 3 perfiles para el desglose por
+// mes (ver cpVerRecuperadaPorMes).
+let _cpRecuperadaTotalDetalle = [];
+
 async function cpCargarTotalGeneral(){
   const cont=document.getElementById('cp-total-general');
-  const tabsCont=document.getElementById('cp-tabs-perfil');
   cont.innerHTML=`<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:10px">TOTAL GENERAL — todos los perfiles</div><div style="font-size:12px;color:var(--text-muted)">Consultando Salesforce en vivo...</div>`;
   try{
     const perfiles=['NAPSE','PRISMA','SIN_PERFIL'];
@@ -375,7 +379,7 @@ async function cpCargarTotalGeneral(){
       const r=await railwayFetch(`/automations/sf-stats/desinstalaciones?perfil=${encodeURIComponent(p)}&fechaInicio=2026-04-01`);
       const j=await r.json();
       if(!r.ok||!j.ok)throw new Error(j.error||'Respuesta no OK');
-      return {perfil:p,total:j.totalGeneral||0,porEstado:j.totalPorEstado||{}};
+      return {perfil:p,total:j.totalGeneral||0,porEstado:j.totalPorEstado||{},estadoDetalle:j.estadoDetalle||{}};
     }));
     const totalGeneral=resultados.reduce((s,r)=>s+r.total,0);
     const estadosSumados={};
@@ -385,20 +389,35 @@ async function cpCargarTotalGeneral(){
       });
     });
     const entries=Object.entries(estadosSumados).sort((a,b)=>b[1]-a[1]);
+
+    // Detalle combinado de "Recuperada" de los 3 perfiles — insumo del
+    // desglose por mes (cada fila ya trae logistica + costo_envio + fecha_creacion).
+    _cpRecuperadaTotalDetalle = resultados.flatMap(r => r.estadoDetalle['Recuperada'] || []);
+
     cont.innerHTML=`
       <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:10px">TOTAL GENERAL — todos los perfiles</div>
       <div style="font-size:34px;font-weight:800;color:var(--teal);line-height:1;margin-bottom:12px">${totalGeneral} <span style="font-size:12px;font-weight:400;color:var(--text-muted)">OTs de desinstalación · desde 1/4/2026 · en vivo desde Salesforce</span></div>
-      <div style="display:flex;flex-wrap:wrap;gap:8px">
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px">
         ${entries.map(([estado,cant])=>{
           const color=ESTADO_COLORS_NAPSE[estado]||'#6b7280';
           const pct=totalGeneral?Math.round(cant/totalGeneral*100):0;
-          return `<div style="background:${color}18;border:1px solid ${color}40;border-radius:10px;padding:8px 12px;min-width:100px">
+          // Pedido 01/09: "Recuperada" es clickeable → desglose por mes
+          // (cantidad, costo y logística). El resto de los estados por
+          // ahora se quedan como chips informativos, sin acción.
+          const esRecuperada = estado==='Recuperada';
+          const clickAttr = esRecuperada ? `onclick="cpVerRecuperadaPorMes()" style="cursor:pointer" title="Click para ver el desglose por mes (cantidad, costo y logística)"` : '';
+          return `<div ${clickAttr} style="${esRecuperada?'cursor:pointer;':''}background:${color}18;border:1px solid ${color}40;border-radius:10px;padding:8px 12px;min-width:100px;position:relative">
             <div style="font-size:18px;font-weight:800;color:${color}">${cant} <span style="font-size:11px;font-weight:700;opacity:.75">(${pct}%)</span></div>
-            <div style="font-size:10px;color:var(--text-muted)">${estado}</div>
+            <div style="font-size:10px;color:var(--text-muted)">${estado}${esRecuperada?' 🔍':''}</div>
           </div>`;
         }).join('')}
+      </div>
+      <div style="border-top:1px solid var(--border2);padding-top:14px">
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:8px">Elegí un perfil para ver el detalle completo</div>
+        <div id="cp-tabs-perfil" style="display:flex;gap:10px;flex-wrap:wrap"></div>
       </div>`;
 
+    const tabsCont=document.getElementById('cp-tabs-perfil');
     tabsCont.innerHTML=resultados.map(r=>{
       const activo=_cpPerfil===r.perfil;
       return `<div onclick="cpSetPerfil('${r.perfil}')" class="cp-perfil-btn" data-perfil="${r.perfil}" style="cursor:pointer;background:${activo?'#8b5cf6':'var(--surface)'};border:1px solid ${activo?'#8b5cf6':'var(--border2)'};border-radius:10px;padding:14px 20px;min-width:150px;transition:all .15s">
@@ -409,6 +428,49 @@ async function cpCargarTotalGeneral(){
   }catch(e){
     cont.innerHTML=`<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:10px">TOTAL GENERAL — todos los perfiles</div><div style="color:var(--red);font-size:12px">No se pudo consultar SF: ${e.message}</div>`;
   }
+}
+
+// Desglose de "Recuperada" por mes — cantidad, costo total y logística.
+// Usa _cpRecuperadaTotalDetalle (los 3 perfiles juntos, ya con costo_envio
+// y logistica incluidos desde la consulta en vivo a SF).
+const MESES_CP=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+function cpVerRecuperadaPorMes(){
+  const porMes={};
+  _cpRecuperadaTotalDetalle.forEach(o=>{
+    if(!o.fecha_creacion)return;
+    const d=new Date(o.fecha_creacion);
+    const key=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    if(!porMes[key])porMes[key]={key,mes:d.getMonth(),anio:d.getFullYear(),n:0,costo:0,logistica:{}};
+    porMes[key].n+=1;
+    porMes[key].costo+=Number(o.costo_envio)||0;
+    const log=(o.logistica||'Sin logística').trim()||'Sin logística';
+    porMes[key].logistica[log]=(porMes[key].logistica[log]||0)+1;
+  });
+  const meses=Object.values(porMes).sort((a,b)=>b.key.localeCompare(a.key));
+
+  document.getElementById('cpModalTitulo').textContent=`Recuperada — desglose por mes (${_cpRecuperadaTotalDetalle.length} OTs · todos los perfiles)`;
+  document.getElementById('cpModalBody').innerHTML = meses.length ? `
+    <div style="overflow-x:auto"><table class="table">
+      <thead><tr>
+        <th>Mes</th><th style="text-align:center">Cantidad</th><th style="text-align:right">Costo total</th>
+        <th style="text-align:right">Prom./OT</th><th>Logística</th>
+      </tr></thead>
+      <tbody>
+        ${meses.map(m=>{
+          const logTxt=Object.entries(m.logistica).sort((a,b)=>b[1]-a[1]).map(([l,n])=>`${l}: ${n}`).join(' · ');
+          return `<tr>
+            <td style="font-weight:700">${MESES_CP[m.mes]} ${m.anio}</td>
+            <td style="text-align:center">${m.n}</td>
+            <td style="text-align:right;font-family:'JetBrains Mono',monospace">$${Math.round(m.costo).toLocaleString('es-AR')}</td>
+            <td style="text-align:right;font-family:'JetBrains Mono',monospace">$${Math.round(m.costo/m.n).toLocaleString('es-AR')}</td>
+            <td style="color:var(--text-muted);font-size:11px">${logTxt}</td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table></div>
+    <div style="font-size:10px;color:var(--text-muted);margin-top:10px">* Costo = Costo_de_envio__c de la OT de desinstalación (en vivo desde Salesforce). Mes = mes de creación de la OT.</div>
+  ` : `<div style="text-align:center;padding:20px;color:var(--text-muted)">Sin datos para desglosar.</div>`;
+  document.getElementById('cpModalOverlay').style.display='flex';
 }
 
 function cpSetPerfil(perfil){
