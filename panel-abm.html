@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Panel ABM — Operaciones</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   :root{
@@ -106,23 +107,34 @@
 const RAILWAY_BASE = 'https://alleata-agent-production.up.railway.app';
 const AUTOMATION_SECRET = '123456'; // mismo secret compartido que usa railwayFetch() en index.html
 
+// Mismo proyecto/key de Supabase que index.html — al inicializar el
+// cliente con la misma URL/anon key, si el usuario ya está logueado en el
+// portal principal (misma pestaña de GitHub Pages, mismo origin), la
+// sesión persistida en localStorage por supabase-js se reconoce acá solo,
+// sin tener que loguearse de nuevo.
+const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
+const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
 let _filas = [];       // dataset completo devuelto por el backend
 let _columnas = [];    // nombres de columna (sale del primer registro)
 let _pagina = 1;
 const PAGE_SIZE = 50;
 let _sortCol = null, _sortDir = 1;
 
-// Requiere estar logueado en el portal principal (mismo patrón que
-// napse-watchdog.html) — no reimplementa login acá, solo chequea que
-// exista sesión.
-function requiereSesion(){
-  const token = localStorage.getItem('supabase_token');
-  if(!token){
+// Chequea la sesión REAL de Supabase (antes esto miraba localStorage con
+// una key inventada, 'supabase_token', que index.html nunca setea —
+// index.html usa sb.auth.getSession() del cliente supabase-js real, así
+// que acá hay que hacer exactamente lo mismo para que la sesión se
+// comparta entre pestañas del mismo origin).
+async function requiereSesion(){
+  const { data: { session } } = await sb.auth.getSession();
+  if(!session){
     alert('Necesitás estar logueado en el portal. Te llevo al login.');
     window.location.href = 'index.html';
     return null;
   }
-  return token;
+  return session.access_token;
 }
 
 // Default: hoy en las dos fechas
@@ -145,7 +157,8 @@ function ocultarEstado(){
 }
 
 async function consultar(){
-  if(!requiereSesion()) return;
+  const token = await requiereSesion();
+  if(!token) return;
   const desde = document.getElementById('f-desde').value;
   const hasta = document.getElementById('f-hasta').value;
   const contractId = document.getElementById('f-contrato').value.trim();
@@ -166,6 +179,7 @@ async function consultar(){
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + token,
         'x-automation-secret': AUTOMATION_SECRET,
       },
       body: JSON.stringify({ desde, hasta, contractId, storeId }),
