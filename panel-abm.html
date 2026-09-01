@@ -61,7 +61,7 @@
       <h1>Panel ABM — Operaciones<span>Reporte de transacciones (panel.alleata.co) sincronizado en vivo</span></h1>
     </div>
     <a class="back" href="index.html">← Volver al portal</a>
-    <div class="version-tag">v1.2.0</div>
+    <div class="version-tag">v1.2.1</div>
   </header>
 
   <div class="card">
@@ -101,7 +101,11 @@
       <div class="campo">
         <label>Backfill desde</label>
         <input type="date" id="sync-backfill-desde" value="2026-06-01">
-        <small>Hasta = ayer. Corre en background, puede tardar horas — no bloquea esta pantalla.</small>
+      </div>
+      <div class="campo">
+        <label>Backfill hasta</label>
+        <input type="date" id="sync-backfill-hasta">
+        <small>Vacío = hasta ayer. Corre en background, puede tardar horas — no bloquea esta pantalla.</small>
       </div>
       <button class="ghost" id="btn-backfill" onclick="lanzarBackfill()">🔄 Iniciar backfill</button>
       <div class="campo">
@@ -133,7 +137,7 @@
 <script>
 const RAILWAY_BASE = 'https://alleata-agent-production.up.railway.app';
 const AUTOMATION_SECRET = '123456'; // mismo secret compartido que usa railwayFetch() en index.html
-const PANEL_VERSION = 'v1.2.0';
+const PANEL_VERSION = 'v1.2.1';
 console.log('[Panel ABM] ' + PANEL_VERSION);
 
 // Mismo proyecto/key de Supabase que index.html — al inicializar el
@@ -359,17 +363,21 @@ async function lanzarBackfill(){
   const token = await requiereSesion();
   if(!token) return;
   const desde = document.getElementById('sync-backfill-desde').value;
+  const hasta = document.getElementById('sync-backfill-hasta').value; // opcional
   if(!desde){ alert('Elegí una fecha de inicio para el backfill.'); return; }
-  if(!confirm(`¿Iniciar backfill desde ${desde} hasta ayer? Corre en background — puede tardar horas, no hace falta dejar esta pantalla abierta.`)) return;
+  const rangoTexto = hasta ? `desde ${desde} hasta ${hasta}` : `desde ${desde} hasta ayer`;
+  if(!confirm(`¿Iniciar backfill ${rangoTexto}? Corre en background — puede tardar horas, no hace falta dejar esta pantalla abierta.`)) return;
 
   const btn = document.getElementById('btn-backfill');
   btn.disabled = true;
   mostrarSyncEstado('Iniciando backfill...', 'loading');
   try{
+    const body = { desde };
+    if(hasta) body.hasta = hasta;
     const r = await fetch(`${RAILWAY_BASE}/automations/operaciones-alleata/backfill`, {
       method: 'POST',
       headers: { 'Content-Type':'application/json', 'Authorization':'Bearer '+token, 'x-automation-secret': AUTOMATION_SECRET },
-      body: JSON.stringify({ desde }),
+      body: JSON.stringify(body),
     });
     const j = await r.json();
     if(!r.ok || !j.ok) throw new Error(j.error || `HTTP ${r.status}`);
