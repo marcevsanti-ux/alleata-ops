@@ -83,7 +83,7 @@
   <header>
     <div class="brand">
       <div class="brand-logo">alleata</div>
-      <div class="brand-sub">· Indicadores Operaciones <span style="opacity:.5">v2.7.0</span></div>
+      <div class="brand-sub">· Indicadores Operaciones <span style="opacity:.5">v2.9.0</span></div>
     </div>
     <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
       <div style="font-size:11px;color:var(--text-dim);text-align:right;line-height:1.4">
@@ -205,7 +205,7 @@
 </div>
 
 <script>
-// indicadores.html — v2.7.0 (18 ago 2026)
+// indicadores.html — v2.9.0 (01 sep 2026)
 // Changelog:
 //  v1.0.0 — versión inicial (costo logística por mes, Logicalis, % Pre-Colecta, SLA Operaciones/Logística)
 //  v1.1.0 — suma Alleata (logística propia) al reporte de costos a $1/envío (costo simbólico,
@@ -278,8 +278,10 @@
 //           (Credenciales Pendientes → Configurar Terminal → ... → Pre-Colecta). SLA Total
 //           también recalculado con el mismo punto de partida para que siga siendo
 //           Operaciones + Logística.
-//  v2.7.0 — deja entrar también al rol "ceo" (antes solo admin/auditor_externo) — pasa a
+//  v2.8.0 — deja entrar también al rol "ceo" (antes solo admin/auditor_externo) — pasa a
 //           ser el dashboard de Diego, embebido vía iframe en index.html.
+//  v2.9.0 — cards de logística discriminan Prom. de costo por Altas y por Cambios además
+//           del Prom. general (antes solo mostraba la cantidad de cada uno, sin su costo).
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_ANON);
@@ -471,13 +473,19 @@ async function cargarDatos(){
     if(!porMes[key])porMes[key]={key,label,logs:{},total_ots:0,total_costo:0,estimados:0};
     if(estimada)porMes[key].estimados+=1;
     const log=(r.logistica||'OTROS').toUpperCase().trim();
-    if(!porMes[key].logs[log])porMes[key].logs[log]={ots:0,costo:0,altas:0,cambios:0};
+    if(!porMes[key].logs[log])porMes[key].logs[log]={ots:0,costo:0,altas:0,cambios:0,costo_altas:0,costo_cambios:0};
     porMes[key].logs[log].ots+=1;
-    porMes[key].logs[log].costo+=log==='ALLEATA'?COSTO_FIJO_ALLEATA:(Number(r.costo_envio)||0);
-    if(r.record_type==='Cambio de Terminal') porMes[key].logs[log].cambios+=1;
-    else porMes[key].logs[log].altas+=1; // Instalación Equipo + Simcard = alta nueva
+    const costoEsteEnvio=log==='ALLEATA'?COSTO_FIJO_ALLEATA:(Number(r.costo_envio)||0);
+    porMes[key].logs[log].costo+=costoEsteEnvio;
+    if(r.record_type==='Cambio de Terminal'){
+      porMes[key].logs[log].cambios+=1;
+      porMes[key].logs[log].costo_cambios+=costoEsteEnvio;
+    }else{ // Instalación Equipo + Simcard = alta nueva
+      porMes[key].logs[log].altas+=1;
+      porMes[key].logs[log].costo_altas+=costoEsteEnvio;
+    }
     porMes[key].total_ots+=1;
-    porMes[key].total_costo+=log==='ALLEATA'?COSTO_FIJO_ALLEATA:(Number(r.costo_envio)||0);
+    porMes[key].total_costo+=costoEsteEnvio;
   });
 
   _todosLosMeses=Object.values(porMes).sort((a,b)=>b.key.localeCompare(a.key));
@@ -620,24 +628,33 @@ function renderVista(){
   const mesesAMostrar=_mesActivo==='__todos'?_todosLosMeses:_todosLosMeses.filter(m=>m.key===_mesActivo);
 
   const agregado={};
-  LOGISTICAS.forEach(l=>{agregado[l.key]={ots:0,costo:0,altas:0,cambios:0};});
-  let totalOts=0,totalCosto=0;
+  LOGISTICAS.forEach(l=>{agregado[l.key]={ots:0,costo:0,altas:0,cambios:0,costo_altas:0,costo_cambios:0};});
+  let totalOts=0,totalCosto=0,totalAltas=0,totalCambios=0,totalCostoAltas=0,totalCostoCambios=0;
   mesesAMostrar.forEach(m=>{
     LOGISTICAS.forEach(l=>{
       const v=m.logs[l.key];
       if(v){
         agregado[l.key].ots+=v.ots;agregado[l.key].costo+=v.costo;
         agregado[l.key].altas+=v.altas||0;agregado[l.key].cambios+=v.cambios||0;
+        agregado[l.key].costo_altas+=v.costo_altas||0;agregado[l.key].costo_cambios+=v.costo_cambios||0;
         // Total período (igual que Gestión NAPSE): NO incluye Alleata —
         // es logística propia, Gestión NAPSE tampoco la contempla en su
         // card de "Total envíos".
-        if(l.key!=='ALLEATA'){ totalOts+=v.ots; totalCosto+=v.costo; }
+        if(l.key!=='ALLEATA'){
+          totalOts+=v.ots; totalCosto+=v.costo;
+          totalAltas+=v.altas||0; totalCambios+=v.cambios||0;
+          totalCostoAltas+=v.costo_altas||0; totalCostoCambios+=v.costo_cambios||0;
+        }
       }
     });
   });
 
   cardsWrap.className='cards';
   const esSinFecha=_mesActivo==='0000-00';
+  // Pedido 01/09: discriminar el promedio de costo por Altas y por Cambios
+  // además del promedio general — antes solo se veía la cantidad de cada
+  // uno, sin su costo asociado.
+  const lineasTipo=(cant,costo,label)=>cant?`<div class="card-sub" style="margin-top:2px;opacity:.8">${cant} ${label} · Prom. ${fmt$(Math.round(costo/cant))}</div>`:'';
   cardsWrap.innerHTML=LOGISTICAS.map(l=>{
     const v=agregado[l.key];
     const prom=v.ots?Math.round(v.costo/v.ots):0;
@@ -646,14 +663,17 @@ function renderVista(){
       <div class="card-label">${l.label}</div>
       <div class="card-num">${fmt$(v.costo)}</div>
       <div class="card-sub">${v.ots} envíos · Prom. ${fmt$(prom)}</div>
-      <div class="card-sub" style="margin-top:2px;opacity:.8">${v.altas} altas · ${v.cambios} cambios</div>
+      ${lineasTipo(v.altas,v.costo_altas,'altas')}
+      ${lineasTipo(v.cambios,v.costo_cambios,'cambios')}
       ${esSinFecha?'<div class="card-sub" style="margin-top:6px;color:var(--teal);font-weight:700">🔍 Click para ver listado</div>':''}
     </div>`;
   }).join('')+`<div class="card" style="--accent:var(--teal)">
       <div class="card-label">Total envíos</div>
       <div class="card-num" style="color:var(--teal)">${fmt$(totalCosto)}</div>
       <div class="card-sub">${totalOts} envíos · Prom. ${fmt$(totalOts?Math.round(totalCosto/totalOts):0)}</div>
-      <div class="card-sub" style="margin-top:2px;opacity:.6">No contempla envíos Alleata (igual que Gestión NAPSE)</div>
+      ${lineasTipo(totalAltas,totalCostoAltas,'altas')}
+      ${lineasTipo(totalCambios,totalCostoCambios,'cambios')}
+      <div class="card-sub" style="margin-top:6px;opacity:.6">No contempla envíos Alleata (igual que Gestión NAPSE)</div>
     </div>`;
 
   const tbody=document.getElementById('tablaMeses');
