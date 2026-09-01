@@ -61,7 +61,7 @@
       <h1>Panel ABM — Operaciones<span>Reporte de transacciones (panel.alleata.co) sincronizado en vivo</span></h1>
     </div>
     <a class="back" href="index.html">← Volver al portal</a>
-    <div class="version-tag">v1.0.2</div>
+    <div class="version-tag">v1.1.0</div>
   </header>
 
   <div class="card">
@@ -108,7 +108,7 @@
 <script>
 const RAILWAY_BASE = 'https://alleata-agent-production.up.railway.app';
 const AUTOMATION_SECRET = '123456'; // mismo secret compartido que usa railwayFetch() en index.html
-const PANEL_VERSION = 'v1.0.2';
+const PANEL_VERSION = 'v1.1.0';
 console.log('[Panel ABM] ' + PANEL_VERSION);
 
 // Mismo proyecto/key de Supabase que index.html — al inicializar el
@@ -173,27 +173,48 @@ async function consultar(){
   const btn = document.getElementById('btn-consultar');
   btn.disabled = true;
   document.getElementById('resultados-card').style.display = 'none';
-  // El flujo real es: crear el reporte en el panel de Alleata → esperar a
-  // que termine de generarse → bajarlo. Puede tardar unos segundos, así
-  // que el mensaje de carga es explícito sobre eso (evita que parezca
-  // colgado).
-  mostrarEstado('Generando el reporte en el panel de Alleata — con rangos grandes (varios días/meses) puede tardar hasta 1-2 minutos...', 'loading');
+
+  // Pedido 01/09: 10 días ya tardó ~95s — 30 días puede irse a varios
+  // minutos. En vez de un solo request bloqueado (riesgo de timeout del
+  // navegador/proxy), se dispara el reporte (iniciar) y se hace polling
+  // liviano al estado cada 3s, mostrando el tiempo transcurrido en vivo.
+  const headersAuth = {
+    'Content-Type': 'application/json',
+    'Authorization': 'Bearer ' + token,
+    'x-automation-secret': AUTOMATION_SECRET,
+  };
 
   try{
-    const r = await fetch(`${RAILWAY_BASE}/automations/operaciones-alleata/consultar`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + token,
-        'x-automation-secret': AUTOMATION_SECRET,
-      },
+    mostrarEstado('Iniciando la generación del reporte...', 'loading');
+    const rIni = await fetch(`${RAILWAY_BASE}/automations/operaciones-alleata/iniciar`, {
+      method: 'POST', headers: headersAuth,
       body: JSON.stringify({ desde, hasta, contractId, storeId }),
     });
-    const j = await r.json();
-    if(!r.ok || !j.ok) throw new Error(j.error || `Respuesta no OK (HTTP ${r.status})`);
+    const jIni = await rIni.json();
+    if(!rIni.ok || !jIni.ok) throw new Error(jIni.error || `Respuesta no OK (HTTP ${rIni.status})`);
+    const trackingId = jIni.trackingId;
 
-    _filas = j.filas || [];
-    _tiempos = j.tiempos || null;
+    const inicioMs = Date.now();
+    const MAX_ESPERA_MS = 10 * 60 * 1000; // 10 min tope del lado del navegador, por las dudas
+    let resultado = null;
+
+    while (Date.now() - inicioMs < MAX_ESPERA_MS) {
+      const seg = Math.round((Date.now() - inicioMs) / 1000);
+      mostrarEstado(`Generando el reporte en el panel de Alleata... (${seg}s transcurridos — con rangos grandes puede tardar varios minutos)`, 'loading');
+
+      const rEst = await fetch(`${RAILWAY_BASE}/automations/operaciones-alleata/estado/${trackingId}`, { headers: headersAuth });
+      const jEst = await rEst.json();
+      if(!rEst.ok || !jEst.ok) throw new Error(jEst.error || `Respuesta no OK (HTTP ${rEst.status})`);
+
+      if(jEst.status === 'completed'){ resultado = jEst; break; }
+      if(jEst.status === 'error'){ throw new Error(jEst.error || 'El reporte terminó con error'); }
+      // status 'pending' → esperar y volver a preguntar.
+      await new Promise(res => setTimeout(res, 3000));
+    }
+    if(!resultado) throw new Error(`Se superaron los ${MAX_ESPERA_MS/60000} minutos de espera — probá con un rango de fechas más chico`);
+
+    _filas = resultado.filas || [];
+    _tiempos = resultado.tiempos || null;
     _columnas = _filas.length ? Object.keys(_filas[0]) : [];
     _pagina = 1;
     _sortCol = null;
