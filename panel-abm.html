@@ -61,7 +61,7 @@
       <h1>Panel ABM — Operaciones<span>Reporte de transacciones (panel.alleata.co) sincronizado en vivo</span></h1>
     </div>
     <a class="back" href="index.html">← Volver al portal</a>
-    <div class="version-tag">v1.0.1</div>
+    <div class="version-tag">v1.0.2</div>
   </header>
 
   <div class="card">
@@ -108,7 +108,7 @@
 <script>
 const RAILWAY_BASE = 'https://alleata-agent-production.up.railway.app';
 const AUTOMATION_SECRET = '123456'; // mismo secret compartido que usa railwayFetch() en index.html
-const PANEL_VERSION = 'v1.0.1';
+const PANEL_VERSION = 'v1.0.2';
 console.log('[Panel ABM] ' + PANEL_VERSION);
 
 // Mismo proyecto/key de Supabase que index.html — al inicializar el
@@ -121,6 +121,7 @@ const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSI
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let _filas = [];       // dataset completo devuelto por el backend
+let _tiempos = null;   // desglose de tiempos de la última consulta
 let _columnas = [];    // nombres de columna (sale del primer registro)
 let _pagina = 1;
 const PAGE_SIZE = 50;
@@ -192,6 +193,7 @@ async function consultar(){
     if(!r.ok || !j.ok) throw new Error(j.error || `Respuesta no OK (HTTP ${r.status})`);
 
     _filas = j.filas || [];
+    _tiempos = j.tiempos || null;
     _columnas = _filas.length ? Object.keys(_filas[0]) : [];
     _pagina = 1;
     _sortCol = null;
@@ -207,13 +209,25 @@ async function consultar(){
   }
 }
 
+function fmtSeg(ms){ return (ms/1000).toFixed(1) + 's'; }
+
 function renderResumen(){
   const total = _filas.length;
   const colVenta = _columnas.find(c => /TOTAL DE VENTAS/i.test(c));
   const sumaVentas = colVenta ? _filas.reduce((a,f)=>a+(Number(f[colVenta])||0),0) : null;
+  // Pedido 01/09: mostrar cuánto tardó la consulta (desglosado por fase),
+  // para ir juntando datos reales de "cuánto tarda según el rango de
+  // fechas" en vez de tener que adivinar el timeout.
+  let tiempoHtml = '';
+  if(_tiempos){
+    const t = _tiempos;
+    const detalle = `Crear reporte: ${fmtSeg(t.crearReporteMs)} · Esperar generación: ${fmtSeg(t.esperarListoMs)} · Link descarga: ${fmtSeg(t.signedUrlMs)} · Descargar+parsear: ${fmtSeg(t.descargaParseoMs)}`;
+    tiempoHtml = `<div class="stat" title="${detalle}" style="cursor:help"><div class="stat-label">Tiempo total (ℹ️ desglose)</div><div class="stat-value">${fmtSeg(t.totalMs)}</div></div>`;
+  }
   document.getElementById('resumen').innerHTML = `
     <div class="stat"><div class="stat-label">Registros</div><div class="stat-value">${total.toLocaleString('es-AR')}</div></div>
     ${sumaVentas!=null ? `<div class="stat"><div class="stat-label">Total de ventas</div><div class="stat-value">$${sumaVentas.toLocaleString('es-AR')}</div></div>` : ''}
+    ${tiempoHtml}
   `;
 }
 
