@@ -154,6 +154,7 @@ table.table tr:hover td{background:var(--surface2);}
         <th class="cp-sortable" data-key="cuenta" onclick="cpOrdenarPor('cuenta')" style="cursor:pointer">Cuenta <span id="cp-sort-cuenta" class="cp-sort-arrow"></span></th>
         <th class="cp-sortable" data-key="propietario_cuenta" onclick="cpOrdenarPor('propietario_cuenta')" style="cursor:pointer">Propietario cta. <span id="cp-sort-propietario_cuenta" class="cp-sort-arrow"></span></th>
         <th class="cp-sortable" data-key="fecha_instalacion_cuenta" onclick="cpOrdenarPor('fecha_instalacion_cuenta')" style="cursor:pointer">Fecha Instalación <span id="cp-sort-fecha_instalacion_cuenta" class="cp-sort-arrow"></span></th>
+        <th class="cp-sortable" data-key="fecha_terminal_actual_desde" onclick="cpOrdenarPor('fecha_terminal_actual_desde')" style="cursor:pointer" title="Cuando el antecedente es un Cambio de Terminal: fecha en que esa OT pasó a 'Retirar Terminal' — desde ahí el comercio ya usa la terminal actual, aunque la OT de cambio todavía no haya cerrado como Exitoso. Vacío si nunca hubo un cambio de terminal de por medio.">Terminal actual desde <span id="cp-sort-fecha_terminal_actual_desde" class="cp-sort-arrow"></span></th>
         <th class="cp-sortable" data-key="fecha_baja_cuenta" onclick="cpOrdenarPor('fecha_baja_cuenta')" style="cursor:pointer" title="Recuperada: Fecha_de_baja__c (baja confirmada). Resto de los estados: Fecha_de_Pedido_de_Baja__c (todavía no hay baja definitiva, solo el pedido)">Fecha de baja <span id="cp-sort-fecha_baja_cuenta" class="cp-sort-arrow"></span></th>
         <th class="cp-sortable" data-key="terminal_id" onclick="cpOrdenarPor('terminal_id')" style="cursor:pointer">Terminal <span id="cp-sort-terminal_id" class="cp-sort-arrow"></span></th>
         <th class="cp-sortable" data-key="motivo" onclick="cpOrdenarPor('motivo')" style="cursor:pointer">Motivo <span id="cp-sort-motivo" class="cp-sort-arrow"></span></th>
@@ -165,7 +166,7 @@ table.table tr:hover td{background:var(--surface2);}
         <th id="cp-th-observaciones">Observaciones</th>
       </tr></thead>
       <tbody id="cp-tbody">
-        <tr><td colspan="12" style="text-align:center;padding:30px;color:var(--text-muted)">Sin datos todavía — apretá "Recalcular" para traer del vivo de Salesforce.</td></tr>
+        <tr><td colspan="13" style="text-align:center;padding:30px;color:var(--text-muted)">Sin datos todavía — apretá "Recalcular" para traer del vivo de Salesforce.</td></tr>
       </tbody>
     </table>
     </div>
@@ -677,7 +678,7 @@ function cpRenderTabla(){
   });
 
   if(!filas.length){
-    tbody.innerHTML=`<tr><td colspan="12" style="text-align:center;padding:30px;color:var(--text-muted)">${_cpFiltroEstado?`Sin casos "${_cpFiltroEstado}" en la tabla cargada.`:'Sin datos todavía — apretá "Recalcular" para traer del vivo de Salesforce.'}</td></tr>`;
+    tbody.innerHTML=`<tr><td colspan="13" style="text-align:center;padding:30px;color:var(--text-muted)">${_cpFiltroEstado?`Sin casos "${_cpFiltroEstado}" en la tabla cargada.`:'Sin datos todavía — apretá "Recalcular" para traer del vivo de Salesforce.'}</td></tr>`;
     return;
   }
 
@@ -691,6 +692,10 @@ function cpRenderTabla(){
       <td>${nombreCuenta}<div style="font-size:10px;color:var(--text-muted);font-family:'JetBrains Mono',monospace">${r.cuit||'—'}${r.ot_desinstalacion?` <span class="ot-num" style="font-size:10px">· ${r.sf_id_desinstalacion?`<a href="https://alleata.lightning.force.com/lightning/r/WorkOrder/${r.sf_id_desinstalacion}/view" target="_blank" rel="noopener" style="color:inherit;text-decoration:none" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'" title="Abrir OT en Salesforce">OT ${r.ot_desinstalacion} ↗</a>`:`OT ${r.ot_desinstalacion}`}</span>`:''}</div>${r.comercio?`<div style="font-size:10px;color:var(--text-muted)">${r.comercio}</div>`:''}</td>
       <td style="font-size:11px">${r.propietario_cuenta||'<span style="color:var(--text-muted)">—</span>'}</td>
       <td>${fmtFechaCP(r.fecha_instalacion_cuenta)}</td>
+      <td>${r.fecha_terminal_actual_desde
+        ? `${fmtFechaCP(r.fecha_terminal_actual_desde)}${r.ot_instalacion?`<div style="font-size:9px;color:var(--text-muted)">vía OT ${r.ot_instalacion} (cambio)</div>`:''}`
+        : '<span style="color:var(--text-muted)">—</span>'
+      }</td>
       <td>${r.estado_desinst==='Recuperada'
         ? fmtFechaCP(r.fecha_baja_cuenta)
         : `${fmtFechaCP(r.fecha_pedido_baja_cuenta)}${r.fecha_pedido_baja_cuenta?'<div style="font-size:9px;color:var(--text-muted)">(pedido de baja)</div>':''}`
