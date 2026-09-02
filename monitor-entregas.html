@@ -80,6 +80,9 @@
   .print-btn{background:linear-gradient(135deg,#17a07a,#1dbf8e);color:#fff;border:none;padding:9px 16px;border-radius:8px;font-size:12.5px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px;font-family:inherit}
   .print-btn:disabled{background:#1e3252;color:var(--text-dim);cursor:not-allowed}
   .print-btn:not(:disabled):hover{filter:brightness(1.08)}
+
+  .stop-print-btn{background:transparent;border:1px solid var(--border);color:var(--text-dim);font-size:11px;padding:2px 6px;border-radius:5px;cursor:pointer;line-height:1.4;margin-left:2px}
+  .stop-print-btn:hover{color:var(--teal);border-color:var(--teal)}
 </style>
 </head>
 <body>
@@ -291,22 +294,27 @@ function bloqueRotulo(r){
 
 async function imprimirRotulos(){
   if(!_ultimaLista.length){ alert('No hay entregas pendientes cargadas todavía.'); return; }
-
-  const btn=document.getElementById('btnRotulos');
-  const txtOriginal=btn.textContent;
-  btn.disabled=true; btn.textContent='Buscando datos…';
-
   // Mismo orden que se ve en pantalla: zona → orden_sugerido.
   const items=[..._ultimaLista].sort((a,b)=>
     (a.zona||'').localeCompare(b.zona||'') || (a.orden_sugerido||0)-(b.orden_sugerido||0)
   );
-  const otNumeros=items.map(o=>o.ot_numero);
+  await abrirVentanaRotulos(items.map(o=>o.ot_numero), document.getElementById('btnRotulos'));
+}
+
+// Botón 🖨️ individual en cada OT — mismo mecanismo, un solo número de OT.
+async function imprimirRotuloUnico(otNumero, btnEl){
+  await abrirVentanaRotulos([otNumero], btnEl);
+}
+
+async function abrirVentanaRotulos(otNumeros, btn){
+  const txtOriginal = btn ? btn.textContent : null;
+  if(btn){ btn.disabled=true; btn.textContent = btn===document.getElementById('btnRotulos') ? 'Buscando datos…' : '⏳'; }
 
   // ruta_sugerida_actual no tiene todos los campos del rótulo — se
   // completa con una consulta a sf_workorders (misma tabla/campos que usa
   // printRotuloInstalacion en Envíos).
   const { data: full, error } = await sb.from('sf_workorders').select('*').in('workorder_number', otNumeros);
-  btn.disabled=false; btn.textContent=txtOriginal;
+  if(btn){ btn.disabled=false; btn.textContent=txtOriginal; }
 
   if(error){ alert('No se pudo consultar sf_workorders: '+error.message); return; }
 
@@ -318,8 +326,8 @@ async function imprimirRotulos(){
     console.warn('[Rótulos] OTs sin datos completos en sf_workorders (no se van a poder imprimir):', faltantes);
   }
 
-  const rows=items.map(o=>porOt[o.ot_numero]).filter(Boolean);
-  if(!rows.length){ alert('No se encontraron los datos completos de las OTs en sf_workorders.'); return; }
+  const rows=otNumeros.map(n=>porOt[n]).filter(Boolean);
+  if(!rows.length){ alert('No se encontraron los datos completos de la OT en sf_workorders.'); return; }
 
   const win=window.open('', '_blank');
   if(!win){ alert('El navegador bloqueó la ventana emergente — habilitá pop-ups para este sitio e intentá de nuevo.'); return; }
@@ -434,6 +442,7 @@ function render(lista, resumenZonas){
           <span class="stop-orden">${o.orden_sugerido}</span>
           <span class="stop-ot">${esc(o.ot_numero)}</span>
           ${o.es_rollout?'<span class="rollout-tag">ROLLOUT</span>':''}
+          <button class="stop-print-btn" onclick="imprimirRotuloUnico('${esc(o.ot_numero)}', this)" title="Imprimir rótulo">🖨️</button>
         </div>
         ${llegadaTag}
         ${horarioTag}
@@ -473,6 +482,7 @@ function render(lista, resumenZonas){
               <div class="stop-left">
                 <span class="stop-ot">${esc(o.ot_numero)}</span>
                 ${o.es_rollout?'<span class="rollout-tag">ROLLOUT</span>':''}
+                <button class="stop-print-btn" onclick="imprimirRotuloUnico('${esc(o.ot_numero)}', this)" title="Imprimir rótulo">🖨️</button>
               </div>
               ${o.horario_entrega?`<div class="stop-horario">${esc(o.horario_entrega)}</div>`:''}
             </div>
