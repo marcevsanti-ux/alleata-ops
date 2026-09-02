@@ -396,8 +396,11 @@ async function cpCargarTotalGeneral(){
 
     cont.innerHTML=`
       <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:10px">TOTAL GENERAL — todos los perfiles</div>
-      <div style="font-size:34px;font-weight:800;color:var(--teal);line-height:1;margin-bottom:12px">${totalGeneral} <span style="font-size:12px;font-weight:400;color:var(--text-muted)">OTs de desinstalación · desde 1/4/2026 · en vivo desde Salesforce</span></div>
-      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:14px;margin-bottom:12px">
+        <div style="font-size:34px;font-weight:800;color:var(--teal);line-height:1">${totalGeneral} <span style="font-size:12px;font-weight:400;color:var(--text-muted)">OTs de desinstalación · desde 1/4/2026 · en vivo desde Salesforce</span></div>
+        <div id="cp-tabs-perfil" style="display:flex;gap:8px;flex-wrap:wrap" title="Elegí un perfil para ver el detalle completo"></div>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px">
         ${entries.map(([estado,cant])=>{
           const color=ESTADO_COLORS_NAPSE[estado]||'#6b7280';
           const pct=totalGeneral?Math.round(cant/totalGeneral*100):0;
@@ -411,18 +414,14 @@ async function cpCargarTotalGeneral(){
             <div style="font-size:10px;color:var(--text-muted)">${estado}${esRecuperada?' 🔍':''}</div>
           </div>`;
         }).join('')}
-      </div>
-      <div style="border-top:1px solid var(--border2);padding-top:14px">
-        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:8px">Elegí un perfil para ver el detalle completo</div>
-        <div id="cp-tabs-perfil" style="display:flex;gap:10px;flex-wrap:wrap"></div>
       </div>`;
 
     const tabsCont=document.getElementById('cp-tabs-perfil');
     tabsCont.innerHTML=resultados.map(r=>{
       const activo=_cpPerfil===r.perfil;
-      return `<div onclick="cpSetPerfil('${r.perfil}')" class="cp-perfil-btn" data-perfil="${r.perfil}" style="cursor:pointer;background:${activo?'#8b5cf6':'var(--surface)'};border:1px solid ${activo?'#8b5cf6':'var(--border2)'};border-radius:10px;padding:14px 20px;min-width:150px;transition:all .15s">
-        <div class="cp-tab-num" style="font-size:26px;font-weight:800;color:${activo?'#fff':'var(--text)'}">${r.total}</div>
-        <div class="cp-tab-label" style="font-size:11px;font-weight:700;color:${activo?'#fff':'var(--text-muted)'}">${CP_PERFIL_LABEL[r.perfil]} ${activo?'✓':''}</div>
+      return `<div onclick="cpSetPerfil('${r.perfil}')" class="cp-perfil-btn" data-perfil="${r.perfil}" style="cursor:pointer;background:${activo?'#8b5cf6':'var(--surface)'};border:1px solid ${activo?'#8b5cf6':'var(--border2)'};border-radius:10px;padding:8px 14px;min-width:88px;text-align:right;transition:all .15s">
+        <div class="cp-tab-num" style="font-size:18px;font-weight:800;color:${activo?'#fff':'var(--text)'};line-height:1.2">${r.total}</div>
+        <div class="cp-tab-label" style="font-size:9.5px;font-weight:700;letter-spacing:.3px;color:${activo?'#fff':'var(--text-muted)'}">${CP_PERFIL_LABEL[r.perfil]} ${activo?'✓':''}</div>
       </div>`;
     }).join('');
   }catch(e){
