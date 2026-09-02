@@ -197,82 +197,180 @@ async function cargar(){
 }
 
 // ── Impresión de rótulos ──────────────────────────────────────────────
-// Pedido 02/09: un botón en el header que abre una hoja imprimible con un
-// rótulo por cada entrega pendiente (mismo patrón que la "Hoja de Ruta"
-// de distri.html, pero acá es 1 rótulo por página en vez de una tabla,
-// pensado para pegar en el paquete/bolso de cada entrega). Usa los datos
-// que YA están cargados en pantalla (_ultimaLista) — no vuelve a pegarle
-// a Supabase.
+// Pedido 02/09: botón en el header que imprime el rótulo de cada entrega
+// pendiente. IMPORTANTE: usa el MISMO template que ya existe en el módulo
+// Envíos de index.html (función printRotuloInstalacion) — mismo layout,
+// mismos campos, mismo QR de ruta + código de barras + footer "Logística
+// Alleata" — para que sea IDÉNTICO al rótulo que ya conocen, no uno nuevo.
+// No usa la versión EPSA (printRotuloEpsa) porque ruta_sugerida_actual
+// (fuente de este monitor) SOLO trae OTs con logistica='ALLEATA' — ver
+// el .eq('logistica','ALLEATA') en rutaSugeridaGeo.js.
+//
+// ruta_sugerida_actual no tiene todos los campos del rótulo (contacto,
+// horario __c real, nombre fantasía, observación, sf_id para el QR de
+// ruta) — por eso acá SÍ hace falta ir a buscar esos datos a
+// sf_workorders por workorder_number antes de imprimir.
 let _ultimaLista = [];
 
-function imprimirRotulos(){
+function makeQRDataUrl(text, size) {
+  return `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(text)}&color=000000&bgcolor=ffffff&margin=2`;
+}
+
+// Arma el bloque HTML de un rótulo — copia 1:1 el markup/CSS de
+// printRotuloInstalacion (index.html) para que salga igual.
+function bloqueRotulo(r){
+  const tipo = r.record_type || '—';
+  const tipoCode = tipo.toUpperCase().includes('SIMCARD') ? 'INS' :
+                   tipo.toUpperCase().includes('ASISTENCIA') ? 'AST' :
+                   tipo.toUpperCase().includes('CAMBIO') ? 'CAM' : 'OT';
+
+  const ciudadZ = (r.ciudad || '').toLowerCase();
+  const provZ   = (r.provincia || '').toLowerCase();
+  let zonaCode = 'FUERA', zonaColor = '#ef4444';
+  if (provZ.includes('ciudad autónoma') || provZ.includes('caba')) { zonaCode = 'CABA'; zonaColor = '#1a9fd4'; }
+  else if (['san isidro','vicente lópez','vicente lopez','tigre','pilar','escobar','san fernando','malvinas argentinas','san miguel','san martín','san martin','jose c. paz','josé c. paz','general rodriguez','general rodríguez'].some(n => ciudadZ.includes(n))) { zonaCode = 'ZN'; zonaColor = '#10b981'; }
+  else if (['lomas de zamora','lanús','lanus','avellaneda','quilmes','berazategui','florencio varela','almirante brown','ezeiza','esteban echeverría','esteban echeverria','la plata','guernica','monte grande','temperley','banfield'].some(n => ciudadZ.includes(n))) { zonaCode = 'ZS'; zonaColor = '#f59e0b'; }
+  else if (['la matanza','morón','moron','hurlingham','ituzaingó','ituzaingo','merlo','moreno','tres de febrero','luján','lujan','ramos mejía','ramos mejia','san justo','haedo','castelar','palomar','ciudadela','tapiales','villa luzuriaga','aldo bonzi','gregorio laferrere','villa tesei','william morris','villa sarmiento'].some(n => ciudadZ.includes(n))) { zonaCode = 'ZO'; zonaColor = '#8b5cf6'; }
+
+  const dir = r.direccion || r.direccion_formula || '';
+  const direccionQR = encodeURIComponent(`${dir} ${r.ciudad || ''} ${r.provincia || ''} Argentina`);
+  const mapsUrl  = `https://www.google.com/maps/search/?api=1&query=${direccionQR}`;
+  const rutaUrl  = `https://marcevsanti-ux.github.io/alleata-ops/mobile.html?ot=${r.sf_id || r.id}`;
+
+  const qrGeoSrc  = makeQRDataUrl(mapsUrl, 75);
+  const qrRutaSrc = makeQRDataUrl(rutaUrl, 68);
+  const barcodeSrc = `https://barcode.tec-it.com/barcode.ashx?data=${encodeURIComponent(r.workorder_number||'')}&code=Code128&dpi=200&imagetype=Png`;
+
+  const horario = r.horario || '—';
+  const turnos = [r.turno_manana ? 'Mañana' : '', r.turno_tarde ? 'Tarde' : ''].filter(Boolean).join(' / ');
+
+  return `
+  <div class="rotulo">
+    <div class="hdr">
+      <div class="hdr-logo">alleata</div>
+      <div class="hdr-info">Andrés Moretti e Hijos S.A.<br>Logística Alleata &nbsp;·&nbsp; (+54 11) 4103-4600</div>
+    </div>
+    <div class="tipo">TIPO DE O.T.: &nbsp; ${esc(tipo)}</div>
+    <div class="ot-block">
+      <div class="ot-num">O.T.: ${esc(r.workorder_number) || '—'}</div>
+      <div class="qr-ruta">
+        <img src="${qrRutaSrc}" width="68" height="68" style="display:block;">
+        <div class="qr-ruta-lbl">Escanear Ruta</div>
+      </div>
+    </div>
+    <div class="barcode-row"><img src="${barcodeSrc}"></div>
+    <div class="dest">${esc(r.cuenta || r.nombre_comercio) || '—'}</div>
+    <div class="row"><span class="lbl">Dirección</span><span class="val">${esc(dir) || '—'}</span></div>
+    <div class="row"><span class="lbl">C.P.</span><span class="val">${esc(r.codigo_postal) || '—'}</span></div>
+    <div class="row"><span class="lbl">Localidad</span><span class="val">${esc(r.localidad || r.ciudad) || '—'}</span></div>
+    <div class="row"><span class="lbl">Provincia</span><span class="val">${esc(r.provincia) || '—'}</span></div>
+    <div class="row"><span class="lbl">Contacto</span><span class="val">${esc(r.contacto_celular) || '—'}</span></div>
+    <div class="row"><span class="lbl">Horario</span><span class="val">${esc(horario)}${turnos ? ' (' + esc(turnos) + ')' : ''}</span></div>
+    <div class="row"><span class="lbl">Nombre Fantasía</span><span class="val">${esc(r.nombre_comercio) || '—'}</span></div>
+    <div class="divider"></div>
+    <div class="bottom">
+      <div class="qr-geo">
+        <img src="${qrGeoSrc}" width="75" height="75" style="display:block;">
+        <div class="qr-geo-lbl">Geo&shy;ubicación</div>
+      </div>
+      <div class="obs-wrap">
+        <div class="obs-lbl">Observaciones</div>
+        <div class="obs-val">${esc(r.observacion_corta) || ''}</div>
+      </div>
+      <div class="badges">
+        <div class="tipo-badge">${tipoCode}</div>
+        <div class="zona-badge" style="color:${zonaColor};border-color:${zonaColor};background:${zonaColor}15">${zonaCode}</div>
+      </div>
+    </div>
+    <div class="footer">
+      <div class="footer-lbl">Remitente</div>
+      <div class="footer-val">Logística Alleata &nbsp;·&nbsp; Andrés Moretti e Hijos S.A.</div>
+    </div>
+  </div>`;
+}
+
+async function imprimirRotulos(){
   if(!_ultimaLista.length){ alert('No hay entregas pendientes cargadas todavía.'); return; }
 
-  // Orden: zona → orden_sugerido, para que los rótulos salgan en el mismo
-  // orden en que se ven en el monitor (y en el que se va a hacer la ruta).
+  const btn=document.getElementById('btnRotulos');
+  const txtOriginal=btn.textContent;
+  btn.disabled=true; btn.textContent='Buscando datos…';
+
+  // Mismo orden que se ve en pantalla: zona → orden_sugerido.
   const items=[..._ultimaLista].sort((a,b)=>
     (a.zona||'').localeCompare(b.zona||'') || (a.orden_sugerido||0)-(b.orden_sugerido||0)
   );
+  const otNumeros=items.map(o=>o.ot_numero);
 
-  const ahora=new Date();
-  const fechaLbl=ahora.toLocaleDateString('es-AR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
-  const horaLbl=ahora.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
+  // ruta_sugerida_actual no tiene todos los campos del rótulo — se
+  // completa con una consulta a sf_workorders (misma tabla/campos que usa
+  // printRotuloInstalacion en Envíos).
+  const { data: full, error } = await sb.from('sf_workorders').select('*').in('workorder_number', otNumeros);
+  btn.disabled=false; btn.textContent=txtOriginal;
 
-  const rotuloHtml=o=>`
-    <div class="rotulo${o.es_rollout?' rollout':''}">
-      <div class="rot-head">
-        <div class="rot-brand">alleata</div>
-        <div class="rot-zona">${esc(o.zona)||'—'}</div>
-      </div>
-      <div class="rot-ot">${esc(o.ot_numero)}</div>
-      ${o.es_rollout?'<div class="rot-rollout">⚡ ROLLOUT — PRIORIDAD</div>':''}
-      <div class="rot-cuenta">${esc(o.cuenta)||'—'}</div>
-      <div class="rot-dir">${esc(o.direccion)||'—'}</div>
-      <div class="rot-ciudad">${esc(o.ciudad)||''}${o.provincia?' · '+esc(o.provincia):''}</div>
-      ${o.horario_entrega?`<div class="rot-horario">🕘 Horario de atención: ${esc(o.horario_entrega)}</div>`:''}
-      <div class="rot-foot">Generado ${fechaLbl} · ${horaLbl} — orden sugerido #${o.orden_sugerido??'—'}</div>
-    </div>`;
+  if(error){ alert('No se pudo consultar sf_workorders: '+error.message); return; }
+
+  const porOt={};
+  (full||[]).forEach(r=>{ porOt[r.workorder_number]=r; });
+
+  const faltantes=otNumeros.filter(n=>!porOt[n]);
+  if(faltantes.length){
+    console.warn('[Rótulos] OTs sin datos completos en sf_workorders (no se van a poder imprimir):', faltantes);
+  }
+
+  const rows=items.map(o=>porOt[o.ot_numero]).filter(Boolean);
+  if(!rows.length){ alert('No se encontraron los datos completos de las OTs en sf_workorders.'); return; }
 
   const win=window.open('', '_blank');
   if(!win){ alert('El navegador bloqueó la ventana emergente — habilitá pop-ups para este sitio e intentá de nuevo.'); return; }
 
-  win.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
-<title>Alleata · Rótulos de entrega</title>
-<style>
-  *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:'Inter',-apple-system,sans-serif;background:#f1f5f9;padding:20px}
-  .toolbar{text-align:center;margin-bottom:18px}
-  .toolbar button{background:linear-gradient(135deg,#00897B,#00BFA5);color:#fff;border:none;padding:11px 28px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 4px 14px rgba(0,191,165,.3)}
-  .toolbar .count{color:#475569;font-size:12.5px;margin-top:8px}
-
-  .rotulo{
-    width:100mm;min-height:148mm;margin:0 auto 14px;background:#fff;border:2px solid #0A2540;
-    border-radius:10px;padding:16px 18px;page-break-after:always;position:relative;
-  }
-  .rotulo.rollout{border-color:#8b5cf6;box-shadow:0 0 0 3px rgba(139,92,246,.15) inset}
-  .rot-head{display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #0A2540;padding-bottom:8px;margin-bottom:14px}
-  .rot-brand{font-size:18px;font-weight:800;color:#00695C;letter-spacing:-.5px}
-  .rot-zona{font-size:11px;font-weight:800;color:#0A2540;background:#e2e8f0;padding:3px 10px;border-radius:20px;text-transform:uppercase;letter-spacing:.5px}
-  .rot-ot{font-family:'Courier New',monospace;font-size:34px;font-weight:800;color:#0A2540;text-align:center;letter-spacing:1px;margin:10px 0}
-  .rot-rollout{text-align:center;font-size:11px;font-weight:800;color:#7c3aed;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;padding:4px;margin-bottom:12px;letter-spacing:.5px}
-  .rot-cuenta{font-size:15px;font-weight:700;color:#0A2540;margin-bottom:6px}
-  .rot-dir{font-size:14px;color:#1e293b;line-height:1.35}
-  .rot-ciudad{font-size:12.5px;color:#64748b;margin-bottom:10px}
-  .rot-horario{font-size:12px;font-weight:700;color:#00695C;background:#e8f9f4;border:1px solid #a7f3d0;border-radius:6px;padding:6px 9px;display:inline-block;margin-top:4px}
-  .rot-foot{position:absolute;bottom:10px;left:18px;right:18px;font-size:8.5px;color:#94a3b8;font-family:'Courier New',monospace;border-top:1px solid #e2e8f0;padding-top:6px}
-
-  @media print{
-    body{background:#fff;padding:0}
-    .toolbar{display:none}
-    .rotulo{margin:0;border-radius:0}
-  }
-</style></head><body>
-<div class="toolbar no-print">
-  <button onclick="window.print()">🖨️ Imprimir / Guardar PDF</button>
-  <div class="count">${items.length} rótulo${items.length===1?'':'s'} · uno por página (10×15cm aprox., ajustable en la configuración de impresión)</div>
-</div>
-${items.map(rotuloHtml).join('')}
-</body></html>`);
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
+  <title>Rótulos — ${rows.length} OT</title>
+  <style>
+    @page{ size:100mm 150mm; margin:0; }
+    *{margin:0;padding:0;box-sizing:border-box;}
+    html,body{width:100mm;font-family:'Arial',sans-serif;background:#fff;font-size:10px;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+    .rotulo{width:100mm;height:150mm;padding:3mm;display:flex;flex-direction:column;page-break-after:always;}
+    .hdr{display:flex;align-items:center;justify-content:space-between;border-bottom:1.5px solid #000;padding-bottom:1.5mm;margin-bottom:2mm;}
+    .hdr-logo{font-size:16px;font-weight:900;letter-spacing:-1px;color:#1dbf8e !important;}
+    .hdr-info{font-size:6.5px;line-height:1.5;color:#444;text-align:right;}
+    .tipo{font-size:9px;font-weight:700;text-align:center;border:1.5px solid #000;padding:1.5mm;margin-bottom:2mm;}
+    .ot-block{display:flex;align-items:center;justify-content:space-between;border:2.5px solid #000;padding:2mm 3mm;margin-bottom:2mm;}
+    .ot-num{font-size:28px;font-weight:900;letter-spacing:-1px;line-height:1;}
+    .qr-ruta{text-align:center;flex-shrink:0;}
+    .qr-ruta-lbl{font-size:6px;font-weight:700;margin-top:2px;text-transform:uppercase;}
+    .barcode-row{text-align:center;margin-bottom:2mm;}
+    .barcode-row img{display:block;height:11mm;max-width:90mm;margin:0 auto;}
+    .dest{font-size:11px;font-weight:900;text-align:center;text-transform:uppercase;background:#f0f0f0 !important;padding:2mm;margin-bottom:2mm;line-height:1.3;border:1px solid #ccc;}
+    .row{display:flex;align-items:baseline;gap:2mm;margin-bottom:1.2mm;}
+    .lbl{font-weight:700;font-size:9px;min-width:26mm;color:#555;text-transform:uppercase;}
+    .val{font-size:11px;font-weight:700;color:#000;}
+    .divider{border-top:1.5px solid #000;margin:2mm 0 1.5mm;}
+    .bottom{display:flex;gap:2mm;align-items:flex-start;flex:1;}
+    .qr-geo{display:flex;flex-direction:column;align-items:center;gap:1mm;flex-shrink:0;}
+    .qr-geo-lbl{font-size:6px;font-weight:700;text-align:center;text-transform:uppercase;}
+    .obs-wrap{flex:1;min-width:0;display:flex;flex-direction:column;}
+    .obs-lbl{font-size:9px;font-weight:700;text-transform:uppercase;margin-bottom:1mm;}
+    .obs-val{font-size:9px;flex:1;border:1px solid #ccc;padding:1.5mm;word-break:break-word;line-height:1.4;}
+    .badges{display:flex;flex-direction:column;gap:2mm;align-items:center;flex-shrink:0;}
+    .tipo-badge{font-size:20px;font-weight:900;background:#000 !important;color:#fff !important;padding:3mm 4mm;text-align:center;min-width:14mm;line-height:1;}
+    .zona-badge{font-size:12px;font-weight:900;padding:2mm 3mm;text-align:center;min-width:14mm;border:2.5px solid;line-height:1;}
+    .footer{border-top:1.5px solid #000;padding-top:1.5mm;margin-top:2mm;}
+    .footer-lbl{font-size:7px;font-weight:700;color:#555;text-transform:uppercase;}
+    .footer-val{font-size:7.5px;background:#000 !important;color:#fff !important;padding:1mm 2mm;display:inline-block;margin-top:0.5mm;}
+    .toolbar{padding:8px;text-align:center;}
+    .toolbar button{padding:8px 24px;background:#1dbf8e;color:#fff;border:none;font-size:13px;font-weight:700;cursor:pointer;border-radius:5px;font-family:Arial,sans-serif;}
+    .toolbar .count{font-size:11px;color:#666;margin-top:6px;}
+    @media print{.toolbar{display:none!important;}}
+  </style>
+  </head><body>
+  <div class="toolbar no-print">
+    <button onclick="window.print()">🖨️ Imprimir / Guardar PDF</button>
+    <div class="count">${rows.length} rótulo${rows.length===1?'':'s'}${faltantes.length?` · ${faltantes.length} OT sin datos completos, no incluida${faltantes.length===1?'':'s'} (${faltantes.join(', ')})`:''}</div>
+  </div>
+  ${rows.map(bloqueRotulo).join('')}
+  <script>window.onafterprint=()=>window.close();<\/script>
+  </body></html>`);
   win.document.close();
 }
 
