@@ -76,6 +76,10 @@
   .empty-all .msg{font-size:20px;font-weight:700;color:var(--text)}
 
   footer{flex-shrink:0;padding:6px 30px;border-top:1px solid var(--border);display:flex;justify-content:space-between;font-size:10px;color:var(--text-dim);font-family:var(--mono)}
+
+  .print-btn{background:linear-gradient(135deg,#17a07a,#1dbf8e);color:#fff;border:none;padding:9px 16px;border-radius:8px;font-size:12.5px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px;font-family:inherit}
+  .print-btn:disabled{background:#1e3252;color:var(--text-dim);cursor:not-allowed}
+  .print-btn:not(:disabled):hover{filter:brightness(1.08)}
 </style>
 </head>
 <body>
@@ -86,6 +90,7 @@
     <div class="brand-title">· Entregas pendientes — Logística Alleata</div>
   </div>
   <div class="header-right">
+    <button id="btnRotulos" class="print-btn" onclick="imprimirRotulos()" disabled>🖨️ Imprimir rótulos</button>
     <div style="text-align:right">
       <div><span class="live-dot"></span><span class="last-sync" id="lastSync">cargando...</span></div>
       <div class="last-sync" id="nextSync" style="margin-top:2px;opacity:.75">—</div>
@@ -182,10 +187,93 @@ async function cargar(){
     ? 'Ruta calculada '+generadoAt.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'})
     : 'Sin datos todavía';
 
-  render(data||[], resumenZonas||[]);
+  _ultimaLista = data||[];
+  document.getElementById('btnRotulos').disabled = !_ultimaLista.length;
+
+  render(_ultimaLista, resumenZonas||[]);
   } finally {
     _cargando=false;
   }
+}
+
+// ── Impresión de rótulos ──────────────────────────────────────────────
+// Pedido 02/09: un botón en el header que abre una hoja imprimible con un
+// rótulo por cada entrega pendiente (mismo patrón que la "Hoja de Ruta"
+// de distri.html, pero acá es 1 rótulo por página en vez de una tabla,
+// pensado para pegar en el paquete/bolso de cada entrega). Usa los datos
+// que YA están cargados en pantalla (_ultimaLista) — no vuelve a pegarle
+// a Supabase.
+let _ultimaLista = [];
+
+function imprimirRotulos(){
+  if(!_ultimaLista.length){ alert('No hay entregas pendientes cargadas todavía.'); return; }
+
+  // Orden: zona → orden_sugerido, para que los rótulos salgan en el mismo
+  // orden en que se ven en el monitor (y en el que se va a hacer la ruta).
+  const items=[..._ultimaLista].sort((a,b)=>
+    (a.zona||'').localeCompare(b.zona||'') || (a.orden_sugerido||0)-(b.orden_sugerido||0)
+  );
+
+  const ahora=new Date();
+  const fechaLbl=ahora.toLocaleDateString('es-AR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  const horaLbl=ahora.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
+
+  const rotuloHtml=o=>`
+    <div class="rotulo${o.es_rollout?' rollout':''}">
+      <div class="rot-head">
+        <div class="rot-brand">alleata</div>
+        <div class="rot-zona">${esc(o.zona)||'—'}</div>
+      </div>
+      <div class="rot-ot">${esc(o.ot_numero)}</div>
+      ${o.es_rollout?'<div class="rot-rollout">⚡ ROLLOUT — PRIORIDAD</div>':''}
+      <div class="rot-cuenta">${esc(o.cuenta)||'—'}</div>
+      <div class="rot-dir">${esc(o.direccion)||'—'}</div>
+      <div class="rot-ciudad">${esc(o.ciudad)||''}${o.provincia?' · '+esc(o.provincia):''}</div>
+      ${o.horario_entrega?`<div class="rot-horario">🕘 Horario de atención: ${esc(o.horario_entrega)}</div>`:''}
+      <div class="rot-foot">Generado ${fechaLbl} · ${horaLbl} — orden sugerido #${o.orden_sugerido??'—'}</div>
+    </div>`;
+
+  const win=window.open('', '_blank');
+  if(!win){ alert('El navegador bloqueó la ventana emergente — habilitá pop-ups para este sitio e intentá de nuevo.'); return; }
+
+  win.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
+<title>Alleata · Rótulos de entrega</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Inter',-apple-system,sans-serif;background:#f1f5f9;padding:20px}
+  .toolbar{text-align:center;margin-bottom:18px}
+  .toolbar button{background:linear-gradient(135deg,#00897B,#00BFA5);color:#fff;border:none;padding:11px 28px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 4px 14px rgba(0,191,165,.3)}
+  .toolbar .count{color:#475569;font-size:12.5px;margin-top:8px}
+
+  .rotulo{
+    width:100mm;min-height:148mm;margin:0 auto 14px;background:#fff;border:2px solid #0A2540;
+    border-radius:10px;padding:16px 18px;page-break-after:always;position:relative;
+  }
+  .rotulo.rollout{border-color:#8b5cf6;box-shadow:0 0 0 3px rgba(139,92,246,.15) inset}
+  .rot-head{display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #0A2540;padding-bottom:8px;margin-bottom:14px}
+  .rot-brand{font-size:18px;font-weight:800;color:#00695C;letter-spacing:-.5px}
+  .rot-zona{font-size:11px;font-weight:800;color:#0A2540;background:#e2e8f0;padding:3px 10px;border-radius:20px;text-transform:uppercase;letter-spacing:.5px}
+  .rot-ot{font-family:'Courier New',monospace;font-size:34px;font-weight:800;color:#0A2540;text-align:center;letter-spacing:1px;margin:10px 0}
+  .rot-rollout{text-align:center;font-size:11px;font-weight:800;color:#7c3aed;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;padding:4px;margin-bottom:12px;letter-spacing:.5px}
+  .rot-cuenta{font-size:15px;font-weight:700;color:#0A2540;margin-bottom:6px}
+  .rot-dir{font-size:14px;color:#1e293b;line-height:1.35}
+  .rot-ciudad{font-size:12.5px;color:#64748b;margin-bottom:10px}
+  .rot-horario{font-size:12px;font-weight:700;color:#00695C;background:#e8f9f4;border:1px solid #a7f3d0;border-radius:6px;padding:6px 9px;display:inline-block;margin-top:4px}
+  .rot-foot{position:absolute;bottom:10px;left:18px;right:18px;font-size:8.5px;color:#94a3b8;font-family:'Courier New',monospace;border-top:1px solid #e2e8f0;padding-top:6px}
+
+  @media print{
+    body{background:#fff;padding:0}
+    .toolbar{display:none}
+    .rotulo{margin:0;border-radius:0}
+  }
+</style></head><body>
+<div class="toolbar no-print">
+  <button onclick="window.print()">🖨️ Imprimir / Guardar PDF</button>
+  <div class="count">${items.length} rótulo${items.length===1?'':'s'} · uno por página (10×15cm aprox., ajustable en la configuración de impresión)</div>
+</div>
+${items.map(rotuloHtml).join('')}
+</body></html>`);
+  win.document.close();
 }
 
 function render(lista, resumenZonas){
