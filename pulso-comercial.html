@@ -588,9 +588,14 @@ function renderRanking(topTiendas){
     const val = Number(t.total_ventas)||0;
     const pct = max ? Math.round(val/max*100) : 0;
     const cls = i===0?'top1':i===1?'top2':i===2?'top3':'';
+    const nombreCel = t.sf_id
+      ? `<a class="sf-link" href="https://alleata.lightning.force.com/lightning/r/Account/${t.sf_id}/view" target="_blank" rel="noopener">${t.sf_nombre} ↗</a>`
+      : (t.sf_nombre || t.nombre_tienda || t.razon_social || '—');
+    const subLinea = t.nombre_tienda && (t.sf_nombre || t.razon_social) && t.nombre_tienda !== (t.sf_nombre||t.razon_social)
+      ? `<div style="font-size:10.5px;color:var(--text-muted)">${t.nombre_tienda}</div>` : '';
     return `<tr>
       <td><span class="rank-badge ${cls}">${i+1}</span></td>
-      <td>${t.nombre_tienda || t.razon_social || '—'}${t.nombre_tienda && t.razon_social ? `<div style="font-size:10.5px;color:var(--text-muted)">${t.razon_social}</div>`:''}</td>
+      <td>${nombreCel}${subLinea}</td>
       <td class="num" style="font-family:var(--mono);font-weight:700">${fmt$(val)}</td>
       <td style="width:120px"><div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div></td>
     </tr>`;
@@ -761,16 +766,20 @@ async function buscarTrazabilidad(){
     if(!r.ok || !j.ok) throw new Error(j.error || `HTTP ${r.status}`);
     const filas = (j.filas||[]).sort((a,b)=>String(b.dia).localeCompare(String(a.dia)));
     if(!filas.length){ tbody.innerHTML='<tr><td colspan="8" class="empty">Sin resultados para esa búsqueda en el rango elegido.</td></tr>'; return; }
-    tbody.innerHTML = filas.map(f=>`<tr>
+    tbody.innerHTML = filas.map(f=>{
+      const nombreCel = f.sf_id
+        ? `<a class="sf-link" href="https://alleata.lightning.force.com/lightning/r/Account/${f.sf_id}/view" target="_blank" rel="noopener">${f.sf_nombre} ↗</a>`
+        : (f.sf_nombre || f.nombre_tienda || f.razon_social || '—');
+      return `<tr>
       <td>${f.dia}</td>
-      <td>${f.nombre_tienda || f.razon_social || '—'}</td>
+      <td>${nombreCel}</td>
       <td style="font-family:var(--mono)">${f.cuit || '—'}</td>
       <td class="num" style="font-family:var(--mono);font-weight:700">${fmt$(f.total_de_ventas)}</td>
       <td class="num">${fmt$(f.efectivo)}</td>
       <td class="num">${fmt$(f.debito)}</td>
       <td class="num">${fmt$(f.credito)}</td>
       <td class="num">${fmt$(f.codigo_qr)}</td>
-    </tr>`).join('');
+    </tr>`;}).join('');
     if(j.truncado) tbody.innerHTML += `<tr><td colspan="8" style="text-align:center;color:var(--amber);font-size:11px;padding:10px">⚠️ Hay más resultados de los que se muestran (${j.total}) — acotá el rango de fechas o la búsqueda.</td></tr>`;
   }catch(e){
     tbody.innerHTML = `<tr><td colspan="8" class="empty" style="color:var(--red)">Error: ${e.message}</td></tr>`;
