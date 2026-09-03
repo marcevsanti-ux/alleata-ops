@@ -111,6 +111,11 @@
         <button class="chip" data-dias="30">30 días</button>
         <button class="chip" data-dias="90">90 días</button>
       </div>
+      <div class="campo" style="min-width:240px">
+        <label>Trazabilidad — buscar comercio</label>
+        <input type="text" id="f-traza" placeholder="Nombre de tienda, razón social o CUIT...">
+      </div>
+      <button class="primary" onclick="buscarTrazabilidad()" style="background:linear-gradient(135deg,#1a7fb0,#1a9fd4)">🔎 Buscar</button>
       <button class="primary" id="btn-cargar" onclick="cargarTodo()">Actualizar</button>
     </div>
     <div class="estado" id="estado" style="display:none"></div>
@@ -163,6 +168,18 @@
       </div>
     </div>
 
+    <div class="grid2">
+      <div class="card">
+        <div class="card-title">🧾 Facturado vs. Presupuesto de venta</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px">"Presupuesto de venta" = ventas sin factura fiscal emitida (comprobante no fiscal). El resto son ventas facturadas (A+B+C).</div>
+        <canvas id="chartFacturacion" height="140"></canvas>
+      </div>
+      <div class="card">
+        <div class="card-title">📋 Desglose por tipo de factura</div>
+        <div id="fact-detalle"></div>
+      </div>
+    </div>
+
     <div class="card">
       <div class="card-title">
         <span>⚠️ Cuentas dadas de baja en Salesforce que siguen facturando</span>
@@ -179,14 +196,7 @@
 
     <div class="card">
       <div class="card-title">🔎 Trazabilidad a pedido</div>
-      <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px">Buscá por comercio, razón social o CUIT y mirá el detalle día a día dentro del rango de fechas de arriba.</div>
-      <div class="filtros" style="margin-bottom:12px">
-        <div class="campo" style="min-width:280px">
-          <label>Buscar</label>
-          <input type="text" id="f-traza" placeholder="Nombre de tienda, razón social o CUIT...">
-        </div>
-        <button class="primary" onclick="buscarTrazabilidad()">Buscar</button>
-      </div>
+      <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px">Usá el buscador de arriba (junto a las fechas) para ver acá el detalle día a día del comercio elegido.</div>
       <div class="tabla-wrap">
         <table>
           <thead><tr>
@@ -268,7 +278,7 @@ function mostrarEstado(msg, tipo){
 }
 function ocultarEstado(){ document.getElementById('estado').style.display='none'; }
 
-let _chartPorDia = null, _chartMedioPago = null;
+let _chartPorDia = null, _chartMedioPago = null, _chartFacturacion = null;
 
 async function cargarTodo(){
   const token = await requiereSesion();
@@ -298,6 +308,7 @@ async function cargarTodo(){
     renderChartPorDia(jResumen.porDia||[]);
     renderRanking(jResumen.topTiendas||[]);
     renderMedioPago(jResumen.porMedioPago);
+    renderFacturacion(jResumen.facturacion);
     renderCruce(jCruce.discrepancias||[]);
 
     ocultarEstado();
@@ -378,10 +389,44 @@ function renderMedioPago(pm){
     {label:'Otros',    val:Number(pm.otros)||0,    color:'#64748b'},
   ];
   const total = items.reduce((s,i)=>s+i.val,0);
+  // Pedido 03/09: la leyenda nativa de Chart.js solo mostraba el nombre —
+  // se pide acá con generateLabels para que cada ítem lleve también el %,
+  // en vez de tener que mirar la lista de abajo para saber la proporción.
   _chartMedioPago = new Chart(ctx, {
     type: 'doughnut',
     data: { labels: items.map(i=>i.label), datasets:[{ data: items.map(i=>i.val), backgroundColor: items.map(i=>i.color) }] },
-    options: { responsive:true, plugins:{ legend:{ position:'bottom', labels:{color:'#e8edf3'} } } },
+    options: {
+      responsive:true,
+      plugins:{
+        legend:{
+          position:'bottom',
+          labels:{
+            color:'#e8edf3',
+            generateLabels(chart){
+              return chart.data.labels.map((label,i)=>{
+                const val = chart.data.datasets[0].data[i];
+                const pct = total ? Math.round(val/total*100) : 0;
+                return {
+                  text: `${label} — ${pct}%`,
+                  fillStyle: chart.data.datasets[0].backgroundColor[i],
+                  strokeStyle: chart.data.datasets[0].backgroundColor[i],
+                  index: i,
+                };
+              });
+            },
+          },
+        },
+        tooltip:{
+          callbacks:{
+            label(ctx2){
+              const val = ctx2.parsed;
+              const pct = total ? Math.round(val/total*100) : 0;
+              return `${ctx2.label}: ${fmt$(val)} (${pct}%)`;
+            },
+          },
+        },
+      },
+    },
   });
   detalle.innerHTML = items.map(i=>{
     const pct = total ? Math.round(i.val/total*100) : 0;
@@ -390,6 +435,65 @@ function renderMedioPago(pm){
       <span class="pm-val">${fmt$(i.val)} <span style="color:var(--text-muted);font-weight:400">(${pct}%)</span></span>
     </div>`;
   }).join('');
+}
+
+// Pedido 03/09: "cuánto hay de facturación y cuánto de presupuesto" —
+// factura_a+b+c (ventas con comprobante fiscal) vs presupuesto_de_venta
+// (ventas sin factura fiscal emitida). Requiere el RPC nuevo
+// operaciones_facturacion_vs_presupuesto en Supabase.
+function renderFacturacion(f){
+  const ctx = document.getElementById('chartFacturacion');
+  const detalle = document.getElementById('fact-detalle');
+  if(_chartFacturacion) _chartFacturacion.destroy();
+  if(!f){
+    detalle.innerHTML = '<div class="empty">Sin datos — ¿ya creaste el RPC operaciones_facturacion_vs_presupuesto en Supabase?</div>';
+    return;
+  }
+  const facturaA = Number(f.factura_a)||0, facturaB = Number(f.factura_b)||0, facturaC = Number(f.factura_c)||0;
+  const totalFacturado = facturaA + facturaB + facturaC;
+  const presupuesto = Number(f.presupuesto_de_venta)||0;
+  const total = totalFacturado + presupuesto;
+
+  _chartFacturacion = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: ['Facturado (A+B+C)', 'Presupuesto de venta'],
+      datasets: [{ data: [totalFacturado, presupuesto], backgroundColor: ['#1dbf8e', '#f59e0b'] }],
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: {
+          position: 'bottom',
+          labels: {
+            color: '#e8edf3',
+            generateLabels(chart){
+              return chart.data.labels.map((label,i)=>{
+                const val = chart.data.datasets[0].data[i];
+                const pct = total ? Math.round(val/total*100) : 0;
+                return { text: `${label} — ${pct}%`, fillStyle: chart.data.datasets[0].backgroundColor[i], strokeStyle: chart.data.datasets[0].backgroundColor[i], index: i };
+              });
+            },
+          },
+        },
+        tooltip: { callbacks: { label: ctx2 => { const pct = total?Math.round(ctx2.parsed/total*100):0; return `${ctx2.label}: ${fmt$(ctx2.parsed)} (${pct}%)`; } } },
+      },
+    },
+  });
+
+  const items = [
+    {label:'Factura A', val:facturaA, color:'#1dbf8e'},
+    {label:'Factura B', val:facturaB, color:'#1a9fd4'},
+    {label:'Factura C', val:facturaC, color:'#8b5cf6'},
+    {label:'Presupuesto de venta', val:presupuesto, color:'#f59e0b'},
+  ];
+  detalle.innerHTML = items.map(i=>{
+    const pct = total ? Math.round(i.val/total*100) : 0;
+    return `<div class="pm-row">
+      <span><span class="pm-dot" style="background:${i.color}"></span>${i.label}</span>
+      <span class="pm-val">${fmt$(i.val)} <span style="color:var(--text-muted);font-weight:400">(${pct}%)</span></span>
+    </div>`;
+  }).join('') + `<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted)">Total facturado: <b style="color:var(--text)">${fmt$(totalFacturado)}</b></div>`;
 }
 
 function renderCruce(discrepancias){
