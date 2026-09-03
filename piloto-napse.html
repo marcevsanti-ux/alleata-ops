@@ -59,6 +59,21 @@
 
   canvas{max-height:180px}
   .empty{text-align:center;padding:24px;color:var(--text-muted);font-size:12.5px}
+
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  thead th{text-align:left;padding:9px 10px;color:var(--text-muted);text-transform:uppercase;font-size:10px;letter-spacing:.5px;font-weight:700;border-bottom:1px solid var(--border2);white-space:nowrap}
+  th.num,td.num{text-align:right}
+  tbody td{padding:10px;border-bottom:1px solid var(--border);vertical-align:top}
+  tbody tr.fila-terminal:hover{background:rgba(255,255,255,.02)}
+  .tabla-wrap{overflow-x:auto}
+  .x-btn{background:transparent;border:1px solid var(--border2);color:var(--text-muted);width:24px;height:24px;border-radius:6px;cursor:pointer;font-size:13px;line-height:1;font-family:inherit}
+  .x-btn:hover{border-color:var(--red);color:var(--red);background:rgba(239,68,68,.1)}
+  .detalle-btn{background:transparent;border:1px solid var(--border2);color:var(--teal);padding:5px 11px;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit}
+  .detalle-btn:hover{background:rgba(29,191,142,.1)}
+  .fila-detalle td{background:var(--navy);padding:18px}
+  .pm-compara{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:14px}
+  .pm-col-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:8px}
+  .pm-row2{display:flex;justify-content:space-between;padding:5px 0;font-size:12px;border-bottom:1px solid var(--border)}
 </style>
 </head>
 <body>
@@ -66,7 +81,7 @@
   <header>
     <div>
       <div class="brand">alleata</div>
-      <h1>🧪 Piloto Napse 1.6.0 <span style="font-size:11px;font-weight:400;color:var(--text-muted);font-family:var(--mono)">v1.0.1</span></h1>
+      <h1>🧪 Piloto Napse 1.6.0 <span style="font-size:11px;font-weight:400;color:var(--text-muted);font-family:var(--mono)">v1.1.0</span></h1>
       <div class="sub">Seguimiento de las terminales que se van actualizando a mano — ventas antes vs. después de cada actualización. La fecha de corte es por terminal, cada una tiene la suya (ver "Actualizada el..." / "Seguimiento desde..." en cada card).</div>
     </div>
     <a class="back" href="pulso-comercial.html">← Volver a Pulso Comercial</a>
@@ -186,6 +201,7 @@ async function quitarTerminal(id, nombre){
 }
 
 const _charts = {};
+let _ultimoPiloto = [];
 
 async function cargarPiloto(){
   const token = await requiereSesion();
@@ -197,66 +213,108 @@ async function cargarPiloto(){
     const j = await r.json();
     if(!r.ok || !j.ok) throw new Error(j.error || `HTTP ${r.status}`);
 
+    _ultimoPiloto = j.terminales;
+
     if(!j.terminales.length){
       cont.innerHTML = '<div class="card"><div class="empty">Todavía no agregaste ninguna terminal al piloto.</div></div>';
       return;
     }
 
-    cont.innerHTML = j.terminales.map(t=>t.error ? `
-      <div class="terminal-card" style="border-color:rgba(239,68,68,.4)">
-        <div class="terminal-head">
-          <div>
-            <div class="terminal-nombre">${t.razon_social || t.nombre_tienda || '(sin nombre todavía)'}</div>
-            <div class="terminal-sub">Terminal ${t.numero_terminal} · CUIT ${t.cuit||'—'}</div>
-          </div>
-          <div class="terminal-meta">
-            <button class="ghost" onclick="quitarTerminal(${t.id},'${(t.razon_social||t.nombre_tienda||t.numero_terminal).replace(/'/g,"\\'")}')">Sacar del piloto</button>
-          </div>
-        </div>
-        <div class="empty" style="color:var(--red);text-align:left;padding:8px 0">⚠️ No se pudo traer el historial: ${t.error}. Probá recargar — si sigue pasando, puede hacer falta un índice en la tabla.</div>
+    cont.innerHTML = `<div class="card">
+      <div class="tabla-wrap">
+        <table>
+          <thead><tr>
+            <th>Comercio</th><th>Fechas</th>
+            <th class="num">Antes</th><th class="num">Después</th><th class="num">Δ</th>
+            <th></th><th></th>
+          </tr></thead>
+          <tbody>
+            ${j.terminales.map(t => filaTerminal(t)).join('')}
+          </tbody>
+        </table>
       </div>
-    ` : `
-      <div class="terminal-card">
-        <div class="terminal-head">
-          <div>
-            <div class="terminal-nombre">${t.razon_social || t.nombre_tienda || '(sin nombre todavía)'}</div>
-            <div class="terminal-sub">Terminal ${t.numero_terminal} · CUIT ${t.cuit||'—'}</div>
-            ${t.notas?`<div style="font-size:11.5px;color:var(--text-muted);margin-top:4px">📝 ${t.notas}</div>`:''}
-          </div>
-          <div class="terminal-meta">
-            Actualizada el ${t.fecha_actualizacion}${t.corte_seguimiento!==t.fecha_actualizacion?`<br>Seguimiento desde ${t.corte_seguimiento}`:''} (hace ${t.dias_de_seguimiento} día${t.dias_de_seguimiento===1?'':'s'})<br>
-            <button class="ghost" style="margin-top:6px" onclick="quitarTerminal(${t.id},'${(t.razon_social||t.nombre_tienda||t.numero_terminal).replace(/'/g,"\\'")}')">Sacar del piloto</button>
-          </div>
-        </div>
-        <div class="comparativa">
-          <div class="comp-box">
-            <div class="comp-label">Promedio diario — ANTES</div>
-            <div class="comp-val">${fmt$(t.promedio_diario_antes)}</div>
-            <div class="comp-sub">${t.dias_de_historial_antes} día${t.dias_de_historial_antes===1?'':'s'} de historial previo</div>
-          </div>
-          <div class="comp-box">
-            <div class="comp-label">Promedio diario — DESPUÉS</div>
-            <div class="comp-val">${fmt$(t.promedio_diario_despues)}</div>
-            <div class="comp-sub">${t.dias_de_historial_despues} día${t.dias_de_historial_despues===1?'':'s'} desde la actualización</div>
-            ${renderDelta(t.promedio_diario_antes, t.promedio_diario_despues)}
-          </div>
-        </div>
-        <canvas id="chart-${t.id}" height="60"></canvas>
-      </div>
-    `).join('');
-
-    j.terminales.filter(t=>!t.error).forEach(t => pintarHistorial(t));
+    </div>`;
   }catch(e){
     cont.innerHTML = `<div class="card"><div class="empty" style="color:var(--red)">Error: ${e.message}</div></div>`;
   }
 }
 
+function filaTerminal(t){
+  if(t.error){
+    return `<tr class="fila-terminal">
+      <td colspan="5">
+        <b>${t.razon_social || t.nombre_tienda || '(sin nombre)'}</b>
+        <div style="font-size:11px;color:var(--text-muted);font-family:var(--mono)">Terminal ${t.numero_terminal} · CUIT ${t.cuit||'—'}</div>
+        <div style="color:var(--red);font-size:11.5px;margin-top:4px">⚠️ No se pudo traer el historial: ${t.error}</div>
+      </td>
+      <td></td>
+      <td><button class="x-btn" title="Sacar del piloto" onclick="quitarTerminal(${t.id},'${(t.razon_social||t.nombre_tienda||t.numero_terminal).replace(/'/g,"\\'")}')">✕</button></td>
+    </tr>`;
+  }
+  return `<tr class="fila-terminal">
+      <td>
+        <b>${t.razon_social || t.nombre_tienda || '(sin nombre todavía)'}</b>
+        <div style="font-size:11px;color:var(--text-muted);font-family:var(--mono)">Terminal ${t.numero_terminal} · CUIT ${t.cuit||'—'}</div>
+        ${t.notas?`<div style="font-size:11px;color:var(--text-muted);margin-top:2px">📝 ${t.notas}</div>`:''}
+      </td>
+      <td style="font-size:11px;color:var(--text-muted)">
+        Actualizada ${t.fecha_actualizacion}${t.corte_seguimiento!==t.fecha_actualizacion?`<br>Seguim. desde ${t.corte_seguimiento}`:''}<br>
+        (hace ${t.dias_de_seguimiento} día${t.dias_de_seguimiento===1?'':'s'})
+      </td>
+      <td class="num" style="font-family:var(--mono)">${fmt$(t.promedio_diario_antes)}<div style="font-size:10px;color:var(--text-muted)">${t.dias_de_historial_antes}d</div></td>
+      <td class="num" style="font-family:var(--mono)">${fmt$(t.promedio_diario_despues)}<div style="font-size:10px;color:var(--text-muted)">${t.dias_de_historial_despues}d</div></td>
+      <td class="num">${renderDelta(t.promedio_diario_antes, t.promedio_diario_despues)}</td>
+      <td><button class="detalle-btn" id="btn-det-${t.id}" onclick="toggleDetalle(${t.id})">Ver detalle</button></td>
+      <td><button class="x-btn" title="Sacar del piloto" onclick="quitarTerminal(${t.id},'${(t.razon_social||t.nombre_tienda||t.numero_terminal).replace(/'/g,"\\'")}')">✕</button></td>
+    </tr>
+    <tr class="fila-detalle" id="fila-det-${t.id}" style="display:none">
+      <td colspan="7">
+        <canvas id="chart-${t.id}" height="60"></canvas>
+        <div class="pm-compara">
+          ${bloqueMedios('Medios de pago — ANTES', t.medios_antes)}
+          ${bloqueMedios('Medios de pago — DESPUÉS', t.medios_despues)}
+        </div>
+      </td>
+    </tr>`;
+}
+
+function bloqueMedios(titulo, m){
+  if(!m) return `<div><div class="pm-col-title">${titulo}</div><div class="empty">Sin datos</div></div>`;
+  const items = [
+    {label:'Efectivo', val:m.efectivo},
+    {label:'Débito', val:m.debito},
+    {label:'Crédito', val:m.credito},
+    {label:'Código QR', val:m.codigo_qr},
+    {label:'Otros', val:m.otros},
+  ];
+  const total = items.reduce((s,i)=>s+i.val,0);
+  return `<div>
+    <div class="pm-col-title">${titulo} (total: ${fmt$(total)})</div>
+    ${items.map(i=>{
+      const pct = total ? Math.round(i.val/total*100) : 0;
+      return `<div class="pm-row2"><span>${i.label}</span><span style="font-family:var(--mono)">${fmt$(i.val)} <span style="color:var(--text-muted)">(${pct}%)</span></span></div>`;
+    }).join('')}
+  </div>`;
+}
+
+function toggleDetalle(id){
+  const fila = document.getElementById(`fila-det-${id}`);
+  const btn = document.getElementById(`btn-det-${id}`);
+  const abrir = fila.style.display === 'none';
+  fila.style.display = abrir ? 'table-row' : 'none';
+  btn.textContent = abrir ? 'Ocultar' : 'Ver detalle';
+  if(abrir && !_charts[id]){
+    const t = _ultimoPiloto.find(x=>x.id===id);
+    if(t) pintarHistorial(t);
+  }
+}
+
 function renderDelta(antes, despues){
-  if(antes===null || despues===null || !antes) return '';
+  if(antes===null || despues===null || !antes) return '—';
   const pct = Math.round((despues-antes)/antes*100);
   const cls = pct>=0 ? 'up' : 'down';
   const signo = pct>=0 ? '+' : '';
-  return `<div class="delta ${cls}">${signo}${pct}% vs. antes</div>`;
+  return `<span class="delta ${cls}">${signo}${pct}%</span>`;
 }
 
 function pintarHistorial(t){
