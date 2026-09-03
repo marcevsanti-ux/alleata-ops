@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Alleata · Piloto Napse 1.6.0</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<style>
+  :root{
+    --navy:#0d1b2a; --navy-800:#112236; --navy-700:#162d45;
+    --teal:#1dbf8e; --blue:#1a9fd4; --purple:#8b5cf6; --amber:#f59e0b; --red:#ef4444;
+    --border:rgba(255,255,255,.08); --border2:rgba(255,255,255,.14);
+    --text:#e8edf3; --text-muted:rgba(232,237,243,.5);
+    --mono:'JetBrains Mono',monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--navy);color:var(--text);font-family:'Inter',sans-serif;min-height:100vh;padding:24px}
+  .container{max-width:1200px;margin:0 auto}
+  header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:22px;flex-wrap:wrap;gap:14px}
+  .brand{font-size:20px;font-weight:800;color:var(--teal);letter-spacing:-.5px}
+  h1{font-size:19px;font-weight:800;margin-top:2px}
+  .sub{font-size:12px;color:var(--text-muted);margin-top:3px}
+  a.back{color:var(--text-muted);text-decoration:none;font-size:12px}
+  a.back:hover{color:var(--text)}
+
+  .card{background:var(--navy-800);border:1px solid var(--border2);border-radius:14px;padding:18px 20px;margin-bottom:16px}
+  .card-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:12px}
+
+  .form-row{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end}
+  .campo{display:flex;flex-direction:column;gap:5px}
+  .campo label{font-size:10px;color:var(--text-muted);text-transform:uppercase;font-weight:700;letter-spacing:.5px}
+  .campo input{background:var(--navy-700);border:1px solid var(--border2);border-radius:8px;padding:8px 11px;color:var(--text);font-size:13px;font-family:inherit}
+  .campo input:focus{outline:none;border-color:var(--teal)}
+  button.primary{background:linear-gradient(135deg,#17a07a,#1dbf8e);color:#fff;border:none;padding:9px 18px;border-radius:8px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit}
+  button.primary:disabled{opacity:.5;cursor:not-allowed}
+  button.primary:not(:disabled):hover{filter:brightness(1.08)}
+  button.ghost{background:transparent;border:1px solid var(--border2);color:var(--text-muted);padding:6px 12px;border-radius:8px;font-size:11.5px;cursor:pointer;font-family:inherit}
+  button.ghost:hover{border-color:var(--red);color:var(--red)}
+
+  .estado{font-size:12px;color:var(--text-muted);margin-top:10px}
+  .estado.error{color:var(--red)}
+
+  .terminal-card{background:var(--navy-700);border:1px solid var(--border2);border-radius:12px;padding:16px 18px;margin-bottom:14px}
+  .terminal-head{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;margin-bottom:12px}
+  .terminal-nombre{font-size:15px;font-weight:800}
+  .terminal-sub{font-size:11.5px;color:var(--text-muted);margin-top:2px;font-family:var(--mono)}
+  .terminal-meta{font-size:11px;color:var(--text-muted);text-align:right}
+
+  .comparativa{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+  .comp-box{background:var(--navy);border:1px solid var(--border);border-radius:10px;padding:12px 14px}
+  .comp-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:6px}
+  .comp-val{font-size:20px;font-weight:800;font-family:var(--mono)}
+  .comp-sub{font-size:10.5px;color:var(--text-muted);margin-top:3px}
+  .delta{font-size:12px;font-weight:700;margin-top:6px}
+  .delta.up{color:var(--teal)}
+  .delta.down{color:var(--red)}
+
+  canvas{max-height:180px}
+  .empty{text-align:center;padding:24px;color:var(--text-muted);font-size:12.5px}
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <div>
+      <div class="brand">alleata</div>
+      <h1>🧪 Piloto Napse 1.6.0</h1>
+      <div class="sub">Seguimiento de las terminales que se van actualizando a mano — ventas antes vs. después de cada actualización.</div>
+    </div>
+    <a class="back" href="pulso-comercial.html">← Volver a Pulso Comercial</a>
+  </header>
+
+  <div class="card">
+    <div class="card-title">➕ Agregar terminal al piloto</div>
+    <div class="form-row">
+      <div class="campo">
+        <label>N° de terminal</label>
+        <input type="text" id="f-terminal" placeholder="Ej: 211057314201201420459765" style="width:280px">
+      </div>
+      <div class="campo">
+        <label>Fecha de actualización</label>
+        <input type="date" id="f-fecha" onchange="sugerirInicioSeguimiento()">
+      </div>
+      <div class="campo">
+        <label>Inicio del seguimiento</label>
+        <input type="date" id="f-fecha-inicio">
+      </div>
+      <div class="campo" style="flex:1;min-width:200px">
+        <label>Notas (opcional)</label>
+        <input type="text" id="f-notas" placeholder="Ej: primer lote piloto CABA">
+      </div>
+      <button class="primary" onclick="agregarTerminal()" id="btn-agregar">Agregar</button>
+    </div>
+    <div class="estado" id="estado-agregar" style="display:none"></div>
+  </div>
+
+  <div id="lista-terminales">
+    <div class="empty">Cargando piloto...</div>
+  </div>
+</div>
+
+<script>
+const RAILWAY_BASE = 'https://alleata-agent-production.up.railway.app';
+const AUTOMATION_SECRET = '123456';
+const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
+const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const fmt$ = v => v===null||v===undefined ? '—' : '$' + Math.round(Number(v)||0).toLocaleString('es-AR');
+const fechaLocalYMD = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+
+document.getElementById('f-fecha').value = fechaLocalYMD(new Date());
+sugerirInicioSeguimiento();
+
+function sugerirInicioSeguimiento(){
+  // Sugerencia, no obligación: por defecto el seguimiento arranca al día
+  // siguiente de la actualización (para no mezclar un día partido entre
+  // antes/después) — el operador lo puede pisar a mano si quiere que
+  // cuente desde el mismo día.
+  const fechaAct = document.getElementById('f-fecha').value;
+  if(!fechaAct) return;
+  const [y,m,d] = fechaAct.split('-').map(Number);
+  const siguiente = new Date(y, m-1, d+1);
+  document.getElementById('f-fecha-inicio').value = fechaLocalYMD(siguiente);
+}
+
+async function requiereSesion(){
+  const { data: { session } } = await sb.auth.getSession();
+  if(!session){ alert('Necesitás estar logueado en el portal.'); window.location.href = 'index.html'; return null; }
+  return session.access_token;
+}
+function headersAuth(token){ return { 'Authorization': 'Bearer ' + token, 'x-automation-secret': AUTOMATION_SECRET }; }
+
+async function agregarTerminal(){
+  const token = await requiereSesion();
+  if(!token) return;
+  const numero_terminal = document.getElementById('f-terminal').value.trim();
+  const fecha_actualizacion = document.getElementById('f-fecha').value;
+  const fecha_inicio_seguimiento = document.getElementById('f-fecha-inicio').value || null;
+  const notas = document.getElementById('f-notas').value.trim();
+  const estado = document.getElementById('estado-agregar');
+  if(!numero_terminal || !fecha_actualizacion){
+    estado.style.display='block'; estado.className='estado error'; estado.textContent='Completá al menos el N° de terminal y la fecha.';
+    return;
+  }
+  const btn = document.getElementById('btn-agregar');
+  btn.disabled = true;
+  estado.style.display='block'; estado.className='estado'; estado.textContent='Agregando...';
+  try{
+    const { data: { user } } = await sb.auth.getUser();
+    const r = await fetch(`${RAILWAY_BASE}/automations/operaciones-alleata/piloto-napse`, {
+      method:'POST',
+      headers:{ ...headersAuth(token), 'Content-Type':'application/json' },
+      body: JSON.stringify({ numero_terminal, fecha_actualizacion, fecha_inicio_seguimiento, notas, agregado_por: user?.email||null }),
+    });
+    const j = await r.json();
+    if(!r.ok || !j.ok) throw new Error(j.error || `HTTP ${r.status}`);
+    estado.textContent = j.encontro_historial
+      ? '✅ Agregada — se le encontró historial previo para comparar.'
+      : '✅ Agregada — todavía no tiene ventas registradas en operaciones_alleata (puede ser nueva, o el número no coincide con ningún numero_terminal cargado).';
+    document.getElementById('f-terminal').value='';
+    document.getElementById('f-notas').value='';
+    sugerirInicioSeguimiento();
+    cargarPiloto();
+  }catch(e){
+    estado.className='estado error'; estado.textContent='Error: '+e.message;
+  }finally{
+    btn.disabled = false;
+  }
+}
+
+async function quitarTerminal(id, nombre){
+  if(!confirm(`¿Sacar "${nombre}" del piloto? Esto no borra ningún dato de ventas, solo la deja de trackear acá.`)) return;
+  const token = await requiereSesion();
+  if(!token) return;
+  try{
+    const r = await fetch(`${RAILWAY_BASE}/automations/operaciones-alleata/piloto-napse/${id}`, { method:'DELETE', headers: headersAuth(token) });
+    const j = await r.json();
+    if(!r.ok || !j.ok) throw new Error(j.error || `HTTP ${r.status}`);
+    cargarPiloto();
+  }catch(e){
+    alert('Error: '+e.message);
+  }
+}
+
+const _charts = {};
+
+async function cargarPiloto(){
+  const token = await requiereSesion();
+  if(!token) return;
+  const cont = document.getElementById('lista-terminales');
+  cont.innerHTML = '<div class="empty">Cargando piloto...</div>';
+  try{
+    const r = await fetch(`${RAILWAY_BASE}/automations/operaciones-alleata/piloto-napse`, { headers: headersAuth(token) });
+    const j = await r.json();
+    if(!r.ok || !j.ok) throw new Error(j.error || `HTTP ${r.status}`);
+
+    if(!j.terminales.length){
+      cont.innerHTML = '<div class="card"><div class="empty">Todavía no agregaste ninguna terminal al piloto.</div></div>';
+      return;
+    }
+
+    cont.innerHTML = j.terminales.map(t=>`
+      <div class="terminal-card">
+        <div class="terminal-head">
+          <div>
+            <div class="terminal-nombre">${t.razon_social || t.nombre_tienda || '(sin nombre todavía)'}</div>
+            <div class="terminal-sub">Terminal ${t.numero_terminal} · CUIT ${t.cuit||'—'}</div>
+            ${t.notas?`<div style="font-size:11.5px;color:var(--text-muted);margin-top:4px">📝 ${t.notas}</div>`:''}
+          </div>
+          <div class="terminal-meta">
+            Actualizada el ${t.fecha_actualizacion}${t.corte_seguimiento!==t.fecha_actualizacion?`<br>Seguimiento desde ${t.corte_seguimiento}`:''} (hace ${t.dias_de_seguimiento} día${t.dias_de_seguimiento===1?'':'s'})<br>
+            <button class="ghost" style="margin-top:6px" onclick="quitarTerminal(${t.id},'${(t.razon_social||t.nombre_tienda||t.numero_terminal).replace(/'/g,"\\'")}')">Sacar del piloto</button>
+          </div>
+        </div>
+        <div class="comparativa">
+          <div class="comp-box">
+            <div class="comp-label">Promedio diario — ANTES</div>
+            <div class="comp-val">${fmt$(t.promedio_diario_antes)}</div>
+            <div class="comp-sub">${t.dias_de_historial_antes} día${t.dias_de_historial_antes===1?'':'s'} de historial previo</div>
+          </div>
+          <div class="comp-box">
+            <div class="comp-label">Promedio diario — DESPUÉS</div>
+            <div class="comp-val">${fmt$(t.promedio_diario_despues)}</div>
+            <div class="comp-sub">${t.dias_de_historial_despues} día${t.dias_de_historial_despues===1?'':'s'} desde la actualización</div>
+            ${renderDelta(t.promedio_diario_antes, t.promedio_diario_despues)}
+          </div>
+        </div>
+        <canvas id="chart-${t.id}" height="60"></canvas>
+      </div>
+    `).join('');
+
+    j.terminales.forEach(t => pintarHistorial(t));
+  }catch(e){
+    cont.innerHTML = `<div class="card"><div class="empty" style="color:var(--red)">Error: ${e.message}</div></div>`;
+  }
+}
+
+function renderDelta(antes, despues){
+  if(antes===null || despues===null || !antes) return '';
+  const pct = Math.round((despues-antes)/antes*100);
+  const cls = pct>=0 ? 'up' : 'down';
+  const signo = pct>=0 ? '+' : '';
+  return `<div class="delta ${cls}">${signo}${pct}% vs. antes</div>`;
+}
+
+function pintarHistorial(t){
+  const ctx = document.getElementById(`chart-${t.id}`);
+  if(!ctx || !t.historial.length) return;
+  if(_charts[t.id]) _charts[t.id].destroy();
+  const idxCorte = t.historial.findIndex(h => h.dia >= t.corte_seguimiento);
+  _charts[t.id] = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: t.historial.map(h=>h.dia),
+      datasets: [{
+        label: 'Ventas',
+        data: t.historial.map(h=>Number(h.total_de_ventas)||0),
+        borderColor: '#1dbf8e', backgroundColor: '#1dbf8e18', fill:true, tension:.2, pointRadius:1.5,
+        segment: {
+          borderColor: ctx2 => (idxCorte>=0 && ctx2.p1DataIndex >= idxCorte) ? '#8b5cf6' : '#1dbf8e',
+        },
+      }],
+    },
+    options: {
+      responsive:true,
+      plugins:{ legend:{display:false} },
+      scales:{
+        x:{ ticks:{color:'#94a3b8', maxTicksLimit:8}, grid:{color:'#334155'} },
+        y:{ ticks:{color:'#94a3b8', callback:v=>'$'+v.toLocaleString('es-AR')}, grid:{color:'#334155'} },
+      },
+    },
+  });
+}
+
+cargarPiloto();
+</script>
+</body>
+</html>
