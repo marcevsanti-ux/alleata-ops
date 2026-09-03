@@ -188,7 +188,7 @@
       <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px">Cruce por CUIT contra Salesforce — si el estado de la cuenta figura como dada de baja pero el terminal sigue procesando ventas en el período, algo quedó a medio cerrar (o el comercio nunca dejó de operar).</div>
       <div class="tabla-wrap">
         <table>
-          <thead><tr><th>Cuenta (SF)</th><th>Razón social (panel)</th><th>CUIT</th><th class="num">Ventas período</th><th>Última venta</th><th>Alerta</th></tr></thead>
+          <thead><tr><th>Cuenta (SF)</th><th>CUIT</th><th>Terminal</th><th class="num">Ventas período</th><th>Última venta / Alerta</th></tr></thead>
           <tbody id="tbody-cruce"></tbody>
         </table>
       </div>
@@ -337,10 +337,21 @@ function renderChartPorDia(porDia){
   const ctx = document.getElementById('chartPorDia');
   if(_chartPorDia) _chartPorDia.destroy();
   if(!datos.length){ return; }
+  // Pedido 03/09: con pocos días en pantalla (7 o menos) conviene ver el
+  // día de la semana además de la fecha — con 30/90 días se satura, ahí
+  // se deja solo la fecha como antes.
+  const DIAS_SEMANA = ['dom','lun','mar','mié','jue','vie','sáb'];
+  const mostrarDiaSemana = datos.length <= 8;
+  const labels = datos.map(d=>{
+    const [y,m,dd] = String(d.dia).split('-').map(Number);
+    const fechaLocal = new Date(y, m-1, dd); // evita el corrimiento de zona horaria de parsear "YYYY-MM-DD" como UTC
+    const ddmm = `${String(dd).padStart(2,'0')}/${String(m).padStart(2,'0')}`;
+    return mostrarDiaSemana ? `${ddmm} (${DIAS_SEMANA[fechaLocal.getDay()]})` : d.dia;
+  });
   _chartPorDia = new Chart(ctx, {
     type: 'line',
     data: {
-      labels: datos.map(d=>d.dia),
+      labels,
       datasets: [{
         label: 'Ventas',
         data: datos.map(d=>Number(d.total_ventas)||0),
@@ -500,7 +511,7 @@ function renderCruce(discrepancias){
   const tbody = document.getElementById('tbody-cruce');
   document.getElementById('cruce-count').textContent = discrepancias.length ? `${discrepancias.length} caso${discrepancias.length===1?'':'s'}` : '';
   if(!discrepancias.length){
-    tbody.innerHTML = '<tr><td colspan="6" class="empty">Sin discrepancias en el rango elegido — buena señal 👍</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5" class="empty">Sin discrepancias en el rango elegido — buena señal 👍</td></tr>';
     return;
   }
   tbody.innerHTML = discrepancias.map(d=>{
@@ -508,13 +519,17 @@ function renderCruce(discrepancias){
     const badge = esBaja
       ? '<span class="badge baja">Facturó estando de baja</span>'
       : '<span class="badge sinmatch">Sin cuenta en SF</span>';
+    const cuentaCel = d.sf_nombre
+      ? (d.sf_id
+          ? `<a class="sf-link" href="https://alleata.lightning.force.com/lightning/r/Account/${d.sf_id}/view" target="_blank" rel="noopener">${d.sf_nombre} ↗</a>`
+          : d.sf_nombre)
+      : '<span style="color:var(--text-muted)">— sin match —</span>';
     return `<tr>
-      <td>${d.sf_nombre ? `<span style="color:var(--teal)">${d.sf_nombre}</span>` : '<span style="color:var(--text-muted)">— sin match —</span>'}</td>
-      <td>${d.razon_social || '—'}</td>
+      <td>${cuentaCel}${d.razon_social?`<div style="font-size:10.5px;color:var(--text-muted)">${d.razon_social}</div>`:''}</td>
       <td style="font-family:var(--mono)">${d.cuit || '—'}</td>
+      <td style="font-family:var(--mono)">${d.numero_terminal || '<span style="color:var(--text-muted)">—</span>'}</td>
       <td class="num" style="font-family:var(--mono)">${fmt$(d.total_ventas)}</td>
-      <td>${d.ultima_venta || '—'}</td>
-      <td>${badge}</td>
+      <td>${d.ultima_venta || '—'} ${badge}</td>
     </tr>`;
   }).join('');
 }
