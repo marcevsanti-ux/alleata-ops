@@ -128,9 +128,9 @@
       <div class="kpi-sub" id="kpi-promedio-sub">—</div>
     </div>
     <div class="kpi">
-      <div class="kpi-label">Comercios con venta</div>
+      <div class="kpi-label">Top del ranking</div>
       <div class="kpi-val" id="kpi-comercios" style="color:var(--purple)">—</div>
-      <div class="kpi-sub">en el ranking top 15</div>
+      <div class="kpi-sub">comercios en el Top 15 (no es el total de terminales activos)</div>
     </div>
     <div class="kpi">
       <div class="kpi-label">Alertas de baja/facturación</div>
@@ -213,6 +213,18 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const fmt$ = v => '$' + Math.round(Number(v)||0).toLocaleString('es-AR');
 const fmtInt = v => Math.round(Number(v)||0).toLocaleString('es-AR');
 
+// FIX 03/09: toISOString() siempre da la fecha en UTC — a la noche en
+// Argentina (ART = UTC-3) eso ya cae en el día siguiente (ej. 21:12 ART
+// del 2/9 = 00:12 UTC del 3/9), así que el botón "Hoy" y la fecha default
+// marcaban un día de más. Esto arma la fecha con los componentes LOCALES
+// del navegador, no con el reloj UTC.
+function fechaLocalYMD(d){
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,'0');
+  const dd = String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${dd}`;
+}
+
 async function requiereSesion(){
   const { data: { session } } = await sb.auth.getSession();
   if(!session){
@@ -231,8 +243,8 @@ function headersAuth(token){
 (function initFechas(){
   const hoy = new Date();
   const hace7 = new Date(hoy.getTime() - 6*86400000);
-  document.getElementById('f-hasta').value = hoy.toISOString().slice(0,10);
-  document.getElementById('f-desde').value = hace7.toISOString().slice(0,10);
+  document.getElementById('f-hasta').value = fechaLocalYMD(hoy);
+  document.getElementById('f-desde').value = fechaLocalYMD(hace7);
 })();
 
 document.getElementById('chips-rango').addEventListener('click', e=>{
@@ -243,8 +255,8 @@ document.getElementById('chips-rango').addEventListener('click', e=>{
   const dias = Number(btn.dataset.dias);
   const hoy = new Date();
   const desde = new Date(hoy.getTime() - dias*86400000);
-  document.getElementById('f-hasta').value = hoy.toISOString().slice(0,10);
-  document.getElementById('f-desde').value = desde.toISOString().slice(0,10);
+  document.getElementById('f-hasta').value = fechaLocalYMD(hoy);
+  document.getElementById('f-desde').value = fechaLocalYMD(desde);
   cargarTodo();
 });
 
