@@ -180,6 +180,39 @@
       </div>
     </div>
 
+    <div class="card" style="border-color:rgba(245,158,11,.35)">
+      <div class="card-title">
+        <span>🩺 Diagnóstico de calidad — desvíos detectados</span>
+        <span id="diag-count" style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-muted)"></span>
+      </div>
+      <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px">
+        Esto NO excluye nada solo — es una lista de filas donde <code style="color:var(--amber)">total_de_ventas</code> no coincide con la suma de sus propios componentes (factura A+B+C+presupuesto). Vos decidís, fila por fila, si corresponde excluirla del análisis.
+      </div>
+      <div class="tabla-wrap">
+        <table>
+          <thead><tr>
+            <th>Día</th><th>Comercio</th><th>Terminal</th>
+            <th class="num">Total</th><th class="num">Suma componentes</th><th class="num">Diferencia</th><th></th>
+          </tr></thead>
+          <tbody id="tbody-diag"><tr><td colspan="7" class="empty">Cargando...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card" id="card-exclusiones" style="display:none;border-color:rgba(239,68,68,.35)">
+      <div class="card-title">
+        <span>🚫 Exclusiones activas en este rango</span>
+        <span id="excl-count" style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-muted)"></span>
+      </div>
+      <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px">Los totales de arriba (KPIs, gráfico, ranking, medios de pago, facturación) ya están recalculados restando estas filas. Reversible en cualquier momento.</div>
+      <div class="tabla-wrap">
+        <table>
+          <thead><tr><th>Día</th><th>Comercio</th><th>Terminal</th><th class="num">Monto excluido</th><th>Motivo</th><th>Excluido por</th><th></th></tr></thead>
+          <tbody id="tbody-exclusiones"></tbody>
+        </table>
+      </div>
+    </div>
+
     <div class="card">
       <div class="card-title">
         <span>⚠️ Cuentas dadas de baja en Salesforce que siguen facturando</span>
@@ -295,20 +328,37 @@ async function cargarTodo(){
 
   try{
     const qs = new URLSearchParams({ desde, hasta });
-    const [rResumen, rCruce] = await Promise.all([
+    const [rResumen, rCruce, rDiag, rExcl] = await Promise.all([
       fetch(`${RAILWAY_BASE}/automations/operaciones-alleata/resumen?${qs}`, { headers: headersAuth(token) }),
       fetch(`${RAILWAY_BASE}/automations/operaciones-alleata/cruce-sf?${qs}`, { headers: headersAuth(token) }),
+      fetch(`${RAILWAY_BASE}/automations/operaciones-alleata/diagnostico?${qs}`, { headers: headersAuth(token) }),
+      fetch(`${RAILWAY_BASE}/automations/operaciones-alleata/exclusiones?${qs}`, { headers: headersAuth(token) }),
     ]);
     const jResumen = await rResumen.json();
     if(!rResumen.ok || !jResumen.ok) throw new Error(jResumen.error || `HTTP ${rResumen.status} (resumen)`);
     const jCruce = await rCruce.json();
     if(!rCruce.ok || !jCruce.ok) throw new Error(jCruce.error || `HTTP ${rCruce.status} (cruce-sf)`);
+    const jDiag = await rDiag.json();
+    if(!rDiag.ok || !jDiag.ok) throw new Error(jDiag.error || `HTTP ${rDiag.status} (diagnostico)`);
+    const jExcl = await rExcl.json();
+    if(!rExcl.ok || !jExcl.ok) throw new Error(jExcl.error || `HTTP ${rExcl.status} (exclusiones)`);
 
-    renderKPIs(jResumen.porDia||[], jResumen.topTiendas||[], jCruce.discrepancias||[]);
-    renderChartPorDia(jResumen.porDia||[]);
-    renderRanking(jResumen.topTiendas||[]);
-    renderMedioPago(jResumen.porMedioPago);
-    renderFacturacion(jResumen.facturacion);
+    _ultimasExclusiones = jExcl.exclusiones || [];
+
+    // Pedido 03/09: nada se excluye solo — pero lo que el operador YA marcó
+    // manualmente en corridas anteriores sí se resta acá, en el cliente,
+    // de los agregados que vienen de los RPCs (que no tienen forma de saber
+    // de esta tabla de exclusiones). Reversible: sacar la exclusión vuelve
+    // a sumar el valor la próxima vez que se recalcule.
+    const { porDia, topTiendas, porMedioPago, facturacion } = restarExclusiones(jResumen, _ultimasExclusiones);
+
+    renderKPIs(porDia, topTiendas, jCruce.discrepancias||[]);
+    renderChartPorDia(porDia);
+    renderRanking(topTiendas);
+    renderMedioPago(porMedioPago);
+    renderFacturacion(facturacion);
+    renderDiagnostico(jDiag.sospechosas||[]);
+    renderExclusiones(_ultimasExclusiones);
     renderCruce(jCruce.discrepancias||[]);
 
     ocultarEstado();
@@ -321,6 +371,132 @@ async function cargarTodo(){
   }
 }
 
+let _ultimasExclusiones = [];
+
+// Resta, del lado del cliente, lo que el operador excluyó manualmente —
+// sin tocar los RPCs. porDia y topTiendas se ajustan monto por monto;
+// porMedioPago y facturacion se ajustan por sus propios componentes.
+// LIMITACIÓN CONOCIDA: si una fila excluida infla a un comercio que hoy
+// está en el Top 15, al restarle el monto puede quedar mal ordenado o
+// "debería" salir del Top 15 y entrar otro que hoy no aparece — el RPC ya
+// devolvió solo 15, no hay forma de recuperar un 16to desde acá. Si eso
+// pasa seguido, hay que sumar el filtro directamente al RPC top_tiendas.
+function restarExclusiones(jResumen, exclusiones){
+  const porDia = (jResumen.porDia||[]).map(d=>({...d}));
+  const topTiendas = (jResumen.topTiendas||[]).map(t=>({...t}));
+  const pm = jResumen.porMedioPago ? {...jResumen.porMedioPago} : null;
+  const fact = jResumen.facturacion ? {...jResumen.facturacion} : null;
+
+  for(const ex of exclusiones){
+    const monto = Number(ex.total_de_ventas)||0;
+
+    const diaRow = porDia.find(d=>d.dia===ex.dia);
+    if(diaRow) diaRow.total_ventas = (Number(diaRow.total_ventas)||0) - monto;
+
+    const tRow = topTiendas.find(t=>(t.nombre_tienda||t.razon_social)===(ex.nombre_tienda||ex.razon_social));
+    if(tRow) tRow.total_ventas = (Number(tRow.total_ventas)||0) - monto;
+
+    if(pm){
+      pm.efectivo   = (Number(pm.efectivo)||0)   - (Number(ex.efectivo)||0);
+      pm.debito     = (Number(pm.debito)||0)     - (Number(ex.debito)||0);
+      pm.credito    = (Number(pm.credito)||0)    - (Number(ex.credito)||0);
+      pm.codigo_qr  = (Number(pm.codigo_qr)||0)  - (Number(ex.codigo_qr)||0);
+      pm.otros      = (Number(pm.otros)||0)      - (Number(ex.otros)||0);
+    }
+    if(fact){
+      fact.factura_a = (Number(fact.factura_a)||0) - (Number(ex.factura_a)||0);
+      fact.factura_b = (Number(fact.factura_b)||0) - (Number(ex.factura_b)||0);
+      fact.factura_c = (Number(fact.factura_c)||0) - (Number(ex.factura_c)||0);
+      fact.presupuesto_de_venta = (Number(fact.presupuesto_de_venta)||0) - (Number(ex.presupuesto_de_venta)||0);
+    }
+  }
+  return { porDia, topTiendas, porMedioPago: pm, facturacion: fact };
+}
+
+function renderDiagnostico(sospechosas){
+  const tbody = document.getElementById('tbody-diag');
+  document.getElementById('diag-count').textContent = sospechosas.length ? `${sospechosas.length} caso${sospechosas.length===1?'':'s'}` : '';
+  if(!sospechosas.length){
+    tbody.innerHTML = '<tr><td colspan="7" class="empty">Sin desvíos estructurales detectados en este rango 👍</td></tr>';
+    return;
+  }
+  tbody.innerHTML = sospechosas.map(f=>{
+    if(f.ya_excluida){
+      return `<tr style="opacity:.5">
+        <td>${f.dia}</td>
+        <td>${f.nombre_tienda || f.razon_social || '—'}</td>
+        <td style="font-family:var(--mono)">${f.numero_terminal || '—'}</td>
+        <td class="num" style="font-family:var(--mono)">${fmt$(f.total_de_ventas)}</td>
+        <td class="num" style="font-family:var(--mono)">${fmt$(f.suma_componentes)}</td>
+        <td class="num" style="font-family:var(--mono);color:var(--red)">${fmt$(f.diferencia)}</td>
+        <td><span class="badge sinmatch">Ya excluida</span></td>
+      </tr>`;
+    }
+    return `<tr>
+      <td>${f.dia}</td>
+      <td>${f.nombre_tienda || f.razon_social || '—'}</td>
+      <td style="font-family:var(--mono)">${f.numero_terminal || '—'}</td>
+      <td class="num" style="font-family:var(--mono)">${fmt$(f.total_de_ventas)}</td>
+      <td class="num" style="font-family:var(--mono)">${fmt$(f.suma_componentes)}</td>
+      <td class="num" style="font-family:var(--mono);color:var(--red)">${fmt$(f.diferencia)}</td>
+      <td><button class="chip" style="background:rgba(239,68,68,.15);border-color:rgba(239,68,68,.4);color:var(--red)" onclick="excluirFila(${f.id},'${(f.nombre_tienda||f.razon_social||'').replace(/'/g,"\\'")}')">Excluir</button></td>
+    </tr>`;
+  }).join('');
+}
+
+function renderExclusiones(exclusiones){
+  const card = document.getElementById('card-exclusiones');
+  const tbody = document.getElementById('tbody-exclusiones');
+  document.getElementById('excl-count').textContent = exclusiones.length ? `${exclusiones.length} activa${exclusiones.length===1?'':'s'}` : '';
+  if(!exclusiones.length){ card.style.display='none'; return; }
+  card.style.display='block';
+  tbody.innerHTML = exclusiones.map(e=>`<tr>
+    <td>${e.dia}</td>
+    <td>${e.nombre_tienda || e.razon_social || '—'}</td>
+    <td style="font-family:var(--mono)">${e.numero_terminal || '—'}</td>
+    <td class="num" style="font-family:var(--mono)">${fmt$(e.total_de_ventas)}</td>
+    <td>${e.motivo || '<span style="color:var(--text-muted)">—</span>'}</td>
+    <td>${e.excluido_por || '<span style="color:var(--text-muted)">—</span>'}</td>
+    <td><button class="chip" onclick="reincluirFila(${e.operacion_id})">Reincluir</button></td>
+  </tr>`).join('');
+}
+
+async function excluirFila(operacion_id, nombreComercio){
+  const motivo = prompt(`Motivo de la exclusión para "${nombreComercio}" (opcional):`, 'Desvío estructural — total no coincide con la suma de sus componentes');
+  if(motivo === null) return; // canceló
+  const token = await requiereSesion();
+  if(!token) return;
+  try{
+    const { data: { user } } = await sb.auth.getUser();
+    const r = await fetch(`${RAILWAY_BASE}/automations/operaciones-alleata/exclusiones`, {
+      method: 'POST',
+      headers: { ...headersAuth(token), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ operacion_id, motivo, excluido_por: user?.email || null }),
+    });
+    const j = await r.json();
+    if(!r.ok || !j.ok) throw new Error(j.error || `HTTP ${r.status}`);
+    cargarTodo();
+  }catch(e){
+    alert('Error al excluir: '+e.message);
+  }
+}
+
+async function reincluirFila(operacion_id){
+  if(!confirm('¿Reincluir esta fila en el análisis? Vuelve a sumar su monto a todos los totales.')) return;
+  const token = await requiereSesion();
+  if(!token) return;
+  try{
+    const r = await fetch(`${RAILWAY_BASE}/automations/operaciones-alleata/exclusiones/${operacion_id}`, {
+      method: 'DELETE',
+      headers: headersAuth(token),
+    });
+    const j = await r.json();
+    if(!r.ok || !j.ok) throw new Error(j.error || `HTTP ${r.status}`);
+    cargarTodo();
+  }catch(e){
+    alert('Error al reincluir: '+e.message);
+  }
+}
 function renderKPIs(porDia, topTiendas, discrepancias){
   const total = porDia.reduce((s,d)=>s+(Number(d.total_ventas)||0), 0);
   const promedio = porDia.length ? total/porDia.length : 0;
