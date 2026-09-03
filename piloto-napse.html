@@ -202,7 +202,20 @@ async function cargarPiloto(){
       return;
     }
 
-    cont.innerHTML = j.terminales.map(t=>`
+    cont.innerHTML = j.terminales.map(t=>t.error ? `
+      <div class="terminal-card" style="border-color:rgba(239,68,68,.4)">
+        <div class="terminal-head">
+          <div>
+            <div class="terminal-nombre">${t.razon_social || t.nombre_tienda || '(sin nombre todavía)'}</div>
+            <div class="terminal-sub">Terminal ${t.numero_terminal} · CUIT ${t.cuit||'—'}</div>
+          </div>
+          <div class="terminal-meta">
+            <button class="ghost" onclick="quitarTerminal(${t.id},'${(t.razon_social||t.nombre_tienda||t.numero_terminal).replace(/'/g,"\\'")}')">Sacar del piloto</button>
+          </div>
+        </div>
+        <div class="empty" style="color:var(--red);text-align:left;padding:8px 0">⚠️ No se pudo traer el historial: ${t.error}. Probá recargar — si sigue pasando, puede hacer falta un índice en la tabla.</div>
+      </div>
+    ` : `
       <div class="terminal-card">
         <div class="terminal-head">
           <div>
@@ -232,7 +245,7 @@ async function cargarPiloto(){
       </div>
     `).join('');
 
-    j.terminales.forEach(t => pintarHistorial(t));
+    j.terminales.filter(t=>!t.error).forEach(t => pintarHistorial(t));
   }catch(e){
     cont.innerHTML = `<div class="card"><div class="empty" style="color:var(--red)">Error: ${e.message}</div></div>`;
   }
