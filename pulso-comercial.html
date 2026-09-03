@@ -190,11 +190,8 @@
       </div>
       <div class="tabla-wrap">
         <table>
-          <thead><tr>
-            <th>Día</th><th>Comercio</th><th>Terminal</th>
-            <th class="num">Total</th><th class="num">Suma componentes</th><th class="num">Diferencia</th><th></th>
-          </tr></thead>
-          <tbody id="tbody-diag"><tr><td colspan="7" class="empty">Cargando...</td></tr></tbody>
+          <thead><tr id="diag-thead"></tr></thead>
+          <tbody id="tbody-diag"><tr><td colspan="8" class="empty">Cargando...</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -413,33 +410,70 @@ function restarExclusiones(jResumen, exclusiones){
   return { porDia, topTiendas, porMedioPago: pm, facturacion: fact };
 }
 
+let _ultimoDiagnostico = [];
+let _diagOrden = { campo: 'diferencia', asc: false };
+
+const DIAG_COLUMNAS = [
+  { campo: 'dia', label: 'Día' },
+  { campo: 'cuenta', label: 'Cuenta (SF)' },
+  { campo: 'cuit', label: 'CUIT' },
+  { campo: 'numero_terminal', label: 'Terminal' },
+  { campo: 'total_de_ventas', label: 'Total', num: true },
+  { campo: 'suma_componentes', label: 'Suma componentes', num: true },
+  { campo: 'diferencia', label: 'Diferencia', num: true },
+];
+
+function diagOrdenarPor(campo){
+  if(_diagOrden.campo === campo) _diagOrden.asc = !_diagOrden.asc;
+  else _diagOrden = { campo, asc: true };
+  pintarDiagnostico();
+}
+
 function renderDiagnostico(sospechosas){
-  const tbody = document.getElementById('tbody-diag');
+  _ultimoDiagnostico = sospechosas;
+  pintarDiagnostico();
+}
+
+function pintarDiagnostico(){
+  const sospechosas = _ultimoDiagnostico;
   document.getElementById('diag-count').textContent = sospechosas.length ? `${sospechosas.length} caso${sospechosas.length===1?'':'s'}` : '';
+
+  const thead = document.getElementById('diag-thead');
+  thead.innerHTML = DIAG_COLUMNAS.map(c=>{
+    const activa = _diagOrden.campo===c.campo;
+    const flecha = activa ? (_diagOrden.asc?' ▲':' ▼') : '';
+    return `<th class="${c.num?'num':''}" style="cursor:pointer;user-select:none" onclick="diagOrdenarPor('${c.campo}')">${c.label}${activa?`<span style="color:var(--teal)">${flecha}</span>`:''}</th>`;
+  }).join('') + '<th></th>';
+
+  const tbody = document.getElementById('tbody-diag');
   if(!sospechosas.length){
-    tbody.innerHTML = '<tr><td colspan="7" class="empty">Sin desvíos estructurales detectados en este rango 👍</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" class="empty">Sin desvíos estructurales detectados en este rango 👍</td></tr>';
     return;
   }
-  tbody.innerHTML = sospechosas.map(f=>{
-    if(f.ya_excluida){
-      return `<tr style="opacity:.5">
-        <td>${f.dia}</td>
-        <td>${f.nombre_tienda || f.razon_social || '—'}</td>
-        <td style="font-family:var(--mono)">${f.numero_terminal || '—'}</td>
-        <td class="num" style="font-family:var(--mono)">${fmt$(f.total_de_ventas)}</td>
-        <td class="num" style="font-family:var(--mono)">${fmt$(f.suma_componentes)}</td>
-        <td class="num" style="font-family:var(--mono);color:var(--red)">${fmt$(f.diferencia)}</td>
-        <td><span class="badge sinmatch">Ya excluida</span></td>
-      </tr>`;
-    }
-    return `<tr>
+
+  const valorDe = (f, campo) => campo==='cuenta' ? (f.sf_nombre || f.razon_social || f.nombre_tienda || '') : f[campo];
+  const ordenadas = [...sospechosas].sort((a,b)=>{
+    const va = valorDe(a, _diagOrden.campo), vb = valorDe(b, _diagOrden.campo);
+    const cmp = typeof va === 'number' && typeof vb === 'number' ? va - vb : String(va??'').localeCompare(String(vb??''));
+    return _diagOrden.asc ? cmp : -cmp;
+  });
+
+  tbody.innerHTML = ordenadas.map(f=>{
+    const cuentaCel = f.sf_id
+      ? `<a class="sf-link" href="https://alleata.lightning.force.com/lightning/r/Account/${f.sf_id}/view" target="_blank" rel="noopener">${f.sf_nombre} ↗</a>`
+      : (f.sf_nombre || `<span style="color:var(--text-muted)" title="No se encontró la cuenta en Salesforce por este CUIT">${f.razon_social || f.nombre_tienda || '— sin match —'}</span>`);
+    const accionCel = f.ya_excluida
+      ? '<span class="badge sinmatch">Ya excluida</span>'
+      : `<button class="chip" style="background:rgba(239,68,68,.15);border-color:rgba(239,68,68,.4);color:var(--red)" onclick="excluirFila(${f.id},'${(f.sf_nombre||f.razon_social||'').replace(/'/g,"\\'")}')">Excluir</button>`;
+    return `<tr${f.ya_excluida?' style="opacity:.5"':''}>
       <td>${f.dia}</td>
-      <td>${f.nombre_tienda || f.razon_social || '—'}</td>
+      <td>${cuentaCel}</td>
+      <td style="font-family:var(--mono)">${f.cuit || '—'}</td>
       <td style="font-family:var(--mono)">${f.numero_terminal || '—'}</td>
       <td class="num" style="font-family:var(--mono)">${fmt$(f.total_de_ventas)}</td>
       <td class="num" style="font-family:var(--mono)">${fmt$(f.suma_componentes)}</td>
       <td class="num" style="font-family:var(--mono);color:var(--red)">${fmt$(f.diferencia)}</td>
-      <td><button class="chip" style="background:rgba(239,68,68,.15);border-color:rgba(239,68,68,.4);color:var(--red)" onclick="excluirFila(${f.id},'${(f.nombre_tienda||f.razon_social||'').replace(/'/g,"\\'")}')">Excluir</button></td>
+      <td>${accionCel}</td>
     </tr>`;
   }).join('');
 }
