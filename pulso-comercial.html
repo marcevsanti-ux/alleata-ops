@@ -210,6 +210,24 @@
       </div>
     </div>
 
+    <div class="card" id="card-bajo-umbral" style="border-color:rgba(139,92,246,.35)">
+      <div class="card-title">
+        <span>🚀 Cuentas por debajo del umbral de arranque</span>
+        <span id="umbral-count" style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-muted)"></span>
+      </div>
+      <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px">
+        Cuentas <b>activas</b> con más de 30 días desde su fecha de alta que NO llegaron a <b>$500.000</b> vendidos en sus primeros 30 días — ventana fija, no se recalcula con el tiempo. Señal para que Customer Success haga seguimiento.
+        Recorre <b>todas</b> las cuentas activas de la org — puede tardar. No se calcula solo, hay que pedirlo.
+      </div>
+      <button class="primary" onclick="calcularBajoUmbral()" id="btn-umbral" style="background:linear-gradient(135deg,#7c3aed,#8b5cf6);margin-bottom:12px">Calcular</button>
+      <div class="tabla-wrap">
+        <table>
+          <thead><tr><th>Cuenta (SF)</th><th>CUIT</th><th>Fecha de alta</th><th class="num">Días desde alta</th><th class="num">Vendido en primeros 30 días</th></tr></thead>
+          <tbody id="tbody-umbral"><tr><td colspan="5" class="empty">Apretá "Calcular" para traer el resultado.</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
     <div class="card" id="card-cruce-sf">
       <div class="card-title">
         <span>⚠️ Cuentas dadas de baja en Salesforce que siguen facturando</span>
@@ -378,6 +396,40 @@ function irACuentasDeBaja(){
   card.style.transition = 'border-color .3s';
   card.style.borderColor = 'var(--amber)';
   setTimeout(()=>{ card.style.borderColor = colorOriginal; }, 1500);
+}
+
+async function calcularBajoUmbral(){
+  const token = await requiereSesion();
+  if(!token) return;
+  const btn = document.getElementById('btn-umbral');
+  const tbody = document.getElementById('tbody-umbral');
+  btn.disabled = true;
+  btn.textContent = 'Calculando... (recorre toda la org, puede tardar)';
+  tbody.innerHTML = '<tr><td colspan="5" class="empty">Calculando...</td></tr>';
+  try{
+    const r = await fetch(`${RAILWAY_BASE}/automations/operaciones-alleata/bajo-umbral`, { headers: headersAuth(token) });
+    const j = await r.json();
+    if(!r.ok || !j.ok) throw new Error(j.error || `HTTP ${r.status}`);
+
+    document.getElementById('umbral-count').textContent = `${j.bajo_umbral.length} de ${j.total_cuentas_evaluadas} cuentas evaluadas`;
+
+    if(!j.bajo_umbral.length){
+      tbody.innerHTML = '<tr><td colspan="5" class="empty">Ninguna cuenta activa con más de 30 días quedó por debajo del umbral 👍</td></tr>';
+      return;
+    }
+    tbody.innerHTML = j.bajo_umbral.map(c=>`<tr>
+      <td><a class="sf-link" href="https://alleata.lightning.force.com/lightning/r/Account/${c.sf_id}/view" target="_blank" rel="noopener">${c.sf_nombre} ↗</a></td>
+      <td style="font-family:var(--mono)">${c.cuit || '—'}</td>
+      <td>${c.fecha_alta}</td>
+      <td class="num">${fmtInt(c.dias_desde_alta)}</td>
+      <td class="num" style="font-family:var(--mono);color:${c.total_primeros_30_dias===0?'var(--red)':'var(--amber)'}">${fmt$(c.total_primeros_30_dias)}</td>
+    </tr>`).join('');
+  }catch(e){
+    tbody.innerHTML = `<tr><td colspan="5" class="empty" style="color:var(--red)">Error: ${e.message}</td></tr>`;
+  }finally{
+    btn.disabled = false;
+    btn.textContent = 'Calcular';
+  }
 }
 
 // Resta, del lado del cliente, lo que el operador excluyó manualmente —
