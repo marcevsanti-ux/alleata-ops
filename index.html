@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.7.3</title>
+<title>Alleata · Operaciones v4.7.4</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -408,7 +408,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.3 · 04 sep 2026
+      v4.7.4 · 04 sep 2026
     </div>
   </div>
 </div>
@@ -517,7 +517,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.3 · 04 sep 2026
+      v4.7.4 · 04 sep 2026
     </div>
   </div>
 </nav>
@@ -572,7 +572,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.3</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.4</div>
   </div>
   <div class="content">
 
@@ -5188,7 +5188,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.7.3] OK');
+console.log('[Alleata v4.7.4] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -9163,6 +9163,7 @@ function dsToggleEstadoGenerico(estado, estadoDetalleObj, detalleElId){
   // esto a otros estados todavía.
   if(estado==='Pendiente'){ dsPendienteRenderInvestigacion(lista, el); return; }
   if(estado==='En Proceso'){ dsEnProcesoRenderTracking(lista, el); return; }
+  if(estado==='Recuperada'){ dsRecuperadaRenderPorMes(lista, el); return; }
 
   const celda=v=>v?`<span>${v}</span>`:`<span style="color:var(--text-muted)">—</span>`;
   const color=ESTADO_COLORS_NAPSE[estado]||'#6b7280';
@@ -9198,6 +9199,93 @@ function dsToggleEstadoGenerico(estado, estadoDetalleObj, detalleElId){
     </table>
   </div>`;
 }
+
+// Pedido 04/09: desglose de "Recuperada" por mes (cantidad de recuperos
+// exitosos), mismo patrón que la vista especial de Pendiente/En Proceso.
+// Agrupa por mes de fecha_creacion de la OT; clickear un mes filtra la
+// tabla de abajo a solo ese mes (toggle — un segundo click en el mismo
+// mes vuelve a mostrar todos).
+let _dsRecuperadaMesActivo=null;
+function dsRecuperadaRenderPorMes(lista, el){
+  _dsRecuperadaMesActivo=null;
+  const color=ESTADO_COLORS_NAPSE['Recuperada']||'#10b981';
+  const porMes={};
+  lista.forEach(o=>{
+    const d=o.fecha_creacion?new Date(o.fecha_creacion):null;
+    const key=d&&!isNaN(d)?`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`:'sin-fecha';
+    (porMes[key]=porMes[key]||[]).push(o);
+  });
+  const MESES_LABEL={'01':'Ene','02':'Feb','03':'Mar','04':'Abr','05':'May','06':'Jun','07':'Jul','08':'Ago','09':'Sep','10':'Oct','11':'Nov','12':'Dic'};
+  const mesesOrdenados=Object.keys(porMes).filter(k=>k!=='sin-fecha').sort();
+  if(porMes['sin-fecha']) mesesOrdenados.push('sin-fecha');
+
+  window._dsRecuperadaPorMes=porMes;
+
+  const chips=mesesOrdenados.map(k=>{
+    const label=k==='sin-fecha' ? 'Sin fecha' : `${MESES_LABEL[k.slice(5)]} ${k.slice(0,4)}`;
+    return `<div onclick="dsRecuperadaFiltrarPorMes('${k}')" id="ds-rec-mes-${k}" style="cursor:pointer;background:${color}18;border:1px solid ${color}40;border-radius:10px;padding:8px 14px;min-width:70px;text-align:center">
+      <div style="font-size:17px;font-weight:800;color:${color}">${porMes[k].length}</div>
+      <div style="font-size:10px;color:var(--text-muted)">${label}</div>
+    </div>`;
+  }).join('');
+
+  el.innerHTML=`
+    <div style="margin-top:12px">
+      <div style="font-size:12px;font-weight:700;color:${color};margin-bottom:8px">Recuperada (${lista.length}) — por mes de creación de la OT</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px">${chips}</div>
+      <div id="ds-recuperada-tabla"></div>
+    </div>`;
+  dsRecuperadaFiltrarPorMes(null, true);
+}
+
+function dsRecuperadaFiltrarPorMes(mesKey, esInicial){
+  const cont=document.getElementById('ds-recuperada-tabla');
+  if(!cont)return;
+  // Toggle: click en el mismo mes ya activo vuelve a mostrar todos.
+  if(!esInicial){
+    _dsRecuperadaMesActivo = (_dsRecuperadaMesActivo===mesKey) ? null : mesKey;
+  }
+  document.querySelectorAll('[id^="ds-rec-mes-"]').forEach(c=>{ c.style.boxShadow=''; });
+  if(_dsRecuperadaMesActivo){
+    const activo=document.getElementById(`ds-rec-mes-${_dsRecuperadaMesActivo}`);
+    if(activo) activo.style.boxShadow=`0 0 0 2px ${ESTADO_COLORS_NAPSE['Recuperada']||'#10b981'}`;
+  }
+  const porMes=window._dsRecuperadaPorMes||{};
+  const lista=_dsRecuperadaMesActivo ? (porMes[_dsRecuperadaMesActivo]||[]) : Object.values(porMes).flat();
+  const color=ESTADO_COLORS_NAPSE['Recuperada']||'#10b981';
+  const celda=v=>v?`<span>${v}</span>`:`<span style="color:var(--text-muted)">—</span>`;
+  cont.innerHTML=`<div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:10px 12px;overflow-x:auto">
+    <table style="width:100%;border-collapse:collapse;font-size:11px;white-space:nowrap">
+      <thead><tr style="text-align:left;color:var(--text-muted);text-transform:uppercase;font-size:9px;letter-spacing:.03em">
+        <th style="padding:4px 8px 4px 0">OT</th>
+        <th style="padding:4px 8px">Fecha creación</th>
+        <th style="padding:4px 8px">Cuenta</th>
+        <th style="padding:4px 8px">CUIT</th>
+        <th style="padding:4px 8px">Comercio</th>
+        <th style="padding:4px 8px">Motivo</th>
+        <th style="padding:4px 8px">Propietario cta.</th>
+        <th style="padding:4px 8px">Contacto</th>
+        <th style="padding:4px 8px">Terminal ID</th>
+        <th style="padding:4px 0">Ciudad</th>
+      </tr></thead>
+      <tbody>
+        ${lista.map(o=>`<tr style="border-top:1px solid var(--border)">
+          <td style="padding:5px 8px 5px 0;font-family:'JetBrains Mono',monospace;font-weight:700">${o.ot}</td>
+          <td style="padding:5px 8px;font-size:10px;color:var(--text-muted)">${o.fecha_creacion?new Date(o.fecha_creacion).toLocaleDateString('es-AR'):'—'}</td>
+          <td style="padding:5px 8px">${celda(o.cuenta)}</td>
+          <td style="padding:5px 8px;font-family:'JetBrains Mono',monospace">${celda(o.cuit)}</td>
+          <td style="padding:5px 8px">${celda(o.comercio)}</td>
+          <td style="padding:5px 8px">${celda(o.motivo)}</td>
+          <td style="padding:5px 8px">${o.propietario?`<span style="color:#9ca3af">${o.propietario}</span>`:`<span style="color:var(--text-muted)">—</span>`}</td>
+          <td style="padding:5px 8px">${celda(o.contacto)}</td>
+          <td style="padding:5px 8px">${celda(o.terminal_id)}</td>
+          <td style="padding:5px 0">${celda(o.ciudad)}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>
+  </div>`;
+}
+
 
 // ── Backlog Histórico — Desinstalaciones (pedido 26/08) ────────────────────
 // MISMO patrón que Gestión OPS de arriba (mismo endpoint SF en vivo, mismo
