@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.7.6</title>
+<title>Alleata · Operaciones v4.7.7</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -408,7 +408,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.6 · 04 sep 2026
+      v4.7.7 · 04 sep 2026
     </div>
   </div>
 </div>
@@ -517,7 +517,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.6 · 04 sep 2026
+      v4.7.7 · 04 sep 2026
     </div>
   </div>
 </nav>
@@ -572,7 +572,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.6</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.7</div>
   </div>
   <div class="content">
 
@@ -5188,7 +5188,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.7.6] OK');
+console.log('[Alleata v4.7.7] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -9202,16 +9202,19 @@ function dsToggleEstadoGenerico(estado, estadoDetalleObj, detalleElId){
 
 // Pedido 04/09: desglose de "Recuperada" por mes (cantidad de recuperos
 // exitosos), mismo patrón que la vista especial de Pendiente/En Proceso.
-// Agrupa por mes de fecha_creacion de la OT; clickear un mes filtra la
-// tabla de abajo a solo ese mes (toggle — un segundo click en el mismo
-// mes vuelve a mostrar todos).
+// FIX 04/09 (v2): agrupa por FECHA DE RECUPERACIÓN (fecha_recuperada —
+// cuándo el Status pasó a Recuperada), no por fecha_creacion de la OT —
+// antes una OT creada en julio pero recuperada en agosto aparecía en el
+// balde de julio, que no tiene sentido para este desglose puntual.
+// Clickear un mes filtra la tabla de abajo a solo ese mes (toggle — un
+// segundo click en el mismo mes vuelve a mostrar todos).
 let _dsRecuperadaMesActivo=null;
 function dsRecuperadaRenderPorMes(lista, el){
   _dsRecuperadaMesActivo=null;
   const color=ESTADO_COLORS_NAPSE['Recuperada']||'#10b981';
   const porMes={};
   lista.forEach(o=>{
-    const d=o.fecha_creacion?new Date(o.fecha_creacion):null;
+    const d=o.fecha_recuperada?new Date(o.fecha_recuperada):null;
     const key=d&&!isNaN(d)?`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`:'sin-fecha';
     (porMes[key]=porMes[key]||[]).push(o);
   });
@@ -9231,7 +9234,7 @@ function dsRecuperadaRenderPorMes(lista, el){
 
   el.innerHTML=`
     <div style="margin-top:12px">
-      <div style="font-size:12px;font-weight:700;color:${color};margin-bottom:8px">Recuperada (${lista.length}) — por mes de creación de la OT</div>
+      <div style="font-size:12px;font-weight:700;color:${color};margin-bottom:8px">Recuperada (${lista.length}) — por mes de recuperación${porMes['sin-fecha']?` (${porMes['sin-fecha'].length} sin fecha de recuperación identificada en el historial)`:''}</div>
       <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px">${chips}</div>
       <div id="ds-recuperada-tabla"></div>
     </div>`;
@@ -9251,7 +9254,9 @@ async function dsRecuperadaFiltrarPorMes(mesKey, esInicial){
     if(activo) activo.style.boxShadow=`0 0 0 2px ${ESTADO_COLORS_NAPSE['Recuperada']||'#10b981'}`;
   }
   const porMes=window._dsRecuperadaPorMes||{};
-  const lista=_dsRecuperadaMesActivo ? (porMes[_dsRecuperadaMesActivo]||[]) : Object.values(porMes).flat();
+  const lista=(_dsRecuperadaMesActivo ? (porMes[_dsRecuperadaMesActivo]||[]) : Object.values(porMes).flat())
+    .slice()
+    .sort((a,b)=>(a.fecha_recuperada||'').localeCompare(b.fecha_recuperada||''));
   const color=ESTADO_COLORS_NAPSE['Recuperada']||'#10b981';
   const celda=v=>v?`<span>${v}</span>`:`<span style="color:var(--text-muted)">—</span>`;
 
