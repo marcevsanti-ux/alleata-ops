@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.7.2</title>
+<title>Alleata · Operaciones v4.7.3</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -408,7 +408,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.2 · 04 sep 2026
+      v4.7.3 · 04 sep 2026
     </div>
   </div>
 </div>
@@ -517,7 +517,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.2 · 04 sep 2026
+      v4.7.3 · 04 sep 2026
     </div>
   </div>
 </nav>
@@ -572,7 +572,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.2</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.3</div>
   </div>
   <div class="content">
 
@@ -1022,7 +1022,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
           <div class="field"><label class="label">Contraseña inicial</label><div style="position:relative;display:flex;align-items:center"><input class="input" id="ajPass" type="password" placeholder="Mínimo 6 caracteres" style="padding-right:42px" /><button type="button" onclick="togglePassVisibility('ajPass',this)" style="position:absolute;right:10px;background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:16px;padding:4px;line-height:1;transition:color .2s" title="Mostrar/ocultar contraseña">👁</button></div></div>
           <div class="field"><label class="label">Celular</label><input class="input" id="ajCelular" type="tel" placeholder="+54 11 1234-5678" /></div>
           <div class="field"><label class="label">Rol</label>
-            <select class="select" id="ajRol">
+            <select class="select" id="ajRol" onchange="ajToggleFiltroResponsable()">
               <option value="operador">Operador</option>
               <option value="logistica">Logística</option>
               <option value="admin">Administrador</option>
@@ -1030,6 +1030,11 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
               <option value="customer">Customer (solo Desinstalaciones)</option>
             </select>
           </div>
+        </div>
+        <div class="field" id="ajFiltroResponsableWrap" style="display:none">
+          <label class="label">Responsable a filtrar (solo ve sus propias OTs)</label>
+          <input class="input" id="ajFiltroResponsable" placeholder="Ej: Keila Tabares — tal cual figura en el Responsable de la OT" />
+          <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Vacío = ve el trabajo de TODOS los responsables (como Rosario/Juan Ignacio). Cargado = ve SOLO sus propias OTs.</div>
         </div>
         <div class="field">
           <label class="label" style="margin-bottom:10px">Módulos habilitados</label>
@@ -5183,7 +5188,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.7.2] OK');
+console.log('[Alleata v4.7.3] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -6000,12 +6005,19 @@ function toggleCreateMod(el){
   el.classList.toggle('active');
 }
 
+function ajToggleFiltroResponsable(){
+  const wrap = document.getElementById('ajFiltroResponsableWrap');
+  const rol = document.getElementById('ajRol').value;
+  if(wrap) wrap.style.display = rol === 'customer' ? 'block' : 'none';
+}
+
 async function createUser() {
   const nombre = document.getElementById('ajNombre').value.trim();
   const email  = document.getElementById('ajEmail').value.trim();
   const pass   = document.getElementById('ajPass').value;
   const celular= document.getElementById('ajCelular').value.trim();
   const rol    = document.getElementById('ajRol').value;
+  const filtro_responsable = document.getElementById('ajFiltroResponsable')?.value.trim() || null;
   const msg    = document.getElementById('ajMsg');
 
   if (!nombre || !email || !pass) {
@@ -6027,7 +6039,7 @@ async function createUser() {
     const res = await fetch(`${ALLY_RAILWAY_BASE}/admin/users`, {
       method: 'POST',
       headers: ADMIN_HEADERS,
-      body: JSON.stringify({ nombre, email, password: pass, rol, modulos, celular })
+      body: JSON.stringify({ nombre, email, password: pass, rol, modulos, celular, filtro_responsable })
     });
     const data = await res.json();
     if (!data.ok) throw new Error(data.error);
@@ -6039,6 +6051,8 @@ async function createUser() {
     document.getElementById('ajPass').value   = '';
     document.getElementById('ajCelular').value= '';
     document.getElementById('ajRol').value    = 'operador';
+    ajToggleFiltroResponsable();
+    const fr = document.getElementById('ajFiltroResponsable'); if(fr) fr.value = '';
     document.querySelectorAll('#createModPills .mod-pill').forEach(p => p.classList.remove('active'));
     // Recargar lista
     loadUsers();
@@ -6065,13 +6079,17 @@ function editUser(u) {
         </div>
         <div style="margin-bottom:14px">
           <label style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:6px">Rol</label>
-          <select id="euRol" style="width:100%;background:var(--navy-700);border:1px solid var(--border);border-radius:8px;padding:7px 10px;color:var(--text);font-family:'Inter',sans-serif;font-size:13px">
+          <select id="euRol" style="width:100%;background:var(--navy-700);border:1px solid var(--border);border-radius:8px;padding:7px 10px;color:var(--text);font-family:'Inter',sans-serif;font-size:13px" onchange="euToggleFiltroResponsable()">
             <option value="operador">Operador</option>
             <option value="logistica">Logística</option>
             <option value="admin">Administrador</option>
             <option value="ceo">CEO (solo dashboard, lectura)</option>
             <option value="customer">Customer (solo Desinstalaciones)</option>
           </select>
+        </div>
+        <div style="margin-bottom:14px" id="euFiltroResponsableWrap">
+          <label style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:6px">Responsable a filtrar (solo ve sus propias OTs)</label>
+          <input id="euFiltroResponsable" style="width:100%;background:var(--navy-700);border:1px solid var(--border);border-radius:8px;padding:7px 10px;color:var(--text);font-family:'Inter',sans-serif;font-size:13px" placeholder="Ej: Keila Tabares" />
         </div>
         <div style="margin-bottom:18px">
           <label style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:8px">Módulos habilitados</label>
@@ -6092,6 +6110,9 @@ function editUser(u) {
   document.getElementById('euNombre').textContent = u.nombre || '—';
   document.getElementById('euEmail').textContent  = u.email  || '';
   document.getElementById('euRol').value          = u.rol    || 'operador';
+  const euFR = document.getElementById('euFiltroResponsable');
+  if(euFR) euFR.value = u.filtro_responsable || '';
+  euToggleFiltroResponsable();
   document.getElementById('euMsg').innerHTML      = '';
 
   // Pills de módulos
@@ -6117,10 +6138,17 @@ function editUser(u) {
   modal.style.display = 'flex';
 }
 
+function euToggleFiltroResponsable(){
+  const wrap = document.getElementById('euFiltroResponsableWrap');
+  const rol = document.getElementById('euRol').value;
+  if(wrap) wrap.style.display = rol === 'customer' ? 'block' : 'none';
+}
+
 async function saveEditUser() {
   const modal  = document.getElementById('editUserModal');
   const id     = modal._userId;
   const rol    = document.getElementById('euRol').value;
+  const filtro_responsable = document.getElementById('euFiltroResponsable')?.value.trim() || null;
   const modulos = Array.from(document.querySelectorAll('#euPills .mod-pill.active')).map(p => p.dataset.mod);
   const msg    = document.getElementById('euMsg');
   const btn    = document.getElementById('euSaveBtn');
@@ -6133,7 +6161,7 @@ async function saveEditUser() {
     const res = await fetch(`${ALLY_RAILWAY_BASE}/admin/users/${id}`, {
       method: 'PATCH',
       headers: ADMIN_HEADERS,
-      body: JSON.stringify({ rol, modulos })
+      body: JSON.stringify({ rol, modulos, filtro_responsable })
     });
     const data = await res.json();
     if (!data.ok) throw new Error(data.error);
