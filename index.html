@@ -16166,7 +16166,15 @@ async function napseMatchSF(serialNumber, node, store, btn){
               const v=String(rows[i][sIdx]||'').trim();
               const m=mIdx>-1?String(rows[i][mIdx]||'').trim():'D7 Axium';
               const sol=solIdx>-1?String(rows[i][solIdx]||'').trim():'';
-              const esError = solIdx>-1 && sol!=='' && normTxt(sol)!=='personalizacion';
+              // FIX 04/09: "Solución" viene como "Personalización sin cambio
+              // de pila" / "Personalización con cambio de pila" — nunca
+              // literalmente "Personalización" a secas. El !== exacto de
+              // antes marcaba TODAS las terminales como "con error" (Estado
+              // ROTA / Perfil PRISMA), incluso las que estaban perfectamente
+              // bien. Ahora alcanza con que arranque con "personalizacion"
+              // para considerarla un caso normal — cualquier otra cosa
+              // (una reparación real, por ejemplo) sigue cayendo en error.
+              const esError = solIdx>-1 && sol!=='' && !normTxt(sol).startsWith('personalizacion');
               if(v.length>10) series.push({serie:v, modelo:m||'D7 Axium', solucion:sol, esError});
             }
             const mr=rows.find(r=>String(r[1]||'').toLowerCase().includes('mes'));
