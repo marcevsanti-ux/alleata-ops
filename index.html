@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.7.4</title>
+<title>Alleata · Operaciones v4.7.5</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -408,7 +408,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.4 · 04 sep 2026
+      v4.7.5 · 04 sep 2026
     </div>
   </div>
 </div>
@@ -517,7 +517,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.4 · 04 sep 2026
+      v4.7.5 · 04 sep 2026
     </div>
   </div>
 </nav>
@@ -572,7 +572,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.4</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.5</div>
   </div>
   <div class="content">
 
@@ -5188,7 +5188,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.7.4] OK');
+console.log('[Alleata v4.7.5] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -9238,7 +9238,7 @@ function dsRecuperadaRenderPorMes(lista, el){
   dsRecuperadaFiltrarPorMes(null, true);
 }
 
-function dsRecuperadaFiltrarPorMes(mesKey, esInicial){
+async function dsRecuperadaFiltrarPorMes(mesKey, esInicial){
   const cont=document.getElementById('ds-recuperada-tabla');
   if(!cont)return;
   // Toggle: click en el mismo mes ya activo vuelve a mostrar todos.
@@ -9254,7 +9254,32 @@ function dsRecuperadaFiltrarPorMes(mesKey, esInicial){
   const lista=_dsRecuperadaMesActivo ? (porMes[_dsRecuperadaMesActivo]||[]) : Object.values(porMes).flat();
   const color=ESTADO_COLORS_NAPSE['Recuperada']||'#10b981';
   const celda=v=>v?`<span>${v}</span>`:`<span style="color:var(--text-muted)">—</span>`;
-  cont.innerHTML=`<div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:10px 12px;overflow-x:auto">
+
+  // Pedido 04/09: costo promedio del grupo visible — mismo dato que usa
+  // Churn Producto (sf_workorders.costo_envio, cruce por
+  // ot_desinstalacion = workorder_number), pedido acá vivo cada vez que
+  // se cambia de mes para no traer de más.
+  cont.innerHTML=`<div style="font-size:11px;color:var(--text-muted);margin-bottom:8px">Calculando costo promedio de ${lista.length} OT...</div>`;
+  let costoHtml='';
+  try{
+    const numeros=lista.map(o=>o.ot).filter(Boolean);
+    if(numeros.length){
+      const {data,error}=await sb.from('sf_workorders').select('workorder_number,costo_envio').in('workorder_number',numeros);
+      if(error) throw new Error(error.message);
+      const costos=(data||[]).map(r=>Number(r.costo_envio)).filter(n=>Number.isFinite(n)&&n>0);
+      const totalCosto=costos.reduce((s,n)=>s+n,0);
+      const promedio=costos.length?totalCosto/costos.length:0;
+      const sinCosto=numeros.length-costos.length;
+      costoHtml=`<div style="display:flex;gap:18px;flex-wrap:wrap;align-items:baseline;background:${color}10;border:1px solid ${color}30;border-radius:10px;padding:10px 14px;margin-bottom:12px">
+        <div><span style="font-size:20px;font-weight:800;color:${color}">$${Math.round(promedio).toLocaleString('es-AR')}</span><span style="font-size:11px;color:var(--text-muted);margin-left:6px">costo promedio</span></div>
+        <div style="font-size:11px;color:var(--text-muted)">Total: $${Math.round(totalCosto).toLocaleString('es-AR')} · sobre ${costos.length} OT con costo cargado${sinCosto?` (${sinCosto} sin costo)`:''}</div>
+      </div>`;
+    }
+  }catch(e){
+    costoHtml=`<div style="font-size:11px;color:var(--red);margin-bottom:10px">⚠️ No se pudo calcular el costo promedio: ${e.message}</div>`;
+  }
+
+  cont.innerHTML=`${costoHtml}<div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:10px 12px;overflow-x:auto">
     <table style="width:100%;border-collapse:collapse;font-size:11px;white-space:nowrap">
       <thead><tr style="text-align:left;color:var(--text-muted);text-transform:uppercase;font-size:9px;letter-spacing:.03em">
         <th style="padding:4px 8px 4px 0">OT</th>
