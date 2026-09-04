@@ -92,7 +92,10 @@
       <div class="sub">Ventas diarias reales por terminal (panel Alleata) cruzadas con Salesforce — actualizado por el cron de la 1am ART</div>
       <div class="version">v1.0.0</div>
     </div>
-    <a class="back" href="index.html">← Volver al portal</a>
+    <div style="text-align:right">
+      <a class="back" href="piloto-napse.html">🧪 Piloto Napse 1.6.0</a><br>
+      <a class="back" href="index.html">← Volver al portal</a>
+    </div>
   </header>
 
   <div class="card">
@@ -523,7 +526,7 @@ function pintarDiagnostico(){
   tbody.innerHTML = ordenadas.map(f=>{
     const cuentaCel = f.sf_id
       ? `<a class="sf-link" href="https://alleata.lightning.force.com/lightning/r/Account/${f.sf_id}/view" target="_blank" rel="noopener">${f.sf_nombre} ↗</a>`
-      : (f.sf_nombre || `<span style="color:var(--text-muted)" title="No se encontró la cuenta en Salesforce por este CUIT">${f.razon_social || f.nombre_tienda || '— sin match —'}</span>`);
+      : (f.sf_nombre || `<span style="color:var(--text-muted)" title="El terminal existe pero su Product2 no tiene la Cuenta cargada en Salesforce (Cuenta_busqueda__c vacío)">${f.razon_social || f.nombre_tienda || '— sin terminal asociada —'}</span>`);
     const accionCel = f.ya_excluida
       ? '<span class="badge sinmatch">Ya excluida</span>'
       : `<button class="chip" style="background:rgba(239,68,68,.15);border-color:rgba(239,68,68,.4);color:var(--red)" onclick="excluirFila(${f.id},'${(f.sf_nombre||f.razon_social||'').replace(/'/g,"\\'")}')">Excluir</button>`;
@@ -795,7 +798,7 @@ function renderCruce(discrepancias){
     const esBaja = d.alerta === 'FACTURA_CON_CUENTA_DE_BAJA';
     const badge = esBaja
       ? '<span class="badge baja">Facturó estando de baja</span>'
-      : '<span class="badge sinmatch">Sin cuenta en SF</span>';
+      : '<span class="badge sinmatch" title="El Product2 (terminal) existe pero su campo Cuenta_busqueda__c está vacío en Salesforce — no es que falte la cuenta, falta el vínculo terminal→cuenta.">Sin terminal asociada</span>';
     const cuentaCel = d.sf_nombre
       ? (d.sf_id
           ? `<a class="sf-link" href="https://alleata.lightning.force.com/lightning/r/Account/${d.sf_id}/view" target="_blank" rel="noopener">${d.sf_nombre} ↗</a>`
