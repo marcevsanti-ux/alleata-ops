@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.7.9</title>
+<title>Alleata · Operaciones v4.7.10</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -408,7 +408,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.9 · 07 sep 2026
+      v4.7.10 · 07 sep 2026
     </div>
   </div>
 </div>
@@ -517,7 +517,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.9 · 07 sep 2026
+      v4.7.10 · 07 sep 2026
     </div>
   </div>
 </nav>
@@ -572,7 +572,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.9</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.10</div>
   </div>
   <div class="content">
 
@@ -5184,7 +5184,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.7.9] OK');
+console.log('[Alleata v4.7.10] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -12951,7 +12951,17 @@ async function consultarTracking(id, trackNum){
         ultimo_evento_envio:       ultimo.estadoCA ? `${ultimo.historia} — ${ultimo.estadoCA}` : ultimo.historia,
         ultimo_evento_envio_fecha: ultimo.fecha
       };
-      if(estadoMapeado) updateData.status = estadoMapeado;
+      // FIX 07/09: se sacó "if(estadoMapeado) updateData.status = estadoMapeado".
+      // El comentario de más abajo ya decía que este botón debía ser "de solo
+      // lectura: no modifica Salesforce" — pero esa línea SÍ pisaba el status
+      // local en sf_workorders con un valor calculado acá en el frontend
+      // (mapearEstadoCA), que podía no coincidir con el status real de SF
+      // (ej. "En tránsito", que ya no es un estado válido del flujo). Caso
+      // real OT 23825: se corrigió el status a mano en SF a "Pre-Colecta",
+      // pero un click en esta lupa lo pisó localmente con "En tránsito" —
+      // la OT desapareció del portal (no está en los estados visibles) sin
+      // que SF se haya tocado en absoluto. El status ahora es EXCLUSIVAMENTE
+      // lo que sincroniza desde Salesforce (Full Sync / cron / Forzar OT).
 
       const sla = calcularSLA(eventos);
       if(sla.fecha_repesaje)         updateData.fecha_repesaje       = sla.fecha_repesaje;
@@ -12963,14 +12973,10 @@ async function consultarTracking(id, trackNum){
       await sb.from('sf_workorders').update(updateData).eq('id', id);
       loadBadges(); renderEnvios();
 
-      // FIX: antes acá se llamaba automáticamente a /run/sf_ca_tracker_one en
-      // CADA consulta manual (botón 🔍), aunque el operador solo quisiera MIRAR
-      // el tracking. Eso escribía Observaciones__c en Salesforce por cada click,
-      // ensuciando el Historial de la OT con una entrada nueva cada vez — incluso
-      // sin ningún cambio real de fondo. El write-back a SF ahora es EXCLUSIVO
-      // del proceso automático (scheduler.js, corre 4 veces por día), que sí
-      // representa una actualización real y controlada. Consultar tracking desde
-      // el portal es de solo lectura: no modifica Salesforce.
+      // El write-back a SF (incluido el cambio de Status) es EXCLUSIVO del
+      // proceso automático (scheduler.js / sfCaTracker.js). Consultar
+      // tracking desde el portal es de solo lectura: no modifica Salesforce
+      // ni el status local.
     }
 
     // ── Disparar Ally Rules via backend si hubo cambio de estado ─────────────
@@ -13215,7 +13221,11 @@ async function autoActualizarTracking(){
         if(sla.sla_total_dias !== null) updateAT.sla_total_dias     = sla.sla_total_dias;
 
         if(estadoMapeado && estadoMapeado !== envio.estado){
-          updateAT.status = estadoMapeado;
+          // FIX 07/09: mismo problema que en consultarTracking() — se sacó
+          // "updateAT.status = estadoMapeado", que pisaba el status real de
+          // SF con un valor calculado localmente en el frontend. Esta
+          // función está deshabilitada hoy (sin botón activo que la
+          // dispare), pero se corrige igual por si se reactiva.
           await sb.from('sf_workorders').update(updateAT).eq('id', envio.id);
           // Disparar processAllyRules vía backend para CUALQUIER cambio de estado
           // Esto evalúa ally_notification_rules y envía notificaciones al grupo correcto
@@ -13228,7 +13238,7 @@ async function autoActualizarTracking(){
             atAddLog('alerta', otLabel, envio.responsable, envio.cuenta, `⚠️ ${visitaLabel||'ALERTA'} — ${detalle}`);
             alertas++;
           } else {
-            atAddLog('cambio', otLabel, envio.responsable, envio.cuenta, `${envio.estado} → ${estadoMapeado}`);
+            atAddLog('cambio', otLabel, envio.responsable, envio.cuenta, `${envio.estado} → ${estadoMapeado} (info CA, no se escribió en status)`);
             actualizados++;
           }
         } else {
