@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.7.11</title>
+<title>Alleata · Operaciones v4.7.12</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -408,7 +408,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.11 · 07 sep 2026
+      v4.7.12 · 07 sep 2026
     </div>
   </div>
 </div>
@@ -517,7 +517,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.11 · 07 sep 2026
+      v4.7.12 · 07 sep 2026
     </div>
   </div>
 </nav>
@@ -572,7 +572,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.11</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.12</div>
   </div>
   <div class="content">
 
@@ -5184,7 +5184,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.7.11] OK');
+console.log('[Alleata v4.7.12] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -12942,65 +12942,64 @@ async function consultarTracking(id, trackNum){
     }
     mostrarModalTrackingCA(trackNum, { eventos, pieza }, 'ok', '', otNumero);
 
-    // ── SLA: calcular y persistir ────────────────────────────────────────────
-    const ultimo   = eventos[0];
-    const estadoMapeado = mapearEstadoCA(ultimo.historia, ultimo.estadoCA, tipoOT);
-
+    // ── SLA: calcular y persistir (esto sigue siendo solo informativo, no
+    // toca status) ────────────────────────────────────────────────────────
+    const ultimo = eventos[0];
     if(id){
       const updateData = {
         ultimo_evento_envio:       ultimo.estadoCA ? `${ultimo.historia} — ${ultimo.estadoCA}` : ultimo.historia,
         ultimo_evento_envio_fecha: ultimo.fecha
       };
-      // FIX 07/09: se sacó "if(estadoMapeado) updateData.status = estadoMapeado".
-      // El comentario de más abajo ya decía que este botón debía ser "de solo
-      // lectura: no modifica Salesforce" — pero esa línea SÍ pisaba el status
-      // local en sf_workorders con un valor calculado acá en el frontend
-      // (mapearEstadoCA), que podía no coincidir con el status real de SF
-      // (ej. "En tránsito", que ya no es un estado válido del flujo). Caso
-      // real OT 23825: se corrigió el status a mano en SF a "Pre-Colecta",
-      // pero un click en esta lupa lo pisó localmente con "En tránsito" —
-      // la OT desapareció del portal (no está en los estados visibles) sin
-      // que SF se haya tocado en absoluto. El status ahora es EXCLUSIVAMENTE
-      // lo que sincroniza desde Salesforce (Full Sync / cron / Forzar OT).
-
       const sla = calcularSLA(eventos);
       if(sla.fecha_repesaje)         updateData.fecha_repesaje       = sla.fecha_repesaje;
       if(sla.fecha_primer_intento)   updateData.fecha_primer_intento = sla.fecha_primer_intento;
       if(sla.cant_intentos)          updateData.cant_intentos         = sla.cant_intentos;
       if(sla.sla_ca_dias !== null)   updateData.sla_ca_dias           = sla.sla_ca_dias;
       if(sla.sla_total_dias !== null)updateData.sla_total_dias        = sla.sla_total_dias;
-
       await sb.from('sf_workorders').update(updateData).eq('id', id);
-      loadBadges(); renderEnvios();
-
-      // El write-back a SF (incluido el cambio de Status) es EXCLUSIVO del
-      // proceso automático (scheduler.js / sfCaTracker.js). Consultar
-      // tracking desde el portal es de solo lectura: no modifica Salesforce
-      // ni el status local.
     }
 
-    // ── Disparar Ally Rules via backend si hubo cambio de estado ─────────────
+    // ── FIX 07/09 (v2): la función original de esta lupa SÍ era consultar
+    // CA y accionar en SF si correspondía — lo que estaba mal no era la
+    // intención, era que el cálculo de "a qué estado accionar" se hacía acá
+    // mismo en el frontend (mapearEstadoCA), con lógica duplicada y
+    // desactualizada, escribiendo directo en Supabase sin pasar por SF ni
+    // por las validaciones reales. Eso fue lo que rompió la OT 23825 (pasó
+    // a "En tránsito" localmente sin que SF se enterara).
+    // Ahora la lupa delega la decisión al mismo proceso que usa el cron
+    // automático (sfCaTracker.js vía /run/sf_ca_tracker_one,
+    // writeback_sf:true) — ahí vive la lógica correcta y actualizada:
+    // primera detección → Despachado, Entregado → Exitoso/Retirar Terminal,
+    // y si SF rechaza el cambio, avisa a Ops por WhatsApp en vez de fallar
+    // en silencio. Un solo lugar con la lógica de estados, sea manual o
+    // automático.
     if(otNumero){
       try {
-        const allyResp = await fetch(
-          'https://alleata-agent-production.up.railway.app/automations/run/ca_status_checker_one',
+        showTrackingToast('🔄 Consultando y actualizando en SF...', 'teal');
+        const r = await fetch(
+          'https://alleata-agent-production.up.railway.app/automations/run/sf_ca_tracker_one',
           {
             method: 'POST',
-            headers: {
-              'Content-Type':       'application/json',
-              'x-automation-secret': '123456'
-            },
+            headers: { 'Content-Type': 'application/json', 'x-automation-secret': '123456' },
             body: JSON.stringify({ ot_numero: otNumero })
           }
         );
-        const allyData = await allyResp.json();
-        if(allyData.status === 'changed' && allyData.applied > 0){
-          showTrackingToast(`📢 Ally notificó ${allyData.applied} regla(s)`, 'teal');
+        const j = await r.json();
+        console.log('[consultarTracking] sf_ca_tracker_one result:', j);
+        if(j.ok && j.cerradasSF > 0){
+          showTrackingToast('✅ OT cerrada en SF (Exitoso/Retirar Terminal)', 'teal');
+        } else if(j.ok && j.actualizadas > 0){
+          showTrackingToast(`✅ Actualizado en SF (${j.actualizadas} cambio/s)`, 'teal');
+        } else if(j.motivo === 'sin_tracking'){
+          // No debería pasar acá (ya tenemos trackNum), pero por las dudas.
+        } else if(!j.ok){
+          showTrackingToast(`⚠️ ${j.mensaje || j.error || 'No se pudo actualizar en SF'}`, 'yellow');
         }
-        console.log('[consultarTracking] Ally result:', allyData);
-      } catch(allyErr){
-        // No interrumpir el flujo si Ally falla
-        console.warn('[consultarTracking] Ally Rules error:', allyErr.message);
+        // Refrescar la tabla para reflejar cualquier cambio de status real.
+        loadBadges(); renderEnvios();
+      } catch(errSF){
+        console.warn('[consultarTracking] error consultando/actualizando SF:', errSF.message);
+        showTrackingToast('⚠️ Error de red actualizando en SF', 'yellow');
       }
     }
 
