@@ -9546,7 +9546,13 @@ async function dsBacklogRenderSimplificado(lista, estado){
   // normalizada (sin acentos/mayúsculas, mismo criterio que esAngelResp
   // más arriba) para no depender de que el texto venga carácter a
   // carácter idéntico entre SF y lo cargado en el perfil.
-  const miFiltro = window.currentProfile?.filtro_responsable;
+  // FIX 07/09: `currentProfile` es una variable `let` de scope de script
+  // (declarada arriba, línea ~5447) — NUNCA fue una propiedad de `window`.
+  // Este era el único lugar de todo el archivo que la leía como
+  // `window.currentProfile`, así que `miFiltro` daba SIEMPRE undefined y
+  // el filtro de abajo nunca se activaba: cualquier usuario Customer veía
+  // la grilla completa de todos los responsables (el bug que vio Keila).
+  const miFiltro = currentProfile?.filtro_responsable;
   if(miFiltro){
     const norm = s => String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toUpperCase();
     const miClave = Object.keys(porResp).find(k => norm(k)===norm(miFiltro));
