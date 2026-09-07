@@ -336,13 +336,13 @@ function filaTerminalCambio(t){
         <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin:14px 0 8px">Día por día — pago digital (débito+crédito+QR), alineado por día-del-mes</div>
         <div class="tabla-wrap">
           <table>
-            <thead><tr><th>Día (después)</th><th class="num">Digital después</th><th>Día (antes, 1 mes atrás)</th><th class="num">Digital antes</th><th class="num">Δ</th></tr></thead>
+            <thead><tr><th>Día (antes, 1 mes atrás)</th><th class="num">Digital antes</th><th>Día (después)</th><th class="num">Digital después</th><th class="num">Δ</th></tr></thead>
             <tbody>
               ${(t.comparacion||[]).map(c=>`<tr>
-                <td>${c.dia_despues}</td>
-                <td class="num" style="font-family:var(--mono)">${fmt$(c.digital_despues)}</td>
                 <td>${c.dia_antes || '<span style="color:var(--text-muted)">— sin dato —</span>'}${c.es_fecha_aproximada?' <span style="color:var(--amber);font-size:10px">(aprox.)</span>':''}</td>
-                <td class="num" style="font-family:var(--mono)">${fmt$(c.digital_antes)}</td>
+                <td class="num" style="font-family:var(--mono)">${fmt$(c.digital_antes)}${desgloseHtml(c.desglose_antes)}</td>
+                <td>${c.dia_despues}</td>
+                <td class="num" style="font-family:var(--mono)">${fmt$(c.digital_despues)}${desgloseHtml(c.desglose_despues)}</td>
                 <td class="num">${renderDelta(c.digital_antes, c.digital_despues)}</td>
               </tr>`).join('') || '<tr><td colspan="5" class="empty">Sin días para comparar todavía.</td></tr>'}
             </tbody>
@@ -424,6 +424,18 @@ function toggleDetalle(id, tipo){
   }
 }
 
+// Pedido 06/09: aclarar de qué está compuesto el "digital" (débito+crédito+QR)
+// en vez de mostrar solo el total combinado. Muestra solo los medios con monto.
+function desgloseHtml(d){
+  if(!d) return '';
+  const partes = [];
+  if(d.debito)    partes.push(`déb ${fmt$(d.debito)}`);
+  if(d.credito)   partes.push(`créd ${fmt$(d.credito)}`);
+  if(d.codigo_qr) partes.push(`QR ${fmt$(d.codigo_qr)}`);
+  if(!partes.length) return '';
+  return `<div style="font-size:10px;color:var(--text-muted);font-weight:400">${partes.join(' · ')}</div>`;
+}
+
 function renderDelta(antes, despues){
   if(antes===null || despues===null || !antes) return '—';
   const pct = Math.round((despues-antes)/antes*100);
@@ -443,14 +455,14 @@ function pintarComparacionCambio(t){
       labels: datos.map(c=>c.dia_despues),
       datasets: [
         {
-          label: 'Digital — después (terminal nueva)',
-          data: datos.map(c=>c.digital_despues),
-          borderColor: '#8b5cf6', backgroundColor: '#8b5cf618', fill:true, tension:.2, pointRadius:1.5,
-        },
-        {
           label: 'Digital — antes (mismo día-del-mes, terminal vieja)',
           data: datos.map(c=>c.digital_antes),
           borderColor: '#1dbf8e', backgroundColor: 'transparent', borderDash:[4,3], tension:.2, pointRadius:1.5,
+        },
+        {
+          label: 'Digital — después (terminal nueva)',
+          data: datos.map(c=>c.digital_despues),
+          borderColor: '#8b5cf6', backgroundColor: '#8b5cf618', fill:true, tension:.2, pointRadius:1.5,
         },
       ],
     },
