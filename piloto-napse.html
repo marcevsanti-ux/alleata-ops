@@ -74,6 +74,11 @@
   .pm-compara{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:14px}
   .pm-col-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:8px}
   .pm-row2{display:flex;justify-content:space-between;padding:5px 0;font-size:12px;border-bottom:1px solid var(--border)}
+  .tabs{display:flex;gap:6px;margin-bottom:16px;border-bottom:1px solid var(--border2)}
+  .tab-btn{background:transparent;border:none;color:var(--text-muted);padding:10px 16px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;border-bottom:2px solid transparent}
+  .tab-btn.active{color:var(--teal);border-bottom-color:var(--teal)}
+  .tab-panel{display:none}
+  .tab-panel.active{display:block}
 </style>
 </head>
 <body>
@@ -81,38 +86,59 @@
   <header>
     <div>
       <div class="brand">alleata</div>
-      <h1>🧪 Piloto Napse 1.6.0 <span style="font-size:11px;font-weight:400;color:var(--text-muted);font-family:var(--mono)">v1.1.0</span></h1>
-      <div class="sub">Seguimiento de las terminales que se van actualizando a mano — ventas antes vs. después de cada actualización. La fecha de corte es por terminal, cada una tiene la suya (ver "Actualizada el..." / "Seguimiento desde..." en cada card).</div>
+      <h1>🧪 Piloto Napse 1.6.0 <span style="font-size:11px;font-weight:400;color:var(--text-muted);font-family:var(--mono)">v1.3.0</span></h1>
+      <div class="sub">Dos casos distintos, cada uno en su solapa: cambio de terminal (hardware nuevo) vs. actualización de versión (mismo terminal, solo control de estabilidad).</div>
     </div>
     <a class="back" href="pulso-comercial.html">← Volver a Pulso Comercial</a>
   </header>
 
-  <div class="card">
-    <div class="card-title">➕ Agregar terminal al piloto</div>
-    <div class="form-row">
-      <div class="campo">
-        <label>N° de terminal</label>
-        <input type="text" id="f-terminal" placeholder="Ej: 211057314201201420459765" style="width:280px">
-      </div>
-      <div class="campo">
-        <label>Fecha de actualización</label>
-        <input type="date" id="f-fecha" onchange="sugerirInicioSeguimiento()">
-      </div>
-      <div class="campo">
-        <label>Inicio del seguimiento</label>
-        <input type="date" id="f-fecha-inicio">
-      </div>
-      <div class="campo" style="flex:1;min-width:200px">
-        <label>Notas (opcional)</label>
-        <input type="text" id="f-notas" placeholder="Ej: primer lote piloto CABA">
-      </div>
-      <button class="primary" onclick="agregarTerminal()" id="btn-agregar">Agregar</button>
-    </div>
-    <div class="estado" id="estado-agregar" style="display:none"></div>
+  <div class="tabs">
+    <button class="tab-btn active" id="tab-btn-cambio" onclick="cambiarTab('cambio')">🔧 Cambio de Terminal</button>
+    <button class="tab-btn" id="tab-btn-actualizacion" onclick="cambiarTab('actualizacion')">🔄 Actualización de versión (misma terminal)</button>
   </div>
 
-  <div id="lista-terminales">
-    <div class="empty">Cargando piloto...</div>
+  <div class="tab-panel active" id="panel-cambio">
+    <div class="card">
+      <div class="card-title">➕ Agregar OT al piloto</div>
+      <div class="form-row">
+        <div class="campo">
+          <label>N° de OT (Cambio de Terminal)</label>
+          <input type="text" id="f-ot" placeholder="Ej: 00023969" style="width:200px">
+        </div>
+        <div class="campo" style="flex:1;min-width:200px">
+          <label>Notas (opcional)</label>
+          <input type="text" id="f-notas-cambio" placeholder="Ej: primer lote piloto CABA">
+        </div>
+        <button class="primary" onclick="agregarPorOt()" id="btn-agregar-ot">Buscar y agregar</button>
+      </div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:8px">Terminal vieja → terminal nueva (una OT de Cambio de Terminal real). Busca la OT en Salesforce, saca ambas terminales y calcula sola la fecha efectiva del cambio (primera vez que pasó a "Retirar Terminal", o "Exitoso" si nunca pasó por ahí). Compara pago digital (débito+crédito+QR) día a día, alineado por día-del-mes contra la terminal vieja.</div>
+      <div class="estado" id="estado-agregar-ot" style="display:none"></div>
+    </div>
+    <div id="lista-cambio"><div class="empty">Cargando...</div></div>
+  </div>
+
+  <div class="tab-panel" id="panel-actualizacion">
+    <div class="card">
+      <div class="card-title">➕ Agregar terminal al piloto</div>
+      <div class="form-row">
+        <div class="campo">
+          <label>N° de terminal</label>
+          <input type="text" id="f-terminal" placeholder="Ej: 211057314201201420459765" style="width:280px">
+        </div>
+        <div class="campo">
+          <label>Fecha de actualización</label>
+          <input type="date" id="f-fecha">
+        </div>
+        <div class="campo" style="flex:1;min-width:200px">
+          <label>Notas (opcional)</label>
+          <input type="text" id="f-notas-act" placeholder="Ej: primer lote piloto CABA">
+        </div>
+        <button class="primary" onclick="agregarPorTerminal()" id="btn-agregar-terminal">Agregar</button>
+      </div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:8px">Misma terminal, mismo hardware — solo se actualiza el software a 1.6.0. Compara el promedio de venta diaria de antes vs. después de esa fecha, en la misma terminal.</div>
+      <div class="estado" id="estado-agregar-terminal" style="display:none"></div>
+    </div>
+    <div id="lista-actualizacion"><div class="empty">Cargando...</div></div>
   </div>
 </div>
 
@@ -125,20 +151,13 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const fmt$ = v => v===null||v===undefined ? '—' : '$' + Math.round(Number(v)||0).toLocaleString('es-AR');
 const fechaLocalYMD = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-
 document.getElementById('f-fecha').value = fechaLocalYMD(new Date());
-sugerirInicioSeguimiento();
 
-function sugerirInicioSeguimiento(){
-  // Sugerencia, no obligación: por defecto el seguimiento arranca al día
-  // siguiente de la actualización (para no mezclar un día partido entre
-  // antes/después) — el operador lo puede pisar a mano si quiere que
-  // cuente desde el mismo día.
-  const fechaAct = document.getElementById('f-fecha').value;
-  if(!fechaAct) return;
-  const [y,m,d] = fechaAct.split('-').map(Number);
-  const siguiente = new Date(y, m-1, d+1);
-  document.getElementById('f-fecha-inicio').value = fechaLocalYMD(siguiente);
+function cambiarTab(tab){
+  document.getElementById('tab-btn-cambio').classList.toggle('active', tab==='cambio');
+  document.getElementById('tab-btn-actualizacion').classList.toggle('active', tab==='actualizacion');
+  document.getElementById('panel-cambio').classList.toggle('active', tab==='cambio');
+  document.getElementById('panel-actualizacion').classList.toggle('active', tab==='actualizacion');
 }
 
 async function requiereSesion(){
@@ -148,36 +167,69 @@ async function requiereSesion(){
 }
 function headersAuth(token){ return { 'Authorization': 'Bearer ' + token, 'x-automation-secret': AUTOMATION_SECRET }; }
 
-async function agregarTerminal(){
+async function agregarPorOt(){
+  const token = await requiereSesion();
+  if(!token) return;
+  const ot_numero = document.getElementById('f-ot').value.trim();
+  const notas = document.getElementById('f-notas-cambio').value.trim();
+  const estado = document.getElementById('estado-agregar-ot');
+  if(!ot_numero){
+    estado.style.display='block'; estado.className='estado error'; estado.textContent='Ingresá el N° de OT.';
+    return;
+  }
+  const btn = document.getElementById('btn-agregar-ot');
+  btn.disabled = true;
+  estado.style.display='block'; estado.className='estado'; estado.textContent='Buscando la OT en Salesforce...';
+  try{
+    const { data: { user } } = await sb.auth.getUser();
+    const r = await fetch(`${RAILWAY_BASE}/automations/operaciones-alleata/piloto-napse`, {
+      method: 'POST',
+      headers: { ...headersAuth(token), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ot_numero, notas, agregado_por: user?.email || null }),
+    });
+    const j = await r.json();
+    if(!r.ok || !j.ok) throw new Error(j.error || `HTTP ${r.status}`);
+    estado.className='estado';
+    estado.innerHTML = `✅ Agregada — fecha efectiva ${j.fecha_efectiva} (vía "${j.tipo_transicion}") · terminal vieja ${j.terminal_vieja||'—'} → nueva ${j.terminal_nueva}` +
+      (j.es_napse_x_napse ? ' <span style="color:var(--purple);font-weight:700">⚠️ NAPSE × NAPSE — caso raro, revisar</span>' : '');
+    document.getElementById('f-ot').value='';
+    document.getElementById('f-notas-cambio').value='';
+    cargarPiloto();
+  }catch(e){
+    estado.className='estado error'; estado.textContent='Error: '+e.message;
+  }finally{
+    btn.disabled = false;
+  }
+}
+
+async function agregarPorTerminal(){
   const token = await requiereSesion();
   if(!token) return;
   const numero_terminal = document.getElementById('f-terminal').value.trim();
   const fecha_actualizacion = document.getElementById('f-fecha').value;
-  const fecha_inicio_seguimiento = document.getElementById('f-fecha-inicio').value || null;
-  const notas = document.getElementById('f-notas').value.trim();
-  const estado = document.getElementById('estado-agregar');
+  const notas = document.getElementById('f-notas-act').value.trim();
+  const estado = document.getElementById('estado-agregar-terminal');
   if(!numero_terminal || !fecha_actualizacion){
-    estado.style.display='block'; estado.className='estado error'; estado.textContent='Completá al menos el N° de terminal y la fecha.';
+    estado.style.display='block'; estado.className='estado error'; estado.textContent='Completá el N° de terminal y la fecha.';
     return;
   }
-  const btn = document.getElementById('btn-agregar');
+  const btn = document.getElementById('btn-agregar-terminal');
   btn.disabled = true;
   estado.style.display='block'; estado.className='estado'; estado.textContent='Agregando...';
   try{
     const { data: { user } } = await sb.auth.getUser();
     const r = await fetch(`${RAILWAY_BASE}/automations/operaciones-alleata/piloto-napse`, {
-      method:'POST',
-      headers:{ ...headersAuth(token), 'Content-Type':'application/json' },
-      body: JSON.stringify({ numero_terminal, fecha_actualizacion, fecha_inicio_seguimiento, notas, agregado_por: user?.email||null }),
+      method: 'POST',
+      headers: { ...headersAuth(token), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ numero_terminal, fecha_actualizacion, notas, agregado_por: user?.email || null }),
     });
     const j = await r.json();
     if(!r.ok || !j.ok) throw new Error(j.error || `HTTP ${r.status}`);
     estado.textContent = j.encontro_historial
       ? '✅ Agregada — se le encontró historial previo para comparar.'
-      : '✅ Agregada — todavía no tiene ventas registradas en operaciones_alleata (puede ser nueva, o el número no coincide con ningún numero_terminal cargado).';
+      : '✅ Agregada — todavía no tiene ventas registradas en operaciones_alleata.';
     document.getElementById('f-terminal').value='';
-    document.getElementById('f-notas').value='';
-    sugerirInicioSeguimiento();
+    document.getElementById('f-notas-act').value='';
     cargarPiloto();
   }catch(e){
     estado.className='estado error'; estado.textContent='Error: '+e.message;
@@ -206,8 +258,10 @@ let _ultimoPiloto = [];
 async function cargarPiloto(){
   const token = await requiereSesion();
   if(!token) return;
-  const cont = document.getElementById('lista-terminales');
-  cont.innerHTML = '<div class="empty">Cargando piloto...</div>';
+  const contCambio = document.getElementById('lista-cambio');
+  const contAct = document.getElementById('lista-actualizacion');
+  contCambio.innerHTML = '<div class="empty">Cargando...</div>';
+  contAct.innerHTML = '<div class="empty">Cargando...</div>';
   try{
     const r = await fetch(`${RAILWAY_BASE}/automations/operaciones-alleata/piloto-napse`, { headers: headersAuth(token) });
     const j = await r.json();
@@ -215,31 +269,90 @@ async function cargarPiloto(){
 
     _ultimoPiloto = j.terminales;
 
-    if(!j.terminales.length){
-      cont.innerHTML = '<div class="card"><div class="empty">Todavía no agregaste ninguna terminal al piloto.</div></div>';
-      return;
-    }
+    const cambios = j.terminales.filter(t=>t.tipo!=='actualizacion_version');
+    const actualizaciones = j.terminales.filter(t=>t.tipo==='actualizacion_version');
 
-    cont.innerHTML = `<div class="card">
-      <div class="tabla-wrap">
-        <table>
+    contCambio.innerHTML = !cambios.length
+      ? '<div class="card"><div class="empty">Todavía no agregaste ninguna OT de Cambio de Terminal.</div></div>'
+      : `<div class="card"><div class="tabla-wrap"><table>
+          <thead><tr>
+            <th>Comercio</th><th>Fechas</th>
+            <th class="num">Antes (digital)</th><th class="num">Después (digital)</th><th class="num">Δ</th>
+            <th></th><th></th>
+          </tr></thead>
+          <tbody>${cambios.map(t => filaTerminalCambio(t)).join('')}</tbody>
+        </table></div></div>`;
+
+    contAct.innerHTML = !actualizaciones.length
+      ? '<div class="card"><div class="empty">Todavía no agregaste ninguna terminal en seguimiento de versión.</div></div>'
+      : `<div class="card"><div class="tabla-wrap"><table>
           <thead><tr>
             <th>Comercio</th><th>Fechas</th>
             <th class="num">Antes</th><th class="num">Después</th><th class="num">Δ</th>
             <th></th><th></th>
           </tr></thead>
-          <tbody>
-            ${j.terminales.map(t => filaTerminal(t)).join('')}
-          </tbody>
-        </table>
-      </div>
-    </div>`;
+          <tbody>${actualizaciones.map(t => filaTerminalActualizacion(t)).join('')}</tbody>
+        </table></div></div>`;
   }catch(e){
-    cont.innerHTML = `<div class="card"><div class="empty" style="color:var(--red)">Error: ${e.message}</div></div>`;
+    const msg = `<div class="card"><div class="empty" style="color:var(--red)">Error: ${e.message}</div></div>`;
+    contCambio.innerHTML = msg;
+    contAct.innerHTML = msg;
   }
 }
 
-function filaTerminal(t){
+function filaTerminalCambio(t){
+  const linkOt = t.sf_id ? `<a href="https://alleata.lightning.force.com/lightning/r/WorkOrder/${t.sf_id}/view" target="_blank" rel="noopener" style="color:var(--teal);text-decoration:none">OT ${t.ot_numero||''} ↗</a>` : '';
+  if(t.error){
+    return `<tr class="fila-terminal">
+      <td colspan="5">
+        <b>${t.razon_social || t.nombre_tienda || '(sin nombre)'}</b> ${linkOt}
+        <div style="font-size:11px;color:var(--text-muted);font-family:var(--mono)">Terminal ${t.numero_terminal} · CUIT ${t.cuit||'—'}</div>
+        <div style="color:var(--red);font-size:11.5px;margin-top:4px">⚠️ No se pudo traer el historial: ${t.error}</div>
+      </td>
+      <td></td>
+      <td><button class="x-btn" title="Sacar del piloto" onclick="quitarTerminal(${t.id},'${(t.razon_social||t.nombre_tienda||t.numero_terminal).replace(/'/g,"\\'")}')">✕</button></td>
+    </tr>`;
+  }
+  return `<tr class="fila-terminal">
+      <td>
+        <b>${t.razon_social || t.nombre_tienda || '(sin nombre todavía)'}</b> ${linkOt}
+        ${t.es_napse_x_napse?'<span style="color:var(--purple);font-weight:700;font-size:10.5px;margin-left:6px">⚠️ NAPSE × NAPSE</span>':''}
+        <div style="font-size:11px;color:var(--text-muted);font-family:var(--mono)">Vieja ${t.terminal_vieja||'—'} → Nueva ${t.numero_terminal} · CUIT ${t.cuit||'—'}</div>
+        ${t.notas?`<div style="font-size:11px;color:var(--text-muted);margin-top:2px">📝 ${t.notas}</div>`:''}
+      </td>
+      <td style="font-size:11px;color:var(--text-muted)">
+        Fecha efectiva ${t.fecha_actualizacion} <span style="opacity:.7">(${t.tipo_transicion||'—'})</span><br>
+        (hace ${t.dias_de_seguimiento} día${t.dias_de_seguimiento===1?'':'s'})
+      </td>
+      <td class="num" style="font-family:var(--mono)">${fmt$(t.promedio_digital_antes)}</td>
+      <td class="num" style="font-family:var(--mono)">${fmt$(t.promedio_digital_despues)}</td>
+      <td class="num">${renderDelta(t.promedio_digital_antes, t.promedio_digital_despues)}</td>
+      <td><button class="detalle-btn" id="btn-det-${t.id}" onclick="toggleDetalle(${t.id},'cambio_terminal')">Ver detalle</button></td>
+      <td><button class="x-btn" title="Sacar del piloto" onclick="quitarTerminal(${t.id},'${(t.razon_social||t.nombre_tienda||t.numero_terminal).replace(/'/g,"\\'")}')">✕</button></td>
+    </tr>
+    <tr class="fila-detalle" id="fila-det-${t.id}" style="display:none">
+      <td colspan="7">
+        <canvas id="chart-${t.id}" height="60"></canvas>
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin:14px 0 8px">Día por día — pago digital (débito+crédito+QR), alineado por día-del-mes</div>
+        <div class="tabla-wrap">
+          <table>
+            <thead><tr><th>Día (después)</th><th class="num">Digital después</th><th>Día (antes, 1 mes atrás)</th><th class="num">Digital antes</th><th class="num">Δ</th></tr></thead>
+            <tbody>
+              ${(t.comparacion||[]).map(c=>`<tr>
+                <td>${c.dia_despues}</td>
+                <td class="num" style="font-family:var(--mono)">${fmt$(c.digital_despues)}</td>
+                <td>${c.dia_antes || '<span style="color:var(--text-muted)">— sin dato —</span>'}${c.es_fecha_aproximada?' <span style="color:var(--amber);font-size:10px">(aprox.)</span>':''}</td>
+                <td class="num" style="font-family:var(--mono)">${fmt$(c.digital_antes)}</td>
+                <td class="num">${renderDelta(c.digital_antes, c.digital_despues)}</td>
+              </tr>`).join('') || '<tr><td colspan="5" class="empty">Sin días para comparar todavía.</td></tr>'}
+            </tbody>
+          </table>
+        </div>
+      </td>
+    </tr>`;
+}
+
+function filaTerminalActualizacion(t){
   if(t.error){
     return `<tr class="fila-terminal">
       <td colspan="5">
@@ -258,13 +371,13 @@ function filaTerminal(t){
         ${t.notas?`<div style="font-size:11px;color:var(--text-muted);margin-top:2px">📝 ${t.notas}</div>`:''}
       </td>
       <td style="font-size:11px;color:var(--text-muted)">
-        Actualizada ${t.fecha_actualizacion}${t.corte_seguimiento!==t.fecha_actualizacion?`<br>Seguim. desde ${t.corte_seguimiento}`:''}<br>
+        Actualizada ${t.fecha_actualizacion}<br>
         (hace ${t.dias_de_seguimiento} día${t.dias_de_seguimiento===1?'':'s'})
       </td>
       <td class="num" style="font-family:var(--mono)">${fmt$(t.promedio_diario_antes)}<div style="font-size:10px;color:var(--text-muted)">${t.dias_de_historial_antes}d</div></td>
       <td class="num" style="font-family:var(--mono)">${fmt$(t.promedio_diario_despues)}<div style="font-size:10px;color:var(--text-muted)">${t.dias_de_historial_despues}d</div></td>
       <td class="num">${renderDelta(t.promedio_diario_antes, t.promedio_diario_despues)}</td>
-      <td><button class="detalle-btn" id="btn-det-${t.id}" onclick="toggleDetalle(${t.id})">Ver detalle</button></td>
+      <td><button class="detalle-btn" id="btn-det-${t.id}" onclick="toggleDetalle(${t.id},'actualizacion_version')">Ver detalle</button></td>
       <td><button class="x-btn" title="Sacar del piloto" onclick="quitarTerminal(${t.id},'${(t.razon_social||t.nombre_tienda||t.numero_terminal).replace(/'/g,"\\'")}')">✕</button></td>
     </tr>
     <tr class="fila-detalle" id="fila-det-${t.id}" style="display:none">
@@ -297,7 +410,7 @@ function bloqueMedios(titulo, m){
   </div>`;
 }
 
-function toggleDetalle(id){
+function toggleDetalle(id, tipo){
   const fila = document.getElementById(`fila-det-${id}`);
   const btn = document.getElementById(`btn-det-${id}`);
   const abrir = fila.style.display === 'none';
@@ -305,7 +418,9 @@ function toggleDetalle(id){
   btn.textContent = abrir ? 'Ocultar' : 'Ver detalle';
   if(abrir && !_charts[id]){
     const t = _ultimoPiloto.find(x=>x.id===id);
-    if(t) pintarHistorial(t);
+    if(!t) return;
+    if(tipo==='actualizacion_version') pintarHistorialActualizacion(t);
+    else pintarComparacionCambio(t);
   }
 }
 
@@ -317,9 +432,42 @@ function renderDelta(antes, despues){
   return `<span class="delta ${cls}">${signo}${pct}%</span>`;
 }
 
-function pintarHistorial(t){
+function pintarComparacionCambio(t){
   const ctx = document.getElementById(`chart-${t.id}`);
-  if(!ctx || !t.historial.length) return;
+  const datos = t.comparacion||[];
+  if(!ctx || !datos.length) return;
+  if(_charts[t.id]) _charts[t.id].destroy();
+  _charts[t.id] = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: datos.map(c=>c.dia_despues),
+      datasets: [
+        {
+          label: 'Digital — después (terminal nueva)',
+          data: datos.map(c=>c.digital_despues),
+          borderColor: '#8b5cf6', backgroundColor: '#8b5cf618', fill:true, tension:.2, pointRadius:1.5,
+        },
+        {
+          label: 'Digital — antes (mismo día-del-mes, terminal vieja)',
+          data: datos.map(c=>c.digital_antes),
+          borderColor: '#1dbf8e', backgroundColor: 'transparent', borderDash:[4,3], tension:.2, pointRadius:1.5,
+        },
+      ],
+    },
+    options: {
+      responsive:true,
+      plugins:{ legend:{display:true, labels:{color:'#e8edf3', font:{size:10}}} },
+      scales:{
+        x:{ ticks:{color:'#94a3b8', maxTicksLimit:8}, grid:{color:'#334155'} },
+        y:{ ticks:{color:'#94a3b8', callback:v=>'$'+v.toLocaleString('es-AR')}, grid:{color:'#334155'} },
+      },
+    },
+  });
+}
+
+function pintarHistorialActualizacion(t){
+  const ctx = document.getElementById(`chart-${t.id}`);
+  if(!ctx || !t.historial || !t.historial.length) return;
   if(_charts[t.id]) _charts[t.id].destroy();
   const idxCorte = t.historial.findIndex(h => h.dia >= t.corte_seguimiento);
   _charts[t.id] = new Chart(ctx, {
