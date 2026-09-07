@@ -114,12 +114,12 @@
         <button class="chip" data-dias="30">30 días</button>
         <button class="chip" data-dias="90">90 días</button>
       </div>
+      <button class="primary" id="btn-cargar" onclick="cargarTodo()">Actualizar</button>
       <div class="campo" style="min-width:240px">
         <label>Trazabilidad — buscar comercio</label>
         <input type="text" id="f-traza" placeholder="Nombre de tienda, razón social o CUIT...">
       </div>
       <button class="primary" onclick="buscarTrazabilidad()" style="background:linear-gradient(135deg,#1a7fb0,#1a9fd4)">🔎 Buscar</button>
-      <button class="primary" id="btn-cargar" onclick="cargarTodo()">Actualizar</button>
     </div>
     <div class="estado" id="estado" style="display:none"></div>
   </div>
@@ -247,7 +247,7 @@
 
     <div class="card">
       <div class="card-title">🔎 Trazabilidad a pedido</div>
-      <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px">Usá el buscador de arriba (junto a las fechas) para ver acá el detalle día a día del comercio elegido.</div>
+      <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px">Buscá por nombre, razón social o CUIT — trae el detalle día a día de los últimos 365 días de ese comercio, sin importar el rango de fechas elegido arriba (ese filtro es solo para los KPIs del período).</div>
       <div class="tabla-wrap">
         <table>
           <thead><tr>
@@ -817,20 +817,29 @@ function renderCruce(discrepancias){
 async function buscarTrazabilidad(){
   const token = await requiereSesion();
   if(!token) return;
-  const desde = document.getElementById('f-desde').value;
-  const hasta = document.getElementById('f-hasta').value;
   const buscar = document.getElementById('f-traza').value.trim();
   const tbody = document.getElementById('tbody-traza');
   if(!buscar){ tbody.innerHTML='<tr><td colspan="8" class="empty">Escribí algo arriba y apretá Buscar.</td></tr>'; return; }
 
-  tbody.innerHTML = '<tr><td colspan="8" class="empty">Buscando...</td></tr>';
+  // FIX 06/09: antes usaba las mismas fechas Desde/Hasta del panel de
+  // arriba (por defecto, últimos 7 días) — si el comercio buscado no tenía
+  // ventas en esa ventana puntual, la búsqueda daba "sin resultados" y
+  // parecía rota. La trazabilidad es una búsqueda puntual de un comercio,
+  // no un reporte de período: usa su propia ventana amplia (365 días),
+  // independiente del filtro de fechas del dashboard.
+  const hoy = new Date();
+  const hace365 = new Date(hoy); hace365.setDate(hace365.getDate() - 365);
+  const desde = fechaLocalYMD(hace365);
+  const hasta = fechaLocalYMD(hoy);
+
+  tbody.innerHTML = '<tr><td colspan="8" class="empty">Buscando (últimos 365 días)...</td></tr>';
   try{
     const qs = new URLSearchParams({ desde, hasta, buscar });
     const r = await fetch(`${RAILWAY_BASE}/automations/operaciones-alleata/query?${qs}`, { headers: headersAuth(token) });
     const j = await r.json();
     if(!r.ok || !j.ok) throw new Error(j.error || `HTTP ${r.status}`);
     const filas = (j.filas||[]).sort((a,b)=>String(b.dia).localeCompare(String(a.dia)));
-    if(!filas.length){ tbody.innerHTML='<tr><td colspan="8" class="empty">Sin resultados para esa búsqueda en el rango elegido.</td></tr>'; return; }
+    if(!filas.length){ tbody.innerHTML='<tr><td colspan="8" class="empty">Sin resultados para esa búsqueda en los últimos 365 días.</td></tr>'; return; }
     tbody.innerHTML = filas.map(f=>{
       const nombreCel = f.sf_id
         ? `<a class="sf-link" href="https://alleata.lightning.force.com/lightning/r/Account/${f.sf_id}/view" target="_blank" rel="noopener">${f.sf_nombre} ↗</a>`
