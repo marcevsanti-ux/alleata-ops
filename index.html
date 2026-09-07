@@ -759,7 +759,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
             <label class="label">Estado</label>
             <select class="select" id="envFiltroEstado" onchange="renderEnvios()">
               <option value="">Todos</option>
-              <option>Pre-Colecta</option><option>Despachado</option><option>En tránsito</option><option>En camino</option>
+              <option>Pre-Colecta</option><option>Despachado</option><option>En camino</option>
               <option>En espera en sucursal</option><option>Entregado</option><option>Retirar Terminal</option><option>Fallido</option>
               <option>Perdido</option><option>Devuelto</option>
             </select>
@@ -1119,10 +1119,6 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <div class="stat-num" id="rl-num-despachado" style="color:#8b5cf6">—</div>
       <div class="stat-label">DESPACHADOS</div>
     </div>
-    <div class="stat-box" onclick="rlFiltrarEstado('En tránsito')" style="cursor:pointer;border-left:3px solid #f59e0b">
-      <div class="stat-num" id="rl-num-transito" style="color:#f59e0b">—</div>
-      <div class="stat-label">EN TRÁNSITO</div>
-    </div>
     <div class="stat-box" onclick="rlFiltrarEstado('Retirar Terminal')" style="cursor:pointer;border-left:3px solid #f59e0b">
       <div class="stat-num" id="rl-num-retirar" style="color:#f59e0b">—</div>
       <div class="stat-label">RETIRAR TERMINAL</div>
@@ -1155,7 +1151,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <span style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;font-weight:600">Estado</span>
         <select class="select" id="rl-f-estado" onchange="rlFiltrarEstado(this.value)" style="font-size:12px;padding:6px 10px;min-width:160px">
           <option value="">Todos</option>
-          <option>Pre-Colecta</option><option>Despachado</option><option>En tránsito</option>
+          <option>Pre-Colecta</option><option>Despachado</option>
           <option>En camino</option><option>Entregado</option><option>Retirar Terminal</option>
           <option>Fallido</option><option>Devuelto</option>
         </select>
@@ -8345,11 +8341,10 @@ function rlActualizarKPIs(){
   const total=_rlData.length;
   const precolecta=_rlData.filter(e=>e.estado==='Pre-Colecta').length;
   const despachado=_rlData.filter(e=>e.estado==='Despachado').length;
-  const transito=_rlData.filter(e=>['En tránsito','En camino','En espera en sucursal'].includes(e.estado)).length;
   const retirar=_rlData.filter(e=>e.estado==='Retirar Terminal').length;
   const set=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v;};
   set('rl-num-total',total);set('rl-num-precolecta',precolecta);set('rl-num-despachado',despachado);
-  set('rl-num-transito',transito);set('rl-num-retirar',retirar);
+  set('rl-num-retirar',retirar);
   const nbRo=document.getElementById('nb-rollout');if(nbRo)nbRo.textContent=total;
 }
 
@@ -8419,7 +8414,7 @@ function rlRenderTabla(){
   // <option> matcheaba, el navegador mostraba la PRIMERA opción de la lista
   // por default (Pre-Colecta), mintiendo el estado real en pantalla aunque
   // el dato guardado en sf_workorders.status estuviera correcto.
-  const estados=['Configurar Terminal','En Proceso','Pre-Colecta','Despachado','En tránsito','En camino','En espera en sucursal','Entregado','Retirar Terminal','Fallido','Perdido','Devuelto'];
+  const estados=['Configurar Terminal','En Proceso','Pre-Colecta','Despachado','En camino','En espera en sucursal','Entregado','Retirar Terminal','Fallido','Perdido','Devuelto'];
   // A prueba de futuro: si aparece un estado real que no está en la lista de
   // arriba, se lo agrega dinámicamente por fila en vez de mostrar cualquier
   // otra cosa como si fuera el estado real.
@@ -12629,7 +12624,7 @@ async function renderEnviosTable(list){
       <td>
         <!-- SELECT ESTADO ENVÍO -->
         <select class="select" style="width:160px;padding:4px 8px;font-size:11px" onchange="updateEnvioEstado('${e.id}',this.value)">
-          ${(()=>{const base=['Configurar Terminal','En Proceso','Pre-Colecta','Despachado','En tránsito','En camino','En espera en sucursal','Entregado','Retirar Terminal','Fallido','Perdido','Devuelto'];const est=e.estado||'Pre-Colecta';const lista=base.includes(est)?base:[est,...base];return lista.map(s=>`<option ${est===s?'selected':''}>${s}</option>`).join('');})()}
+          ${(()=>{const base=['Configurar Terminal','En Proceso','Pre-Colecta','Despachado','En camino','En espera en sucursal','Entregado','Retirar Terminal','Fallido','Perdido','Devuelto'];const est=e.estado||'Pre-Colecta';const lista=base.includes(est)?base:[est,...base];return lista.map(s=>`<option ${est===s?'selected':''}>${s}</option>`).join('');})()}
         </select>
         ${e.ultimo_evento_fecha ? `<div style="font-size:10px;color:var(--text-muted);margin-top:4px;font-family:'JetBrains Mono',monospace;letter-spacing:0.3px">${formatFechaCA(e.ultimo_evento_fecha)}</div>` : ''}
         <!-- SELECT ESTADO RETORNO (solo si tiene retorno) -->
@@ -14412,7 +14407,7 @@ async function openUpdateEvento(id, current){
   let m=document.getElementById('modalDetalleOT');
   if(!m){ m=document.createElement('div'); m.id='modalDetalleOT'; m.className='modal-overlay'; m.onclick=ev=>{if(ev.target===m)m.classList.remove('show');}; document.body.appendChild(m); }
 
-  const estados=['Configurar Terminal','En Proceso','Pre-Colecta','Despachado','En tránsito','En camino','En espera en sucursal','Entregado','Retirar Terminal','Fallido','Perdido','Devuelto'];
+  const estados=['Configurar Terminal','En Proceso','Pre-Colecta','Despachado','En camino','En espera en sucursal','Entregado','Retirar Terminal','Fallido','Perdido','Devuelto'];
   const estadosModal=estados.includes(e.estado)?estados:[e.estado,...estados];
   const estadoOpts=estadosModal.map(s=>`<option value="${s}" ${e.estado===s?'selected':''}>${s}</option>`).join('');
 
