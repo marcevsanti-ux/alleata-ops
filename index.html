@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.7.12</title>
+<title>Alleata · Operaciones v4.7.13</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -408,7 +408,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.12 · 07 sep 2026
+      v4.7.13 · 07 sep 2026
     </div>
   </div>
 </div>
@@ -517,7 +517,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.12 · 07 sep 2026
+      v4.7.13 · 07 sep 2026
     </div>
   </div>
 </nav>
@@ -572,7 +572,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.12</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.13</div>
   </div>
   <div class="content">
 
@@ -5184,7 +5184,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.7.12] OK');
+console.log('[Alleata v4.7.13] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -7676,34 +7676,33 @@ async function cargarPendienteRetiroExitosa() {
     return;
   }
 
-  // Pedido 07/09: 3 cards chicas — cuántas OT de Cambio de Terminal están
-  // AHORA en "Configurar Terminal" (arranque del flujo, previo a
-  // despachar), y de esas cuántas son logística Alleata vs Epsa. Es una
-  // foto del momento (no por semana, a diferencia del resto de esta card),
-  // por eso va en una query aparte sin filtro de fecha.
-  const { data: dataConfig, error: errConfig } = await sb.from('sf_workorders')
-    .select('logistica')
+  // Pedido 07/09 (v1): card chica con cuántas OT de Cambio de Terminal
+  // están AHORA en "Configurar Terminal" (arranque del flujo, previo a
+  // despachar). Es una foto del momento (no por semana, a diferencia del
+  // resto de esta card), por eso va en una query aparte sin filtro de fecha.
+  // Pedido 08/09 (v2): se sacaron los desgloses por logística (Alleata/Epsa)
+  // y se agregó, al lado, el mismo tipo de foto para "Pre-Colecta".
+  const { count: totalConfig, error: errConfig } = await sb.from('sf_workorders')
+    .select('id', { count: 'exact', head: true })
     .eq('record_type', 'Cambio de Terminal')
     .eq('status', 'Configurar Terminal');
+  const { count: totalPrecolecta, error: errPrecolecta } = await sb.from('sf_workorders')
+    .select('id', { count: 'exact', head: true })
+    .eq('record_type', 'Cambio de Terminal')
+    .eq('status', 'Pre-Colecta');
   let htmlMiniCards = '';
-  if (!errConfig) {
-    const filas = dataConfig || [];
-    const totalConfig = filas.length;
-    const norm = l => (l || '').toUpperCase().trim();
-    const totalAlleata = filas.filter(f => norm(f.logistica) === 'ALLEATA').length;
-    const totalEpsa = filas.filter(f => norm(f.logistica) === 'EPSA').length;
+  if (!errConfig && !errPrecolecta) {
     const miniCard = (label, valor, color) => `
       <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:6px 12px;text-align:center;min-width:110px">
         <div style="font-size:17px;font-weight:800;color:${color}">${valor}</div>
         <div style="font-size:9.5px;color:var(--text-muted);font-weight:700;letter-spacing:.03em;white-space:nowrap">${label}</div>
       </div>`;
     htmlMiniCards = `
-      ${miniCard('CONFIGURAR TERMINAL', totalConfig, 'var(--text)')}
-      ${miniCard('· LOG. ALLEATA', totalAlleata, 'var(--teal)')}
-      ${miniCard('· LOG. EPSA', totalEpsa, '#f59e0b')}
+      ${miniCard('CONFIGURAR TERMINAL', totalConfig || 0, 'var(--text)')}
+      ${miniCard('PRE-COLECTA', totalPrecolecta || 0, '#8b5cf6')}
     `;
   } else {
-    console.warn('[Configurar Terminal] no se pudo cargar:', errConfig.message);
+    console.warn('[Configurar Terminal / Pre-Colecta] no se pudo cargar:', errConfig?.message || errPrecolecta?.message);
   }
 
   // Arma { 'YYYY-MM-DD': {cambio,rollout} } para un estado+campo de fecha dado.
