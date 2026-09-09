@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.7.13</title>
+<title>Alleata · Operaciones v4.7.14</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -408,7 +408,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.13 · 07 sep 2026
+      v4.7.14 · 07 sep 2026
     </div>
   </div>
 </div>
@@ -517,7 +517,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.13 · 07 sep 2026
+      v4.7.14 · 07 sep 2026
     </div>
   </div>
 </nav>
@@ -572,7 +572,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.13</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.14</div>
   </div>
   <div class="content">
 
@@ -602,6 +602,11 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
            Reemplaza al de AMBA/Interior en el dash. -->
       <div id="cambiosResponsableCard" style="display:none;margin-bottom:18px"></div>
 
+      <!-- 🚚 Indicadores de ruta — Marce/Nacho (pedido 09/09): cuántas OT
+           de logística Alleata tuvo cada uno, cuántas Exitosas, cuántas
+           Reprogramar. Solo admin — ver cargarIndicadoresRutaChofer(). -->
+      <div id="indicadoresRutaCard" style="display:none;margin-bottom:18px"></div>
+
       <!-- Pendiente Retiro / Exitosa — Cambio de Terminal (pedido 26/08).
            "PENDIENTE RETIRO" = status 'Retirar Terminal' en sf_workorders
            (mismo campo que ya usa Misión Rollout como "Retirar Terminal" —
@@ -617,9 +622,12 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
            coincide con lo que Gonzalo/Andres tienen realmente pendiente.
            Se muestra/oculta y se carga desde loadOpsPanel(). -->
       <div class="card" id="opProximaOTCard" style="display:none;margin-bottom:14px;border-left:4px solid var(--teal)">
-        <div style="font-size:13px;font-weight:700;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between">
+        <div style="font-size:13px;font-weight:700;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
           <span>🔧 OTs en "Configurar Terminal"</span>
-          <button class="btn-ghost btn-sm" onclick="cargarProximaOT(currentProfile?.nombre||'')">↺</button>
+          <div style="display:flex;align-items:center;gap:8px">
+            <div id="opMiniCards" style="display:flex;gap:8px"></div>
+            <button class="btn-ghost btn-sm" onclick="cargarProximaOT(currentProfile?.nombre||'')">↺</button>
+          </div>
         </div>
         <div id="opProximaOTTop" style="margin-bottom:6px;font-size:12px;color:var(--text-muted)">Cargando...</div>
       </div>
@@ -5184,7 +5192,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.7.13] OK');
+console.log('[Alleata v4.7.14] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -6412,7 +6420,7 @@ async function loadHojaRuta(){
   let otsMap={};
   if(todosNumeros.length){
     const{data:ots,error:errOts}=await sb.from('sf_workorders')
-      .select('id,sf_id,workorder_number,status,cuenta,propietario_cuenta,direccion,direccion_formula,ciudad,record_type,perfil,logistica,rollout')
+      .select('id,sf_id,workorder_number,status,cuenta,propietario_cuenta,direccion,direccion_formula,ciudad,record_type,perfil,logistica,rollout,fecha_exitoso,sf_last_modified')
       .in('workorder_number',todosNumeros);
     if(errOts){
       console.error('[loadHojaRuta] Error consultando sf_workorders:',errOts);
@@ -6508,13 +6516,30 @@ async function loadHojaRuta(){
           <div style="font-size:13px;margin-top:2px">${ot.cuenta||ot.propietario_cuenta||'—'}</div>
           <div style="font-size:11px;color:var(--text-muted)">${dir}${ot.ciudad?' · '+ot.ciudad:''}</div>
         </div>
-        <div style="display:flex;align-items:center;gap:8px">
-          <span class="badge" style="background:${ESTADO_HR_COLOR[ot.status]?.bg||(cerrada?'rgba(29,191,142,.12)':'rgba(107,114,128,.15)')};color:${ESTADO_HR_COLOR[ot.status]?.fg||(cerrada?'var(--teal)':'var(--text-muted)')};border:1px solid ${ESTADO_HR_COLOR[ot.status]?.bd||(cerrada?'rgba(29,191,142,.3)':'var(--border2)')}">${ot.status}</span>
-          ${cerrada?'':`
-            <button class="btn-sm" style="background:var(--teal);color:#fff;border:none" onclick="cerrarOTHojaRuta('${ot.sf_id||''}','${choferJs}',this,'Entregado','${ot.workorder_number}','${(ot.cuenta||'').replace(/'/g,"\\'")}', '${(ot.perfil||'').replace(/'/g,"\\'")}')">✅ Entregado</button>
-            <button class="btn-sm" style="background:none;border:1px solid #f59e0b;color:#f59e0b" onclick="cerrarOTHojaRuta('${ot.sf_id||''}','${choferJs}',this,'Reprogramar','${ot.workorder_number}','${(ot.cuenta||'').replace(/'/g,"\\'")}', '${(ot.perfil||'').replace(/'/g,"\\'")}')">🔄 Reprogramar</button>
-            <button class="btn-sm" style="background:none;border:1px solid var(--red);color:var(--red)" onclick="cerrarOTHojaRuta('${ot.sf_id||''}','${choferJs}',this,'Fallido','${ot.workorder_number}','${(ot.cuenta||'').replace(/'/g,"\\'")}', '${(ot.perfil||'').replace(/'/g,"\\'")}')">❌ Fallido</button>
-          `}
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span class="badge" style="background:${ESTADO_HR_COLOR[ot.status]?.bg||(cerrada?'rgba(29,191,142,.12)':'rgba(107,114,128,.15)')};color:${ESTADO_HR_COLOR[ot.status]?.fg||(cerrada?'var(--teal)':'var(--text-muted)')};border:1px solid ${ESTADO_HR_COLOR[ot.status]?.bd||(cerrada?'rgba(29,191,142,.3)':'var(--border2)')}">${ot.status}</span>
+            ${cerrada?'':`
+              <button class="btn-sm" style="background:var(--teal);color:#fff;border:none" onclick="cerrarOTHojaRuta('${ot.sf_id||''}','${choferJs}',this,'Entregado','${ot.workorder_number}','${(ot.cuenta||'').replace(/'/g,"\\'")}', '${(ot.perfil||'').replace(/'/g,"\\'")}')">✅ Entregado</button>
+              <button class="btn-sm" style="background:none;border:1px solid #f59e0b;color:#f59e0b" onclick="cerrarOTHojaRuta('${ot.sf_id||''}','${choferJs}',this,'Reprogramar','${ot.workorder_number}','${(ot.cuenta||'').replace(/'/g,"\\'")}', '${(ot.perfil||'').replace(/'/g,"\\'")}')">🔄 Reprogramar</button>
+              <button class="btn-sm" style="background:none;border:1px solid var(--red);color:var(--red)" onclick="cerrarOTHojaRuta('${ot.sf_id||''}','${choferJs}',this,'Fallido','${ot.workorder_number}','${(ot.cuenta||'').replace(/'/g,"\\'")}', '${(ot.perfil||'').replace(/'/g,"\\'")}')">❌ Fallido</button>
+            `}
+          </div>
+          ${cerrada?(() => {
+            // Pedido 09/09: fecha/hora en que se transicionó esta OT — se ve
+            // debajo del badge, solo en las ya cerradas. fecha_exitoso es lo
+            // más preciso (Exitoso_Fecha__c de SF) pero solo existe para el
+            // caso Exitoso; para Reprogramar/Fallido no hay campo dedicado
+            // en sf_workorders, así que se usa sf_last_modified como mejor
+            // proxy disponible (mismo criterio ya usado en otras partes del
+            // portal para este mismo problema — ver cargarPendienteRetiroExitosa).
+            const fechaTx = ot.fecha_exitoso || ot.sf_last_modified;
+            if(!fechaTx) return '';
+            const esAprox = !ot.fecha_exitoso;
+            const d = new Date(fechaTx);
+            const txt = isNaN(d) ? '' : d.toLocaleString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+            return txt ? `<div style="font-size:9.5px;color:var(--text-muted)">${txt}${esAprox?' <span title="No hay campo exacto de fecha de transición para este estado — se usa la última modificación en SF como mejor aproximación.">(aprox.)</span>':''}</div>` : '';
+          })():''}
         </div>
       </div>`;
     }).join('');
@@ -7565,6 +7590,66 @@ async function cargarCambiosPorZona() {
     if(notaA) notaA.textContent = [ctx(entregadasA, ambaTotalMes[m.key]||0), notaSinClas].filter(Boolean).join(' · ');
     if(notaI) notaI.textContent = [ctx(entregadasI, interiorTotalMes[m.key]||0), notaSinClas].filter(Boolean).join(' · ');
   });
+}
+
+// ── Indicadores de ruta por chofer — Marce/Nacho (pedido 09/09) ───────────
+// "Cuántas OT en ruta tuvo cada uno / cuántas exitosas / cuántas
+// reprogramar". A diferencia de cargarCambiosPorResponsable() (que solo
+// mira "Cambio de Terminal" y solo cuenta Exitosas), acá entra CUALQUIER
+// record_type de logística Alleata (Instalación, Cambio, etc. — la Hoja de
+// Ruta mezcla los tres) y se suman también las Reprogramadas. Mismo campo
+// de match (responsable) y mismas funciones _mrEsMarce/_mrEsNacho que ya
+// existían — no se reinventa el criterio de "de quién es esta OT".
+async function cargarIndicadoresRutaChofer() {
+  const cont = document.getElementById('indicadoresRutaCard');
+  if (!cont) return;
+  cont.innerHTML = '<div class="card" style="padding:16px;color:var(--text-muted);font-size:12px">Cargando indicadores de ruta...</div>';
+
+  const { data, error } = await sb.from('sf_workorders')
+    .select('workorder_number,status,responsable')
+    .eq('logistica', 'ALLEATA')
+    .gte('sf_created_at', MR_FECHA_CORTE);
+  if (error) {
+    cont.innerHTML = `<div class="card" style="padding:16px;color:var(--red);font-size:12px">No se pudo cargar indicadores de ruta: ${error.message}</div>`;
+    return;
+  }
+
+  const contar = matchFn => {
+    const filas = (data || []).filter(r => matchFn(r.responsable));
+    return {
+      total: filas.length,
+      exitosas: filas.filter(r => r.status === 'Exitoso').length,
+      reprogramar: filas.filter(r => r.status === 'Reprogramar').length,
+    };
+  };
+  const marce = contar(_mrEsMarce);
+  const nacho = contar(_mrEsNacho);
+
+  const bloque = (nombre, d, color) => `
+    <div class="card" style="flex:1;min-width:220px">
+      <div style="font-size:13px;font-weight:700;margin-bottom:10px">👷 ${nombre}</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 14px;text-align:center;min-width:80px">
+          <div style="font-size:20px;font-weight:800;color:${color}">${d.total}</div>
+          <div style="font-size:9.5px;color:var(--text-muted);font-weight:700">EN RUTA</div>
+        </div>
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 14px;text-align:center;min-width:80px">
+          <div style="font-size:20px;font-weight:800;color:var(--teal)">${d.exitosas}</div>
+          <div style="font-size:9.5px;color:var(--text-muted);font-weight:700">EXITOSAS</div>
+        </div>
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 14px;text-align:center;min-width:80px">
+          <div style="font-size:20px;font-weight:800;color:#f59e0b">${d.reprogramar}</div>
+          <div style="font-size:9.5px;color:var(--text-muted);font-weight:700">REPROGRAMAR</div>
+        </div>
+      </div>
+    </div>`;
+
+  cont.innerHTML = `
+    <div style="font-size:13px;font-weight:700;margin-bottom:10px">🚚 Ruta — Marce / Nacho (desde ${MR_FECHA_CORTE})</div>
+    <div style="display:flex;gap:12px;flex-wrap:wrap">
+      ${bloque('Marce', marce, 'var(--text)')}
+      ${bloque('Nacho', nacho, 'var(--text)')}
+    </div>`;
 }
 
 // ── Cambios de Terminal por responsable (Marce/Nacho), por mes — pedido
@@ -10559,13 +10644,16 @@ async function loadOpsPanel(isAdmin, modulos){
   const objCard = document.getElementById('objSemanalCard');
   const cambiosRespCard = document.getElementById('cambiosResponsableCard');
   const pendRetiroCard = document.getElementById('pendRetiroExitosaCard');
+  const indicadoresRutaCard = document.getElementById('indicadoresRutaCard');
   if(objCard) objCard.style.display='none';
   if(cambiosRespCard) cambiosRespCard.style.display='none';
   const esMarcelos = (currentProfile?.email||currentUser?.email||'').trim().toLowerCase()==='marcelos@moretti.com.ar';
   if(esMarcelos){
     if(pendRetiroCard){ pendRetiroCard.style.display='block'; cargarPendienteRetiroExitosa(); }
+    if(indicadoresRutaCard){ indicadoresRutaCard.style.display='block'; cargarIndicadoresRutaChofer(); }
   } else {
     if(pendRetiroCard) pendRetiroCard.style.display='none';
+    if(indicadoresRutaCard) indicadoresRutaCard.style.display='none';
   }
 
   // QUERIES — admin ve todo, operador filtra por su nombre
@@ -11192,6 +11280,27 @@ async function cargarProximaOT(nombre){
     .eq('status','Configurar Terminal')
     .ilike('responsable',`%${nombre}%`)
     .order('created_at',{ascending:true});
+
+  // Pedido 09/09: mini cards con el total de "Configurar Terminal" (mismo
+  // dato que rows.length de abajo) y "Pre-Colecta", scopeadas a ESTE
+  // operador — mismo criterio que el resto de esta card (responsable ilike
+  // nombre). Va aparte porque Pre-Colecta no es parte del query de arriba.
+  const miniEl = document.getElementById('opMiniCards');
+  if(miniEl){
+    const { count: totalPrecolecta } = await sb.from('sf_workorders')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'Pre-Colecta')
+      .ilike('responsable', `%${nombre}%`);
+    const miniCard = (label, valor, color) => `
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:5px 11px;text-align:center;min-width:90px">
+        <div style="font-size:15px;font-weight:800;color:${color}">${valor}</div>
+        <div style="font-size:9px;color:var(--text-muted);font-weight:700;letter-spacing:.03em;white-space:nowrap">${label}</div>
+      </div>`;
+    miniEl.innerHTML = `
+      ${miniCard('CONFIGURAR TERMINAL', (data||[]).length, 'var(--text)')}
+      ${miniCard('PRE-COLECTA', totalPrecolecta || 0, '#8b5cf6')}
+    `;
+  }
 
   if(error){ top.innerHTML=`<span style="color:var(--red)">Error: ${error.message}</span>`; return; }
 
