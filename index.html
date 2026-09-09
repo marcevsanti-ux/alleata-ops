@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.7.14</title>
+<title>Alleata · Operaciones v4.7.15</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -408,7 +408,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.14 · 07 sep 2026
+      v4.7.15 · 07 sep 2026
     </div>
   </div>
 </div>
@@ -517,7 +517,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.14 · 07 sep 2026
+      v4.7.15 · 07 sep 2026
     </div>
   </div>
 </nav>
@@ -572,7 +572,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.14</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.15</div>
   </div>
   <div class="content">
 
@@ -5192,7 +5192,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.7.14] OK');
+console.log('[Alleata v4.7.15] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -7594,62 +7594,82 @@ async function cargarCambiosPorZona() {
 
 // ── Indicadores de ruta por chofer — Marce/Nacho (pedido 09/09) ───────────
 // "Cuántas OT en ruta tuvo cada uno / cuántas exitosas / cuántas
-// reprogramar". A diferencia de cargarCambiosPorResponsable() (que solo
-// mira "Cambio de Terminal" y solo cuenta Exitosas), acá entra CUALQUIER
-// record_type de logística Alleata (Instalación, Cambio, etc. — la Hoja de
-// Ruta mezcla los tres) y se suman también las Reprogramadas. Mismo campo
-// de match (responsable) y mismas funciones _mrEsMarce/_mrEsNacho que ya
-// existían — no se reinventa el criterio de "de quién es esta OT".
+// reprogramar" — de HOY, la ruta que confirmaron. FIX 09/09 (v2): la
+// primera versión usaba sf_workorders.responsable (el responsable de SF/
+// venta, no quién la tiene en su hoja de ruta) — daba números que no
+// coincidían con lo que se ve en la pantalla Hoja de Ruta. Ahora usa la
+// MISMA fuente que esa pantalla: rutas_diarias (confirmadas para hoy) +
+// profiles para el nombre del chofer, igual que loadHojaRuta().
 async function cargarIndicadoresRutaChofer() {
   const cont = document.getElementById('indicadoresRutaCard');
   if (!cont) return;
   cont.innerHTML = '<div class="card" style="padding:16px;color:var(--text-muted);font-size:12px">Cargando indicadores de ruta...</div>';
 
-  const { data, error } = await sb.from('sf_workorders')
-    .select('workorder_number,status,responsable')
-    .eq('logistica', 'ALLEATA')
-    .gte('sf_created_at', MR_FECHA_CORTE);
-  if (error) {
-    cont.innerHTML = `<div class="card" style="padding:16px;color:var(--red);font-size:12px">No se pudo cargar indicadores de ruta: ${error.message}</div>`;
-    return;
-  }
+  try {
+    const hoy = hoyArgentina();
+    const { data: rutas, error: errRutas } = await sb.from('rutas_diarias')
+      .select('user_id,ots_numeros').eq('fecha', hoy);
+    if (errRutas) throw new Error(errRutas.message);
 
-  const contar = matchFn => {
-    const filas = (data || []).filter(r => matchFn(r.responsable));
-    return {
-      total: filas.length,
-      exitosas: filas.filter(r => r.status === 'Exitoso').length,
-      reprogramar: filas.filter(r => r.status === 'Reprogramar').length,
+    const userIds = [...new Set((rutas || []).map(r => r.user_id).filter(Boolean))];
+    const { data: perfiles } = await sb.from('profiles').select('id,nombre,email').in('id', userIds);
+    const porUser = {}; (perfiles || []).forEach(p => { porUser[p.id] = p; });
+
+    const todosNumeros = [...new Set((rutas || []).flatMap(r => r.ots_numeros || []).filter(Boolean))];
+    let statusMap = {};
+    if (todosNumeros.length) {
+      const { data: ots, error: errOts } = await sb.from('sf_workorders')
+        .select('workorder_number,status').in('workorder_number', todosNumeros);
+      if (errOts) throw new Error(errOts.message);
+      (ots || []).forEach(o => { statusMap[o.workorder_number] = o.status; });
+    }
+
+    const contar = matchFn => {
+      let total = 0, exitosas = 0, reprogramar = 0;
+      (rutas || []).forEach(r => {
+        const nombre = (porUser[r.user_id]?.nombre || porUser[r.user_id]?.email || '').trim();
+        if (!matchFn(nombre)) return;
+        (r.ots_numeros || []).forEach(num => {
+          total++;
+          const st = statusMap[num];
+          if (st === 'Exitoso' || st === 'Exitosa') exitosas++;
+          if (st === 'Reprogramar') reprogramar++;
+        });
+      });
+      return { total, exitosas, reprogramar };
     };
-  };
-  const marce = contar(_mrEsMarce);
-  const nacho = contar(_mrEsNacho);
+    const marce = contar(_mrEsMarce);
+    const nacho = contar(_mrEsNacho);
 
-  const bloque = (nombre, d, color) => `
-    <div class="card" style="flex:1;min-width:220px">
-      <div style="font-size:13px;font-weight:700;margin-bottom:10px">👷 ${nombre}</div>
-      <div style="display:flex;gap:10px;flex-wrap:wrap">
-        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 14px;text-align:center;min-width:80px">
-          <div style="font-size:20px;font-weight:800;color:${color}">${d.total}</div>
-          <div style="font-size:9.5px;color:var(--text-muted);font-weight:700">EN RUTA</div>
+    const bloque = (nombre, d, color) => `
+      <div class="card" style="flex:1;min-width:220px">
+        <div style="font-size:13px;font-weight:700;margin-bottom:10px">👷 ${nombre}</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 14px;text-align:center;min-width:80px">
+            <div style="font-size:20px;font-weight:800;color:${color}">${d.total}</div>
+            <div style="font-size:9.5px;color:var(--text-muted);font-weight:700">EN RUTA HOY</div>
+          </div>
+          <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 14px;text-align:center;min-width:80px">
+            <div style="font-size:20px;font-weight:800;color:var(--teal)">${d.exitosas}</div>
+            <div style="font-size:9.5px;color:var(--text-muted);font-weight:700">EXITOSAS</div>
+          </div>
+          <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 14px;text-align:center;min-width:80px">
+            <div style="font-size:20px;font-weight:800;color:#f59e0b">${d.reprogramar}</div>
+            <div style="font-size:9.5px;color:var(--text-muted);font-weight:700">REPROGRAMAR</div>
+          </div>
         </div>
-        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 14px;text-align:center;min-width:80px">
-          <div style="font-size:20px;font-weight:800;color:var(--teal)">${d.exitosas}</div>
-          <div style="font-size:9.5px;color:var(--text-muted);font-weight:700">EXITOSAS</div>
-        </div>
-        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 14px;text-align:center;min-width:80px">
-          <div style="font-size:20px;font-weight:800;color:#f59e0b">${d.reprogramar}</div>
-          <div style="font-size:9.5px;color:var(--text-muted);font-weight:700">REPROGRAMAR</div>
-        </div>
+      </div>`;
+
+    cont.innerHTML = `
+      <div style="font-size:13px;font-weight:700;margin-bottom:10px">🚚 Ruta — Marce / Nacho (hoy)</div>
+      <div style="display:flex;gap:12px;flex-wrap:wrap">
+        ${bloque('Marce', marce, 'var(--text)')}
+        ${bloque('Nacho', nacho, 'var(--text)')}
       </div>
-    </div>`;
-
-  cont.innerHTML = `
-    <div style="font-size:13px;font-weight:700;margin-bottom:10px">🚚 Ruta — Marce / Nacho (desde ${MR_FECHA_CORTE})</div>
-    <div style="display:flex;gap:12px;flex-wrap:wrap">
-      ${bloque('Marce', marce, 'var(--text)')}
-      ${bloque('Nacho', nacho, 'var(--text)')}
-    </div>`;
+      <div style="font-size:10px;color:var(--text-muted);margin-top:8px">Cuenta solo lo que está en rutas_diarias de hoy (mismo dato que la pantalla Hoja de Ruta) — no incluye desinstalaciones/retiros ni paradas manuales.</div>`;
+  } catch (e) {
+    cont.innerHTML = `<div class="card" style="padding:16px;color:var(--red);font-size:12px">No se pudo cargar indicadores de ruta: ${e.message}</div>`;
+  }
 }
 
 // ── Cambios de Terminal por responsable (Marce/Nacho), por mes — pedido
