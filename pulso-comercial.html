@@ -276,6 +276,12 @@ const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSI
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const fmt$ = v => '$' + Math.round(Number(v)||0).toLocaleString('es-AR');
+// Convierte "2026-09-08" (formato que devuelve la base) a "08-09-2026".
+const fmtFechaDDMM = s => {
+  if(!s) return '—';
+  const m = String(s).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? `${m[3]}-${m[2]}-${m[1]}` : s;
+};
 const fmtInt = v => Math.round(Number(v)||0).toLocaleString('es-AR');
 
 // FIX 03/09: toISOString() siempre da la fecha en UTC — a la noche en
@@ -849,7 +855,7 @@ async function buscarTrazabilidad(){
         ? `<a class="sf-link" href="https://alleata.lightning.force.com/lightning/r/Account/${f.sf_id}/view" target="_blank" rel="noopener">${f.sf_nombre} ↗</a>`
         : (f.sf_nombre || f.nombre_tienda || f.razon_social || '—');
       return `<tr>
-      <td>${f.dia}</td>
+      <td>${fmtFechaDDMM(f.dia)}</td>
       <td>${nombreCel}</td>
       <td style="font-family:var(--mono);font-size:10px">${f.numero_terminal || '—'}</td>
       <td style="font-family:var(--mono)">${f.cuit || '—'}</td>
