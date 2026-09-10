@@ -90,7 +90,7 @@
       <div class="brand">alleata</div>
       <h1>📊 Pulso Comercial</h1>
       <div class="sub">Ventas diarias reales por terminal (panel Alleata) cruzadas con Salesforce — actualizado por el cron de la 1am ART</div>
-      <div class="version">v1.0.0</div>
+      <div class="version">v1.1.0</div>
     </div>
     <div style="text-align:right">
       <a class="back" href="piloto-napse.html">🧪 Piloto Napse 1.6.0</a><br>
@@ -163,6 +163,38 @@
           </tr></thead>
           <tbody id="tbody-traza"><tr><td colspan="9" class="empty">Escribí algo arriba y apretá Buscar.</td></tr></tbody>
         </table>
+      </div>
+
+      <!-- Pedido 10/09: detalle de tarjeta (marca, débito/crédito, N° de
+           comprobante fiscal + CAE) para la/s terminal/es de la búsqueda
+           de arriba. A diferencia de la tabla de arriba (que sale de
+           operaciones_alleata, cacheado, agregado por día), esto pega en
+           vivo a la API del Panel Alleata — por eso pide un rango de
+           fechas chico aparte (no 365 días) y solo se activa después de
+           tener una búsqueda con resultados. -->
+      <div id="comprobantesBox" style="display:none;margin-top:18px;padding-top:16px;border-top:1px solid var(--border)">
+        <div style="font-size:13px;font-weight:700;margin-bottom:6px">🧾 Comprobantes con detalle de tarjeta</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px">Consulta en vivo al Panel Alleata para <span id="comprobantesTerminalesLabel">esta/s terminal/es</span> — marca de tarjeta, débito/crédito y N° de comprobante fiscal. Usá un rango corto (esto no está cacheado, cada búsqueda pega en vivo a la API).</div>
+        <div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap;margin-bottom:12px">
+          <div class="campo">
+            <label>Desde</label>
+            <input type="date" id="compDesde">
+          </div>
+          <div class="campo">
+            <label>Hasta</label>
+            <input type="date" id="compHasta">
+          </div>
+          <button class="primary" onclick="buscarComprobantes()" style="background:linear-gradient(135deg,#1a7fb0,#1a9fd4)">🧾 Buscar comprobantes</button>
+        </div>
+        <div class="tabla-wrap">
+          <table>
+            <thead><tr>
+              <th>Fecha/Hora</th><th>Tienda</th><th>Comprobante</th><th>Estado</th>
+              <th>Medio de pago</th><th>Tipo</th><th class="num">Monto</th><th>Tarjeta</th><th>Cuotas</th>
+            </tr></thead>
+            <tbody id="tbody-comprobantes"><tr><td colspan="9" class="empty">Elegí un rango y apretá Buscar comprobantes.</td></tr></tbody>
+          </table>
+        </div>
       </div>
     </div>
 
@@ -849,7 +881,12 @@ async function buscarTrazabilidad(){
     const j = await r.json();
     if(!r.ok || !j.ok) throw new Error(j.error || `HTTP ${r.status}`);
     const filas = (j.filas||[]).sort((a,b)=>String(b.dia).localeCompare(String(a.dia)));
-    if(!filas.length){ tbody.innerHTML='<tr><td colspan="9" class="empty">Sin resultados para esa búsqueda en los últimos 365 días.</td></tr>'; return; }
+    const compBox = document.getElementById('comprobantesBox');
+    if(!filas.length){
+      tbody.innerHTML='<tr><td colspan="9" class="empty">Sin resultados para esa búsqueda en los últimos 365 días.</td></tr>';
+      if(compBox) compBox.style.display='none';
+      return;
+    }
     tbody.innerHTML = filas.map(f=>{
       const nombreCel = f.sf_id
         ? `<a class="sf-link" href="https://alleata.lightning.force.com/lightning/r/Account/${f.sf_id}/view" target="_blank" rel="noopener">${f.sf_nombre} ↗</a>`
@@ -866,11 +903,70 @@ async function buscarTrazabilidad(){
       <td class="num">${fmt$(f.codigo_qr)}</td>
     </tr>`;}).join('');
     if(j.truncado) tbody.innerHTML += `<tr><td colspan="9" style="text-align:center;color:var(--amber);font-size:11px;padding:10px">⚠️ Hay más resultados de los que se muestran (${j.total}) — acotá el rango de fechas o la búsqueda.</td></tr>`;
+
+    // Pedido 10/09: habilitar la búsqueda de comprobantes con detalle de
+    // tarjeta para la/s terminal/es que aparecieron en esta búsqueda.
+    window._trazaTerminales = [...new Set(filas.map(f=>f.numero_terminal).filter(Boolean))];
+    if(compBox){
+      compBox.style.display = window._trazaTerminales.length ? 'block' : 'none';
+      const lbl = document.getElementById('comprobantesTerminalesLabel');
+      if(lbl) lbl.textContent = window._trazaTerminales.length===1
+        ? `la terminal ${window._trazaTerminales[0]}`
+        : `estas ${window._trazaTerminales.length} terminales`;
+      // Default: últimos 7 días — esto pega en vivo a la API, no conviene
+      // arrancar con un rango largo sin que el usuario lo pida.
+      const hoyComp = new Date(); const hace7 = new Date(hoyComp); hace7.setDate(hace7.getDate()-7);
+      const compDesdeEl = document.getElementById('compDesde'), compHastaEl = document.getElementById('compHasta');
+      if(compDesdeEl && !compDesdeEl.value) compDesdeEl.value = fechaLocalYMD(hace7);
+      if(compHastaEl && !compHastaEl.value) compHastaEl.value = fechaLocalYMD(hoyComp);
+    }
   }catch(e){
     tbody.innerHTML = `<tr><td colspan="9" class="empty" style="color:var(--red)">Error: ${e.message}</td></tr>`;
   }
 }
 document.getElementById('f-traza').addEventListener('keydown', e=>{ if(e.key==='Enter') buscarTrazabilidad(); });
+
+// ── Comprobantes con detalle de tarjeta (Panel Alleata) — pedido 10/09 ────
+async function buscarComprobantes(){
+  const token = await requiereSesion();
+  if(!token) return;
+  const tbody = document.getElementById('tbody-comprobantes');
+  const terminales = window._trazaTerminales || [];
+  if(!terminales.length){ tbody.innerHTML='<tr><td colspan="9" class="empty">Buscá primero arriba en Trazabilidad.</td></tr>'; return; }
+  const desde = document.getElementById('compDesde').value;
+  const hasta = document.getElementById('compHasta').value;
+  if(!desde || !hasta){ tbody.innerHTML='<tr><td colspan="9" class="empty">Elegí Desde y Hasta.</td></tr>'; return; }
+
+  tbody.innerHTML = '<tr><td colspan="9" class="empty">Consultando en vivo al Panel Alleata...</td></tr>';
+  try{
+    const qs = new URLSearchParams({ desde, hasta, terminales: terminales.join(',') });
+    const r = await fetch(`${RAILWAY_BASE}/automations/operaciones-alleata/comprobantes?${qs}`, { headers: headersAuth(token) });
+    const j = await r.json();
+    if(!r.ok || !j.ok) throw new Error(j.error || `HTTP ${r.status}`);
+    const comprobantes = (j.comprobantes||[]).sort((a,b)=>String(b.fecha).localeCompare(String(a.fecha)));
+    if(!comprobantes.length){ tbody.innerHTML='<tr><td colspan="9" class="empty">Sin comprobantes en ese rango para esta/s terminal/es.</td></tr>'; return; }
+    tbody.innerHTML = comprobantes.map(c=>{
+      const fechaTxt = c.fecha ? new Date(c.fecha).toLocaleString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
+      const pagosTxt = (c.pagos||[]).map(p=>`<div>${p.medio||'—'}</div>`).join('') || '—';
+      const tipoTxt = (c.pagos||[]).map(p=>`<div>${p.tipo||'—'}</div>`).join('') || '—';
+      const montoTxt = (c.pagos||[]).map(p=>`<div>${fmt$(p.monto)}</div>`).join('') || fmt$(c.total);
+      const tarjetaTxt = (c.pagos||[]).map(p=>`<div style="font-family:var(--mono);font-size:10px">${p.tarjeta||'—'}${p.autorizacion?` · aut. ${p.autorizacion}`:''}</div>`).join('') || '—';
+      const cuotasTxt = (c.pagos||[]).map(p=>`<div>${p.cuotas||'—'}</div>`).join('') || '—';
+      return `<tr>
+      <td>${fechaTxt}</td>
+      <td>${c.tienda||'—'}</td>
+      <td style="font-family:var(--mono)">${c.fiscalNumber||'—'}${c.cae?`<div style="font-size:9px;color:var(--text-muted)">CAE ${c.cae}</div>`:''}</td>
+      <td>${c.estado||'—'}</td>
+      <td>${pagosTxt}</td>
+      <td>${tipoTxt}</td>
+      <td class="num" style="font-family:var(--mono);font-weight:700">${montoTxt}</td>
+      <td>${tarjetaTxt}</td>
+      <td>${cuotasTxt}</td>
+    </tr>`;}).join('');
+  }catch(e){
+    tbody.innerHTML = `<tr><td colspan="9" class="empty" style="color:var(--red)">Error: ${e.message}</td></tr>`;
+  }
+}
 
 // Primera carga automática.
 cargarTodo();
