@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.7.15</title>
+<title>Alleata · Operaciones v4.7.16</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -408,7 +408,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.15 · 07 sep 2026
+      v4.7.16 · 07 sep 2026
     </div>
   </div>
 </div>
@@ -517,7 +517,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.15 · 07 sep 2026
+      v4.7.16 · 07 sep 2026
     </div>
   </div>
 </nav>
@@ -572,7 +572,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.15</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.16</div>
   </div>
   <div class="content">
 
@@ -606,6 +606,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
            de logística Alleata tuvo cada uno, cuántas Exitosas, cuántas
            Reprogramar. Solo admin — ver cargarIndicadoresRutaChofer(). -->
       <div id="indicadoresRutaCard" style="display:none;margin-bottom:18px"></div>
+      <div id="indicadoresRutaMensualCard" style="display:none;margin-bottom:18px"></div>
 
       <!-- Pendiente Retiro / Exitosa — Cambio de Terminal (pedido 26/08).
            "PENDIENTE RETIRO" = status 'Retirar Terminal' en sf_workorders
@@ -5192,7 +5193,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.7.15] OK');
+console.log('[Alleata v4.7.16] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -7669,6 +7670,101 @@ async function cargarIndicadoresRutaChofer() {
       <div style="font-size:10px;color:var(--text-muted);margin-top:8px">Cuenta solo lo que está en rutas_diarias de hoy (mismo dato que la pantalla Hoja de Ruta) — no incluye desinstalaciones/retiros ni paradas manuales.</div>`;
   } catch (e) {
     cont.innerHTML = `<div class="card" style="padding:16px;color:var(--red);font-size:12px">No se pudo cargar indicadores de ruta: ${e.message}</div>`;
+  }
+}
+
+// ── Indicadores de ruta por chofer — general por mes (pedido 10/09) ───────
+// Mismo criterio que la versión diaria de arriba (rutas_diarias + profiles,
+// NO sf_workorders.responsable), pero agregado por mes en vez de solo hoy.
+// Los meses se calculan dinámicamente (mes actual + 2 anteriores) — a
+// diferencia de CAMBIOS_ZONA_MESES (lista fija que ya quedó vieja, seguía
+// en Jun/Jul/Ago en septiembre), así este no necesita que nadie lo
+// actualice a mano cada mes que pasa.
+function _ultimosNMeses(n){
+  const meses=[];
+  const MESES_LABEL=['ENERO','FEBRERO','MARZO','ABRIL','MAYO','JUNIO','JULIO','AGOSTO','SEPTIEMBRE','OCTUBRE','NOVIEMBRE','DICIEMBRE'];
+  const d=new Date();
+  for(let i=n-1;i>=0;i--){
+    const dm=new Date(d.getFullYear(),d.getMonth()-i,1);
+    const key=`${dm.getFullYear()}-${String(dm.getMonth()+1).padStart(2,'0')}`;
+    meses.push({key,label:MESES_LABEL[dm.getMonth()]});
+  }
+  return meses;
+}
+
+async function cargarIndicadoresRutaMensual() {
+  const cont = document.getElementById('indicadoresRutaMensualCard');
+  if (!cont) return;
+  cont.innerHTML = '<div class="card" style="padding:16px;color:var(--text-muted);font-size:12px">Cargando resumen mensual de ruta...</div>';
+
+  try {
+    const meses = _ultimosNMeses(3);
+    const desde = meses[0].key + '-01';
+
+    const { data: rutas, error: errRutas } = await sb.from('rutas_diarias')
+      .select('user_id,fecha,ots_numeros').gte('fecha', desde);
+    if (errRutas) throw new Error(errRutas.message);
+
+    const userIds = [...new Set((rutas || []).map(r => r.user_id).filter(Boolean))];
+    const { data: perfiles } = await sb.from('profiles').select('id,nombre,email').in('id', userIds);
+    const porUser = {}; (perfiles || []).forEach(p => { porUser[p.id] = p; });
+
+    const todosNumeros = [...new Set((rutas || []).flatMap(r => r.ots_numeros || []).filter(Boolean))];
+    let statusMap = {};
+    if (todosNumeros.length) {
+      const { data: ots, error: errOts } = await sb.from('sf_workorders')
+        .select('workorder_number,status').in('workorder_number', todosNumeros);
+      if (errOts) throw new Error(errOts.message);
+      (ots || []).forEach(o => { statusMap[o.workorder_number] = o.status; });
+    }
+
+    const contarMes = (matchFn, mesKey) => {
+      let total = 0, exitosas = 0, reprogramar = 0;
+      (rutas || []).forEach(r => {
+        if (String(r.fecha).slice(0, 7) !== mesKey) return;
+        const nombre = (porUser[r.user_id]?.nombre || porUser[r.user_id]?.email || '').trim();
+        if (!matchFn(nombre)) return;
+        (r.ots_numeros || []).forEach(num => {
+          total++;
+          const st = statusMap[num];
+          if (st === 'Exitoso' || st === 'Exitosa') exitosas++;
+          if (st === 'Reprogramar') reprogramar++;
+        });
+      });
+      return { total, exitosas, reprogramar };
+    };
+
+    const filaMini = (label, valor, color) => `
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:5px 9px;text-align:center;min-width:56px">
+        <div style="font-size:15px;font-weight:800;color:${color}">${valor}</div>
+        <div style="font-size:8px;color:var(--text-muted);font-weight:700">${label}</div>
+      </div>`;
+
+    const filaChofer = (nombre) => `
+      <div style="font-size:11px;font-weight:700;margin:8px 0 6px">👷 ${nombre}</div>
+      <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:6px">
+        ${meses.map(m => {
+          const d = contarMes(nombre === 'Marce' ? _mrEsMarce : _mrEsNacho, m.key);
+          return `<div style="display:flex;flex-direction:column;align-items:center;gap:4px">
+            <div style="font-size:9px;color:var(--text-muted);font-weight:700">${m.label}</div>
+            <div style="display:flex;gap:5px">
+              ${filaMini('RUTA', d.total, 'var(--text)')}
+              ${filaMini('EXIT.', d.exitosas, 'var(--teal)')}
+              ${filaMini('REPR.', d.reprogramar, '#f59e0b')}
+            </div>
+          </div>`;
+        }).join('')}
+      </div>`;
+
+    cont.innerHTML = `
+      <div class="card">
+        <div style="font-size:13px;font-weight:700;margin-bottom:4px">🚚 Ruta — Marce / Nacho, general por mes</div>
+        ${filaChofer('Marce')}
+        ${filaChofer('Nacho')}
+        <div style="font-size:10px;color:var(--text-muted);margin-top:8px">Mismo criterio que la card de hoy (rutas_diarias + profiles) — no incluye desinstalaciones/retiros ni paradas manuales.</div>
+      </div>`;
+  } catch (e) {
+    cont.innerHTML = `<div class="card" style="padding:16px;color:var(--red);font-size:12px">No se pudo cargar el resumen mensual de ruta: ${e.message}</div>`;
   }
 }
 
@@ -10665,15 +10761,18 @@ async function loadOpsPanel(isAdmin, modulos){
   const cambiosRespCard = document.getElementById('cambiosResponsableCard');
   const pendRetiroCard = document.getElementById('pendRetiroExitosaCard');
   const indicadoresRutaCard = document.getElementById('indicadoresRutaCard');
+  const indicadoresRutaMensualCard = document.getElementById('indicadoresRutaMensualCard');
   if(objCard) objCard.style.display='none';
   if(cambiosRespCard) cambiosRespCard.style.display='none';
   const esMarcelos = (currentProfile?.email||currentUser?.email||'').trim().toLowerCase()==='marcelos@moretti.com.ar';
   if(esMarcelos){
     if(pendRetiroCard){ pendRetiroCard.style.display='block'; cargarPendienteRetiroExitosa(); }
     if(indicadoresRutaCard){ indicadoresRutaCard.style.display='block'; cargarIndicadoresRutaChofer(); }
+    if(indicadoresRutaMensualCard){ indicadoresRutaMensualCard.style.display='block'; cargarIndicadoresRutaMensual(); }
   } else {
     if(pendRetiroCard) pendRetiroCard.style.display='none';
     if(indicadoresRutaCard) indicadoresRutaCard.style.display='none';
+    if(indicadoresRutaMensualCard) indicadoresRutaMensualCard.style.display='none';
   }
 
   // QUERIES — admin ve todo, operador filtra por su nombre
