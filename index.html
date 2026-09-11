@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.7.16</title>
+<title>Alleata · Operaciones v4.7.17</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -408,7 +408,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.16 · 07 sep 2026
+      v4.7.17 · 07 sep 2026
     </div>
   </div>
 </div>
@@ -517,7 +517,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.16 · 07 sep 2026
+      v4.7.17 · 07 sep 2026
     </div>
   </div>
 </nav>
@@ -572,7 +572,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.16</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.17</div>
   </div>
   <div class="content">
 
@@ -5193,7 +5193,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.7.16] OK');
+console.log('[Alleata v4.7.17] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -6503,7 +6503,20 @@ async function loadHojaRuta(){
     const perfil=porUser[r.user_id];
     const chofer=(perfil?.nombre||perfil?.email||'Chofer desconocido').trim();
     const choferJs=chofer.replace(/'/g,"\\'");
-    const itemsEnvios=(r.ots_numeros||[]).map(num=>{
+    // Pedido 10/09: ordenar por hora de transición real (fecha_exitoso o
+    // sf_last_modified, el mismo criterio que ya se usa para MOSTRAR la
+    // hora abajo de cada badge) — así se ve la ruta real que hizo el
+    // chofer, no el orden sugerido original. Las que todavía no se
+    // transicionaron (sin hora) quedan al final, en su orden original.
+    const numerosOrdenados = [...(r.ots_numeros||[])].sort((numA, numB) => {
+      const otA = otsMap[numA], otB = otsMap[numB];
+      const cerradaA = otA && ESTADOS_CERRADOS.includes(otA.status);
+      const cerradaB = otB && ESTADOS_CERRADOS.includes(otB.status);
+      const tA = cerradaA ? new Date(otA.fecha_exitoso || otA.sf_last_modified).getTime() : Infinity;
+      const tB = cerradaB ? new Date(otB.fecha_exitoso || otB.sf_last_modified).getTime() : Infinity;
+      return (isNaN(tA)?Infinity:tA) - (isNaN(tB)?Infinity:tB);
+    });
+    const itemsEnvios=numerosOrdenados.map(num=>{
       const ot=otsMap[num];
       if(!ot){
         return `<div style="background:var(--navy-900);border:1px dashed var(--border2);border-radius:10px;padding:10px 14px;font-size:12px;color:var(--text-muted)">OT ${num} — no está en la caché de <code>sf_workorders</code> (o cambió de número en SF). Probá "↺ Full Sync" arriba y actualizá esta pantalla.</div>`;
@@ -6539,7 +6552,7 @@ async function loadHojaRuta(){
             const esAprox = !ot.fecha_exitoso;
             const d = new Date(fechaTx);
             const txt = isNaN(d) ? '' : d.toLocaleString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
-            return txt ? `<div style="font-size:9.5px;color:var(--text-muted)">${txt}${esAprox?' <span title="No hay campo exacto de fecha de transición para este estado — se usa la última modificación en SF como mejor aproximación.">(aprox.)</span>':''}</div>` : '';
+            return txt ? `<div style="font-size:12px;font-weight:600;color:#fff">${txt}${esAprox?' <span style="color:var(--text-muted);font-weight:400" title="No hay campo exacto de fecha de transición para este estado — se usa la última modificación en SF como mejor aproximación.">(aprox.)</span>':''}</div>` : '';
           })():''}
         </div>
       </div>`;
