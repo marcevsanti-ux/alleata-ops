@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.7.18</title>
+<title>Alleata · Operaciones v4.7.20</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -408,7 +408,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.18 · 12 sep 2026
+      v4.7.20 · 12 sep 2026
     </div>
   </div>
 </div>
@@ -517,7 +517,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.18 · 12 sep 2026
+      v4.7.20 · 12 sep 2026
     </div>
   </div>
 </nav>
@@ -572,7 +572,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.18</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.20</div>
   </div>
   <div class="content">
 
@@ -5193,7 +5193,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.7.18] OK');
+console.log('[Alleata v4.7.20] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -7636,6 +7636,53 @@ async function cargarCambiosPorZona() {
 // coincidían con lo que se ve en la pantalla Hoja de Ruta. Ahora usa la
 // MISMA fuente que esa pantalla: rutas_diarias (confirmadas para hoy) +
 // profiles para el nombre del chofer, igual que loadHojaRuta().
+let _hrDiaBuckets = {};  // { 'Marce': {todas:[],exitosas:[],reprogramar:[],otros:[]}, 'Nacho': {...} }
+
+// Modal genérico de detalle de OTs — mismo patrón visual que abrirModalExitosasHoy().
+// Recibe una lista de items { ot_num, status, cuenta, entregado_por, fechaHora }.
+function mostrarModalRutaOTs(titulo, lista) {
+  lista = lista || [];
+  if (!document.getElementById('modalRutaOTs')) {
+    const m = document.createElement('div');
+    m.id = 'modalRutaOTs';
+    m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px;';
+    m.innerHTML = `
+      <div style="background:var(--navy-800);border:1px solid var(--border2);border-radius:16px;width:100%;max-width:560px;max-height:78vh;display:flex;flex-direction:column;box-shadow:var(--shadow-lg);">
+        <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
+          <div id="modalRutaOTsTitulo" style="font-size:14px;font-weight:700;color:var(--text)"></div>
+          <button onclick="document.getElementById('modalRutaOTs').remove()" style="background:none;border:none;color:var(--text-muted);font-size:18px;cursor:pointer;line-height:1;">×</button>
+        </div>
+        <div id="modalRutaOTsBody" style="padding:14px 20px;overflow-y:auto;flex:1;"></div>
+      </div>`;
+    document.body.appendChild(m);
+    m.addEventListener('click', (e) => { if (e.target === m) m.remove(); });
+  }
+  document.getElementById('modalRutaOTsTitulo').textContent = titulo;
+  const body = document.getElementById('modalRutaOTsBody');
+  if (!lista.length) {
+    body.innerHTML = `<div style="text-align:center;color:var(--text-muted);font-size:13px;padding:30px 0">No hay OTs en esta categoría.</div>`;
+    return;
+  }
+  // Más recientes primero — igual que el orden que ya usa loadHojaRuta() para las cerradas.
+  const ordenada = [...lista].sort((a, b) => new Date(b.fechaHora || 0) - new Date(a.fechaHora || 0));
+  body.innerHTML = ordenada.map(o => {
+    const fechaHora = o.fechaHora
+      ? new Date(o.fechaHora).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' })
+      : '— sin fecha —';
+    return `
+      <div style="padding:10px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:10px">
+        <div>
+          <div class="ot-num" style="font-size:13px;color:var(--text)">OT ${o.ot_num}${o.status ? ` <span style="font-weight:400;color:var(--text-muted);font-family:Inter,sans-serif">· ${o.status}</span>` : ''}</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:2px">${o.cuenta || '—'}</div>
+        </div>
+        <div style="text-align:right;flex-shrink:0">
+          <div style="font-size:11px;color:var(--teal);font-weight:600;white-space:nowrap">${fechaHora}</div>
+          <div style="font-size:10px;color:var(--text-muted);margin-top:2px;white-space:nowrap">👷 ${o.entregado_por || '—'}</div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
 async function cargarIndicadoresRutaChofer() {
   const cont = document.getElementById('indicadoresRutaCard');
   if (!cont) return;
@@ -7652,49 +7699,74 @@ async function cargarIndicadoresRutaChofer() {
     const porUser = {}; (perfiles || []).forEach(p => { porUser[p.id] = p; });
 
     const todosNumeros = [...new Set((rutas || []).flatMap(r => r.ots_numeros || []).filter(Boolean))];
-    let statusMap = {};
+    // Pedido 12/09: se amplía el select para poder mostrar el detalle de cada
+    // OT al hacer click en las mini-cards — antes solo se traía "status".
+    let otsInfo = {};
     if (todosNumeros.length) {
       const { data: ots, error: errOts } = await sb.from('sf_workorders')
-        .select('workorder_number,status').in('workorder_number', todosNumeros);
+        .select('workorder_number,status,cuenta,entregado_por,fecha_exitoso,updated_at')
+        .in('workorder_number', todosNumeros);
       if (errOts) throw new Error(errOts.message);
-      (ots || []).forEach(o => { statusMap[o.workorder_number] = o.status; });
+      (ots || []).forEach(o => { otsInfo[o.workorder_number] = o; });
     }
 
+    // Pedido 12/09: 4ta categoría "OTROS" — todo lo que no es Exitoso/Exitosa
+    // ni Reprogramar (Fallido, Despachado sin cerrar, Cancelado, o el número
+    // ya ni existe en sf_workorders). Antes ese resto quedaba invisible: el
+    // total ("EN RUTA HOY") no cerraba contra EXITOSAS+REPROGRAMAR y nadie
+    // podía ver a qué se debía la diferencia sin correr una query a mano.
+    // Cada categoría ahora guarda también la lista completa de OTs (no solo
+    // el conteo), para que el click en la card abra el detalle real.
     const contar = matchFn => {
-      let total = 0, exitosas = 0, reprogramar = 0;
+      const buckets = { todas: [], exitosas: [], reprogramar: [], otros: [] };
       (rutas || []).forEach(r => {
         const nombre = (porUser[r.user_id]?.nombre || porUser[r.user_id]?.email || '').trim();
         if (!matchFn(nombre)) return;
         (r.ots_numeros || []).forEach(num => {
-          total++;
-          const st = statusMap[num];
-          if (st === 'Exitoso' || st === 'Exitosa') exitosas++;
-          if (st === 'Reprogramar') reprogramar++;
+          const info = otsInfo[num] || {};
+          const st = info.status;
+          const item = {
+            ot_num: num,
+            status: st || 'No encontrada en sf_workorders',
+            cuenta: info.cuenta,
+            entregado_por: info.entregado_por,
+            fechaHora: info.fecha_exitoso || info.updated_at || null,
+          };
+          buckets.todas.push(item);
+          if (st === 'Exitoso' || st === 'Exitosa') buckets.exitosas.push(item);
+          else if (st === 'Reprogramar') buckets.reprogramar.push(item);
+          else buckets.otros.push(item);
         });
       });
-      return { total, exitosas, reprogramar };
+      return {
+        total: buckets.todas.length, exitosas: buckets.exitosas.length,
+        reprogramar: buckets.reprogramar.length, otros: buckets.otros.length,
+        buckets,
+      };
     };
     const marce = contar(_mrEsMarce);
     const nacho = contar(_mrEsNacho);
+    _hrDiaBuckets['Marce'] = marce.buckets;
+    _hrDiaBuckets['Nacho'] = nacho.buckets;
 
-    const bloque = (nombre, d, color) => `
+    const bloque = (nombre, d, color) => {
+      const mini = (bucket, label, valor, colorVal) => `
+          <div onclick="mostrarModalRutaOTs('${label} — ${nombre} (hoy)', (_hrDiaBuckets['${nombre}']||{})['${bucket}'])" style="cursor:pointer;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 14px;text-align:center;min-width:80px" title="Ver detalle de OTs">
+            <div style="font-size:20px;font-weight:800;color:${colorVal}">${valor}</div>
+            <div style="font-size:9.5px;color:var(--text-muted);font-weight:700">${label}</div>
+          </div>`;
+      return `
       <div class="card" style="flex:1;min-width:220px">
         <div style="font-size:13px;font-weight:700;margin-bottom:10px">👷 ${nombre}</div>
         <div style="display:flex;gap:10px;flex-wrap:wrap">
-          <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 14px;text-align:center;min-width:80px">
-            <div style="font-size:20px;font-weight:800;color:${color}">${d.total}</div>
-            <div style="font-size:9.5px;color:var(--text-muted);font-weight:700">EN RUTA HOY</div>
-          </div>
-          <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 14px;text-align:center;min-width:80px">
-            <div style="font-size:20px;font-weight:800;color:var(--teal)">${d.exitosas}</div>
-            <div style="font-size:9.5px;color:var(--text-muted);font-weight:700">EXITOSAS</div>
-          </div>
-          <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 14px;text-align:center;min-width:80px">
-            <div style="font-size:20px;font-weight:800;color:#f59e0b">${d.reprogramar}</div>
-            <div style="font-size:9.5px;color:var(--text-muted);font-weight:700">REPROGRAMAR</div>
-          </div>
+          ${mini('todas', 'EN RUTA HOY', d.total, color)}
+          ${mini('exitosas', 'EXITOSAS', d.exitosas, 'var(--teal)')}
+          ${mini('reprogramar', 'REPROGRAMAR', d.reprogramar, '#f59e0b')}
+          ${mini('otros', 'OTROS', d.otros, '#94a3b8')}
         </div>
       </div>`;
+    };
+
 
     cont.innerHTML = `
       <div style="font-size:13px;font-weight:700;margin-bottom:10px">🚚 Ruta — Marce / Nacho (hoy)</div>
@@ -7702,7 +7774,7 @@ async function cargarIndicadoresRutaChofer() {
         ${bloque('Marce', marce, 'var(--text)')}
         ${bloque('Nacho', nacho, 'var(--text)')}
       </div>
-      <div style="font-size:10px;color:var(--text-muted);margin-top:8px">Cuenta solo lo que está en rutas_diarias de hoy (mismo dato que la pantalla Hoja de Ruta) — no incluye desinstalaciones/retiros ni paradas manuales.</div>`;
+      <div style="font-size:10px;color:var(--text-muted);margin-top:8px">Cuenta solo lo que está en rutas_diarias de hoy (mismo dato que la pantalla Hoja de Ruta) — no incluye desinstalaciones/retiros ni paradas manuales. Click en cualquier número para ver el detalle.</div>`;
   } catch (e) {
     cont.innerHTML = `<div class="card" style="padding:16px;color:var(--red);font-size:12px">No se pudo cargar indicadores de ruta: ${e.message}</div>`;
   }
@@ -7727,6 +7799,8 @@ function _ultimosNMeses(n){
   return meses;
 }
 
+let _hrMesBuckets = {};  // { 'Marce|2026-09': {todas:[],exitosas:[],reprogramar:[],otros:[]}, ... }
+
 async function cargarIndicadoresRutaMensual() {
   const cont = document.getElementById('indicadoresRutaMensualCard');
   if (!cont) return;
@@ -7745,32 +7819,64 @@ async function cargarIndicadoresRutaMensual() {
     const porUser = {}; (perfiles || []).forEach(p => { porUser[p.id] = p; });
 
     const todosNumeros = [...new Set((rutas || []).flatMap(r => r.ots_numeros || []).filter(Boolean))];
-    let statusMap = {};
+    // Pedido 12/09: mismo select ampliado que la card de hoy, para el detalle
+    // clickeable de cada categoría (fecha/hora de entrega y quién la hizo).
+    let otsInfo = {};
     if (todosNumeros.length) {
       const { data: ots, error: errOts } = await sb.from('sf_workorders')
-        .select('workorder_number,status').in('workorder_number', todosNumeros);
+        .select('workorder_number,status,cuenta,entregado_por,fecha_exitoso,updated_at')
+        .in('workorder_number', todosNumeros);
       if (errOts) throw new Error(errOts.message);
-      (ots || []).forEach(o => { statusMap[o.workorder_number] = o.status; });
+      (ots || []).forEach(o => { otsInfo[o.workorder_number] = o; });
     }
 
     const contarMes = (matchFn, mesKey) => {
-      let total = 0, exitosas = 0, reprogramar = 0;
+      // FIX 12/09 (caso real: OT 00023934, Marce, quedó "Despachado" sin
+      // cerrar el 10/09 y se arrastró al 11/09 vía la persistencia local de
+      // mobile.html — a propósito, por diseño, ver el comentario de
+      // _rutaPendienteKey() ahí: es para que el chofer no "pierda" una OT
+      // sin cerrar si se le reinicia el celular). Efecto secundario: esa
+      // misma OT queda guardada en rutas_diarias de LOS DOS días, y este
+      // conteo la sumaba dos veces al total del mes sin darse cuenta de que
+      // era la misma. Se deduplica por ot_numero dentro del mes — cada OT
+      // cuenta una sola vez, sin importar cuántos días haya estado en la
+      // ruta hasta que se cerró.
+      //
+      // También agrega la 4ta categoría "OTROS" (mismo criterio que la card
+      // de hoy) y guarda el detalle completo de cada categoría para el click.
+      const vistos = new Set();
+      const buckets = { todas: [], exitosas: [], reprogramar: [], otros: [] };
       (rutas || []).forEach(r => {
         if (String(r.fecha).slice(0, 7) !== mesKey) return;
         const nombre = (porUser[r.user_id]?.nombre || porUser[r.user_id]?.email || '').trim();
         if (!matchFn(nombre)) return;
         (r.ots_numeros || []).forEach(num => {
-          total++;
-          const st = statusMap[num];
-          if (st === 'Exitoso' || st === 'Exitosa') exitosas++;
-          if (st === 'Reprogramar') reprogramar++;
+          if (vistos.has(num)) return;
+          vistos.add(num);
+          const info = otsInfo[num] || {};
+          const st = info.status;
+          const item = {
+            ot_num: num,
+            status: st || 'No encontrada en sf_workorders',
+            cuenta: info.cuenta,
+            entregado_por: info.entregado_por,
+            fechaHora: info.fecha_exitoso || info.updated_at || null,
+          };
+          buckets.todas.push(item);
+          if (st === 'Exitoso' || st === 'Exitosa') buckets.exitosas.push(item);
+          else if (st === 'Reprogramar') buckets.reprogramar.push(item);
+          else buckets.otros.push(item);
         });
       });
-      return { total, exitosas, reprogramar };
+      return {
+        total: buckets.todas.length, exitosas: buckets.exitosas.length,
+        reprogramar: buckets.reprogramar.length, otros: buckets.otros.length,
+        buckets,
+      };
     };
 
-    const filaMini = (label, valor, color) => `
-      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:5px 9px;text-align:center;min-width:56px">
+    const filaMini = (key, bucket, label, valor, color, tituloSufijo) => `
+      <div onclick="mostrarModalRutaOTs('${label} — ${tituloSufijo}', (_hrMesBuckets['${key}']||{})['${bucket}'])" style="cursor:pointer;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:5px 9px;text-align:center;min-width:56px" title="Ver detalle de OTs">
         <div style="font-size:15px;font-weight:800;color:${color}">${valor}</div>
         <div style="font-size:8px;color:var(--text-muted);font-weight:700">${label}</div>
       </div>`;
@@ -7780,12 +7886,16 @@ async function cargarIndicadoresRutaMensual() {
       <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:6px">
         ${meses.map(m => {
           const d = contarMes(nombre === 'Marce' ? _mrEsMarce : _mrEsNacho, m.key);
+          const key = nombre + '|' + m.key;  // ej: "Marce|2026-09"
+          const tituloSufijo = `${nombre} · ${m.label}`;
+          _hrMesBuckets[key] = d.buckets;
           return `<div style="display:flex;flex-direction:column;align-items:center;gap:4px">
             <div style="font-size:9px;color:var(--text-muted);font-weight:700">${m.label}</div>
             <div style="display:flex;gap:5px">
-              ${filaMini('RUTA', d.total, 'var(--text)')}
-              ${filaMini('EXIT.', d.exitosas, 'var(--teal)')}
-              ${filaMini('REPR.', d.reprogramar, '#f59e0b')}
+              ${filaMini(key, 'todas', 'RUTA', d.total, 'var(--text)', tituloSufijo)}
+              ${filaMini(key, 'exitosas', 'EXIT.', d.exitosas, 'var(--teal)', tituloSufijo)}
+              ${filaMini(key, 'reprogramar', 'REPR.', d.reprogramar, '#f59e0b', tituloSufijo)}
+              ${filaMini(key, 'otros', 'OTROS', d.otros, '#94a3b8', tituloSufijo)}
             </div>
           </div>`;
         }).join('')}
@@ -7796,7 +7906,7 @@ async function cargarIndicadoresRutaMensual() {
         <div style="font-size:13px;font-weight:700;margin-bottom:4px">🚚 Ruta — Marce / Nacho, general por mes</div>
         ${filaChofer('Marce')}
         ${filaChofer('Nacho')}
-        <div style="font-size:10px;color:var(--text-muted);margin-top:8px">Mismo criterio que la card de hoy (rutas_diarias + profiles) — no incluye desinstalaciones/retiros ni paradas manuales.</div>
+        <div style="font-size:10px;color:var(--text-muted);margin-top:8px">Mismo criterio que la card de hoy (rutas_diarias + profiles) — no incluye desinstalaciones/retiros ni paradas manuales. Cada OT cuenta una sola vez por mes aunque haya quedado sin cerrar varios días. Click en cualquier número para ver el detalle.</div>
       </div>`;
   } catch (e) {
     cont.innerHTML = `<div class="card" style="padding:16px;color:var(--red);font-size:12px">No se pudo cargar el resumen mensual de ruta: ${e.message}</div>`;
