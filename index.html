@@ -6718,6 +6718,24 @@ async function asignarOTAChofer(){
     if(errOt)throw new Error(errOt.message);
     if(!ot)throw new Error(`No se encontró la OT ${otNumBusqueda} en sf_workorders (probá "↺ Full Sync" arriba si es muy reciente).`);
 
+    // FIX 12/09 (caso real: OT 00022873, Desinstalación logística CORREO
+    // ARGENTINO, terminó en la ruta de Marce en julio y quedó ahí para
+    // siempre — el widget de indicadores mensuales no la cuenta ni como
+    // exitosa ni como reprogramada porque no es una OT de Alleata, así que
+    // ensucia el total sin que nadie se entere).
+    //
+    // Antes, esta función buscaba la OT SIN filtrar logística, la metía en
+    // rutas_diarias igual, y recién DESPUÉS avisaba con un texto (fácil de
+    // no leer) que no era ALLEATA — pero ya había quedado asignada. Marce y
+    // Nacho son choferes de logística propia Alleata: no tienen que cargar
+    // nunca una OT de otra logística en su ruta, sea entrega o
+    // desinstalación. Mismo criterio que ya usan mostrarOTScaneada() y
+    // buscarOTManual() en mobile.html (las dos ya filtran logistica=ALLEATA
+    // desde la query) — acá faltaba el mismo bloqueo.
+    if((ot.logistica||'').toUpperCase()!=='ALLEATA'){
+      throw new Error(`OT ${ot.workorder_number} es logística "${ot.logistica||'—'}" (no ALLEATA) — Marce/Nacho no pueden cargar OTs de otra logística en su ruta.`);
+    }
+
     const hoy=hoyArgentina();
 
     // FIX 28/07: si esta OT ya estaba en la ruta de OTRO chofer hoy, sacarla
@@ -6757,6 +6775,10 @@ async function asignarOTAChofer(){
     if(ot.status==='Despachado'){
       avisoDespacho=notaSacada+' Ya estaba Despachada — visible en su app.';
     }else if((ot.logistica||'').toUpperCase()!=='ALLEATA'){
+      // NOTA 12/09: esta rama quedó inalcanzable a propósito — el chequeo de
+      // logística ahora corta arriba, antes de tocar rutas_diarias. Se deja
+      // el código acá sin tocar (no vale la pena el riesgo de un diff más
+      // grande para borrar una rama muerta e inofensiva).
       avisoDespacho=notaSacada+` ⚠️ Logística es "${ot.logistica||'—'}" (no ALLEATA) — no se pudo despachar automáticamente, va a seguir sin verse en "En Ruta Hoy" hasta que se resuelva a mano.`;
     }else{
       try{
