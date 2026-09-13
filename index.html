@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.7.22</title>
+<title>Alleata · Operaciones v4.7.23</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -408,7 +408,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.22 · 13 sep 2026
+      v4.7.23 · 13 sep 2026
     </div>
   </div>
 </div>
@@ -517,7 +517,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.22 · 13 sep 2026
+      v4.7.23 · 13 sep 2026
     </div>
   </div>
 </nav>
@@ -572,7 +572,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.22</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.23</div>
   </div>
   <div class="content">
 
@@ -5200,7 +5200,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.7.22] OK');
+console.log('[Alleata v4.7.23] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -11556,9 +11556,10 @@ async function initEnvios(){
 //          y (Terminal ID "FACTURADOR" → no espera) o (+24hs)
 //  Tier 3) EPSA — solo si hoy es miércoles o viernes
 const TIER_STYLE = {
+  0: {icon:'🎯',   label:null,           color:'#1dbf8e'}, // teal — cierra o acerca una ruta real, máxima prioridad
   1: {icon:'🛵💨', label:'ROLLOUT',      color:'#a78bfa'}, // violeta, mismo código de color que usa Cabify en el resto del portal
   2: {icon:'⚙️',   label:null,           color:'var(--teal)'},
-  3: {icon:'📅',   label:'EPSA · HOY',   color:'#f59e0b'},
+  3: {icon:'📅',   label:null,           color:'#f59e0b'}, // motivo dinámico: 'EPSA · HOY' o 'EPSA ROLLOUT · HOY'
 };
 async function cargarProximaOT(nombre){
   const top=document.getElementById('opProximaOTTop');
@@ -11566,7 +11567,7 @@ async function cargarProximaOT(nombre){
   top.textContent='Cargando...';
 
   const{data,error}=await sb.from('sf_workorders')
-    .select('id,workorder_number,cuenta,record_type,rollout,logistica,terminal_id,terminal_id_fecha,n_terminal_nueva,usuario_cajero,contrasena_cajero,wo_node_code,wo_store_code,created_at')
+    .select('id,sf_id,workorder_number,cuenta,record_type,rollout,logistica,terminal_id,terminal_id_fecha,n_terminal_nueva,usuario_cajero,contrasena_cajero,wo_node_code,wo_store_code,created_at,ciudad,provincia,codigo_postal')
     .eq('status','Configurar Terminal')
     .ilike('responsable',`%${nombre}%`)
     .order('created_at',{ascending:true});
@@ -11600,6 +11601,23 @@ async function cargarProximaOT(nombre){
     return;
   }
 
+  // Pedido 13/09: "temperatura" de cada zona — cuántas OTs de Pre-Colecta
+  // ALLEATA hay ya en cada zona AMBA (dsGetZona), sin importar de qué
+  // responsable son (esto es sobre la ruta de Marce/Ignacio en conjunto,
+  // no sobre este operador puntual). Se usa para el Tier 0 de abajo: una
+  // OT de Configurar Terminal en una zona que ya tiene la ruta armada (o
+  // casi) es más urgente que una Rollout genérica, porque literalmente
+  // destraba la salida de mañana. Mismo dsGetZona() que hojas-ruta.html.
+  const CUPO_RUTA = 10;
+  const {data:precolectaZonas} = await sb.from('sf_workorders')
+    .select('ciudad,provincia,codigo_postal')
+    .eq('record_type','Cambio de Terminal').eq('logistica','ALLEATA').eq('status','Pre-Colecta');
+  const precolectaPorZona = {};
+  (precolectaZonas||[]).forEach(o=>{
+    const z = dsGetZona(o);
+    precolectaPorZona[z] = (precolectaPorZona[z]||0)+1;
+  });
+
   const hoy=new Date().getDay(); // 0=dom...3=miércoles,5=viernes
   const esDiaEPSA = (hoy===3 || hoy===5);
   const LOG_TIER2 = ['ALLEATA','CABIFY','CORREO ARGENTINO','CA'];
@@ -11610,19 +11628,39 @@ async function cargarProximaOT(nombre){
 
   const conMotivo = rows.map(r=>{
     let tier=null, motivo=null, esperando=false;
-    if(r.record_type==='Cambio de Terminal' && r.rollout===true){ tier=1; motivo='Rollout'; }
+    const esRollout = r.record_type==='Cambio de Terminal' && r.rollout===true;
+    const esAlleata = String(r.logistica||'').toUpperCase()==='ALLEATA';
+    if(esRollout && esAlleata){
+      // Pedido 13/09: dentro de Rollout ALLEATA, separar Tier 0 (zona
+      // caliente — cierra o acerca la ruta de mañana) del resto. Antes
+      // esto era un solo Tier 1 sin mirar zona.
+      const zona = dsGetZona(r);
+      const enRuta = precolectaPorZona[zona]||0;
+      if(enRuta>=CUPO_RUTA || (enRuta>0 && (CUPO_RUTA-enRuta)<=3)){
+        tier=0; motivo=`🎯 ${zona} — ${enRuta>=CUPO_RUTA?'ruta lista':`faltan ${CUPO_RUTA-enRuta} para cerrarla`} (${enRuta}/${CUPO_RUTA} en Pre-Colecta)`;
+      } else {
+        tier=1; motivo='Rollout';
+      }
+    }
     else if(esCandidataTier2(r) && (esFacturador(r)||pasaron24h(r))){ tier=2; motivo=esFacturador(r)?'FACTURADOR':'Terminal ID +24hs'; }
-    else if(r.logistica==='EPSA' && esDiaEPSA){ tier=3; motivo='EPSA · hoy pasa'; }
+    else if(r.logistica==='EPSA' && esDiaEPSA){
+      // Pedido 13/09: acá también entra el Rollout de EPSA — antes
+      // saltaba directo a Tier 1 sin mirar el día, aunque EPSA solo pasa
+      // a retirar miércoles/viernes y podía esperar tranquilo el resto
+      // de la semana.
+      tier=3; motivo = esRollout ? 'EPSA ROLLOUT · HOY' : 'EPSA · HOY';
+    }
     else if(esCandidataTier2(r) && !esFacturador(r)) esperando=true; // ALLEATA/CABIFY/CA, todavía no llega a 24hs
     return {...r,_tier:tier,_motivo:motivo,_esperando:esperando};
   });
 
-  // Prioridad real: primero por tier (1=Rollout > 2 > 3), después por
-  // antigüedad dentro del mismo tier. Antes esto no se ordenaba por tier
-  // y salía primero la más vieja sin importar el motivo — quedaba mal.
-  const prioritarias = conMotivo.filter(r=>r._tier).sort((a,b)=> a._tier-b._tier || new Date(a.created_at||0)-new Date(b.created_at||0));
-  const esperando = conMotivo.filter(r=>!r._tier && r._esperando).sort((a,b)=> new Date(a.created_at||0)-new Date(b.created_at||0));
-  const resto = conMotivo.filter(r=>!r._tier && !r._esperando);
+  // Prioridad real: primero por tier (0=cierra ruta > 1=Rollout > 2 > 3),
+  // después por antigüedad dentro del mismo tier. OJO: _tier puede ser 0,
+  // que es falsy en JS — el filtro de abajo tiene que chequear "no es
+  // null", no simplemente "es truthy" (bug que casi se cuela acá).
+  const prioritarias = conMotivo.filter(r=>r._tier!==null).sort((a,b)=> a._tier-b._tier || new Date(a.created_at||0)-new Date(b.created_at||0));
+  const esperando = conMotivo.filter(r=>r._tier===null && r._esperando).sort((a,b)=> new Date(a.created_at||0)-new Date(b.created_at||0));
+  const resto = conMotivo.filter(r=>r._tier===null && !r._esperando);
 
   const TOPE = 10;
   const prioritariasVisibles = prioritarias.slice(0,TOPE);
@@ -11644,6 +11682,11 @@ async function cargarProximaOT(nombre){
     return `<span style="background:var(--navy-700);border-radius:6px;padding:4px 10px;color:var(--text-muted)"><b style="color:var(--text)">Terminal:</b> <span style="opacity:.55">${escapeHtmlLocal(resto)}</span><span style="font-size:14px;font-weight:800;color:var(--teal);letter-spacing:.03em">${escapeHtmlLocal(cola)}</span></span>`;
   };
   const esRetiraVendedor = r => String(r.logistica||'').trim().toUpperCase().includes('RETIRA');
+  // Pedido 13/09: link directo a la OT en Salesforce, mismo dominio que ya
+  // usa el resto del portal (alleata.lightning.force.com).
+  const linkOT = r => r.sf_id
+    ? `<a href="https://alleata.lightning.force.com/lightning/r/WorkOrder/${r.sf_id}/view" target="_blank" rel="noopener" style="color:inherit;text-decoration:none;border-bottom:1px dashed var(--text-muted)" title="Abrir en Salesforce">${escapeHtmlLocal(r.workorder_number||'—')}</a>`
+    : escapeHtmlLocal(r.workorder_number||'—');
 
   const filaPrioridad = r => {
     const st = TIER_STYLE[r._tier];
@@ -11659,7 +11702,7 @@ async function cargarProximaOT(nombre){
         <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
           <div style="display:flex;align-items:center;gap:8px;min-width:0">
             <span style="font-size:18px">${st.icon}</span>
-            <span style="font-family:'JetBrains Mono',monospace;font-weight:800;font-size:17px">${escapeHtmlLocal(r.workorder_number||'—')}</span>
+            <span style="font-family:'JetBrains Mono',monospace;font-weight:800;font-size:17px">${linkOT(r)}</span>
             <span style="color:var(--text-muted);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtmlLocal(r.cuenta||'—')}</span>
           </div>
           <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px">
@@ -11684,7 +11727,7 @@ async function cargarProximaOT(nombre){
         <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
           <div style="display:flex;align-items:center;gap:7px;min-width:0">
             <span style="font-size:14px">⏳</span>
-            <span style="font-family:'JetBrains Mono',monospace;font-weight:700;font-size:12px">${escapeHtmlLocal(r.workorder_number||'—')}</span>
+            <span style="font-family:'JetBrains Mono',monospace;font-weight:700;font-size:12px">${linkOT(r)}</span>
             <span style="color:var(--text-muted);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtmlLocal(r.cuenta||'—')}</span>
           </div>
           <span style="color:var(--text-muted);font-size:10px;white-space:nowrap">${escapeHtmlLocal(r.logistica||'—')}</span>
@@ -11695,7 +11738,7 @@ async function cargarProximaOT(nombre){
 
   const filaSimple = r => `
       <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:7px 14px;margin-bottom:4px;font-size:12px">
-        <span style="font-family:'JetBrains Mono',monospace;font-weight:700">${escapeHtmlLocal(r.workorder_number||'—')}</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-weight:700">${linkOT(r)}</span>
         <span style="color:var(--text-muted);flex:1;margin:0 8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtmlLocal(r.cuenta||'—')}</span>
         <span style="color:var(--text-muted);font-size:10px;white-space:nowrap">${escapeHtmlLocal(r.record_type||'—')} · ${escapeHtmlLocal(r.logistica||'—')}</span>
         <span style="color:var(--text-muted);font-size:10px;white-space:nowrap">${r.created_at?new Date(r.created_at).toLocaleDateString('es-AR'):'—'}</span>
