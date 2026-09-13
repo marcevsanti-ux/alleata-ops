@@ -196,6 +196,32 @@ function dsGetZona(ot){
 // nos alcanza con marcar "che, esta tiene restricción de día, léela antes
 // de asumir que sirve cualquier día").
 const RE_DIA = /\b(lun|mar|mi[eé]|jue|vie|s[aá]b|dom)[a-záéíóú]*\s*(a|-)\s*(lun|mar|mi[eé]|jue|vie|s[aá]b|dom)/i;
+
+// ── Pedido 13/09: "a partir del martes" / "desde el martes" — casos donde
+// el comercio pidió explícitamente que el cambio empiece un día futuro. Si
+// mañana todavía no llegamos a ese día, esta OT no está lista para la ruta
+// de mañana y hay que sacarla de la vista, no solo marcarla con un ⚠️.
+// Heurística de texto libre — no es 100% infalible (frases raras pueden
+// no matchear), por eso se loguea aparte en vez de fallar en silencio.
+const DIAS_SEMANA = {'domingo':0,'lunes':1,'martes':2,'miercoles':3,'miércoles':3,'jueves':4,'viernes':5,'sabado':6,'sábado':6};
+const RE_A_PARTIR = /\b(?:a partir de(?:l)?|desde el|reci[eé]n (?:el|a partir de(?:l)?))\s+(lunes|martes|mi[eé]rcoles|jueves|viernes|s[aá]bado|domingo)/i;
+
+function fechaInicioMinima(horario){
+  const m = (horario||'').match(RE_A_PARTIR);
+  if(!m) return null;
+  const diaNombre = m[1].toLowerCase();
+  return DIAS_SEMANA[diaNombre] ?? null;
+}
+
+// Próximo día hábil (lo que en la práctica es "la ruta de mañana" — si hoy
+// es sábado o domingo, la próxima ruta real es el lunes).
+function proximoDiaHabil(){
+  const hoy = new Date().getDay();
+  if(hoy===6) return 1; // sábado -> lunes
+  if(hoy===0) return 1; // domingo -> lunes
+  return hoy+1>6 ? 1 : hoy+1;
+}
+
 function horarioInfo(h){
   h = (h||'').trim();
   if(!h) return {texto:'Sin horario', warn:true};
@@ -237,7 +263,27 @@ async function cargar(){
   }
 }
 
-function render(precolecta, configurar){
+function render(precolectaTodas, configurar){
+  // ── Sacar las que todavía no arrancan (pedido 13/09: "a partir del
+  // martes" no puede estar en la ruta de mañana lunes) — se muestran
+  // aparte, no se pierden, solo no cuentan para el cupo de mañana.
+  const manana = proximoDiaHabil();
+  const precolecta = [];
+  const noDisponiblesAun = [];
+  precolectaTodas.forEach(ot=>{
+    const inicioMin = fechaInicioMinima(ot.horario_entrega||ot.horario);
+    // Comparación simple lunes(1)..sábado(6): si el día pedido es "más
+    // adelante en la semana" que mañana, todavía no está disponible. No
+    // contempla que cruce de una semana a la otra (ej. pedirlo en jueves
+    // para "el lunes que viene") — para ese caso raro, mejor pecar de
+    // conservador y dejarla en la lista general en vez de esconderla mal.
+    if(inicioMin!==null && inicioMin>manana){
+      noDisponiblesAun.push({...ot, _disponibleDesde:inicioMin});
+    } else {
+      precolecta.push(ot);
+    }
+  });
+
   // ── Agrupar Pre-Colecta por zona y, dentro de cada zona, por localidad ──
   const porZona = {};
   precolecta.forEach(ot=>{
@@ -248,7 +294,7 @@ function render(precolecta, configurar){
   const zonasConCupo = ORDEN_ZONAS.filter(z=>(porZona[z]||[]).length >= CUPO).length;
 
   document.getElementById('strip').innerHTML = `
-    <div class="strip-item"><div class="strip-num" style="color:var(--purple)">${precolecta.length}</div><div class="strip-lbl">Pre-Colecta (ALLEATA)</div></div>
+    <div class="strip-item"><div class="strip-num" style="color:var(--purple)">${precolecta.length}</div><div class="strip-lbl">Pre-Colecta lista para mañana</div></div>
     <div class="strip-item"><div class="strip-num" style="color:var(--text)">${configurar.length}</div><div class="strip-lbl">Configurar Terminal (ALLEATA)</div></div>
     <div class="strip-item"><div class="strip-num" style="color:${zonasConCupo?'var(--teal)':'var(--text-dim)'}">${zonasConCupo}</div><div class="strip-lbl">Zona(s) con ruta lista (≥${CUPO})</div></div>
   `;
@@ -355,6 +401,14 @@ function render(precolecta, configurar){
     <details class="panel-extra">
       <summary><span>📍 Sin zona clasificada — cargar el CP en Config → Zonas AMBA (${sinZona.length})</span><span>▾</span></summary>
       ${sinZona.map(o=>`<div class="extra-row"><span class="extra-ot">${esc(o.workorder_number)}</span><span class="extra-motivo">${esc(o.ciudad||'—')}, ${esc(o.provincia||'—')} · CP ${esc(o.codigo_postal||'—')}</span></div>`).join('')}
+    </details>`;
+  }
+  if(noDisponiblesAun.length){
+    const NOMBRE_DIA = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+    extrasHtml += `
+    <details class="panel-extra">
+      <summary><span>📆 Todavía no arrancan — pidieron un día puntual, no entran a la ruta de mañana (${noDisponiblesAun.length})</span><span>▾</span></summary>
+      ${noDisponiblesAun.map(o=>`<div class="extra-row"><span class="extra-ot">${esc(o.workorder_number)}</span><span class="extra-motivo">${esc(o.cuenta||'—')} · disponible desde ${NOMBRE_DIA[o._disponibleDesde]} · "${esc(o.horario_entrega||o.horario||'—')}"</span></div>`).join('')}
     </details>`;
   }
   extras.innerHTML = extrasHtml;
