@@ -3,12 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Alleata · Hojas de Ruta — Rollout</title>
+<title>Alleata · Ruta por Zona — Cambio de Terminal</title>
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 <style>
   :root{
     --bg:#070c14; --panel:#0f1a2b; --panel2:#13223a; --border:#1e3252;
-    --teal:#1dbf8e; --amber:#f5a623; --purple:#8b5cf6; --red:#ef4444;
+    --teal:#1dbf8e; --amber:#f5a623; --purple:#8b5cf6; --red:#ef4444; --blue:#1a9fd4; --green:#10b981;
     --text:#eef4fb; --text-dim:#7b93b3; --mono:'JetBrains Mono','Courier New',monospace;
   }
   *{margin:0;padding:0;box-sizing:border-box}
@@ -18,10 +18,9 @@
   .brand{display:flex;align-items:center;gap:14px}
   .brand-logo{font-size:22px;font-weight:800;letter-spacing:-1px;color:var(--teal)}
   .brand-title{font-size:14px;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:1.6px}
-  .fecha-nav{display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:13px}
-  .fecha-nav button{background:var(--panel2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:6px 12px;cursor:pointer;font-family:inherit}
-  .fecha-nav button:hover{border-color:var(--teal)}
-  .last-sync{font-size:10.5px;color:var(--text-dim);font-family:var(--mono)}
+  .last-sync{font-size:10.5px;color:var(--text-dim);font-family:var(--mono);display:flex;align-items:center;gap:10px}
+  .last-sync button{background:var(--panel2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:5px 10px;cursor:pointer;font-family:inherit;font-size:11px}
+  .last-sync button:hover{border-color:var(--teal)}
 
   .strip{display:flex;gap:0;border-bottom:1px solid var(--border);flex-shrink:0;flex-wrap:wrap}
   .strip-item{flex:1;min-width:160px;padding:14px 24px;text-align:center;border-right:1px solid var(--border)}
@@ -29,24 +28,41 @@
   .strip-lbl{font-size:10.5px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.8px;margin-top:4px}
 
   main{padding:20px 24px;display:grid;grid-template-columns:1fr 1fr;gap:20px}
-  @media(max-width:900px){main{grid-template-columns:1fr}}
+  @media(max-width:1000px){main{grid-template-columns:1fr}}
 
-  .hoja{background:var(--panel);border:1px solid var(--border);border-radius:12px;overflow:hidden}
-  .hoja-head{padding:16px 18px;border-bottom:1px solid var(--border);background:var(--panel2)}
-  .hoja-op{font-size:16px;font-weight:800}
-  .hoja-meta{font-size:11.5px;color:var(--text-dim);margin-top:4px;font-family:var(--mono)}
-  .hoja-badges{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
-  .badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:6px;font-family:var(--mono)}
+  .col-title{font-size:14px;font-weight:800;margin-bottom:4px;display:flex;align-items:center;gap:8px}
+  .col-sub{font-size:11px;color:var(--text-dim);margin-bottom:12px}
+
+  .zona-card{background:var(--panel);border:1px solid var(--border);border-radius:12px;margin-bottom:10px;overflow:hidden}
+  .zona-head{padding:12px 16px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;user-select:none}
+  .zona-head:hover{background:var(--panel2)}
+  .zona-nombre{font-size:14px;font-weight:800;display:flex;align-items:center;gap:8px}
+  .zona-cupo{font-family:var(--mono);font-size:13px;font-weight:700}
+  .zona-bar-track{height:5px;background:var(--panel2);border-radius:3px;margin:0 16px 12px;overflow:hidden}
+  .zona-bar-fill{height:100%;border-radius:3px;transition:width .3s}
+  .zona-body{border-top:1px solid var(--border);display:none}
+  .zona-body.open{display:block}
+  .zona-loc-group{padding:8px 16px;border-bottom:1px solid var(--border)}
+  .zona-loc-group:last-child{border-bottom:none}
+  .zona-loc-nombre{font-size:11px;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px}
+  .ot-row{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:4px 0;font-size:12px}
+  .ot-num{font-family:var(--mono);font-weight:700}
+  .ot-cuenta{color:var(--text-dim);flex:1;margin:0 8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .ot-horario{font-size:10.5px;color:var(--text-dim);white-space:nowrap;font-family:var(--mono)}
+  .ot-horario.warn{color:var(--amber)}
+
+  .badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:6px;font-family:var(--mono);white-space:nowrap}
   .badge-ok{background:rgba(29,191,142,.15);color:var(--teal);border:1px solid rgba(29,191,142,.35)}
   .badge-warn{background:rgba(245,166,35,.15);color:var(--amber);border:1px solid rgba(245,166,35,.35)}
-  .badge-bad{background:rgba(239,68,68,.15);color:var(--red);border:1px solid rgba(239,68,68,.35)}
   .badge-info{background:rgba(139,92,246,.15);color:var(--purple);border:1px solid rgba(139,92,246,.35)}
 
-  .stop{padding:11px 18px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:10px}
-  .stop:last-child{border-bottom:none}
-  .stop-ot{font-family:var(--mono);font-weight:700;font-size:13px}
-  .stop-zona{font-size:11px;color:var(--text-dim);margin-top:2px}
-  .stop-hora{font-family:var(--mono);font-size:11.5px;color:var(--text-dim);white-space:nowrap}
+  .prio-row{background:#0f1a2b;border:1px solid var(--border);border-left:3px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:8px}
+  .prio-top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .prio-left{display:flex;align-items:center;gap:8px;min-width:0}
+  .prio-ot{font-family:var(--mono);font-weight:800;font-size:15px}
+  .prio-cuenta{color:var(--text-dim);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .prio-motivo{font-size:11px;margin-top:6px;font-weight:600}
+  .prio-meta{font-size:10.5px;color:var(--text-dim);margin-top:4px;font-family:var(--mono)}
 
   .panel-extra{background:var(--panel);border:1px solid var(--border);border-radius:12px;margin:0 24px 24px;overflow:hidden}
   .panel-extra summary{padding:14px 18px;cursor:pointer;font-weight:700;font-size:13px;color:var(--text-dim);list-style:none;display:flex;justify-content:space-between}
@@ -57,7 +73,8 @@
   .extra-ot{font-family:var(--mono);font-weight:700}
   .extra-motivo{color:var(--text-dim);font-size:11.5px}
 
-  .empty{padding:40px 20px;text-align:center;color:var(--text-dim);font-size:13px}
+  .empty{padding:30px 20px;text-align:center;color:var(--text-dim);font-size:13px}
+  .footnote{padding:0 24px 20px;font-size:11px;color:var(--text-dim);line-height:1.6}
 </style>
 </head>
 <body>
@@ -65,19 +82,18 @@
 <header>
   <div class="brand">
     <div class="brand-logo">alleata</div>
-    <div class="brand-title">Hojas de Ruta · Rollout</div>
+    <div class="brand-title">Ruta por Zona · Cambio de Terminal</div>
   </div>
-  <div class="fecha-nav">
-    <button onclick="cambiarDia(-1)">◀</button>
-    <span id="fechaLabel">—</span>
-    <button onclick="cambiarDia(1)">▶</button>
-  </div>
-  <div class="last-sync" id="lastSync">Cargando…</div>
+  <div class="last-sync" id="lastSync">Cargando…<button onclick="cargar()">↺ Recargar</button></div>
 </header>
 
 <div class="strip" id="strip"></div>
 <main id="main"></main>
 <div id="extras"></div>
+<div class="footnote">
+  Cupo de referencia: 10 OTs por hoja de ruta (Marce / Ignacio). Solo logística ALLEATA — EPSA y Correo Argentino no entran en esta ruta.
+  La zona de cada OT sale de <code>dsGetZona()</code> (mismo criterio que el módulo Desinstalaciones): corrección manual por CP (Config → Zonas AMBA) → tabla de rangos de CP → nombre de localidad como último recurso.
+</div>
 
 <script>
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
@@ -86,112 +102,262 @@ const sb=supabase.createClient(SUPABASE_URL,SUPABASE_ANON);
 
 function esc(s){ return String(s??'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
-// Arranca mostrando "mañana" en ART (mismo criterio que calcularFechaRutaART()
-// del backend — ver asignarHojasRutaRunner.js). Se puede navegar con las flechas.
-function fechaMananaART(){
-  const ahoraUTC=new Date();
-  const ahoraART=new Date(ahoraUTC.getTime()-3*3600*1000);
-  const manana=new Date(Date.UTC(ahoraART.getUTCFullYear(),ahoraART.getUTCMonth(),ahoraART.getUTCDate()+1));
-  if(manana.getUTCDay()===0) manana.setUTCDate(manana.getUTCDate()+1); // domingo -> lunes
-  return manana.toISOString().slice(0,10);
+const CUPO = 10;
+const ZONA_COLOR = {'Zona Sur':'#f59e0b','CABA':'#1a9fd4','Zona Oeste':'#8b5cf6','Zona Norte':'#10b981','Fuera AMBA':'#ef4444','Sin zona':'#6b7280'};
+const ZONA_ICON  = {'Zona Sur':'🟡','CABA':'🏙️','Zona Oeste':'🟣','Zona Norte':'🔵','Fuera AMBA':'🔴','Sin zona':'📍'};
+const ORDEN_ZONAS = ['Zona Sur','CABA','Zona Oeste','Zona Norte','Fuera AMBA','Sin zona'];
+
+// ── Corrección manual de zona por CP (zona_cp_manual) — misma tabla que usa
+// el resto del portal desde Config → Zonas AMBA. Se carga una vez al
+// arrancar; si acaban de cargar un CP nuevo ahí, "↺ Recargar" arriba
+// vuelve a traerla sin que haga falta recargar la pestaña.
+let _zonaOverridesCP={};
+async function cargarZonaOverrides(){
+  try{
+    const{data}=await sb.from('zona_cp_manual').select('cp,zona');
+    _zonaOverridesCP={};
+    (data||[]).forEach(r=>{_zonaOverridesCP[String(r.cp).replace(/\D/g,'')]=r.zona;});
+  }catch(e){console.warn('[zona_cp_manual] No se pudo cargar:',e.message);}
 }
 
-let fechaActual = fechaMananaART();
+// ── dsGetZona — copiado 1:1 de index.html (mismo criterio que Desinstalaciones,
+// NO el de detectarZona() que usa el resto del portal — esa es más pobre,
+// solo matchea por nombre de ciudad y no tiene tabla de rangos de CP).
+function dsGetZona(ot){
+  const ciudad  = (ot.ciudad   ||'').toLowerCase().trim();
+  const prov    = (ot.provincia||'').toLowerCase().trim();
+  const cp      = String(ot.cp||ot.codigo_postal||'').trim();
+  // FIX 13/09: los CP argentinos reales vienen en formato CPA (letra +
+  // 4 dígitos + letras, ej. "B1856GOG") — parseInt(cp) sobre el string
+  // completo da NaN porque arranca con una letra, así que la tabla de
+  // rangos de abajo nunca matcheaba nada (0 casos reales funcionando,
+  // confirmado corriendo esta función contra 29 OTs reales de producción).
+  // Se extraen los 4 dígitos con regex en vez de parsear el string entero.
+  const cpNum   = parseInt((cp.match(/\d{4}/)||[])[0]) || 0;
+  const distKm  = parseFloat(ot.distancia||ot.distancia_km||0)||0;
 
-function cambiarDia(delta){
-  const d = new Date(fechaActual+'T00:00:00Z');
-  d.setUTCDate(d.getUTCDate()+delta);
-  fechaActual = d.toISOString().slice(0,10);
-  cargar();
+  if(cp && _zonaOverridesCP[cp.replace(/\D/g,'')]) return _zonaOverridesCP[cp.replace(/\D/g,'')];
+  if(distKm > 70) return 'Fuera AMBA';
+  if(prov.includes('ciudad autónoma')||prov.includes('ciudad autonoma')||prov==='caba') return 'CABA';
+  if(cpNum>=1000&&cpNum<=1499) return 'CABA';
+
+  const FUERA_AMBA=['santa fe','córdoba','cordoba','mendoza','tucumán','tucuman','salta',
+    'chaco','misiones','corrientes','entre ríos','entre rios','río negro','rio negro',
+    'neuquén','neuquen','la pampa','san luis','san juan','la rioja','catamarca',
+    'santiago del estero','jujuy','formosa','chubut','santa cruz','tierra del fuego'];
+  if(FUERA_AMBA.some(p=>prov.includes(p))) return 'Fuera AMBA';
+
+  const CP_RANGOS=[
+    ['CABA',1000,1499],
+    ['Zona Norte',1602,1638],['Zona Norte',1609,1643],['Zona Norte',1644,1648],
+    ['Zona Norte',1617,1670],['Zona Norte',1619,1625],['Zona Norte',1629,1633],
+    ['Zona Norte',1611,1615],['Zona Norte',1665,1665],['Zona Norte',1663,1663],
+    ['Zona Norte',1650,1672],
+    ['Zona Oeste',1674,1706],['Zona Oeste',1686,1686],['Zona Oeste',1708,1712],
+    ['Zona Oeste',1714,1714],['Zona Oeste',1722,1724],['Zona Oeste',1742,1744],
+    ['Zona Oeste',1752,1778],
+    ['Zona Sur',1870,1875],['Zona Sur',1824,1826],['Zona Sur',1832,1839],
+    ['Zona Sur',1846,1856],['Zona Sur',1804,1842],['Zona Sur',1802,1814],
+    ['Zona Sur',1878,1888],['Zona Sur',1884,1893],['Zona Sur',1888,1891],
+  ];
+  if(cpNum){
+    const match=CP_RANGOS.find(([,desde,hasta])=>cpNum>=desde&&cpNum<=hasta);
+    if(match) return match[0];
+  }
+
+  const sur=['la plata','berisso','ensenada','avellaneda','lanús','lanus',
+    'lomas de zamora','quilmes','monte grande','guernica','bernal','berazategui',
+    'florencio varela','almirante brown','esteban echeverria','esteban echeverría',
+    'ezpeleta','temperley','banfield','adrogué','adrogue','ezeiza'];
+  if(sur.some(c=>ciudad.includes(c))) return 'Zona Sur';
+
+  const oeste=['morón','moron','merlo','moreno','hurlingham','ituzaingo','ituzaingó',
+    'la matanza','san justo','ramos mejía','ramos mejia','haedo','castelar',
+    'palermo','ciudadela','liniers','marcos paz','luján','lujan',
+    'general rodríguez','general rodriguez','villa tesei','william morris',
+    'villa sarmiento','tres de febrero'];
+  if(oeste.some(c=>ciudad.includes(c))) return 'Zona Oeste';
+
+  const norte=['tigre','san isidro','vicente lópez','vicente lopez','pilar','escobar',
+    'zárate','zarate','campana','san miguel','malvinas argentinas','jose c paz',
+    'san martín','san martin','olivos','martinez','martínez',
+    'florida','munro','villa del parque','palermo','belgrano','pacheco','general pacheco',
+    'don torcuato','benavídez','benavidez','nordelta','san fernando'];
+  if(norte.some(c=>ciudad.includes(c))) return 'Zona Norte';
+
+  if(prov.includes('buenos aires')&&cpNum>=1500) return 'Fuera AMBA';
+  if(!ciudad&&!prov) return 'Sin zona';
+  if(ciudad&&prov&&!prov.includes('buenos aires')) return 'Fuera AMBA';
+  return 'Sin zona';
+}
+
+// ── Horario: solo detecta y avisa, no interpreta día por día todavía
+// (eso es lo que resuelve parseVentanasPorDia() del lado del agente — acá
+// nos alcanza con marcar "che, esta tiene restricción de día, léela antes
+// de asumir que sirve cualquier día").
+const RE_DIA = /\b(lun|mar|mi[eé]|jue|vie|s[aá]b|dom)[a-záéíóú]*\s*(a|-)\s*(lun|mar|mi[eé]|jue|vie|s[aá]b|dom)/i;
+function horarioInfo(h){
+  h = (h||'').trim();
+  if(!h) return {texto:'Sin horario', warn:true};
+  if(/consultar/i.test(h)) return {texto:h, warn:true};
+  if(RE_DIA.test(h)) return {texto:h, warn:true};
+  return {texto:h, warn:false};
+}
+
+function diasDesde(fechaIso){
+  if(!fechaIso) return null;
+  return Math.floor((Date.now()-new Date(fechaIso).getTime())/(1000*60*60*24));
 }
 
 let _cargando=false;
 async function cargar(){
   if(_cargando) return;
   _cargando=true;
+  document.getElementById('lastSync').innerHTML = 'Cargando…';
   try{
-    document.getElementById('fechaLabel').textContent = new Date(fechaActual+'T00:00:00Z')
-      .toLocaleDateString('es-AR',{weekday:'long',day:'numeric',month:'long',timeZone:'UTC'});
+    await cargarZonaOverrides();
 
-    const [{data:asignadas,error:e1}, {data:resumen,error:e2}, {data:revision,error:e3}] = await Promise.all([
-      sb.from('hojas_ruta_asignadas').select('*').eq('fecha_ruta',fechaActual).order('operador').order('orden_sugerido'),
-      sb.from('hojas_ruta_resumen').select('*').eq('fecha_ruta',fechaActual),
-      sb.from('hojas_ruta_requieren_revision').select('*').eq('fecha_ruta',fechaActual),
+    const campos='workorder_number,cuenta,ciudad,provincia,codigo_postal,horario,horario_entrega,logistica,status,rollout,fecha_configurar_terminal,created_at,responsable';
+    const [{data:precolecta,error:e1},{data:configurar,error:e2}] = await Promise.all([
+      sb.from('sf_workorders').select(campos)
+        .eq('record_type','Cambio de Terminal').eq('logistica','ALLEATA').eq('status','Pre-Colecta'),
+      sb.from('sf_workorders').select(campos)
+        .eq('record_type','Cambio de Terminal').eq('logistica','ALLEATA').eq('status','Configurar Terminal'),
     ]);
 
-    if(e1||e2||e3){
-      document.getElementById('lastSync').textContent='Error: '+(e1||e2||e3).message;
+    if(e1||e2){
+      document.getElementById('lastSync').textContent='Error: '+(e1||e2).message;
       return;
     }
 
-    const generadoAt = resumen?.[0]?.generado_at ? new Date(resumen[0].generado_at) : null;
-    document.getElementById('lastSync').textContent = generadoAt
-      ? 'Asignado '+generadoAt.toLocaleString('es-AR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})
-      : 'Sin asignación calculada para este día todavía';
-
-    render(asignadas||[], resumen||[], revision||[]);
+    document.getElementById('lastSync').innerHTML = 'Actualizado '+new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'})+'<button onclick="cargar()">↺ Recargar</button>';
+    render(precolecta||[], configurar||[]);
   } finally {
     _cargando=false;
   }
 }
 
-function render(asignadas, resumen, revision){
-  const strip=document.getElementById('strip');
-  const main=document.getElementById('main');
-  const extras=document.getElementById('extras');
+function render(precolecta, configurar){
+  // ── Agrupar Pre-Colecta por zona y, dentro de cada zona, por localidad ──
+  const porZona = {};
+  precolecta.forEach(ot=>{
+    const zona = dsGetZona(ot);
+    (porZona[zona] = porZona[zona]||[]).push(ot);
+  });
 
-  const totalAsignadas = asignadas.length;
-  const zombis = revision.filter(r=>r.motivo?.includes('D7'));
-  const sinGeo = revision.filter(r=>r.motivo?.includes('geocodificar'));
+  const zonasConCupo = ORDEN_ZONAS.filter(z=>(porZona[z]||[]).length >= CUPO).length;
 
-  strip.innerHTML = `
-    <div class="strip-item"><div class="strip-num" style="color:var(--teal)">${totalAsignadas}</div><div class="strip-lbl">OTs asignadas hoy</div></div>
-    <div class="strip-item"><div class="strip-num" style="color:var(--purple)">${resumen.length}</div><div class="strip-lbl">Hojas armadas</div></div>
-    <div class="strip-item"><div class="strip-num" style="color:${zombis.length?'var(--red)':'var(--text-dim)'}">${zombis.length}</div><div class="strip-lbl">Requieren revisión (D7)</div></div>
-    <div class="strip-item"><div class="strip-num" style="color:${sinGeo.length?'var(--amber)':'var(--text-dim)'}">${sinGeo.length}</div><div class="strip-lbl">Sin geocodificar</div></div>
+  document.getElementById('strip').innerHTML = `
+    <div class="strip-item"><div class="strip-num" style="color:var(--purple)">${precolecta.length}</div><div class="strip-lbl">Pre-Colecta (ALLEATA)</div></div>
+    <div class="strip-item"><div class="strip-num" style="color:var(--text)">${configurar.length}</div><div class="strip-lbl">Configurar Terminal (ALLEATA)</div></div>
+    <div class="strip-item"><div class="strip-num" style="color:${zonasConCupo?'var(--teal)':'var(--text-dim)'}">${zonasConCupo}</div><div class="strip-lbl">Zona(s) con ruta lista (≥${CUPO})</div></div>
   `;
 
-  if(!resumen.length){
-    main.innerHTML = `<div class="empty" style="grid-column:1/-1">No hay hojas de ruta calculadas para este día todavía.<br>Corré <code>POST /automations/run/asignar_hojas_ruta</code> o esperá al cron nocturno.</div>`;
-    extras.innerHTML='';
-    return;
-  }
-
-  main.innerHTML = resumen.map(r=>{
-    const ots = asignadas.filter(a=>a.operador===r.operador);
-    const badges = [];
-    badges.push(r.completa ? `<span class="badge badge-ok">${r.total_ots}/10 completa</span>` : `<span class="badge badge-warn">${r.total_ots}/10 incompleta</span>`);
-    if(r.por_envejecimiento) badges.push(`<span class="badge badge-info">por envejecimiento (D5)</span>`);
-    if(r.cruza_zonas) badges.push(`<span class="badge badge-warn">cruza zonas</span>`);
-    if(r.recortada_por_factibilidad) badges.push(`<span class="badge badge-warn">recortada por horario</span>`);
-    if(r.factible===false) badges.push(`<span class="badge badge-bad">⚠️ no entra en el día — revisar</span>`);
-
-    return `
-    <div class="hoja">
-      <div class="hoja-head">
-        <div class="hoja-op">${esc(r.operador)}</div>
-        <div class="hoja-meta">Zona objetivo: ${esc(r.zona_objetivo)||'—'}${(r.zonas_incluidas||[]).length>1?' · incluye: '+r.zonas_incluidas.join(', '):''} · vuelve ~${esc(r.hora_regreso_estimada)||'sin calcular'}</div>
-        <div class="hoja-badges">${badges.join('')}</div>
-      </div>
-      ${ots.length ? ots.map(o=>`
-        <div class="stop">
-          <div>
-            <div class="stop-ot">${esc(o.ot_numero)}</div>
-            <div class="stop-zona">${esc(o.zona||'')}</div>
+  // ── Columna izquierda: Pre-Colecta por zona ──
+  const main = document.getElementById('main');
+  const colIzq = `
+    <div>
+      <div class="col-title">🚚 Pre-Colecta — ruta por zona</div>
+      <div class="col-sub">Cupo de referencia: ${CUPO} OTs por hoja de ruta.</div>
+      ${ORDEN_ZONAS.filter(z=>(porZona[z]||[]).length>0).map(zona=>{
+        const ots = porZona[zona];
+        const color = ZONA_COLOR[zona];
+        const pct = Math.min(100, Math.round(ots.length/CUPO*100));
+        const lista = ots.length>=CUPO
+          ? `<span class="badge badge-ok">✅ Ruta lista</span>`
+          : `<span class="badge badge-warn">Faltan ${CUPO-ots.length}</span>`;
+        // Agrupar por localidad dentro de la zona — para ver los clústers
+        const porLoc = {};
+        ots.forEach(o=>{ const loc=(o.ciudad||'—').trim(); (porLoc[loc]=porLoc[loc]||[]).push(o); });
+        const locsOrdenadas = Object.entries(porLoc).sort((a,b)=>b[1].length-a[1].length);
+        return `
+        <div class="zona-card">
+          <div class="zona-head" onclick="this.parentElement.querySelector('.zona-body').classList.toggle('open')">
+            <div class="zona-nombre">${ZONA_ICON[zona]||'📍'} ${esc(zona)}</div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <span class="zona-cupo" style="color:${color}">${ots.length}/${CUPO}</span>
+              ${lista}
+            </div>
           </div>
-          <div class="stop-hora">${o.hora_llegada_estimada?'llega ~'+esc(o.hora_llegada_estimada):''}${o.dentro_de_horario===false?' ⚠️':''}</div>
-        </div>`).join('') : '<div class="empty">Sin OTs</div>'}
-      ${(r.ots_recortadas||[]).length ? `<div class="extra-row"><span class="extra-motivo">Recortadas por horario, vuelven al pool:</span><span class="extra-ot">${r.ots_recortadas.join(', ')}</span></div>` : ''}
+          <div class="zona-bar-track"><div class="zona-bar-fill" style="width:${pct}%;background:${color}"></div></div>
+          <div class="zona-body">
+            ${locsOrdenadas.map(([loc,otsLoc])=>`
+              <div class="zona-loc-group">
+                <div class="zona-loc-nombre">${esc(loc)} (${otsLoc.length})</div>
+                ${otsLoc.map(o=>{
+                  const hi = horarioInfo(o.horario_entrega||o.horario);
+                  return `<div class="ot-row">
+                    <span class="ot-num">${esc(o.workorder_number)}</span>
+                    <span class="ot-cuenta">${esc(o.cuenta||'—')}</span>
+                    <span class="ot-horario${hi.warn?' warn':''}">${hi.warn?'⚠️ ':''}${esc(hi.texto)}</span>
+                  </div>`;
+                }).join('')}
+              </div>`).join('')}
+          </div>
+        </div>`;
+      }).join('') || '<div class="empty">No hay OTs en Pre-Colecta (ALLEATA) ahora mismo.</div>'}
     </div>`;
-  }).join('');
 
-  extras.innerHTML = `
-    ${revision.length ? `
-    <details class="panel-extra" open>
-      <summary><span>⚠️ Requieren revisión manual (${revision.length})</span><span>▾</span></summary>
-      ${revision.map(r=>`<div class="extra-row"><span class="extra-ot">${esc(r.ot_numero)}</span><span class="extra-motivo">${esc(r.zona)||'—'} · ${r.dias_pendiente}d · ${esc(r.motivo)}</span></div>`).join('')}
-    </details>` : ''}
-  `;
+  // ── Columna derecha: Configurar Terminal, priorizada por zona ──
+  // Motivo de prioridad: si la zona de esta OT ya tiene ruta lista (≥cupo)
+  // o le faltan pocas (≤3) para completarla, esta OT "cierra" o "acerca"
+  // esa ruta — se prepara primero. El resto se ordena por antigüedad.
+  const conMotivo = configurar.map(ot=>{
+    const zona = dsGetZona(ot);
+    const enRuta = (porZona[zona]||[]).length;
+    const faltan = Math.max(0, CUPO-enRuta);
+    let prioridad, motivo, color;
+    if(enRuta>=CUPO){ prioridad=1; motivo=`🎯 ${zona} ya tiene ruta lista (${enRuta}) — esta la deja mejor posicionada para la próxima`; color=ZONA_COLOR[zona]; }
+    else if(enRuta>0 && faltan<=3){ prioridad=2; motivo=`🎯 ${zona} tiene ${enRuta}/${CUPO} — faltan ${faltan} para cerrar la ruta`; color=ZONA_COLOR[zona]; }
+    else if(enRuta>0){ prioridad=3; motivo=`${zona} tiene ${enRuta}/${CUPO} en camino`; color=ZONA_COLOR[zona]; }
+    else { prioridad=4; motivo=`${zona} — sin nada en ruta todavía`; color='var(--text-dim)'; }
+    const dias = diasDesde(ot.fecha_configurar_terminal);
+    return {...ot, _zona:zona, _prioridad:prioridad, _motivo:motivo, _color:color, _dias:dias};
+  }).sort((a,b)=> a._prioridad-b._prioridad || (b._dias||0)-(a._dias||0));
+
+  const colDer = `
+    <div>
+      <div class="col-title">🔧 Configurar Terminal — prioridad sugerida</div>
+      <div class="col-sub">Para Gonza / Andrés — ordenado según si cierra o acerca una ruta que ya está armándose.</div>
+      ${conMotivo.length ? conMotivo.map(ot=>{
+        const hi = horarioInfo(ot.horario_entrega||ot.horario);
+        return `
+        <div class="prio-row" style="border-left-color:${ot._color}">
+          <div class="prio-top">
+            <div class="prio-left">
+              <span class="prio-ot">${esc(ot.workorder_number)}</span>
+              <span class="prio-cuenta">${esc(ot.cuenta||'—')}</span>
+            </div>
+            ${ot.rollout===true?'<span class="badge badge-info">ROLLOUT</span>':''}
+          </div>
+          <div class="prio-motivo" style="color:${ot._color}">${ot._motivo}</div>
+          <div class="prio-meta">${esc(ot.ciudad||'—')} · ${ot._dias!==null?ot._dias+'d en Configurar Terminal':'sin fecha'} · <span style="${hi.warn?'color:var(--amber)':''}">${hi.warn?'⚠️ ':''}${esc(hi.texto)}</span></div>
+        </div>`;
+      }).join('') : '<div class="empty">No hay OTs en Configurar Terminal (ALLEATA) ahora mismo. 🎉</div>'}
+    </div>`;
+
+  main.innerHTML = colIzq + colDer;
+
+  // ── Excepciones — horario roto y sin clasificar ──
+  const sinHorario = [...precolecta, ...configurar].filter(o=>horarioInfo(o.horario_entrega||o.horario).warn && !RE_DIA.test(o.horario_entrega||o.horario||''));
+  const sinZona = [...precolecta, ...configurar].filter(o=>dsGetZona(o)==='Sin zona');
+  const extras = document.getElementById('extras');
+  let extrasHtml = '';
+  if(sinHorario.length){
+    extrasHtml += `
+    <details class="panel-extra">
+      <summary><span>⚠️ Sin horario usable — hay que llamar al comercio (${sinHorario.length})</span><span>▾</span></summary>
+      ${sinHorario.map(o=>`<div class="extra-row"><span class="extra-ot">${esc(o.workorder_number)}</span><span class="extra-motivo">${esc(o.cuenta||'—')} · "${esc(o.horario_entrega||o.horario||'—')}"</span></div>`).join('')}
+    </details>`;
+  }
+  if(sinZona.length){
+    extrasHtml += `
+    <details class="panel-extra">
+      <summary><span>📍 Sin zona clasificada — cargar el CP en Config → Zonas AMBA (${sinZona.length})</span><span>▾</span></summary>
+      ${sinZona.map(o=>`<div class="extra-row"><span class="extra-ot">${esc(o.workorder_number)}</span><span class="extra-motivo">${esc(o.ciudad||'—')}, ${esc(o.provincia||'—')} · CP ${esc(o.codigo_postal||'—')}</span></div>`).join('')}
+    </details>`;
+  }
+  extras.innerHTML = extrasHtml;
 }
 
 cargar();
