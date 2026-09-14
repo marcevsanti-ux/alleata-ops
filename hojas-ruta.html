@@ -50,6 +50,9 @@
   .ot-cuenta{color:var(--text-dim);flex:1;margin:0 8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .ot-horario{font-size:10.5px;color:var(--text-dim);white-space:nowrap;font-family:var(--mono)}
   .ot-horario.warn{color:var(--amber)}
+  .ot-resp{font-size:9.5px;color:var(--text-dim);font-family:var(--mono);white-space:nowrap;padding:1px 6px;border:1px solid var(--border);border-radius:4px}
+  .btn-print{background:none;border:1px solid var(--border);color:var(--text-dim);border-radius:5px;padding:2px 6px;font-size:11px;cursor:pointer;text-decoration:none;white-space:nowrap;margin-left:6px}
+  .btn-print:hover{border-color:var(--teal);color:var(--teal)}
 
   .badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:6px;font-family:var(--mono);white-space:nowrap}
   .badge-ok{background:rgba(29,191,142,.15);color:var(--teal);border:1px solid rgba(29,191,142,.35)}
@@ -99,6 +102,13 @@
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_ANON);
+// Pedido 14/09: reimprimir rótulo desde acá — abre el portal principal,
+// que ya tiene el diseño real del rótulo (ver showApp() en index.html,
+// lee ?imprimir_ot=<numero> y dispara printRotuloPiloto() solo).
+const PORTAL_URL = 'https://marcevsanti-ux.github.io/alleata-ops/';
+function linkImprimir(otNumero){
+  return `${PORTAL_URL}?imprimir_ot=${encodeURIComponent(otNumero)}`;
+}
 
 function esc(s){ return String(s??'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
@@ -383,7 +393,9 @@ function render(precolectaTodas, configurar){
                     <div class="ot-row">
                       <span class="ot-num">${esReprog?'🔁 ':''}${esc(o.workorder_number)}</span>
                       <span class="ot-cuenta">${esc(o.cuenta||'—')}</span>
+                      <span class="ot-resp">${esc(o.responsable||'sin asignar')}</span>
                       <span class="ot-horario${hi.warn?' warn':''}">${hi.warn?'⚠️ ':''}${esc(hi.texto)}</span>
+                      <a class="btn-print" href="${linkImprimir(o.workorder_number)}" target="_blank" rel="noopener" title="Reimprimir rótulo">🖨️</a>
                     </div>
                     ${esReprog?`<div style="font-size:10px;color:var(--amber);margin:-2px 0 4px">🔁 Reprogramada${o.notas_cierre?' — "'+esc(o.notas_cierre)+'"':''}</div>`:''}
                   </div>`;
@@ -424,7 +436,10 @@ function render(precolectaTodas, configurar){
               <span class="prio-ot">${esc(ot.workorder_number)}</span>
               <span class="prio-cuenta">${esc(ot.cuenta||'—')}</span>
             </div>
-            ${ot.rollout===true?'<span class="badge badge-info">ROLLOUT</span>':''}
+            <div style="display:flex;align-items:center;gap:6px">
+              <span class="ot-resp">${esc(ot.responsable||'sin asignar')}</span>
+              ${ot.rollout===true?'<span class="badge badge-info">ROLLOUT</span>':''}
+            </div>
           </div>
           <div class="prio-motivo" style="color:${ot._color}">${ot._motivo}</div>
           <div class="prio-meta">${esc(ot.ciudad||'—')} · ${ot._dias!==null?ot._dias+'d en Configurar Terminal':'sin fecha'} · <span style="${hi.warn?'color:var(--amber)':''}">${hi.warn?'⚠️ ':''}${esc(hi.texto)}</span></div>
@@ -464,7 +479,7 @@ function render(precolectaTodas, configurar){
 }
 
 cargar();
-setInterval(cargar, 60000);
+setInterval(cargar, 120000); // cada 2 minutos
 </script>
 </body>
 </html>
