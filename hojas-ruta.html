@@ -278,10 +278,10 @@ async function cargar(){
   try{
     await cargarZonaOverrides();
 
-    const campos='workorder_number,cuenta,ciudad,provincia,codigo_postal,horario,horario_entrega,logistica,status,rollout,fecha_configurar_terminal,created_at,responsable';
+    const campos='workorder_number,cuenta,ciudad,provincia,codigo_postal,horario,horario_entrega,logistica,status,rollout,fecha_configurar_terminal,created_at,responsable,notas_cierre';
     const [{data:precolecta,error:e1},{data:configurar,error:e2}] = await Promise.all([
       sb.from('sf_workorders').select(campos)
-        .eq('record_type','Cambio de Terminal').eq('logistica','ALLEATA').eq('status','Pre-Colecta'),
+        .eq('record_type','Cambio de Terminal').eq('logistica','ALLEATA').in('status',['Pre-Colecta','Reprogramar']),
       sb.from('sf_workorders').select(campos)
         .eq('record_type','Cambio de Terminal').eq('logistica','ALLEATA').eq('status','Configurar Terminal'),
     ]);
@@ -340,7 +340,7 @@ function render(precolectaTodas, configurar){
   const zonasConCupo = ORDEN_ZONAS.filter(z=>(porZona[z]||[]).length >= CUPO).length;
 
   document.getElementById('strip').innerHTML = `
-    <div class="strip-item"><div class="strip-num" style="color:var(--purple)">${precolecta.length}</div><div class="strip-lbl">Pre-Colecta lista para mañana</div></div>
+    <div class="strip-item"><div class="strip-num" style="color:var(--purple)">${precolecta.length}</div><div class="strip-lbl">Listas para mañana (Pre-Colecta + Reprog.)</div></div>
     <div class="strip-item"><div class="strip-num" style="color:var(--text)">${configurar.length}</div><div class="strip-lbl">Configurar Terminal (ALLEATA)</div></div>
     <div class="strip-item"><div class="strip-num" style="color:${zonasConCupo?'var(--teal)':'var(--text-dim)'}">${zonasConCupo}</div><div class="strip-lbl">Zona(s) con ruta lista (≥${CUPO})</div></div>
   `;
@@ -349,7 +349,7 @@ function render(precolectaTodas, configurar){
   const main = document.getElementById('main');
   const colIzq = `
     <div>
-      <div class="col-title">🚚 Pre-Colecta — ruta por zona</div>
+      <div class="col-title">🚚 Pre-Colecta + Reprogramar — ruta por zona</div>
       <div class="col-sub">Cupo de referencia: ${CUPO} OTs por hoja de ruta.</div>
       ${ORDEN_ZONAS.filter(z=>(porZona[z]||[]).length>0).map(zona=>{
         const ots = porZona[zona];
@@ -378,16 +378,20 @@ function render(precolectaTodas, configurar){
                 <div class="zona-loc-nombre">${esc(loc)} (${otsLoc.length})</div>
                 ${otsLoc.map(o=>{
                   const hi = horarioInfo(o.horario_entrega||o.horario);
-                  return `<div class="ot-row">
-                    <span class="ot-num">${esc(o.workorder_number)}</span>
-                    <span class="ot-cuenta">${esc(o.cuenta||'—')}</span>
-                    <span class="ot-horario${hi.warn?' warn':''}">${hi.warn?'⚠️ ':''}${esc(hi.texto)}</span>
+                  const esReprog = o.status==='Reprogramar';
+                  return `<div>
+                    <div class="ot-row">
+                      <span class="ot-num">${esReprog?'🔁 ':''}${esc(o.workorder_number)}</span>
+                      <span class="ot-cuenta">${esc(o.cuenta||'—')}</span>
+                      <span class="ot-horario${hi.warn?' warn':''}">${hi.warn?'⚠️ ':''}${esc(hi.texto)}</span>
+                    </div>
+                    ${esReprog?`<div style="font-size:10px;color:var(--amber);margin:-2px 0 4px">🔁 Reprogramada${o.notas_cierre?' — "'+esc(o.notas_cierre)+'"':''}</div>`:''}
                   </div>`;
                 }).join('')}
               </div>`).join('')}
           </div>
         </div>`;
-      }).join('') || '<div class="empty">No hay OTs en Pre-Colecta (ALLEATA) ahora mismo.</div>'}
+      }).join('') || '<div class="empty">No hay OTs en Pre-Colecta ni Reprogramar (ALLEATA) ahora mismo.</div>'}
     </div>`;
 
   // ── Columna derecha: Configurar Terminal, priorizada por zona ──
