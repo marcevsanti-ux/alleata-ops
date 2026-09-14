@@ -397,21 +397,25 @@ function render(precolectaTodas, configurar){
     </div>`;
 
   // ── Columna derecha: Configurar Terminal, priorizada por zona ──
-  // Motivo de prioridad: si la zona de esta OT ya tiene ruta lista (≥cupo)
-  // o le faltan pocas (≤3) para completarla, esta OT "cierra" o "acerca"
-  // esa ruta — se prepara primero. El resto se ordena por antigüedad.
+  // FIX 14/09 (mismo bug encontrado y arreglado en index.html — se había
+  // arreglado ahí pero se olvidó replicar acá, hojas-ruta.html tiene su
+  // propia copia independiente de esta lógica): una zona que YA llegó al
+  // cupo no necesita más ayuda — preparar otra OT ahí no acerca nada, esa
+  // ruta ya está armada para mañana. La prioridad más alta es para
+  // cualquier zona que TODAVÍA le falte algo (sin importar cuánto —  antes
+  // había un umbral fijo de "faltan ≤3" que dejaba afuera zonas en 3/10),
+  // ordenada por la que menos le falta primero.
   const conMotivo = configurar.map(ot=>{
     const zona = dsGetZona(ot);
     const enRuta = (porZona[zona]||[]).length;
     const faltan = Math.max(0, CUPO-enRuta);
     let prioridad, motivo, color;
-    if(enRuta>=CUPO){ prioridad=1; motivo=`🎯 ${zona} ya tiene ruta lista (${enRuta}) — esta la deja mejor posicionada para la próxima`; color=ZONA_COLOR[zona]; }
-    else if(enRuta>0 && faltan<=3){ prioridad=2; motivo=`🎯 ${zona} tiene ${enRuta}/${CUPO} — faltan ${faltan} para cerrar la ruta`; color=ZONA_COLOR[zona]; }
-    else if(enRuta>0){ prioridad=3; motivo=`${zona} tiene ${enRuta}/${CUPO} en camino`; color=ZONA_COLOR[zona]; }
-    else { prioridad=4; motivo=`${zona} — sin nada en ruta todavía`; color='var(--text-dim)'; }
+    if(enRuta>0 && enRuta<CUPO){ prioridad=1; motivo=`🎯 ${zona} — faltan ${faltan} para cerrarla (${enRuta}/${CUPO} en Pre-Colecta)`; color=ZONA_COLOR[zona]; }
+    else if(enRuta>=CUPO){ prioridad=2; motivo=`${zona} ya tiene ruta lista, no hace falta apurar esta zona`; color='var(--text-dim)'; }
+    else { prioridad=3; motivo=`${zona} — sin nada en ruta todavía`; color='var(--text-dim)'; }
     const dias = diasDesde(ot.fecha_configurar_terminal);
-    return {...ot, _zona:zona, _prioridad:prioridad, _motivo:motivo, _color:color, _dias:dias};
-  }).sort((a,b)=> a._prioridad-b._prioridad || (b._dias||0)-(a._dias||0));
+    return {...ot, _zona:zona, _prioridad:prioridad, _motivo:motivo, _color:color, _dias:dias, _faltan:faltan};
+  }).sort((a,b)=> a._prioridad-b._prioridad || a._faltan-b._faltan || (b._dias||0)-(a._dias||0));
 
   const colDer = `
     <div>
