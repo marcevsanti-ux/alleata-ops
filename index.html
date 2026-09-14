@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.7.24</title>
+<title>Alleata · Operaciones v4.7.25</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -408,7 +408,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.24 · 13 sep 2026
+      v4.7.25 · 13 sep 2026
     </div>
   </div>
 </div>
@@ -517,7 +517,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.24 · 13 sep 2026
+      v4.7.25 · 13 sep 2026
     </div>
   </div>
 </nav>
@@ -572,7 +572,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.24</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.25</div>
   </div>
   <div class="content">
 
@@ -5200,7 +5200,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.7.24] OK');
+console.log('[Alleata v4.7.25] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -11643,17 +11643,27 @@ async function cargarProximaOT(nombre){
   const esCandidataTier2 = r => r.record_type==='Instalación Equipo + Simcard' && LOG_TIER2.includes(String(r.logistica||'').toUpperCase());
 
   const conMotivo = rows.map(r=>{
-    let tier=null, motivo=null, esperando=false;
+    let tier=null, motivo=null, esperando=false, faltanZona=Infinity;
     const esRollout = r.record_type==='Cambio de Terminal' && r.rollout===true;
     const esAlleata = String(r.logistica||'').toUpperCase()==='ALLEATA';
     if(esRollout && esAlleata){
-      // Pedido 13/09: dentro de Rollout ALLEATA, separar Tier 0 (zona
-      // caliente — cierra o acerca la ruta de mañana) del resto. Antes
-      // esto era un solo Tier 1 sin mirar zona.
+      // FIX 14/09 (caso real: CABA llegó a 10/10 y el sistema seguía
+      // priorizando más OTs de CABA en vez de ayudar a Sur/Oeste/Norte,
+      // que estaban en 3/10 cada una): una zona que YA llegó al cupo no
+      // necesita más ayuda — preparar otra OT de esa zona no acerca nada,
+      // esa ruta ya está armada para mañana. El Tier 0 es solo para zonas
+      // que SIGUEN faltando (enRuta>0 && enRuta<cupo, sin umbral fijo de
+      // "faltan ≤3" — antes eso dejaba afuera a zonas en 3/10 como estas).
+      // Entre varias zonas en Tier 0, se ordena por la que menos le falta
+      // primero (_faltanZona, ver el sort de abajo) — así el sistema
+      // ayuda a cerrar la más próxima a completarse antes que la más lejana.
       const zona = dsGetZona(r);
       const enRuta = precolectaPorZona[zona]||0;
-      if(enRuta>=CUPO_RUTA || (enRuta>0 && (CUPO_RUTA-enRuta)<=3)){
-        tier=0; motivo=`🎯 ${zona} — ${enRuta>=CUPO_RUTA?'ruta lista':`faltan ${CUPO_RUTA-enRuta} para cerrarla`} (${enRuta}/${CUPO_RUTA} en Pre-Colecta)`;
+      if(enRuta>0 && enRuta<CUPO_RUTA){
+        tier=0; faltanZona=CUPO_RUTA-enRuta;
+        motivo=`🎯 ${zona} — faltan ${faltanZona} para cerrarla (${enRuta}/${CUPO_RUTA} en Pre-Colecta)`;
+      } else if(enRuta>=CUPO_RUTA){
+        tier=1; motivo=`Rollout — ${zona} ya tiene ruta lista, no hace falta apurar esta zona`;
       } else {
         tier=1; motivo='Rollout';
       }
@@ -11667,14 +11677,16 @@ async function cargarProximaOT(nombre){
       tier=3; motivo = esRollout ? 'EPSA ROLLOUT · HOY' : 'EPSA · HOY';
     }
     else if(esCandidataTier2(r) && !esFacturador(r)) esperando=true; // ALLEATA/CABIFY/CA, todavía no llega a 24hs
-    return {...r,_tier:tier,_motivo:motivo,_esperando:esperando};
+    return {...r,_tier:tier,_motivo:motivo,_esperando:esperando,_faltanZona:faltanZona};
   });
 
-  // Prioridad real: primero por tier (0=cierra ruta > 1=Rollout > 2 > 3),
-  // después por antigüedad dentro del mismo tier. OJO: _tier puede ser 0,
-  // que es falsy en JS — el filtro de abajo tiene que chequear "no es
-  // null", no simplemente "es truthy" (bug que casi se cuela acá).
-  const prioritarias = conMotivo.filter(r=>r._tier!==null).sort((a,b)=> a._tier-b._tier || new Date(a.created_at||0)-new Date(b.created_at||0));
+  // Prioridad real: primero por tier (0=cierra ruta > 1=Rollout > 2 > 3);
+  // DENTRO del tier 0, por la zona que menos OTs necesita para cerrar
+  // primero (_faltanZona ascendente); recién después, antigüedad. OJO:
+  // _tier puede ser 0, que es falsy en JS — el filtro de abajo tiene que
+  // chequear "no es null", no simplemente "es truthy" (bug que casi se
+  // cuela acá).
+  const prioritarias = conMotivo.filter(r=>r._tier!==null).sort((a,b)=> a._tier-b._tier || a._faltanZona-b._faltanZona || new Date(a.created_at||0)-new Date(b.created_at||0));
   const esperando = conMotivo.filter(r=>r._tier===null && r._esperando).sort((a,b)=> new Date(a.created_at||0)-new Date(b.created_at||0));
   const resto = conMotivo.filter(r=>r._tier===null && !r._esperando);
 
