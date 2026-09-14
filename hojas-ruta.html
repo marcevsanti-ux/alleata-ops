@@ -222,6 +222,41 @@ function proximoDiaHabil(){
   return hoy+1>6 ? 1 : hoy+1;
 }
 
+// ── Pedido 13/09 (caso real: OT 00024103, Lanús, "martes a sábado 8 a
+// 13hs") — un rango de días que EXCLUYE algunos días de la semana, no una
+// fecha de inicio futura como "a partir de". Si mañana cae afuera del
+// rango, la OT no se puede entregar mañana aunque diga que está en
+// Pre-Colecta hace rato.
+// Caso especial real en la data: "Lunes a lunes de 7 hrs a 20 hrs" (OT
+// 00024110) — cuando el día de inicio y el de fin son EL MISMO, es la
+// forma habitual de decir "todos los días", no una restricción real.
+// Ahí no hay que excluir nada.
+const DIA_ABREV = {'lun':1,'mar':2,'mie':3,'jue':4,'vie':5,'sab':6,'dom':0};
+const RE_RANGO_DIAS = /\b(lun|mar|mi[eé]|jue|vie|s[aá]b|dom)[a-záéíóú]*\s*(?:a|-)\s*(lun|mar|mi[eé]|jue|vie|s[aá]b|dom)[a-záéíóú]*/i;
+
+function normDia3(s){
+  return s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').slice(0,3);
+}
+
+// Devuelve el Set de días de semana (0=domingo..6=sábado) que SÍ atiende,
+// o null si no se detectó ningún rango (asumir que atiende cualquier día).
+function diasQueAtiende(horario){
+  const m = (horario||'').match(RE_RANGO_DIAS);
+  if(!m) return null;
+  const d1 = DIA_ABREV[normDia3(m[1])];
+  const d2 = DIA_ABREV[normDia3(m[2])];
+  if(d1===undefined || d2===undefined) return null;
+  if(d1===d2) return null; // "lunes a lunes" = todos los días, no es una restricción real
+  const incluidos = new Set();
+  let d = d1;
+  while(true){
+    incluidos.add(d);
+    if(d===d2) break;
+    d = (d+1)%7;
+  }
+  return incluidos;
+}
+
 function horarioInfo(h){
   h = (h||'').trim();
   if(!h) return {texto:'Sin horario', warn:true};
@@ -264,21 +299,32 @@ async function cargar(){
 }
 
 function render(precolectaTodas, configurar){
-  // ── Sacar las que todavía no arrancan (pedido 13/09: "a partir del
-  // martes" no puede estar en la ruta de mañana lunes) — se muestran
-  // aparte, no se pierden, solo no cuentan para el cupo de mañana.
+  // ── Sacar las que todavía no arrancan mañana — dos motivos distintos:
+  // (a) "a partir del martes" — fecha de inicio futura pedida por el
+  //     comercio.
+  // (b) rango de días que excluye mañana (ej. "martes a sábado" no
+  //     incluye el lunes) — el comercio simplemente no atiende ese día.
+  // Se muestran aparte, no se pierden, solo no cuentan para el cupo.
   const manana = proximoDiaHabil();
+  const NOMBRE_DIA = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
   const precolecta = [];
   const noDisponiblesAun = [];
   precolectaTodas.forEach(ot=>{
-    const inicioMin = fechaInicioMinima(ot.horario_entrega||ot.horario);
-    // Comparación simple lunes(1)..sábado(6): si el día pedido es "más
-    // adelante en la semana" que mañana, todavía no está disponible. No
-    // contempla que cruce de una semana a la otra (ej. pedirlo en jueves
-    // para "el lunes que viene") — para ese caso raro, mejor pecar de
-    // conservador y dejarla en la lista general en vez de esconderla mal.
+    const h = ot.horario_entrega||ot.horario;
+    const inicioMin = fechaInicioMinima(h);
+    const diasOK = diasQueAtiende(h);
+    let motivo = null;
+    // Comparación simple dentro de la misma semana — no contempla que
+    // cruce de una semana a la otra (ej. pedirlo un jueves para "el lunes
+    // que viene"). Para ese caso raro, mejor pecar de conservador y
+    // dejarla en la lista general en vez de esconderla mal.
     if(inicioMin!==null && inicioMin>manana){
-      noDisponiblesAun.push({...ot, _disponibleDesde:inicioMin});
+      motivo = `disponible desde ${NOMBRE_DIA[inicioMin]}`;
+    } else if(diasOK && !diasOK.has(manana)){
+      motivo = `no atiende los ${NOMBRE_DIA[manana]}`;
+    }
+    if(motivo){
+      noDisponiblesAun.push({...ot, _motivoExclusion:motivo});
     } else {
       precolecta.push(ot);
     }
@@ -404,11 +450,10 @@ function render(precolectaTodas, configurar){
     </details>`;
   }
   if(noDisponiblesAun.length){
-    const NOMBRE_DIA = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
     extrasHtml += `
     <details class="panel-extra">
-      <summary><span>📆 Todavía no arrancan — pidieron un día puntual, no entran a la ruta de mañana (${noDisponiblesAun.length})</span><span>▾</span></summary>
-      ${noDisponiblesAun.map(o=>`<div class="extra-row"><span class="extra-ot">${esc(o.workorder_number)}</span><span class="extra-motivo">${esc(o.cuenta||'—')} · disponible desde ${NOMBRE_DIA[o._disponibleDesde]} · "${esc(o.horario_entrega||o.horario||'—')}"</span></div>`).join('')}
+      <summary><span>📆 No disponibles para mañana — fecha/día pedido por el comercio (${noDisponiblesAun.length})</span><span>▾</span></summary>
+      ${noDisponiblesAun.map(o=>`<div class="extra-row"><span class="extra-ot">${esc(o.workorder_number)}</span><span class="extra-motivo">${esc(o.cuenta||'—')} · ${esc(o._motivoExclusion)} · "${esc(o.horario_entrega||o.horario||'—')}"</span></div>`).join('')}
     </details>`;
   }
   extras.innerHTML = extrasHtml;
