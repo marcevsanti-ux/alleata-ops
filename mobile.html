@@ -819,6 +819,64 @@ function cargarRutaPendienteLocal(){
   catch(e){ return []; }
 }
 
+// ── Ticket 06 — Tracking de ubicación (pedido 15/09) ──────────────────────
+// Arranca la primera vez que el chofer despacha o cierra una OT en el día
+// (eso ES, en la práctica, "confirmar la hoja de ruta" — no depende de que
+// responda nada por WhatsApp, ver Ticket 03). Captura cada 20 minutos
+// mientras mobile.html esté abierta y la pantalla prendida, más una
+// captura extra al volver a la app después de tenerla en segundo plano —
+// para tapar algo del hueco que deja el navegador cortando el timer
+// cuando la pantalla se apaga o cambia de app (limitación real de una
+// página web, no una app nativa — no hay forma de evitarla del todo).
+const TRACKING_INTERVALO_MS = 20*60*1000; // 20 minutos
+let _trackingIntervalId = null;
+
+function _trackingYaIniciadoHoy(){
+  return localStorage.getItem('alleata_tracking_iniciado_'+hoyArgentina())==='1';
+}
+function _marcarTrackingIniciadoHoy(){
+  try{ localStorage.setItem('alleata_tracking_iniciado_'+hoyArgentina(),'1'); }catch(e){}
+}
+
+async function _capturarUbicacion(origen){
+  if(!currentUser?.id) return;
+  if(!navigator.geolocation){ console.warn('[tracking] geolocation no soportada en este navegador'); return; }
+  navigator.geolocation.getCurrentPosition(
+    async pos=>{
+      try{
+        await sb.from('ubicaciones_chofer').insert({
+          user_id:     currentUser.id,
+          lat:         pos.coords.latitude,
+          lng:         pos.coords.longitude,
+          precision_m: pos.coords.accuracy,
+          origen,
+        });
+        dlog('[tracking] ubicación guardada',{origen,precision:pos.coords.accuracy});
+      }catch(e){ console.warn('[tracking] error guardando ubicación:',e.message); }
+    },
+    err=>{ console.warn('[tracking] error obteniendo posición:',err.message); },
+    { enableHighAccuracy:false, timeout:15000, maximumAge:60000 }
+  );
+}
+
+// Se llama desde aceptarOT() y confirmarCierreOT() — idempotente, si ya
+// está corriendo no hace nada más que la captura de esta llamada puntual.
+function iniciarTrackingUbicacionSiHaceFalta(){
+  if(!_trackingYaIniciadoHoy()){
+    _marcarTrackingIniciadoHoy();
+    _capturarUbicacion('primera_captura');
+  }
+  if(!_trackingIntervalId){
+    _trackingIntervalId = setInterval(()=>_capturarUbicacion('timer_20min'), TRACKING_INTERVALO_MS);
+    document.addEventListener('visibilitychange', ()=>{
+      if(document.visibilityState==='visible' && _trackingIntervalId){
+        _capturarUbicacion('visibilitychange');
+      }
+    });
+    dlog('[tracking] iniciado — captura cada 20min + al volver a la app');
+  }
+}
+
 // ── Debug log — pasos de la app, para mandar por WhatsApp cuando algo falla
 // en el campo en vez de solo una foto del alert genérico. Se abre tocando
 // 5 veces el número de versión en el topbar.
@@ -2476,6 +2534,7 @@ async function aceptarOT(){
     rutaDelDia.push({...otScaneadaActual});
     guardarRutaPendienteLocal();
     await guardarRutaDiaria();
+    iniciarTrackingUbicacionSiHaceFalta(); // Ticket 06 — arranca (o sigue) el tracking de ubicación
     dlog('✅ aceptarOT() completo',{ot:otScaneadaActual.ot_numero});
 
     const otParaNotif={...otScaneadaActual};
@@ -2982,6 +3041,7 @@ async function confirmarCierreOT(){
 
   btn.disabled=false;btn.textContent='Confirmar';
   if(error){alert('Error: '+error.message);return;}
+  iniciarTrackingUbicacionSiHaceFalta(); // Ticket 06 — arranca (o sigue) el tracking de ubicación
   closeModalCierre();
   if(rolloutSimError){
     alert('⚠️ La OT se cerró bien, pero falló la actualización de la SIM en Salesforce: '+rolloutSimError+'\n\nAvisá para que lo corrijan a mano.');
