@@ -187,7 +187,13 @@ async function cargarRuta(){
     </div>`;
   }
   lista.innerHTML = html;
-  stat.textContent = `${puntos.length} puntos · ~${kmTotal.toFixed(1)} km (línea recta entre puntos, no ruta real)`;
+  const ultimoPunto = puntos[puntos.length-1];
+  const proxEstimado = new Date(new Date(ultimoPunto.created_at).getTime() + 20*60*1000);
+  const esHoy = fecha === hoyArgentina();
+  const proxTxt = esHoy
+    ? ` · próxima muestra estimada ${proxEstimado.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit',timeZone:'America/Argentina/Buenos_Aires'})} (si sigue con la app abierta)`
+    : ''; // no tiene sentido mostrar "próxima muestra" para un día ya cerrado
+  stat.textContent = `${puntos.length} puntos · ~${kmTotal.toFixed(1)} km (línea recta entre puntos, no ruta real)${proxTxt}`;
 }
 
 (async function init(){

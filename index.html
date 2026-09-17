@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.7.28</title>
+<title>Alleata · Operaciones v4.7.29</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -408,7 +408,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.28 · 16 sep 2026
+      v4.7.29 · 16 sep 2026
     </div>
   </div>
 </div>
@@ -517,7 +517,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.28 · 16 sep 2026
+      v4.7.29 · 16 sep 2026
     </div>
   </div>
 </nav>
@@ -572,7 +572,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.28</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.29</div>
   </div>
   <div class="content">
 
@@ -5200,7 +5200,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.7.28] OK');
+console.log('[Alleata v4.7.29] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -6440,7 +6440,22 @@ async function loadHojaRuta(){
   const{data:perfiles}=await sb.from('profiles').select('id,nombre,email').in('id',userIds);
   const porUser={};(perfiles||[]).forEach(p=>{porUser[p.id]=p;});
 
-  const todosNumeros=[...new Set((rutas||[]).flatMap(r=>r.ots_numeros||[]).filter(Boolean))];
+  const todosNumerosBase=[...new Set((rutas||[]).flatMap(r=>r.ots_numeros||[]).filter(Boolean))];
+
+  // FIX 17/09 (mismo bug de siempre, tercera pantalla afectada — ver el
+  // comentario largo en cargarIndicadoresRutaChofer(): rutas_diarias.ots_numeros
+  // se poda durante el día en mobile.html cada vez que se refresca "En
+  // Tránsito", sacando lo que ya se cerró. Acá se notó porque el reporte de
+  // WhatsApp de Marce mostraba 20 OTs gestionadas y esta pantalla solo 10 —
+  // las 10 que faltaban ya estaban Exitosas/Reprogramadas hacía rato y se
+  // habían podado del array antes de que se volviera a guardar la ruta).
+  // Se recupera sumando lo cerrado HOY según sf_workorders.entregado_por +
+  // fecha_cierre, esté o no todavía en rutas_diarias.
+  const{data:cerradosHoyHR,error:errCerradosHR}=await sb.from('sf_workorders')
+    .select('workorder_number,entregado_por').eq('fecha_cierre',hoy).not('entregado_por','is',null);
+  if(errCerradosHR) console.warn('[loadHojaRuta] Error trayendo cerrados de hoy (fix retroactivo):',errCerradosHR.message);
+
+  const todosNumeros=[...new Set([...todosNumerosBase, ...((cerradosHoyHR||[]).map(o=>o.workorder_number))])];
   let otsMap={};
   if(todosNumeros.length){
     const{data:ots,error:errOts}=await sb.from('sf_workorders')
@@ -6526,12 +6541,21 @@ async function loadHojaRuta(){
     const perfil=porUser[r.user_id];
     const chofer=(perfil?.nombre||perfil?.email||'Chofer desconocido').trim();
     const choferJs=chofer.replace(/'/g,"\\'");
+    // FIX 17/09: se suman acá los números recuperados de sf_workorders que
+    // correspondan a ESTE chofer (match por entregado_por) y que ya no
+    // estén en r.ots_numeros — de acá en más, todo lo que use "los números
+    // de este chofer" usa numsPropios, no r.ots_numeros directo.
+    const choferNorm=chofer.trim().toLowerCase();
+    const recuperadosDeEste=(cerradosHoyHR||[])
+      .filter(o=>(o.entregado_por||'').trim().toLowerCase()===choferNorm)
+      .map(o=>o.workorder_number);
+    const numsPropios=[...new Set([...(r.ots_numeros||[]), ...recuperadosDeEste])];
     // Pedido 10/09: ordenar por hora de transición real (fecha_exitoso o
     // sf_last_modified, el mismo criterio que ya se usa para MOSTRAR la
     // hora abajo de cada badge) — así se ve la ruta real que hizo el
     // chofer, no el orden sugerido original. Las que todavía no se
     // transicionaron (sin hora) quedan al final, en su orden original.
-    const numerosOrdenados = [...(r.ots_numeros||[])].sort((numA, numB) => {
+    const numerosOrdenados = [...numsPropios].sort((numA, numB) => {
       const otA = otsMap[numA], otB = otsMap[numB];
       const cerradaA = otA && ESTADOS_CERRADOS.includes(otA.status);
       const cerradaB = otB && ESTADOS_CERRADOS.includes(otB.status);
@@ -6593,9 +6617,9 @@ async function loadHojaRuta(){
     const itemsParadas=paradasDeEste.map(renderParadaItem).join('');
 
     const items=[itemsEnvios,itemsDesinst,itemsParadas].filter(Boolean).join('')||'<div style="font-size:12px;color:var(--text-muted)">Sin OTs en su ruta.</div>';
-    const totalCount=(r.ots_numeros||[]).length+desinstDeEste.length+paradasDeEste.length;
+    const totalCount=numsPropios.length+desinstDeEste.length+paradasDeEste.length;
     const enColaEste=(porChoferCola[r.user_id]||[]).length;
-    const rolloutCount=(r.ots_numeros||[]).filter(num=>esRollout(otsMap[num]||{})).length;
+    const rolloutCount=numsPropios.filter(num=>esRollout(otsMap[num]||{})).length;
 
     return `<div>
       <div style="font-size:14px;font-weight:700;margin-bottom:8px;display:flex;align-items:center;gap:8px">
