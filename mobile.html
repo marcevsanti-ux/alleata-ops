@@ -165,7 +165,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
       <div class="login-logo">
         <img id="loginLogo" src="" alt="Alleata">
         <div class="login-sub">Portal de Operaciones</div>
-        <div class="login-version">v2.14.52 · mobile</div>
+        <div class="login-version">v2.14.53 · mobile</div>
       </div>
       <div class="field"><label class="label">Email</label><input class="input" id="lEmail" type="email" placeholder="usuario@alleata.com" autocomplete="email"></div>
       <div class="field"><label class="label">Contraseña</label><input class="input" id="lPass" type="password" placeholder="••••••••" autocomplete="current-password"></div>
@@ -182,7 +182,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
     <img id="appLogo" src="" alt="Alleata">
     <div class="topbar-title" id="topbarTitle">Operaciones</div>
     <button id="btnSyncRapido" onclick="syncRapido()" title="Actualizar estados desde Salesforce (sin esperar los 10min)" style="background:none;border:none;color:#fff;font-size:18px;cursor:pointer;padding:4px 6px;line-height:1">🔄</button>
-    <div class="topbar-version" onclick="_tocarVersion()">v2.14.52</div>
+    <div class="topbar-version" onclick="_tocarVersion()">v2.14.53</div>
     <div class="topbar-avatar" id="topbarAvatar" onclick="openDrawer()">?</div>
   </div>
 
@@ -2491,6 +2491,12 @@ async function aceptarOT(){
     showScanFeedback('🧪 [PRUEBA] OT '+otScaneadaActual.ot_numero+' "despachada" (simulado, nada real)','ok');
     rutaDelDia.push({...otScaneadaActual}); // solo en memoria de esta sesión — NO se guarda en rutas_diarias
     dlog('🧪 Agregada a rutaDelDia en memoria (no se persiste en Supabase)');
+    // El tracking de ubicación (Ticket 06) SÍ se prueba acá a propósito —
+    // no toca SF/Railway/sf_workorders, solo guarda en ubicaciones_chofer,
+    // así que no rompe la promesa de "modo prueba = nada productivo". De
+    // paso, es la forma de probar el permiso de geolocalización sin tener
+    // que tocar una OT real (pedido 17/09).
+    iniciarTrackingUbicacionSiHaceFalta();
     otScaneadaActual=null;
     cancelarOTScaneada();
     rutaScannerActive=true;
@@ -2824,6 +2830,9 @@ async function confirmarCierreOT(){
     await new Promise(r=>setTimeout(r,500));
     dlog('🧪 Simulado: OT cerrada (no se llamó a Railway/SF)');
     btn.disabled=false;btn.textContent='Confirmar';
+    // Mismo criterio que en aceptarOT(): el tracking no es "productivo" en
+    // el sentido de tocar OTs/SF, así que se prueba acá también.
+    iniciarTrackingUbicacionSiHaceFalta();
     closeModalCierre();
     showScanFeedback('🧪 [PRUEBA] OT '+_otCierreActual.ot_numero+' "'+resultado+'" (simulado, nada real)',resultado==='Entregado'?'ok':'warn');
     rutaDelDia=rutaDelDia.filter(o=>o.id!==_otCierreActual.id); // sacarla de la ruta en memoria
