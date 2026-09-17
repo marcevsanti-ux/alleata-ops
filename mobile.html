@@ -165,7 +165,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
       <div class="login-logo">
         <img id="loginLogo" src="" alt="Alleata">
         <div class="login-sub">Portal de Operaciones</div>
-        <div class="login-version">v2.14.54 · mobile</div>
+        <div class="login-version">v2.14.55 · mobile</div>
       </div>
       <div class="field"><label class="label">Email</label><input class="input" id="lEmail" type="email" placeholder="usuario@alleata.com" autocomplete="email"></div>
       <div class="field"><label class="label">Contraseña</label><input class="input" id="lPass" type="password" placeholder="••••••••" autocomplete="current-password"></div>
@@ -182,7 +182,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
     <img id="appLogo" src="" alt="Alleata">
     <div class="topbar-title" id="topbarTitle">Operaciones</div>
     <button id="btnSyncRapido" onclick="syncRapido()" title="Actualizar estados desde Salesforce (sin esperar los 10min)" style="background:none;border:none;color:#fff;font-size:18px;cursor:pointer;padding:4px 6px;line-height:1">🔄</button>
-    <div class="topbar-version" onclick="_tocarVersion()">v2.14.54</div>
+    <div class="topbar-version" onclick="_tocarVersion()">v2.14.55</div>
     <div class="topbar-avatar" id="topbarAvatar" onclick="openDrawer()">?</div>
   </div>
 
@@ -844,22 +844,24 @@ async function _capturarUbicacion(origen){
   navigator.geolocation.getCurrentPosition(
     async pos=>{
       try{
-        await sb.from('ubicaciones_chofer').insert({
+        // FIX 17/09: supabase-js NO tira excepción cuando el insert falla
+        // por RLS — devuelve {data:null, error:{...}} sin cortar la
+        // ejecución. El código anterior no revisaba `error` y loggeaba
+        // "guardado" igual, aunque la fila nunca se hubiera insertado de
+        // verdad (caso real: 403 Forbidden en consola, pero el log decía
+        // éxito). Ahora se revisa explícito.
+        const { error } = await sb.from('ubicaciones_chofer').insert({
           user_id:     currentUser.id,
           lat:         pos.coords.latitude,
           lng:         pos.coords.longitude,
           precision_m: pos.coords.accuracy,
           origen,
         });
+        if(error){
+          console.warn('[tracking] ❌ insert falló (RLS u otro motivo):',error.message,error);
+          return;
+        }
         dlog('[tracking] ubicación guardada',{origen,precision:pos.coords.accuracy});
-        // FIX 17/09 (caso real: el cartel de permiso se cierra sin
-        // responder — sea porque el chofer toca afuera sin querer, o
-        // porque tarda en decidir). Antes se marcaba "ya se intentó hoy"
-        // ANTES de saber si esto iba a funcionar, así que un cierre
-        // accidental dejaba el tracking mudo el resto del día (o hasta
-        // el próximo timer de 20min). Ahora solo se marca acá, en el
-        // éxito real — si no hubo respuesta o se negó, el próximo
-        // aceptar/cerrar OT (o reabrir la app) vuelve a intentar altiro.
         if(origen==='primera_captura') _marcarTrackingIniciadoHoy();
       }catch(e){ console.warn('[tracking] error guardando ubicación:',e.message); }
     },
