@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Alleata · Tracking</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --bg:#070c14; --panel:#0f1a2b; --panel2:#13223a; --border:#1e3252;
+    --teal:#1dbf8e; --amber:#f5a623; --text:#eef4fb; --text-dim:#9db1cc;
+    --mono:'JetBrains Mono','Courier New',monospace;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Inter',-apple-system,sans-serif;font-size:16px}
+  body{display:flex;flex-direction:column}
+  header{padding:16px 24px;border-bottom:2px solid var(--border);background:linear-gradient(180deg,#0d1626,#070c14);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;flex-shrink:0}
+  .brand{font-size:20px;font-weight:800;color:var(--teal);letter-spacing:-.5px}
+  .titulo{font-size:14px;font-weight:700;color:var(--text-dim);margin-left:14px}
+  .controles{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  select,input[type=date]{background:var(--panel2);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:8px 12px;font-family:inherit;font-size:13px}
+  button{background:var(--teal);border:none;color:#04231a;font-weight:700;border-radius:8px;padding:8px 16px;cursor:pointer;font-family:inherit;font-size:13px}
+  button:hover{opacity:.9}
+  .stat{background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-size:12px;color:var(--text-dim);font-family:var(--mono)}
+  main{flex:1;display:flex;min-height:0}
+  #mapa{flex:1;min-height:0}
+  #panelLateral{width:320px;flex-shrink:0;background:var(--panel);border-left:1px solid var(--border);overflow-y:auto;padding:14px}
+  @media(max-width:800px){main{flex-direction:column}#panelLateral{width:100%;max-height:220px}}
+  .punto-item{background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px;font-size:12.5px;cursor:pointer}
+  .punto-item:hover{border-color:var(--teal)}
+  .punto-num{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:var(--teal);color:#04231a;font-weight:800;font-size:11px;margin-right:8px}
+  .punto-hora{font-family:var(--mono);font-weight:700}
+  .punto-origen{color:var(--text-dim);font-size:11px;margin-top:3px}
+  .gap-warn{color:var(--amber);font-size:10.5px;margin:4px 0 8px;padding-left:28px}
+  .empty{padding:40px 20px;text-align:center;color:var(--text-dim);font-size:13px}
+  .leyenda{padding:0 0 12px;font-size:11px;color:var(--text-dim);line-height:1.6;border-bottom:1px solid var(--border);margin-bottom:12px}
+</style>
+</head>
+<body>
+
+<header>
+  <div style="display:flex;align-items:center">
+    <span class="brand">alleata</span>
+    <span class="titulo">📍 TRACKING</span>
+  </div>
+  <div class="controles">
+    <select id="selChofer">
+      <option value="">Cargando choferes...</option>
+    </select>
+    <input type="date" id="selFecha">
+    <button onclick="cargarRuta()">Ver ruta</button>
+    <span class="stat" id="statResumen">—</span>
+  </div>
+</header>
+
+<main>
+  <div id="mapa"></div>
+  <div id="panelLateral">
+    <div class="leyenda">
+      Cada punto es una captura real de GPS (al aceptar/cerrar una OT, cada
+      20 min con la app abierta, o al volver a la pantalla). <b>No es una
+      traza continua</b> — si el chofer tuvo la pantalla apagada un rato,
+      va a verse como un salto directo entre dos puntos, no como el
+      camino real que recorrió en el medio.
+    </div>
+    <div id="listaPuntos"><div class="empty">Elegí chofer y fecha, y tocá "Ver ruta"</div></div>
+  </div>
+</main>
+
+<script>
+const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
+const SUPABASE_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+let mapa, capaRuta, capaMarcadores;
+
+function initMapa(){
+  mapa = L.map('mapa').setView([-34.648,-58.377], 11); // centrado en Barracas por defecto
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap contributors',
+    maxZoom: 19,
+  }).addTo(mapa);
+  capaRuta = L.layerGroup().addTo(mapa);
+  capaMarcadores = L.layerGroup().addTo(mapa);
+}
+
+async function cargarChoferes(){
+  const sel = document.getElementById('selChofer');
+  try{
+    // Trae solo los que ya tienen al menos una ubicación guardada alguna
+    // vez, para no listar perfiles que nunca van a tener nada que mostrar.
+    const { data, error } = await sb.from('ubicaciones_chofer')
+      .select('user_id, profiles(nombre)')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    const vistos = new Map();
+    (data||[]).forEach(r => { if(r.profiles?.nombre) vistos.set(r.user_id, r.profiles.nombre); });
+    if(!vistos.size){
+      sel.innerHTML = '<option value="">Sin choferes con ubicación guardada todavía</option>';
+      return;
+    }
+    sel.innerHTML = [...vistos.entries()]
+      .sort((a,b)=>a[1].localeCompare(b[1]))
+      .map(([id,nombre])=>`<option value="${id}">${nombre}</option>`).join('');
+  }catch(e){
+    sel.innerHTML = '<option value="">Error cargando choferes</option>';
+    console.error(e);
+  }
+}
+
+function hoyArgentina(){
+  return new Date().toLocaleDateString('en-CA',{timeZone:'America/Argentina/Buenos_Aires'});
+}
+
+async function cargarRuta(){
+  const userId = document.getElementById('selChofer').value;
+  const fecha = document.getElementById('selFecha').value;
+  const lista = document.getElementById('listaPuntos');
+  const stat = document.getElementById('statResumen');
+  if(!userId){ alert('Elegí un chofer.'); return; }
+  if(!fecha){ alert('Elegí una fecha.'); return; }
+
+  lista.innerHTML = '<div class="empty">Cargando...</div>';
+  capaRuta.clearLayers();
+  capaMarcadores.clearLayers();
+
+  const { data, error } = await sb.from('ubicaciones_chofer')
+    .select('lat,lng,precision_m,origen,created_at')
+    .eq('user_id', userId)
+    .eq('fecha', fecha)
+    .order('created_at', { ascending: true });
+
+  if(error){
+    lista.innerHTML = `<div class="empty">Error: ${error.message}</div>`;
+    stat.textContent = 'Error';
+    return;
+  }
+  if(!data || !data.length){
+    lista.innerHTML = '<div class="empty">Sin ubicaciones guardadas para ese chofer en esa fecha.</div>';
+    stat.textContent = '0 puntos';
+    return;
+  }
+
+  const puntos = data.map(d => ({...d, latlng:[d.lat, d.lng]}));
+
+  // Línea conectando los puntos en orden cronológico
+  L.polyline(puntos.map(p=>p.latlng), { color:'#1dbf8e', weight:3, opacity:.8 }).addTo(capaRuta);
+
+  // Marcadores numerados
+  puntos.forEach((p, i) => {
+    const hora = new Date(p.created_at).toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit',timeZone:'America/Argentina/Buenos_Aires'});
+    const esUltimo = i === puntos.length - 1;
+    const color = i===0 ? '#10b981' : (esUltimo ? '#ef4444' : '#1a9fd4');
+    const icono = L.divIcon({
+      className: '',
+      html: `<div style="background:${color};color:#fff;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:11px;font-family:'JetBrains Mono',monospace;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.4)">${i+1}</div>`,
+      iconSize: [26,26], iconAnchor: [13,13],
+    });
+    L.marker(p.latlng, { icon: icono })
+      .bindPopup(`<b>Parada ${i+1}${i===0?' (inicio)':''}${esUltimo?' (última)':''}</b><br>${hora}<br><span style="color:#888">${p.origen} · precisión ${Math.round(p.precision_m||0)}m</span>`)
+      .addTo(capaMarcadores);
+  });
+
+  mapa.fitBounds(L.latLngBounds(puntos.map(p=>p.latlng)), { padding:[40,40] });
+
+  // Panel lateral — lista + aviso de huecos grandes entre puntos (>25min,
+  // más que el intervalo esperado de 20min) para que sea visible cuándo
+  // el chofer estuvo con la pantalla apagada y no hay datos de ese tramo.
+  let html = '';
+  let kmTotal = 0;
+  for(let i=0;i<puntos.length;i++){
+    const p = puntos[i];
+    const hora = new Date(p.created_at).toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit',timeZone:'America/Argentina/Buenos_Aires'});
+    if(i>0){
+      const minDiff = (new Date(p.created_at)-new Date(puntos[i-1].created_at))/60000;
+      const distKm = mapa.distance(puntos[i-1].latlng, p.latlng)/1000;
+      kmTotal += distKm;
+      if(minDiff > 25){
+        html += `<div class="gap-warn">⚠️ Hueco de ${Math.round(minDiff)} min sin datos (pantalla apagada o app cerrada)</div>`;
+      }
+    }
+    html += `<div class="punto-item" onclick="mapa.flyTo([${p.lat},${p.lng}],16)">
+      <span class="punto-num">${i+1}</span><span class="punto-hora">${hora}</span>
+      <div class="punto-origen">${p.origen} · precisión ~${Math.round(p.precision_m||0)}m</div>
+    </div>`;
+  }
+  lista.innerHTML = html;
+  stat.textContent = `${puntos.length} puntos · ~${kmTotal.toFixed(1)} km (línea recta entre puntos, no ruta real)`;
+}
+
+(async function init(){
+  initMapa();
+  document.getElementById('selFecha').value = hoyArgentina();
+  await cargarChoferes();
+})();
+</script>
+</body>
+</html>
