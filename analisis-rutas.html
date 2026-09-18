@@ -113,7 +113,10 @@
   </div>
 
   <div class="card">
-    <div class="card-title">Detalle completo</div>
+    <div class="card-title" style="display:flex;align-items:center;gap:10px">
+      Detalle completo
+      <span id="choferDetalleLabel" style="background:var(--panel2);border:1px solid var(--border);border-radius:20px;padding:3px 12px;font-size:11px;color:var(--text);font-weight:700"></span>
+    </div>
     <div class="tabla-wrap">
       <table id="tablaDetalle"><tbody><tr><td class="empty">Cargando...</td></tr></tbody></table>
     </div>
@@ -182,9 +185,22 @@ async function cargarTodo(){
   });
   Object.values(porChoferDia).forEach(marcarBloques);
 
+  // Pedido 18/09: sf_id (para el link a Salesforce) y ciudad no estaban
+  // guardados en analisis_ruta_septiembre — en vez de reprocesar todo el
+  // mes de nuevo (que implicaría re-geocodificar), se traen acá con una
+  // consulta liviana a sf_workorders, cruzando por número de OT.
+  const numerosOts = [...new Set((data||[]).map(f=>f.workorder_number))];
+  let otsInfo = {};
+  if(numerosOts.length){
+    const { data: otsData } = await sb.from('sf_workorders').select('workorder_number,sf_id,ciudad').in('workorder_number', numerosOts);
+    (otsData||[]).forEach(o=>{ otsInfo[o.workorder_number] = o; });
+  }
+
+  document.getElementById('choferDetalleLabel').textContent = chofer==='todos' ? 'Todos los choferes' : chofer;
+
   renderKpis(data||[]);
   renderCharts(data||[]);
-  renderTabla(data||[]);
+  renderTabla(data||[], otsInfo);
 }
 
 function renderKpis(filas){
@@ -251,16 +267,22 @@ function renderCharts(filas){
   chartBloques = new Chart(document.getElementById('chartBloques'), { type:'bar', data:{labels:fechas,datasets:datasetsDe(bloquesPorDia)}, options:opcionesBase });
 }
 
-function renderTabla(filas){
+function renderTabla(filas, otsInfo){
+  otsInfo = otsInfo || {};
   const tbody = document.querySelector('#tablaDetalle tbody');
   if(!filas.length){ tbody.innerHTML = '<tr><td class="empty">Sin datos para este filtro.</td></tr>'; return; }
   tbody.innerHTML = `<tr>
-      <th>Chofer</th><th>Fecha</th><th>#</th><th>OT</th><th>Hora</th><th>Km</th><th>Min</th>
+      <th>Chofer</th><th>Fecha</th><th>#</th><th>OT</th><th>Ciudad</th><th>Hora</th><th>Km</th><th>Min</th>
     </tr>` + filas.map(f=>{
     const hora = f.hora ? new Date(f.hora).toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit',timeZone:'America/Argentina/Buenos_Aires'}) : '—';
+    const info = otsInfo[f.workorder_number] || {};
+    const otCelda = info.sf_id
+      ? `<a href="https://alleata.lightning.force.com/lightning/r/WorkOrder/${info.sf_id}/view" target="_blank" rel="noopener" style="color:var(--blue)">${f.workorder_number}</a>`
+      : f.workorder_number;
     return `<tr class="${f.enBloque?'en-bloque':''}">
       <td>${f.chofer}</td><td>${f.fecha}</td><td>${f.orden}</td>
-      <td>${f.workorder_number}${f.enBloque?'<span class="badge-bloque">BLOQUE</span>':''}</td>
+      <td>${otCelda}${f.enBloque?'<span class="badge-bloque">BLOQUE</span>':''}</td>
+      <td>${info.ciudad||'—'}</td>
       <td>${hora}</td>
       <td>${f.km_desde_anterior!==null?Number(f.km_desde_anterior).toFixed(1):'—'}</td>
       <td>${f.minReloj??'—'}</td>
