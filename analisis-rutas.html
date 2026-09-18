@@ -170,6 +170,30 @@ const HORAS_EXTRA_IGNACIO_SEPT = {
 // (muy común, ~17% de los casos) el tiempo se perdía aunque el reloj
 // siempre esté disponible. Comparando "hora" directo, la detección no
 // depende para nada de si la geocodificación funcionó.
+// Ticket 07 v2 (18/09) — se agrega una segunda regla, encontrada analizando
+// a mano el caso de Ignacio del 17/09: además de "muy pocos minutos entre
+// cierres", también se marca bloque si la VELOCIDAD IMPLÍCITA entre dos
+// paradas es imposible (>80 km/h en zona urbana/suburbana de GBA) — ese
+// caso no lo agarraba la regla de minutos porque el salto era de 7 min,
+// no ≤3, pero calcular 20km en 7min = 175km/h ya es una imposibilidad
+// física, señal clara de que también es un cierre administrativo.
+//
+// A diferencia de la regla de minutos (que marca las dos paradas, porque
+// con un salto tan corto es ambiguo cuál de las dos "no es real"), acá
+// se marca SOLO la parada actual (i) — la anterior (i-1) ya pasó su
+// propia validación contra SU anterior, así que es más probable que sea
+// real; la que queda mal parada es la que dice haber llegado a un lugar
+// en un tiempo físicamente imposible.
+const VELOCIDAD_IMPOSIBLE_KMH = 80;
+
+// FIX 18/09 v3 — descubierto analizando a mano el caso de Ignacio: la
+// regla simétrica (marcar la parada ANTERIOR también) era demasiado
+// bruta. Caso real: 24125→24215 fueron solo 1 minuto — la regla vieja
+// marcaba las DOS como bloque, pero 24125 tenía evidencia propia sólida
+// de ser real (llegó desde 24234 a 43km/h, totalmente creíble). Ahora
+// solo se marca la parada ACTUAL (i) en los dos casos — la anterior ya
+// pasó (o no) su propia validación contra SU anterior, y no hay que
+// pisarla solo porque lo que viene después es sospechoso.
 function marcarBloques(filas){
   for(let i=1;i<filas.length;i++){
     if(!filas[i].hora || !filas[i-1].hora) continue;
@@ -177,7 +201,14 @@ function marcarBloques(filas){
     filas[i].minReloj = minReal; // minutos reales desde la anterior, siempre disponible (no depende de geo)
     if(minReal<=UMBRAL_BLOQUE_MIN){
       filas[i].enBloque = true;
-      filas[i-1].enBloque = true;
+      continue;
+    }
+    if(minReal>0 && filas[i].km_desde_anterior!=null){
+      const velocidadImplicita = filas[i].km_desde_anterior / (minReal/60);
+      if(velocidadImplicita > VELOCIDAD_IMPOSIBLE_KMH){
+        filas[i].enBloque = true;
+        filas[i].velocidadImposible = Math.round(velocidadImplicita);
+      }
     }
   }
   return filas;
