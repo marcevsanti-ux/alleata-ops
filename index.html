@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.7.30</title>
+<title>Alleata · Operaciones v4.7.32</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -408,7 +408,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.30 · 16 sep 2026
+      v4.7.32 · 16 sep 2026
     </div>
   </div>
 </div>
@@ -517,7 +517,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.30 · 16 sep 2026
+      v4.7.32 · 16 sep 2026
     </div>
   </div>
 </nav>
@@ -572,7 +572,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.30</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.32</div>
   </div>
   <div class="content">
 
@@ -5200,7 +5200,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.7.30] OK');
+console.log('[Alleata v4.7.32] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -7726,6 +7726,30 @@ let _hrDiaBuckets = {};  // { 'Marce': {todas:[],exitosas:[],reprogramar:[],otro
 // proceso automático nuestro las tocó después, corriendo el reloj sin
 // que tenga que ver con la visita real) — mostrar esas horas en vivo
 // frente a un chofer sería un error de credibilidad evitable.
+// Snapshot leído a mano de "Horas Maciel Ignacio" (Google Sheets, RRHH) el
+// 18/09/2026 — igual que HORAS_EXTRA_IGNACIO_SEPT en analisis-rutas.html,
+// es una FOTO FIJA: el navegador no puede leer ese Sheet privado en vivo,
+// así que esto no se actualiza solo. El 18/09 solo tiene entrada cargada
+// todavía (sin salida) al momento de leerlo.
+const HORAS_PLANILLA_IGNACIO_SEPT = {
+  '2026-09-01': { entrada:'07:00', salida:'22:00' },
+  '2026-09-02': { entrada:'07:00', salida:'18:00' },
+  '2026-09-03': { entrada:'07:00', salida:'20:00' },
+  '2026-09-04': { entrada:'07:00', salida:'20:00' },
+  '2026-09-05': { entrada:'08:00', salida:'17:00' },
+  '2026-09-07': { entrada:'07:00', salida:'20:00' },
+  '2026-09-08': { entrada:'07:00', salida:'20:00' },
+  '2026-09-09': { entrada:'07:00', salida:'19:00' },
+  '2026-09-10': { entrada:'07:00', salida:'20:00' },
+  '2026-09-11': { entrada:'07:00', salida:'21:00' },
+  '2026-09-12': { entrada:'09:00', salida:'17:00' },
+  '2026-09-14': { entrada:'07:00', salida:'20:00' },
+  '2026-09-15': { entrada:'07:00', salida:'16:00' },
+  '2026-09-16': { entrada:'06:00', salida:'19:00' },
+  '2026-09-17': { entrada:'07:00', salida:'21:00' },
+  '2026-09-18': { entrada:'07:00', salida:null }, // todavía sin cargar al momento de leer la planilla
+};
+
 async function mostrarModalDiaPorChofer(fecha) {
   if (!document.getElementById('modalDiaChofer')) {
     const m = document.createElement('div');
@@ -7806,10 +7830,18 @@ async function mostrarModalDiaPorChofer(fecha) {
   const seccionChofer = chofer => {
     const filas = porChofer[chofer] || [];
     const reales = filas.filter(f => !f._enBloque).length;
+    // Pedido 18/09: mostrar el horario de la planilla de RRHH al lado de
+    // la ruta real — solo aparece si es Ignacio y hay dato para ese día
+    // (la planilla es una foto fija, no cubre a Marce ni todos los días).
+    const planilla = chofer.toLowerCase().includes('maciel') ? HORAS_PLANILLA_IGNACIO_SEPT[fecha] : null;
+    const planillaHtml = planilla
+      ? `<span style="font-size:10.5px;font-weight:700;color:#f59e0b;background:rgba(245,166,35,.12);border:1px solid rgba(245,166,35,.3);border-radius:10px;padding:1px 9px">📋 Planilla: entrada ${planilla.entrada}${planilla.salida ? ' · salida '+planilla.salida : ' · salida sin cargar'}</span>`
+      : '';
     return `<div style="margin-bottom:18px">
-      <div style="font-size:13px;font-weight:700;margin-bottom:8px;display:flex;align-items:center;gap:8px">
+      <div style="font-size:13px;font-weight:700;margin-bottom:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
         👷 ${chofer}
         <span style="font-size:10.5px;font-weight:700;color:var(--text-muted);background:var(--navy-900);border:1px solid var(--border);border-radius:10px;padding:1px 9px">${filas.length} OT(s) · ${reales} reales</span>
+        ${planillaHtml}
       </div>
       ${filas.map(filaOt).join('') || '<div style="color:var(--text-muted);font-size:12px">Sin OTs registradas.</div>'}
     </div>`;
@@ -8382,13 +8414,13 @@ async function cargarPendienteRetiroExitosa() {
     </div>`;
   }).join('');
 
-  // Pedido 18/09: una fila por cada semana del mes en curso (antes eran
-  // solo 2 semanas fijas, "esta" y "la anterior") — desde el primer lunes
-  // que toca el mes hasta la semana de hoy.
+  // Pedido 18/09 (v1): una fila por cada semana del mes en curso.
+  // Pedido 18/09 (v2): invertir el orden — semana actual siempre arriba,
+  // yendo hacia atrás. Antes arrancaba en la primera semana del mes.
   let filasSemanasHtml = '';
-  let cursorLunes = new Date(primerLunesMes);
+  let cursorLunes = new Date(lunes);
   let esPrimeraSemana = true;
-  while (cursorLunes <= lunes) {
+  while (cursorLunes >= primerLunesMes) {
     const finSemana = new Date(cursorLunes); finSemana.setDate(cursorLunes.getDate() + 6);
     filasSemanasHtml += `
     <div style="display:flex;justify-content:space-between;align-items:center;margin:${esPrimeraSemana ? '0 0 10px' : '16px 0 10px'};${esPrimeraSemana ? '' : 'padding-top:12px;border-top:1px dashed var(--border);'}flex-wrap:wrap;gap:8px">
@@ -8400,7 +8432,7 @@ async function cargarPendienteRetiroExitosa() {
     </div>
     <div style="display:flex;gap:8px;${esPrimeraSemana ? '' : 'opacity:.85'}">${filaSemana(new Date(cursorLunes), !esPrimeraSemana)}</div>`;
     esPrimeraSemana = false;
-    cursorLunes = new Date(cursorLunes); cursorLunes.setDate(cursorLunes.getDate() + 7);
+    cursorLunes = new Date(cursorLunes); cursorLunes.setDate(cursorLunes.getDate() - 7);
   }
 
   cont.innerHTML = `<div class="card">
