@@ -95,6 +95,17 @@
     </div>
   </div>
 
+  <div class="card" style="margin-bottom:20px">
+    <div class="card-title">Horas extra registradas — Ignacio Maciel (planilla de fichadas, septiembre 2026)</div>
+    <canvas id="chartHorasExtra"></canvas>
+    <div class="footnote">
+      Fuente: planilla de fichadas de RRHH (Google Sheets), leída el 18/09/2026. Es una <b>foto fija</b>,
+      no se actualiza sola como el resto del dashboard — si la planilla cambia, hay que volver a
+      pedir que se actualicen estos valores. La segunda quincena de septiembre parece tener carga
+      pendiente en la planilla (solo el día 16 tiene datos).
+    </div>
+  </div>
+
   <div class="mapa-card">
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
       <div class="card-title" style="margin:0">🗺️ Ruta de un día puntual</div>
@@ -116,6 +127,7 @@
     <div class="card-title" style="display:flex;align-items:center;gap:10px">
       Detalle completo
       <span id="choferDetalleLabel" style="background:var(--panel2);border:1px solid var(--border);border-radius:20px;padding:3px 12px;font-size:11px;color:var(--text);font-weight:700"></span>
+      <span id="fechaDetalleLabel" style="background:var(--panel2);border:1px solid var(--border);border-radius:20px;padding:3px 12px;font-size:11px;color:var(--text);font-weight:700"></span>
     </div>
     <div class="tabla-wrap">
       <table id="tablaDetalle"><tbody><tr><td class="empty">Cargando...</td></tr></tbody></table>
@@ -133,7 +145,19 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 
 const UMBRAL_BLOQUE_MIN = 3; // ≤ esto entre dos cierres = "no fue una visita real"
 
-let chartOts, chartKm, chartMin, chartBloques, mapa, capaRuta, capaMarcadores;
+let chartOts, chartKm, chartMin, chartBloques, chartHorasExtra, mapa, capaRuta, capaMarcadores;
+
+// Snapshot leído de la planilla de fichadas de RRHH (Google Sheets) el
+// 18/09/2026 — Ignacio Maciel, septiembre 2026. Estático a propósito: el
+// navegador no tiene forma de leer un Google Sheet privado en vivo sin
+// que el usuario inicie sesión en esa página, así que esto queda fijo
+// hasta que alguien lo vuelva a pedir actualizado.
+const HORAS_EXTRA_IGNACIO_SEPT = {
+  '2026-09-01':6.00, '2026-09-02':2.00, '2026-09-03':4.00, '2026-09-04':4.00,
+  '2026-09-05':9.00, '2026-09-06':0,    '2026-09-07':4.00, '2026-09-08':4.00,
+  '2026-09-09':3.00, '2026-09-10':4.00, '2026-09-11':5.00, '2026-09-12':8.00,
+  '2026-09-13':0,    '2026-09-14':4.00, '2026-09-15':0.00, '2026-09-16':4.00,
+};
 
 // Marca como "enBloque" cualquier parada que esté a ≤UMBRAL_BLOQUE_MIN min
 // de la anterior, Y la anterior también (un bloque necesita al menos 2
@@ -197,6 +221,9 @@ async function cargarTodo(){
   }
 
   document.getElementById('choferDetalleLabel').textContent = chofer==='todos' ? 'Todos los choferes' : chofer;
+  const fechasDistintas = [...new Set((data||[]).map(f=>f.fecha))].sort();
+  document.getElementById('fechaDetalleLabel').textContent = fechasDistintas.length===0 ? '' :
+    fechasDistintas.length===1 ? fechasDistintas[0] : `${fechasDistintas[0]} a ${fechasDistintas[fechasDistintas.length-1]}`;
 
   renderKpis(data||[]);
   renderCharts(data||[]);
@@ -265,6 +292,14 @@ function renderCharts(filas){
 
   if(chartBloques) chartBloques.destroy();
   chartBloques = new Chart(document.getElementById('chartBloques'), { type:'bar', data:{labels:fechas,datasets:datasetsDe(bloquesPorDia)}, options:opcionesBase });
+
+  if(chartHorasExtra) chartHorasExtra.destroy();
+  const heValores = fechas.map(f=>HORAS_EXTRA_IGNACIO_SEPT[f] ?? null);
+  chartHorasExtra = new Chart(document.getElementById('chartHorasExtra'), {
+    type:'bar',
+    data:{labels:fechas, datasets:[{label:'Horas extra (Ignacio)', data:heValores, backgroundColor:'#f59e0b'}]},
+    options:opcionesBase
+  });
 }
 
 function renderTabla(filas, otsInfo){
@@ -272,7 +307,7 @@ function renderTabla(filas, otsInfo){
   const tbody = document.querySelector('#tablaDetalle tbody');
   if(!filas.length){ tbody.innerHTML = '<tr><td class="empty">Sin datos para este filtro.</td></tr>'; return; }
   tbody.innerHTML = `<tr>
-      <th>Chofer</th><th>Fecha</th><th>#</th><th>OT</th><th>Ciudad</th><th>Hora</th><th>Km</th><th>Min</th>
+      <th>#</th><th>OT</th><th>Ciudad</th><th>Hora</th><th>Km</th><th>Min</th>
     </tr>` + filas.map(f=>{
     const hora = f.hora ? new Date(f.hora).toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit',timeZone:'America/Argentina/Buenos_Aires'}) : '—';
     const info = otsInfo[f.workorder_number] || {};
@@ -280,7 +315,7 @@ function renderTabla(filas, otsInfo){
       ? `<a href="https://alleata.lightning.force.com/lightning/r/WorkOrder/${info.sf_id}/view" target="_blank" rel="noopener" style="color:var(--blue)">${f.workorder_number}</a>`
       : f.workorder_number;
     return `<tr class="${f.enBloque?'en-bloque':''}">
-      <td>${f.chofer}</td><td>${f.fecha}</td><td>${f.orden}</td>
+      <td>${f.orden}</td>
       <td>${otCelda}${f.enBloque?'<span class="badge-bloque">BLOQUE</span>':''}</td>
       <td>${info.ciudad||'—'}</td>
       <td>${hora}</td>
