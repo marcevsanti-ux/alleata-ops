@@ -165,7 +165,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
       <div class="login-logo">
         <img id="loginLogo" src="" alt="Alleata">
         <div class="login-sub">Portal de Operaciones</div>
-        <div class="login-version">v2.14.55 · mobile</div>
+        <div class="login-version">v2.14.56 · mobile</div>
       </div>
       <div class="field"><label class="label">Email</label><input class="input" id="lEmail" type="email" placeholder="usuario@alleata.com" autocomplete="email"></div>
       <div class="field"><label class="label">Contraseña</label><input class="input" id="lPass" type="password" placeholder="••••••••" autocomplete="current-password"></div>
@@ -182,7 +182,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
     <img id="appLogo" src="" alt="Alleata">
     <div class="topbar-title" id="topbarTitle">Operaciones</div>
     <button id="btnSyncRapido" onclick="syncRapido()" title="Actualizar estados desde Salesforce (sin esperar los 10min)" style="background:none;border:none;color:#fff;font-size:18px;cursor:pointer;padding:4px 6px;line-height:1">🔄</button>
-    <div class="topbar-version" onclick="_tocarVersion()">v2.14.55</div>
+    <div class="topbar-version" onclick="_tocarVersion()">v2.14.56</div>
     <div class="topbar-avatar" id="topbarAvatar" onclick="openDrawer()">?</div>
   </div>
 
@@ -318,6 +318,21 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
       <button id="btnCerrarHojaRuta" onclick="cerrarHojaDeRuta()" style="width:100%;margin-top:8px;background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:12px;font-size:13px;font-weight:700;border-radius:10px;cursor:pointer;font-family:'Inter',sans-serif">
         🚀 Salir a ruta — avisar y buscar desinstalaciones cercanas
       </button>
+
+      <!-- Pedido 18/09 (Marce): "cargo una nota al cerrar y después no la
+           vuelvo a ver" — tenía razón, esta pantalla no guardaba ninguna
+           vista de lo ya cerrado, la OT desaparece de rutaActivaList en
+           cuanto se cierra (por diseño, ese array es solo lo pendiente).
+           Esto agrega, aparte, un vistazo a lo cerrado HOY con la nota
+           que se haya escrito en cada una. -->
+      <div style="margin-top:14px">
+        <div onclick="toggleCerradasHoy()" style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:10px 12px;background:var(--surface);border:1px solid var(--border);border-radius:10px">
+          <span style="font-size:12px;font-weight:700">📝 Ver mis cierres de hoy</span>
+          <span id="cerradasHoyCount" style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 7px;border-radius:8px;font-size:10px"></span>
+          <span id="cerradasHoyToggleIcon" style="margin-left:auto;font-size:11px;color:var(--text-muted)">▾</span>
+        </div>
+        <div id="cerradasHoyList" style="display:none;margin-top:8px"></div>
+      </div>
       <div id="sugerenciasDesinstWrap" style="margin-top:12px"></div>
 
       <!-- SOLO DESINSTALACIONES — para cuando no hay nada de entregas hoy -->
@@ -1786,6 +1801,47 @@ function registrarCierreResumen(item){
 }
 
 let _otsEnTransitoMap={}; // id → OT completa (última carga de loadEnTransito) — evita re-consultar SF al cerrar
+
+let _cerradasHoyCargadas = false;
+function toggleCerradasHoy(){
+  const cont = document.getElementById('cerradasHoyList');
+  const icon = document.getElementById('cerradasHoyToggleIcon');
+  const abrir = cont.style.display === 'none';
+  cont.style.display = abrir ? 'block' : 'none';
+  icon.textContent = abrir ? '▴' : '▾';
+  if(abrir) cargarCerradasHoy(); // siempre refresca al abrir, no solo la primera vez
+}
+
+async function cargarCerradasHoy(){
+  const cont = document.getElementById('cerradasHoyList');
+  const countEl = document.getElementById('cerradasHoyCount');
+  cont.innerHTML = '<div class="empty" style="padding:16px 0"><p>Cargando...</p></div>';
+  const tecnico = (currentProfile?.nombre||currentUser?.email||'').trim();
+  if(!tecnico){ cont.innerHTML = '<div class="empty" style="padding:16px 0"><p>No se pudo identificar el usuario.</p></div>'; return; }
+
+  const { data, error } = await sb.from('sf_workorders')
+    .select('workorder_number,status,notas_cierre,cuenta')
+    .ilike('entregado_por', tecnico)
+    .eq('fecha_cierre', hoyArgentina())
+    .order('sf_last_modified', { ascending:false });
+
+  if(error){ cont.innerHTML = `<div class="empty" style="padding:16px 0"><p>Error: ${error.message}</p></div>`; return; }
+  countEl.textContent = (data||[]).length;
+  if(!data || !data.length){
+    cont.innerHTML = '<div class="empty" style="padding:16px 0"><p>Todavía no cerraste ninguna OT hoy.</p></div>';
+    return;
+  }
+  const colorEstado = st => st==='Exitoso'?'var(--teal)': st==='Reprogramar'?'#f59e0b': st==='Fallido'?'var(--red)':'var(--text-muted)';
+  cont.innerHTML = data.map(o=>`
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+        <span style="font-family:'JetBrains Mono',monospace;font-weight:700;font-size:13px">${o.workorder_number}</span>
+        <span style="font-size:10.5px;font-weight:700;color:${colorEstado(o.status)}">${o.status}</span>
+      </div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:2px">${o.cuenta||'—'}</div>
+      ${o.notas_cierre ? `<div style="font-size:12px;margin-top:6px;padding:6px 8px;background:var(--surface2);border-left:2px solid var(--border2);border-radius:4px;font-style:italic">📝 "${o.notas_cierre}"</div>` : '<div style="font-size:11px;color:var(--text-muted);margin-top:4px">Sin nota cargada.</div>'}
+    </div>`).join('');
+}
 
 async function loadEnTransito(){
   const el=document.getElementById('rutaActivaList');
