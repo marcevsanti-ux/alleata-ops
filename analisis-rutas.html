@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Alleata · Análisis de Rutas</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --bg:#070c14; --panel:#0f1a2b; --panel2:#13223a; --border:#1e3252;
+    --teal:#1dbf8e; --amber:#f5a623; --red:#ef4444; --blue:#1a9fd4; --purple:#8b5cf6;
+    --text:#eef4fb; --text-dim:#9db1cc; --mono:'JetBrains Mono','Courier New',monospace;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{min-height:100%;background:var(--bg);color:var(--text);font-family:'Inter',-apple-system,sans-serif;font-size:15px}
+  body{display:flex;flex-direction:column}
+  header{padding:16px 24px;border-bottom:2px solid var(--border);background:linear-gradient(180deg,#0d1626,#070c14);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
+  .brand{font-size:20px;font-weight:800;color:var(--teal);letter-spacing:-.5px}
+  .titulo{font-size:14px;font-weight:700;color:var(--text-dim);margin-left:14px}
+  .controles{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  select,input[type=date]{background:var(--panel2);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:7px 12px;font-family:inherit;font-size:13px}
+  button{background:var(--teal);border:none;color:#04231a;font-weight:700;border-radius:8px;padding:8px 16px;cursor:pointer;font-family:inherit;font-size:13px}
+  button:hover{opacity:.9}
+  main{padding:20px 24px}
+
+  .kpis{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:22px}
+  .kpi{flex:1;min-width:150px;background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px 18px}
+  .kpi-num{font-size:26px;font-weight:800;font-family:var(--mono)}
+  .kpi-lbl{font-size:11px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.5px;margin-top:4px}
+
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:20px}
+  @media(max-width:900px){.grid2{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px}
+  .card-title{font-size:13px;font-weight:700;margin-bottom:12px;color:var(--text-dim)}
+  canvas{max-height:260px}
+
+  .mapa-card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:20px}
+  #mapa{height:380px;border-radius:8px;margin-top:12px}
+  .leyenda-mapa{display:flex;gap:16px;flex-wrap:wrap;font-size:11px;color:var(--text-dim);margin-top:8px}
+  .leyenda-punto{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:middle}
+
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  th{text-align:left;padding:8px 10px;color:var(--text-dim);font-weight:700;border-bottom:1px solid var(--border);white-space:nowrap}
+  td{padding:7px 10px;border-bottom:1px solid var(--panel2);white-space:nowrap}
+  tr.en-bloque{background:rgba(245,166,35,.06)}
+  .badge-bloque{font-size:9.5px;font-weight:700;color:var(--amber);background:rgba(245,166,35,.15);border:1px solid rgba(245,166,35,.35);border-radius:10px;padding:1px 7px;margin-left:6px}
+  .tabla-wrap{overflow-x:auto}
+  .empty{padding:30px;text-align:center;color:var(--text-dim)}
+  .footnote{font-size:11px;color:var(--text-dim);margin-top:10px;line-height:1.6}
+</style>
+</head>
+<body>
+
+<header>
+  <div style="display:flex;align-items:center">
+    <span class="brand">alleata</span>
+    <span class="titulo">📊 Análisis de Rutas — tiempos y distancia</span>
+  </div>
+  <div class="controles">
+    <select id="selChofer">
+      <option value="todos">Todos los choferes</option>
+    </select>
+    <input type="date" id="selDesde">
+    <span style="color:var(--text-dim);font-size:12px">a</span>
+    <input type="date" id="selHasta">
+    <button onclick="cargarTodo()">Actualizar</button>
+  </div>
+</header>
+
+<main>
+  <div class="kpis" id="kpis"></div>
+
+  <div class="grid2">
+    <div class="card">
+      <div class="card-title">OTs cerradas por día</div>
+      <canvas id="chartOts"></canvas>
+    </div>
+    <div class="card">
+      <div class="card-title">Km aproximados por día (línea recta entre paradas)</div>
+      <canvas id="chartKm"></canvas>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <div class="card-title">Minutos promedio entre paradas — solo visitas reales (excluye cierres en bloque)</div>
+      <canvas id="chartMin"></canvas>
+    </div>
+    <div class="card">
+      <div class="card-title">Cierres en bloque detectados por día</div>
+      <canvas id="chartBloques"></canvas>
+    </div>
+  </div>
+
+  <div class="mapa-card">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+      <div class="card-title" style="margin:0">🗺️ Ruta de un día puntual</div>
+      <div class="controles">
+        <select id="selChoferMapa"></select>
+        <input type="date" id="selFechaMapa">
+        <button onclick="cargarMapa()">Ver</button>
+      </div>
+    </div>
+    <div id="mapa"></div>
+    <div class="leyenda-mapa">
+      <span><span class="leyenda-punto" style="background:#10b981"></span>Primera parada</span>
+      <span><span class="leyenda-punto" style="background:#1a9fd4"></span>Visita real</span>
+      <span><span class="leyenda-punto" style="background:#f59e0b"></span>Cierre en bloque (no fue una visita real)</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Detalle completo</div>
+    <div class="tabla-wrap">
+      <table id="tablaDetalle"><tbody><tr><td class="empty">Cargando...</td></tr></tbody></table>
+    </div>
+    <div class="footnote">
+      "Cierre en bloque" = OTs cerradas con ≤3 minutos de diferencia entre sí — no representan visitas reales, sino que el chofer resolvió varias de una sin haber ido al lugar en ese momento (reprogramaciones, ajustes administrativos). Km y minutos son aproximados: línea recta entre direcciones geocodificadas, en el orden real de cierre — no la ruta real por calle.
+    </div>
+  </div>
+</main>
+
+<script>
+const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
+const SUPABASE_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+const UMBRAL_BLOQUE_MIN = 3; // ≤ esto entre dos cierres = "no fue una visita real"
+
+let chartOts, chartKm, chartMin, chartBloques, mapa, capaRuta, capaMarcadores;
+
+// Marca como "enBloque" cualquier parada que esté a ≤UMBRAL_BLOQUE_MIN min
+// de la anterior, Y la anterior también (un bloque necesita al menos 2
+// paradas juntas) — se propaga en cadena para bloques de 3+.
+//
+// OJO: usa la diferencia de "hora" (el reloj real, sf_last_modified) en
+// vez del campo minutos_desde_anterior que ya viene calculado en la
+// tabla — ese campo depende de que las DOS direcciones se hayan
+// geocodificado bien, así que en una cadena que cruza una OT sin geo
+// (muy común, ~17% de los casos) el tiempo se perdía aunque el reloj
+// siempre esté disponible. Comparando "hora" directo, la detección no
+// depende para nada de si la geocodificación funcionó.
+function marcarBloques(filas){
+  for(let i=1;i<filas.length;i++){
+    if(!filas[i].hora || !filas[i-1].hora) continue;
+    const minReal = Math.round((new Date(filas[i].hora) - new Date(filas[i-1].hora)) / 60000);
+    filas[i].minReloj = minReal; // minutos reales desde la anterior, siempre disponible (no depende de geo)
+    if(minReal<=UMBRAL_BLOQUE_MIN){
+      filas[i].enBloque = true;
+      filas[i-1].enBloque = true;
+    }
+  }
+  return filas;
+}
+
+async function cargarChoferes(){
+  const { data } = await sb.from('analisis_ruta_septiembre').select('chofer');
+  const choferes = [...new Set((data||[]).map(r=>r.chofer))].sort();
+  const opciones = choferes.map(c=>`<option value="${c}">${c}</option>`).join('');
+  document.getElementById('selChofer').innerHTML = '<option value="todos">Todos los choferes</option>' + opciones;
+  document.getElementById('selChoferMapa').innerHTML = opciones;
+}
+
+async function cargarTodo(){
+  const chofer = document.getElementById('selChofer').value;
+  const desde = document.getElementById('selDesde').value || '2026-09-01';
+  const hasta = document.getElementById('selHasta').value || '2026-12-31';
+
+  let q = sb.from('analisis_ruta_septiembre').select('*').gte('fecha', desde).lte('fecha', hasta).order('chofer').order('fecha').order('orden');
+  if(chofer!=='todos') q = q.eq('chofer', chofer);
+  const { data, error } = await q;
+  if(error){ document.getElementById('kpis').innerHTML = `<div class="kpi"><div class="kpi-num" style="color:var(--red)">Error</div><div class="kpi-lbl">${error.message}</div></div>`; return; }
+
+  // Marcar bloques por chofer+día por separado (no cruzar entre choferes o días distintos)
+  const porChoferDia = {};
+  (data||[]).forEach(r=>{
+    const k = r.chofer+'|||'+r.fecha;
+    (porChoferDia[k]=porChoferDia[k]||[]).push(r);
+  });
+  Object.values(porChoferDia).forEach(marcarBloques);
+
+  renderKpis(data||[]);
+  renderCharts(data||[]);
+  renderTabla(data||[]);
+}
+
+function renderKpis(filas){
+  const total = filas.length;
+  const conGeo = filas.filter(f=>f.geocodificada).length;
+  const enBloque = filas.filter(f=>f.enBloque).length;
+  const kmTotal = filas.reduce((s,f)=>s+(f.km_desde_anterior||0),0);
+  const minsReales = filas.filter(f=>f.minReloj!==undefined && !f.enBloque).map(f=>f.minReloj);
+  const minProm = minsReales.length ? Math.round(minsReales.reduce((a,b)=>a+b,0)/minsReales.length) : 0;
+
+  document.getElementById('kpis').innerHTML = `
+    <div class="kpi"><div class="kpi-num">${total}</div><div class="kpi-lbl">Paradas totales</div></div>
+    <div class="kpi"><div class="kpi-num" style="color:var(--teal)">${kmTotal.toFixed(0)}</div><div class="kpi-lbl">Km aproximados (línea recta)</div></div>
+    <div class="kpi"><div class="kpi-num" style="color:var(--blue)">${minProm}</div><div class="kpi-lbl">Min. promedio entre visitas reales</div></div>
+    <div class="kpi"><div class="kpi-num" style="color:var(--amber)">${enBloque}</div><div class="kpi-lbl">Paradas en cierres de bloque</div></div>
+    <div class="kpi"><div class="kpi-num" style="color:${total?(conGeo/total>0.7?'var(--teal)':'var(--amber)'):'var(--text-dim)'}">${total?Math.round(conGeo/total*100):0}%</div><div class="kpi-lbl">Direcciones geocodificadas</div></div>
+  `;
+}
+
+function agruparPorDiaYChofer(filas, valorFn){
+  // Devuelve { fechas:[...], series: { chofer: [valores por fecha] } }
+  const fechas = [...new Set(filas.map(f=>f.fecha))].sort();
+  const choferes = [...new Set(filas.map(f=>f.chofer))].sort();
+  const series = {};
+  choferes.forEach(ch=>{
+    series[ch] = fechas.map(fecha=>{
+      const deEsteDia = filas.filter(f=>f.chofer===ch && f.fecha===fecha);
+      return valorFn(deEsteDia);
+    });
+  });
+  return { fechas, series };
+}
+
+const COLORES = ['#1dbf8e','#1a9fd4','#8b5cf6','#f59e0b'];
+
+function renderCharts(filas){
+  const { fechas, series: otsPorDia } = agruparPorDiaYChofer(filas, arr=>arr.length);
+  const { series: kmPorDia } = agruparPorDiaYChofer(filas, arr=>Math.round(arr.reduce((s,f)=>s+(f.km_desde_anterior||0),0)));
+  const { series: minPorDia } = agruparPorDiaYChofer(filas, arr=>{
+    const reales = arr.filter(f=>f.minReloj!==undefined && !f.enBloque).map(f=>f.minReloj);
+    return reales.length ? Math.round(reales.reduce((a,b)=>a+b,0)/reales.length) : null;
+  });
+  const { series: bloquesPorDia } = agruparPorDiaYChofer(filas, arr=>arr.filter(f=>f.enBloque).length);
+
+  const datasetsDe = (series, extra={}) => Object.entries(series).map(([chofer,valores],i)=>({
+    label: chofer, data: valores, backgroundColor: COLORES[i%COLORES.length], borderColor: COLORES[i%COLORES.length], ...extra
+  }));
+
+  const opcionesBase = { responsive:true, plugins:{legend:{labels:{color:'#9db1cc'}}}, scales:{
+    x:{ticks:{color:'#9db1cc',maxRotation:60,minRotation:60},grid:{color:'#1e3252'}},
+    y:{ticks:{color:'#9db1cc'},grid:{color:'#1e3252'}}
+  }};
+
+  if(chartOts) chartOts.destroy();
+  chartOts = new Chart(document.getElementById('chartOts'), { type:'bar', data:{labels:fechas,datasets:datasetsDe(otsPorDia)}, options:opcionesBase });
+
+  if(chartKm) chartKm.destroy();
+  chartKm = new Chart(document.getElementById('chartKm'), { type:'bar', data:{labels:fechas,datasets:datasetsDe(kmPorDia)}, options:opcionesBase });
+
+  if(chartMin) chartMin.destroy();
+  chartMin = new Chart(document.getElementById('chartMin'), { type:'line', data:{labels:fechas,datasets:datasetsDe(minPorDia,{tension:.3,fill:false})}, options:opcionesBase });
+
+  if(chartBloques) chartBloques.destroy();
+  chartBloques = new Chart(document.getElementById('chartBloques'), { type:'bar', data:{labels:fechas,datasets:datasetsDe(bloquesPorDia)}, options:opcionesBase });
+}
+
+function renderTabla(filas){
+  const tbody = document.querySelector('#tablaDetalle tbody');
+  if(!filas.length){ tbody.innerHTML = '<tr><td class="empty">Sin datos para este filtro.</td></tr>'; return; }
+  tbody.innerHTML = `<tr>
+      <th>Chofer</th><th>Fecha</th><th>#</th><th>OT</th><th>Hora</th><th>Km</th><th>Min</th>
+    </tr>` + filas.map(f=>{
+    const hora = f.hora ? new Date(f.hora).toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit',timeZone:'America/Argentina/Buenos_Aires'}) : '—';
+    return `<tr class="${f.enBloque?'en-bloque':''}">
+      <td>${f.chofer}</td><td>${f.fecha}</td><td>${f.orden}</td>
+      <td>${f.workorder_number}${f.enBloque?'<span class="badge-bloque">BLOQUE</span>':''}</td>
+      <td>${hora}</td>
+      <td>${f.km_desde_anterior!==null?Number(f.km_desde_anterior).toFixed(1):'—'}</td>
+      <td>${f.minReloj??'—'}</td>
+    </tr>`;
+  }).join('');
+}
+
+function initMapa(){
+  mapa = L.map('mapa').setView([-34.648,-58.377], 10);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution:'© OpenStreetMap contributors', maxZoom:19 }).addTo(mapa);
+  capaRuta = L.layerGroup().addTo(mapa);
+  capaMarcadores = L.layerGroup().addTo(mapa);
+}
+
+async function cargarMapa(){
+  const chofer = document.getElementById('selChoferMapa').value;
+  const fecha = document.getElementById('selFechaMapa').value;
+  if(!chofer || !fecha) return;
+
+  const { data, error } = await sb.from('analisis_ruta_septiembre').select('*').eq('chofer',chofer).eq('fecha',fecha).order('orden');
+  capaRuta.clearLayers(); capaMarcadores.clearLayers();
+  if(error || !data || !data.length) return;
+
+  marcarBloques(data);
+  const conGeo = data.filter(f=>f.lat && f.lng);
+  if(!conGeo.length) return;
+
+  L.polyline(conGeo.map(p=>[p.lat,p.lng]), {color:'#1dbf8e',weight:3,opacity:.7}).addTo(capaRuta);
+  conGeo.forEach((p,i)=>{
+    const color = p.enBloque ? '#f59e0b' : (i===0 ? '#10b981' : '#1a9fd4');
+    const hora = p.hora ? new Date(p.hora).toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit',timeZone:'America/Argentina/Buenos_Aires'}) : '—';
+    const icono = L.divIcon({className:'', html:`<div style="background:${color};color:#fff;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:10px;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.4)">${p.orden}</div>`, iconSize:[24,24], iconAnchor:[12,12]});
+    L.marker([p.lat,p.lng],{icon:icono}).bindPopup(`<b>OT ${p.workorder_number}</b><br>${hora}${p.enBloque?'<br><span style="color:#f59e0b">⚠️ Cierre en bloque</span>':''}`).addTo(capaMarcadores);
+  });
+  mapa.fitBounds(L.latLngBounds(conGeo.map(p=>[p.lat,p.lng])), {padding:[40,40]});
+}
+
+(async function init(){
+  initMapa();
+  document.getElementById('selDesde').value = '2026-09-01';
+  document.getElementById('selFechaMapa').value = new Date().toLocaleDateString('en-CA',{timeZone:'America/Argentina/Buenos_Aires'});
+  await cargarChoferes();
+  await cargarTodo();
+})();
+</script>
+</body>
+</html>
