@@ -309,7 +309,7 @@ function renderTabla(filas, otsInfo){
   tbody.innerHTML = `<tr>
       <th>#</th><th>OT</th><th>Ciudad</th><th>Hora</th><th>Km</th><th>Min</th>
     </tr>` + filas.map(f=>{
-    const hora = f.hora ? new Date(f.hora).toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit',timeZone:'America/Argentina/Buenos_Aires'}) : '—';
+    const hora = f.hora ? new Date(f.hora).toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit',hour12:false,timeZone:'America/Argentina/Buenos_Aires'}) : '—';
     const info = otsInfo[f.workorder_number] || {};
     const otCelda = info.sf_id
       ? `<a href="https://alleata.lightning.force.com/lightning/r/WorkOrder/${info.sf_id}/view" target="_blank" rel="noopener" style="color:var(--blue)">${f.workorder_number}</a>`
@@ -348,7 +348,7 @@ async function cargarMapa(){
   L.polyline(conGeo.map(p=>[p.lat,p.lng]), {color:'#1dbf8e',weight:3,opacity:.7}).addTo(capaRuta);
   conGeo.forEach((p,i)=>{
     const color = p.enBloque ? '#f59e0b' : (i===0 ? '#10b981' : '#1a9fd4');
-    const hora = p.hora ? new Date(p.hora).toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit',timeZone:'America/Argentina/Buenos_Aires'}) : '—';
+    const hora = p.hora ? new Date(p.hora).toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit',hour12:false,timeZone:'America/Argentina/Buenos_Aires'}) : '—';
     const icono = L.divIcon({className:'', html:`<div style="background:${color};color:#fff;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:10px;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.4)">${p.orden}</div>`, iconSize:[24,24], iconAnchor:[12,12]});
     L.marker([p.lat,p.lng],{icon:icono}).bindPopup(`<b>OT ${p.workorder_number}</b><br>${hora}${p.enBloque?'<br><span style="color:#f59e0b">⚠️ Cierre en bloque</span>':''}`).addTo(capaMarcadores);
   });
