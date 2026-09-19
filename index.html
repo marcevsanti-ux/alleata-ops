@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.7.37</title>
+<title>Alleata · Operaciones v4.7.38</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -408,7 +408,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.37 · 18 sep 2026
+      v4.7.38 · 18 sep 2026
     </div>
   </div>
 </div>
@@ -517,7 +517,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.37 · 18 sep 2026
+      v4.7.38 · 18 sep 2026
     </div>
   </div>
 </nav>
@@ -572,7 +572,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.37</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.38</div>
   </div>
   <div class="content">
 
@@ -5200,7 +5200,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.7.37] OK');
+console.log('[Alleata v4.7.38] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -7796,6 +7796,27 @@ async function mostrarModalDiaPorChofer(fecha) {
     (otsData || []).forEach(o => { otsInfo[o.workorder_number] = o; });
   }
 
+  // Pedido 19/09: cards de resumen por chofer. Las reprogramadas NO se pueden
+  // contar por sf_workorders.status: el status es el estado ACTUAL, asi que
+  // una OT reprogramada y entregada al dia siguiente pasa a 'Exitoso' y la
+  // reprogramacion desaparece (es el mismo bug por el que agosto mostraba 0
+  // reprogramadas cuando hubo 16). Se leen de cierres_ruta, que guarda una
+  // fila por evento y no se pisa. Esa tabla empieza a llenarse con el deploy
+  // del 19/09, asi que para dias anteriores no hay registro y se marca como
+  // estimado desde el status en vez de mostrar un cero enganoso.
+  const cierresPorChofer = {};
+  let hayRegistroCierres = false;
+  try {
+    const { data: cierres } = await sb.from('cierres_ruta')
+      .select('chofer,resultado').eq('fecha', fecha);
+    (cierres || []).forEach(c => {
+      const k = _normResponsable(c.chofer);
+      if (!cierresPorChofer[k]) cierresPorChofer[k] = {};
+      cierresPorChofer[k][c.resultado] = (cierresPorChofer[k][c.resultado] || 0) + 1;
+    });
+    hayRegistroCierres = (cierres || []).length > 0;
+  } catch (e) { /* tabla nueva: si todavia no existe, se cae al estimado */ }
+
   // Misma lógica de detección de bloque validada en analisis-rutas.html
   // (asimétrica: solo marca la parada ACTUAL, nunca retroactivamente la
   // anterior — ver ese archivo para el porqué).
@@ -7852,12 +7873,33 @@ async function mostrarModalDiaPorChofer(fecha) {
     const planillaHtml = planilla
       ? `<span style="font-size:10.5px;font-weight:700;color:#f59e0b;background:rgba(245,166,35,.12);border:1px solid rgba(245,166,35,.3);border-radius:10px;padding:1px 9px">📋 Planilla: entrada ${planilla.entrada}${planilla.salida ? ' · salida '+planilla.salida : ' · salida sin cargar'}</span>`
       : '';
+    // Exitosas por status (para un dia pasado ya sincronizado es confiable);
+    // reprogramadas por evento registrado, con fallback marcado con ~.
+    const exitosas = filas.filter(f => {
+      const st = (otsInfo[f.workorder_number] || {}).status;
+      return st === 'Exitoso' || st === 'Exitosa';
+    }).length;
+    const reg = cierresPorChofer[_normResponsable(chofer)] || {};
+    const reprogRegistradas = reg['Reprogramar'];
+    const reprogEstimadas = filas.filter(f => (otsInfo[f.workorder_number] || {}).status === 'Reprogramar').length;
+    const usaRegistro = hayRegistroCierres && reprogRegistradas !== undefined;
+    const reprogValor = usaRegistro ? reprogRegistradas : reprogEstimadas;
+    const card = (valor, label, color, titulo) => `<div title="${titulo}" style="background:var(--navy-900);border:1px solid var(--border);border-radius:9px;padding:5px 12px;text-align:center;min-width:64px">
+      <div style="font-size:17px;font-weight:800;color:${color};line-height:1.1">${valor}</div>
+      <div style="font-size:8.5px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em">${label}</div>
+    </div>`;
+    const cardsHtml = `<div style="display:flex;gap:6px;margin:6px 0 10px">
+      ${card(filas.length, 'En ruta', 'var(--text)', 'Paradas registradas ese dia (incluye las marcadas BLOQUE)')}
+      ${card(exitosas, 'Exitosas', 'var(--teal)', 'OTs de la ruta que hoy figuran en estado Exitoso')}
+      ${card(usaRegistro ? reprogValor : '~' + reprogValor, 'Reprogr.', '#f59e0b', usaRegistro ? 'Reprogramaciones registradas ese dia en cierres_ruta' : 'Estimado: no hay registro de eventos para este dia, se cuenta por estado actual y queda corto si despues se entregaron')}
+    </div>`;
     return `<div style="margin-bottom:18px">
-      <div style="font-size:13px;font-weight:700;margin-bottom:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <div style="font-size:13px;font-weight:700;margin-bottom:2px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
         👷 ${chofer}
         <span style="font-size:10.5px;font-weight:700;color:var(--text-muted);background:var(--navy-900);border:1px solid var(--border);border-radius:10px;padding:1px 9px">${filas.length} OT(s) · ${reales} reales</span>
         ${planillaHtml}
       </div>
+      ${cardsHtml}
       ${filas.length ? encabezadoFilas + filas.map(filaOt).join('') : '<div style="color:var(--text-muted);font-size:12px">Sin OTs registradas.</div>'}
     </div>`;
   };
