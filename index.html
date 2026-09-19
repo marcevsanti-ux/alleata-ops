@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.7.35</title>
+<title>Alleata · Operaciones v4.7.36</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -408,7 +408,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.35 · 18 sep 2026
+      v4.7.36 · 18 sep 2026
     </div>
   </div>
 </div>
@@ -517,7 +517,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.35 · 18 sep 2026
+      v4.7.36 · 18 sep 2026
     </div>
   </div>
 </nav>
@@ -572,7 +572,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.35</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.36</div>
   </div>
   <div class="content">
 
@@ -5200,7 +5200,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.7.35] OK');
+console.log('[Alleata v4.7.36] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -7792,7 +7792,7 @@ async function mostrarModalDiaPorChofer(fecha) {
   const numeros = [...new Set(limpias.map(r => r.workorder_number))];
   let otsInfo = {};
   if (numeros.length) {
-    const { data: otsData } = await sb.from('sf_workorders').select('workorder_number,ciudad,sf_id,status').in('workorder_number', numeros);
+    const { data: otsData } = await sb.from('sf_workorders').select('workorder_number,ciudad,sf_id,status,horario').in('workorder_number', numeros);
     (otsData || []).forEach(o => { otsInfo[o.workorder_number] = o; });
   }
 
@@ -7814,18 +7814,33 @@ async function mostrarModalDiaPorChofer(fecha) {
     }
   });
 
+  // Pedido 18/09: dos columnas mas — el horario de atencion que declara el
+  // cliente (sf_workorders.horario, el mismo que se imprime en el rotulo) y
+  // los km desde la entrega anterior (ya venian en la query, solo que no se
+  // mostraban). El horario va pegado a la hora de llegada a proposito: asi se
+  // ve de un vistazo si la visita cayo fuera de la ventana del comercio.
+  const GRID_FILA = 'display:grid;grid-template-columns:150px 1fr 100px 52px 62px;gap:8px;align-items:center';
+  const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const filaOt = r => {
     const info = otsInfo[r.workorder_number] || {};
     const hora = new Date(r.hora).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Argentina/Buenos_Aires' });
     const otHtml = info.sf_id
       ? `<a href="https://alleata.lightning.force.com/lightning/r/WorkOrder/${info.sf_id}/view" target="_blank" rel="noopener" style="color:var(--text)">${r.workorder_number}</a>`
       : r.workorder_number;
-    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--navy-900);font-size:12.5px">
-      <span style="font-family:monospace;font-weight:700">${otHtml}${r._enBloque ? ' <span style="font-size:9.5px;font-weight:700;color:#f59e0b;background:rgba(245,166,35,.15);border:1px solid rgba(245,166,35,.35);border-radius:10px;padding:1px 7px;margin-left:6px">BLOQUE</span>' : ''}</span>
-      <span style="color:var(--text-muted)">${info.ciudad || '—'}</span>
-      <span style="font-family:monospace">${hora}</span>
+    const horarioTxt = (info.horario || '').trim();
+    // La primera parada del dia no tiene anterior contra la cual medir.
+    const km = r.km_desde_anterior != null ? `${r.km_desde_anterior.toFixed(1)} km` : '—';
+    return `<div style="${GRID_FILA};padding:6px 0;border-bottom:1px solid var(--navy-900);font-size:12.5px">
+      <span style="font-family:monospace;font-weight:700;white-space:nowrap">${otHtml}${r._enBloque ? ' <span style="font-size:9.5px;font-weight:700;color:#f59e0b;background:rgba(245,166,35,.15);border:1px solid rgba(245,166,35,.35);border-radius:10px;padding:1px 7px;margin-left:6px">BLOQUE</span>' : ''}</span>
+      <span style="color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(info.ciudad || '—')}</span>
+      <span style="color:var(--text-muted);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(horarioTxt)}">${horarioTxt ? esc(horarioTxt) : '—'}</span>
+      <span style="font-family:monospace;text-align:right">${hora}</span>
+      <span style="font-family:monospace;text-align:right;color:var(--text-muted);font-size:11px">${km}</span>
     </div>`;
   };
+  const encabezadoFilas = `<div style="${GRID_FILA};padding:0 0 4px;border-bottom:1px solid var(--border);font-size:9.5px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em">
+    <span>OT</span><span>Localidad</span><span>Horario cliente</span><span style="text-align:right">Llegada</span><span style="text-align:right">Km ant.</span>
+  </div>`;
 
   const seccionChofer = chofer => {
     const filas = porChofer[chofer] || [];
@@ -7843,7 +7858,7 @@ async function mostrarModalDiaPorChofer(fecha) {
         <span style="font-size:10.5px;font-weight:700;color:var(--text-muted);background:var(--navy-900);border:1px solid var(--border);border-radius:10px;padding:1px 9px">${filas.length} OT(s) · ${reales} reales</span>
         ${planillaHtml}
       </div>
-      ${filas.map(filaOt).join('') || '<div style="color:var(--text-muted);font-size:12px">Sin OTs registradas.</div>'}
+      ${filas.length ? encabezadoFilas + filas.map(filaOt).join('') : '<div style="color:var(--text-muted);font-size:12px">Sin OTs registradas.</div>'}
     </div>`;
   };
 
