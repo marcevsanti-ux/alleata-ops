@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.7.32</title>
+<title>Alleata · Operaciones v4.7.34</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -408,7 +408,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.32 · 16 sep 2026
+      v4.7.34 · 18 sep 2026
     </div>
   </div>
 </div>
@@ -517,7 +517,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.32 · 16 sep 2026
+      v4.7.34 · 18 sep 2026
     </div>
   </div>
 </nav>
@@ -572,7 +572,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.32</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.34</div>
   </div>
   <div class="content">
 
@@ -5200,7 +5200,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.7.32] OK');
+console.log('[Alleata v4.7.34] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -8302,7 +8302,7 @@ async function cargarPendienteRetiroExitosa() {
   const fmtCorto = d => new Date(d).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' });
 
   const { data, error } = await sb.from('sf_workorders')
-    .select('status,rollout,fecha_exitoso,sf_last_modified')
+    .select('status,rollout,fecha_exitoso,sf_last_modified,logistica,entregado_por')
     .eq('record_type', 'Cambio de Terminal')
     .in('status', ['Retirar Terminal', 'Exitoso'])
     .or(`fecha_exitoso.gte.${primerLunesMesStr},sf_last_modified.gte.${primerLunesMesStr}`);
@@ -8354,8 +8354,21 @@ async function cargarPendienteRetiroExitosa() {
     (data || []).forEach(r => {
       if (r.status !== status || !r[campoFecha]) return;
       const key = claveDiaAR(r[campoFecha]);
-      if (!porDia[key]) porDia[key] = { cambio: 0, rollout: 0 };
+      if (!porDia[key]) porDia[key] = { cambio: 0, rollout: 0, porLog: {} };
       if (r.rollout === true) porDia[key].rollout++; else porDia[key].cambio++;
+      // Pedido 18/09: el split Cambio/Rollout NO separa logísticas — se
+      // confirmó con datos del 14 al 18/09 que hay días con cambios
+      // rollout=false hechos por Alleata (17/09: los 3) y otros donde esos
+      // mismos 3 son de EPSA (18/09). Leer la columna "Cambio" como si
+      // fuera EPSA da un número equivocado. Por eso se acumula acá el corte
+      // real por logística, y dentro de ALLEATA por chofer.
+      const log = (r.logistica || 'Sin logística').toUpperCase().trim();
+      if (!porDia[key].porLog[log]) porDia[key].porLog[log] = { total: 0, marce: 0, nacho: 0, sinChofer: 0 };
+      const cel = porDia[key].porLog[log];
+      cel.total++;
+      if (_mrEsMarce(r.entregado_por)) cel.marce++;
+      else if (_mrEsNacho(r.entregado_por)) cel.nacho++;
+      else cel.sinChofer++;
     });
     return porDia;
   };
@@ -8380,7 +8393,38 @@ async function cargarPendienteRetiroExitosa() {
   // Retiro abajo en ámbar) — en vez de 2 tiras de calendario separadas.
   // 26/08: números más grandes y colores más marcados, pedido de
   // legibilidad — se veía muy chico para leer de un vistazo.
-  const lineaEvento = (label, color, v) => {
+  // Nombre corto de cada logística para que entre en el ancho de la celda.
+  // Cualquier logística nueva que aparezca se muestra tal cual viene de SF.
+  const LOG_LABEL = { 'ALLEATA': 'Alleata', 'EPSA': 'EPSA', 'CORREO ARGENTINO': 'Correo Arg.', 'CABIFY': 'Cabify', 'EXPRESS METROPOLITANA': 'Express Metro.', 'SIN LOGÍSTICA': 's/ logística' };
+  // Un punto de color por logística para distinguirlas de un vistazo.
+  // NINGUNO puede ser naranja/ámbar: ese color ya significa "Pend. Retiro"
+  // en la misma celda y tener dos naranjas con sentidos distintos es peor
+  // que no tener color. Logística desconocida → gris.
+  const LOG_COLOR = { 'ALLEATA': '#1dbf8e', 'EPSA': '#0EA5E9', 'CORREO ARGENTINO': '#E30613', 'CABIFY': '#7C3AED', 'EXPRESS METROPOLITANA': '#22d3ee' };
+  const punto = log => `<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${LOG_COLOR[log] || '#94a3b8'};margin-right:3px;vertical-align:middle"></span>`;
+  // Dos líneas extra debajo del split Cambio/Rollout: primero el corte por
+  // logística (quién se llevó la OT), después quién la entregó dentro de
+  // Alleata. Así el 25 del calendario se lee junto con el 10+13 de la card
+  // "Ruta — Marce / Nacho" sin tener que reconciliarlo a mano.
+  const desgloseHtml = v => {
+    const entradas = Object.entries(v.porLog || {}).sort((a, b) => b[1].total - a[1].total);
+    if (!entradas.length) return '';
+    const porLogTxt = entradas.map(([log, c]) => `${punto(log)}${LOG_LABEL[log] || log} ${c.total}`).join(' <span style="opacity:.5">·</span> ');
+    // Los choferes solo se listan si alguno entregó algo ese día. "s/ch" son
+    // OTs de ALLEATA cerradas sin pasar por la app (marcadas Exitoso directo
+    // en SF), que por eso no figuran en la card de ruta de ningún chofer —
+    // se cuenta solo dentro de Alleata, porque las de EPSA/Correo nunca
+    // tienen chofer propio y ya están contadas en la línea de logística.
+    const tot = entradas.reduce((a, [, c]) => ({ marce: a.marce + c.marce, nacho: a.nacho + c.nacho }), { marce: 0, nacho: 0 });
+    const sinChoferAlleata = (v.porLog['ALLEATA'] || {}).sinChofer || 0;
+    const choferes = [];
+    if (tot.marce) choferes.push(`Marce ${tot.marce}`);
+    if (tot.nacho) choferes.push(`Nacho ${tot.nacho}`);
+    if ((tot.marce || tot.nacho) && sinChoferAlleata) choferes.push(`s/ch ${sinChoferAlleata}`);
+    const linea = txt => `<div style="font-size:8.5px;color:var(--text-muted);opacity:.85;margin-top:1px;line-height:1.3">${txt}</div>`;
+    return linea(porLogTxt) + (choferes.length ? linea(choferes.join(' · ')) : '');
+  };
+  const lineaEvento = (label, color, v, conDesglose) => {
     const total = v.cambio + v.rollout;
     if (!total) return `<div style="font-size:10px;color:var(--border2);padding:6px 6px;text-align:center">—</div>`;
     return `<div style="background:${color}26;border-left:3px solid ${color};border-radius:5px;padding:5px 8px;text-align:left">
@@ -8389,6 +8433,7 @@ async function cargarPendienteRetiroExitosa() {
         <span style="font-size:9px;font-weight:700;color:${color};opacity:.9;text-transform:uppercase;letter-spacing:.02em">${label}</span>
       </div>
       <div style="font-size:9px;color:var(--text-muted);margin-top:1px">Cambio ${v.cambio} · Rollout ${v.rollout}</div>
+      ${conDesglose ? desgloseHtml(v) : ''}
     </div>`;
   };
 
@@ -8408,8 +8453,8 @@ async function cargarPendienteRetiroExitosa() {
         <div style="font-size:${chico ? 16 : 19}px;font-weight:800;color:${esHoy ? 'var(--teal)' : 'var(--text)'}">${d.getDate()}</div>
       </div>
       ${esFuturo ? '<div style="font-size:10px;color:var(--border2);text-align:center;padding:8px 0">—</div>' : `
-        ${lineaEvento('Exitosa', 'var(--teal)', ve)}
-        ${lineaEvento('Pend. Retiro', '#f59e0b', vp)}
+        ${lineaEvento('Exitosa', 'var(--teal)', ve, true)}
+        ${lineaEvento('Pend. Retiro', '#f59e0b', vp, false)}
       `}
     </div>`;
   }).join('');
@@ -8441,7 +8486,7 @@ async function cargarPendienteRetiroExitosa() {
       <div style="display:flex;gap:8px;flex-wrap:wrap">${htmlMiniCards}</div>
     </div>
     ${filasSemanasHtml}
-    <div style="font-size:10px;color:var(--text-muted);margin-top:12px">⚠️ "Pend. Retiro" usa la última modificación en SF como fecha aproximada — no hay campo exacto de "entrada a Retirar Terminal". Click en cualquier día para ver el detalle separado por chofer.</div>
+    <div style="font-size:10px;color:var(--text-muted);margin-top:12px">⚠️ "Pend. Retiro" usa la última modificación en SF como fecha aproximada — no hay campo exacto de "entrada a Retirar Terminal". El desglose de Exitosa muestra logística y, dentro de Alleata, quién entregó ("s/ch" = cerrada directo en SF, sin pasar por la app — por eso no figura en la card de ruta). Ojo: "Cambio / Rollout" es el flag de la OT, NO la logística. Esta card cuenta SOLO record_type "Cambio de Terminal", así que Marce/Nacho acá puede dar menos que en "Ruta — Marce / Nacho", que incluye instalaciones y retiros. Click en cualquier día para ver el detalle separado por chofer.</div>
   </div>`;
 }
 
