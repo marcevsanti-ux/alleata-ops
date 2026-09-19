@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.7.34</title>
+<title>Alleata · Operaciones v4.7.35</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -408,7 +408,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.34 · 18 sep 2026
+      v4.7.35 · 18 sep 2026
     </div>
   </div>
 </div>
@@ -517,7 +517,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.34 · 18 sep 2026
+      v4.7.35 · 18 sep 2026
     </div>
   </div>
 </nav>
@@ -572,7 +572,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.34</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.35</div>
   </div>
   <div class="content">
 
@@ -5200,7 +5200,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.7.34] OK');
+console.log('[Alleata v4.7.35] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -8349,10 +8349,17 @@ async function cargarPendienteRetiroExitosa() {
   // y lo mostraba con "—" — la OT quedaba invisible, no solo mal contada.
   // Fix: convertir a fecha Argentina antes de sacar la clave del día.
   const claveDiaAR = isoUTC => new Date(isoUTC).toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' });
-  const armarPorDia = (status, campoFecha) => {
+  // Pedido 18/09 (Marce): las OT de EPSA en Exitoso no son entregas de
+  // logística — son terminales Prisma que llegan del cliente y que Angel
+  // transiciona en SF. Sumarlas junto a las entregas de Marce y Nacho mezcla
+  // dos cosas distintas, así que la línea verde cuenta SOLO ALLEATA. Del
+  // lado inverso, lo que interesa seguir de EPSA es lo que está pendiente de
+  // retiro, así que la línea naranja cuenta SOLO EPSA.
+  const armarPorDia = (status, campoFecha, logisticaOk) => {
     const porDia = {};
     (data || []).forEach(r => {
       if (r.status !== status || !r[campoFecha]) return;
+      if ((r.logistica || '').toUpperCase().trim() !== logisticaOk) return;
       const key = claveDiaAR(r[campoFecha]);
       if (!porDia[key]) porDia[key] = { cambio: 0, rollout: 0, porLog: {} };
       if (r.rollout === true) porDia[key].rollout++; else porDia[key].cambio++;
@@ -8372,8 +8379,8 @@ async function cargarPendienteRetiroExitosa() {
     });
     return porDia;
   };
-  const exitosaPorDia = armarPorDia('Exitoso', 'fecha_exitoso');
-  const pendRetiroPorDia = armarPorDia('Retirar Terminal', 'sf_last_modified');
+  const exitosaPorDia = armarPorDia('Exitoso', 'fecha_exitoso', 'ALLEATA');
+  const pendRetiroPorDia = armarPorDia('Retirar Terminal', 'sf_last_modified', 'EPSA');
   // Total acotado a los 7 días de UNA semana puntual (no todo lo traído por
   // la query, que puede abarcar más rango) — pedido 26/08: agregar el
   // mismo totalizador también para "semana anterior".
@@ -8409,7 +8416,12 @@ async function cargarPendienteRetiroExitosa() {
   const desgloseHtml = v => {
     const entradas = Object.entries(v.porLog || {}).sort((a, b) => b[1].total - a[1].total);
     if (!entradas.length) return '';
-    const porLogTxt = entradas.map(([log, c]) => `${punto(log)}${LOG_LABEL[log] || log} ${c.total}`).join(' <span style="opacity:.5">·</span> ');
+    // Con el filtro por logística cada línea tiene una sola, así que este
+    // renglón sería siempre "Alleata N" y no aporta nada. Se muestra solo si
+    // aparece más de una, que a esta altura significa que algo se filtró mal.
+    const porLogTxt = entradas.length > 1
+      ? entradas.map(([log, c]) => `${punto(log)}${LOG_LABEL[log] || log} ${c.total}`).join(' <span style="opacity:.5">·</span> ')
+      : '';
     // Los choferes solo se listan si alguno entregó algo ese día. "s/ch" son
     // OTs de ALLEATA cerradas sin pasar por la app (marcadas Exitoso directo
     // en SF), que por eso no figuran en la card de ruta de ningún chofer —
@@ -8422,7 +8434,7 @@ async function cargarPendienteRetiroExitosa() {
     if (tot.nacho) choferes.push(`Nacho ${tot.nacho}`);
     if ((tot.marce || tot.nacho) && sinChoferAlleata) choferes.push(`s/ch ${sinChoferAlleata}`);
     const linea = txt => `<div style="font-size:8.5px;color:var(--text-muted);opacity:.85;margin-top:1px;line-height:1.3">${txt}</div>`;
-    return linea(porLogTxt) + (choferes.length ? linea(choferes.join(' · ')) : '');
+    return (porLogTxt ? linea(porLogTxt) : '') + (choferes.length ? linea(choferes.join(' · ')) : '');
   };
   const lineaEvento = (label, color, v, conDesglose) => {
     const total = v.cambio + v.rollout;
@@ -8453,8 +8465,8 @@ async function cargarPendienteRetiroExitosa() {
         <div style="font-size:${chico ? 16 : 19}px;font-weight:800;color:${esHoy ? 'var(--teal)' : 'var(--text)'}">${d.getDate()}</div>
       </div>
       ${esFuturo ? '<div style="font-size:10px;color:var(--border2);text-align:center;padding:8px 0">—</div>' : `
-        ${lineaEvento('Exitosa', 'var(--teal)', ve, true)}
-        ${lineaEvento('Pend. Retiro', '#f59e0b', vp, false)}
+        ${lineaEvento('Exitosa Alleata', 'var(--teal)', ve, true)}
+        ${lineaEvento('Pend. Retiro EPSA', '#f59e0b', vp, false)}
       `}
     </div>`;
   }).join('');
@@ -8486,7 +8498,7 @@ async function cargarPendienteRetiroExitosa() {
       <div style="display:flex;gap:8px;flex-wrap:wrap">${htmlMiniCards}</div>
     </div>
     ${filasSemanasHtml}
-    <div style="font-size:10px;color:var(--text-muted);margin-top:12px">⚠️ "Pend. Retiro" usa la última modificación en SF como fecha aproximada — no hay campo exacto de "entrada a Retirar Terminal". El desglose de Exitosa muestra logística y, dentro de Alleata, quién entregó ("s/ch" = cerrada directo en SF, sin pasar por la app — por eso no figura en la card de ruta). Ojo: "Cambio / Rollout" es el flag de la OT, NO la logística. Esta card cuenta SOLO record_type "Cambio de Terminal", así que Marce/Nacho acá puede dar menos que en "Ruta — Marce / Nacho", que incluye instalaciones y retiros. Click en cualquier día para ver el detalle separado por chofer.</div>
+    <div style="font-size:10px;color:var(--text-muted);margin-top:12px">⚠️ Verde = Exitosas de logística ALLEATA (las de EPSA en Exitoso son terminales Prisma que transiciona Angel, no entregas — no se cuentan). Naranja = OTs de EPSA en Retirar Terminal, y usa la última modificación en SF como fecha aproximada — no hay campo exacto de "entrada a Retirar Terminal". El desglose de Exitosa muestra quién entregó ("s/ch" = cerrada directo en SF o por script, sin pasar por la app — por eso no figura en la card de ruta). Ojo: "Cambio / Rollout" es el flag de la OT, NO la logística. Esta card cuenta SOLO record_type "Cambio de Terminal", así que Marce/Nacho acá puede dar menos que en "Ruta — Marce / Nacho", que incluye instalaciones y retiros. Click en cualquier día para ver el detalle separado por chofer.</div>
   </div>`;
 }
 
