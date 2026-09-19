@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.7.36</title>
+<title>Alleata · Operaciones v4.7.37</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -408,7 +408,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.36 · 18 sep 2026
+      v4.7.37 · 18 sep 2026
     </div>
   </div>
 </div>
@@ -517,7 +517,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.36 · 18 sep 2026
+      v4.7.37 · 18 sep 2026
     </div>
   </div>
 </nav>
@@ -572,7 +572,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.36</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.37</div>
   </div>
   <div class="content">
 
@@ -5200,7 +5200,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.7.36] OK');
+console.log('[Alleata v4.7.37] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -7086,7 +7086,7 @@ function mrMesLabelDe(key){ const [y,mo]=key.split('-'); return MR_MESES_NOMBRE[
 function mrZonaBucketDe(r){
   const z=detectarZona(r.ciudad,r.provincia,r.codigo_postal);
   if(z.zona==='CABA')return 'CABA';
-  if(['Zona Norte','Zona Sur','Zona Oeste'].includes(z.zona))return 'AMBA';
+  if(['Zona Norte','Zona Sur','Zona Oeste','GBA'].includes(z.zona))return 'AMBA';
   if(z.zona==='—')return 'SIN_DATO';
   return 'RESTO';
 }
@@ -15341,13 +15341,44 @@ const CENTRAL_LAT = -34.5881;
 const CENTRAL_LNG = -58.4265;
 
 // ── DETECTAR ZONA ─────────────────────────────────────────────────────────────
+// FIX 19/09: antes esto clasificaba SOLO por nombre de ciudad, y todo lo que
+// no estuviera en las listas caia en "Fuera AMBA"/"Interior". Con datos
+// reales eso mandaba al bucket equivocado a Wilde, Loma Hermosa, Martinez,
+// Bella Vista, Caseros, Longchamps, City Bell, Bernal Oeste, Ciudadela,
+// Glew, Grand Bourg, Virreyes y varias mas — 82 OTs solo en el top 40, todas
+// GBA contadas como interior. Y al reves: 'san martín' matchea por includes,
+// asi que "San Martín de los Andes" (Neuquén) se clasificaba Zona Norte.
+//
+// El CPA es mucho mas confiable que el nombre: la letra codifica la
+// provincia (C=CABA, B=Buenos Aires, R=Rio Negro, X=Cordoba, Q=Neuquen,
+// S=Santa Fe, M=Mendoza, U=Chubut, V=Tierra del Fuego, Z=Santa Cruz,
+// A=Salta...) y dentro de Buenos Aires el rango 1600-1999 es GBA + Gran La
+// Plata. Se usa en este orden: letra de provincia → CABA → listas de nombres
+// (intactas, para no mover nada de lo que ya clasificaba bien, incluidos
+// Zarate/Campana/Lujan que estan fuera del rango numerico) → rango de CP.
+function cpaPartes(cp){
+  const m = String(cp||'').trim().toUpperCase().match(/^([A-Z])?\s*(\d{4})/);
+  return m ? { letra: m[1] || '', num: parseInt(m[2], 10) } : null;
+}
+
 function detectarZona(ciudad, provincia, cp) {
   const c = (ciudad||'').toLowerCase().trim();
   const p = (provincia||'').toLowerCase().trim();
   const cpStr = String(cp||'');
+  const cpa = cpaPartes(cpStr);
 
-  // CABA
+  // 1) Letra del CPA de otra provincia: corta antes de las listas de nombres,
+  //    que es lo que evita que "San Martín de los Andes" (Q8370) o "Las
+  //    Heras" (M5539) entren por coincidencia de nombre.
+  if(cpa && cpa.letra && !['B','C'].includes(cpa.letra))
+    return {zona:'Interior',  color:'#6b7280', icon:'📍'};
+
+  // CABA — por provincia declarada o por CPA (letra C, o 1000-1499). El CP
+  // resuelve las OTs cargadas en SF como "Buenos Aires / Buenos Aires" que
+  // en realidad son CABA (ej. C1430, C1406, C1007, C1419).
   if(p.includes('ciudad autónoma')||p.includes('caba')||p==='caba')
+    return {zona:'CABA',   color:'#1a9fd4', icon:'🏙️'};
+  if(cpa && (cpa.letra==='C' || (cpa.num>=1000 && cpa.num<=1499)))
     return {zona:'CABA',   color:'#1a9fd4', icon:'🏙️'};
 
   // Zona Norte GBA
@@ -15372,6 +15403,15 @@ function detectarZona(ciudad, provincia, cp) {
       'villa tesei','william morris','villa sarmiento']
     .some(n=>c.includes(n)))
     return {zona:'Zona Oeste', color:'#8b5cf6', icon:'🟣'};
+
+  // 1600-1999 = GBA + Gran La Plata. Va DESPUES de las listas para no pisar
+  // la zona (Norte/Sur/Oeste) de las localidades ya contempladas; solo
+  // recupera las que no figuran en ninguna lista. Se marca como Zona Sur
+  // solo a los 1800-1999 y Norte/Oeste no se adivinan: sin nombre conocido
+  // no hay forma de saber el cuadrante, asi que se usa "GBA" generico, que
+  // los buckets de Mision Rollout cuentan igual como AMBA.
+  if(cpa && cpa.num>=1600 && cpa.num<=1999)
+    return {zona:'GBA', color:'#10b981', icon:'🔵'};
 
   // Buenos Aires provincia → Fuera AMBA
   if(p.includes('buenos aires'))
