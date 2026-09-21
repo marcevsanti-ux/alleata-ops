@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.7.39</title>
+<title>Alleata · Operaciones v4.7.40</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -408,7 +408,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.39 · 18 sep 2026
+      v4.7.40 · 18 sep 2026
     </div>
   </div>
 </div>
@@ -517,7 +517,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.39 · 18 sep 2026
+      v4.7.40 · 18 sep 2026
     </div>
   </div>
 </nav>
@@ -572,7 +572,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.39</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.40</div>
   </div>
   <div class="content">
 
@@ -5200,7 +5200,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.7.39] OK');
+console.log('[Alleata v4.7.40] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -9994,6 +9994,17 @@ function dsToggleEstadoGenerico(estado, estadoDetalleObj, detalleElId){
 // Clickear un mes filtra la tabla de abajo a solo ese mes (toggle — un
 // segundo click en el mismo mes vuelve a mostrar todos).
 let _dsRecuperadaMesActivo=null;
+// Pedido 20/09: las cards por logistica son botones. Click en la card →
+// solo las OTs de esa logistica. Click en "N sin costo" → solo las de esa
+// logistica que no tienen costo cargado, que es lo que hay que ir a
+// corregir. El filtro se mantiene al cambiar de mes, para poder recorrer
+// los faltantes mes por mes.
+let _dsRecFiltroLog={log:null,sinCosto:false};
+function dsRecuperadaFiltrarLog(log, sinCosto){
+  const mismo=_dsRecFiltroLog.log===log && _dsRecFiltroLog.sinCosto===!!sinCosto;
+  _dsRecFiltroLog = mismo ? {log:null,sinCosto:false} : {log, sinCosto:!!sinCosto};
+  dsRecuperadaFiltrarPorMes(_dsRecuperadaMesActivo, true);
+}
 function dsRecuperadaRenderPorMes(lista, el){
   _dsRecuperadaMesActivo=null;
   const color=ESTADO_COLORS_NAPSE['Recuperada']||'#10b981';
@@ -10051,6 +10062,7 @@ async function dsRecuperadaFiltrarPorMes(mesKey, esInicial){
   // se cambia de mes para no traer de más.
   cont.innerHTML=`<div style="font-size:11px;color:var(--text-muted);margin-bottom:8px">Calculando costo promedio de ${lista.length} OT...</div>`;
   let costoHtml='';
+  const infoOT={};   // workorder_number -> {log, costo}: para filtrar y para las columnas nuevas
   try{
     const numeros=lista.map(o=>o.ot).filter(Boolean);
     if(numeros.length){
@@ -10069,6 +10081,7 @@ async function dsRecuperadaFiltrarPorMes(mesKey, esInicial){
       (data||[]).forEach(r=>{
         encontradas.add(r.workorder_number);
         const log=(r.logistica||'Sin logística').toUpperCase().trim();
+        infoOT[r.workorder_number]={log, costo:Number(r.costo_envio)};
         if(!porLog[log]) porLog[log]={n:0,conCosto:0,total:0};
         porLog[log].n++;
         const c=Number(r.costo_envio);
@@ -10096,12 +10109,19 @@ async function dsRecuperadaFiltrarPorMes(mesKey, esInicial){
       const cardLog=k=>{
         const d=porLog[k];
         const col=LOG_COL[k]||'#94a3b8';
-        // Alleata no muestra promedio: es la convencion de $1, no un costo.
+        const kEsc=k.replace(/'/g,"\\'");
+        const activa=_dsRecFiltroLog.log===k;
+        const faltan=d.n-d.conCosto;
+        // Alleata no muestra promedio ni "sin costo": en logistica propia no
+        // se carga costo de envio (verificado 20/09: las 361 estan en null),
+        // asi que marcarlas como faltantes seria una alarma falsa.
         const sub=k==='ALLEATA'
           ? 'logística propia'
           : (d.conCosto ? `prom $${Math.round(d.total/d.conCosto).toLocaleString('es-AR')}` : 'sin costos')
-            + (d.n-d.conCosto && k!=='SIN DATO' ? ` · <span style="color:#f59e0b">${d.n-d.conCosto} sin costo</span>` : '');
-        return `<div style="background:var(--navy-900);border:1px solid var(--border);border-left:3px solid ${col};border-radius:8px;padding:5px 11px;min-width:92px">
+            + (faltan && k!=='SIN DATO'
+                ? ` · <span onclick="event.stopPropagation();dsRecuperadaFiltrarLog('${kEsc}',true)" title="Ver solo las que no tienen costo" style="color:#f59e0b;text-decoration:underline;cursor:pointer;${activa&&_dsRecFiltroLog.sinCosto?'font-weight:800':''}">${faltan} sin costo</span>`
+                : '');
+        return `<div onclick="dsRecuperadaFiltrarLog('${kEsc}',false)" title="Filtrar la tabla por ${LOG_LBL[k]||k}" style="cursor:pointer;background:var(--navy-900);border:1px solid ${activa?col:'var(--border)'};border-left:3px solid ${col};border-radius:8px;padding:5px 11px;min-width:92px;${activa?`box-shadow:0 0 0 2px ${col}55`:''}">
           <div style="font-size:16px;font-weight:800;color:${col};line-height:1.1">${d.n}</div>
           <div style="font-size:9px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em">${LOG_LBL[k]||k}</div>
           <div style="font-size:9.5px;color:var(--text-muted);margin-top:1px">${sub}</div>
@@ -10111,7 +10131,7 @@ async function dsRecuperadaFiltrarPorMes(mesKey, esInicial){
       costoHtml=`<div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;background:${color}10;border:1px solid ${color}30;border-radius:10px;padding:10px 14px;margin-bottom:12px">
         <div style="min-width:170px">
           <div><span style="font-size:20px;font-weight:800;color:${color}">$${Math.round(promedio).toLocaleString('es-AR')}</span><span style="font-size:11px;color:var(--text-muted);margin-left:6px">costo promedio tercerizado</span></div>
-          <div style="font-size:10.5px;color:var(--text-muted);margin-top:2px">Total: $${Math.round(tercTotal).toLocaleString('es-AR')} · sobre ${tercConCosto} OT con costo${sinCostoTerc?` <span style="color:#f59e0b">(${sinCostoTerc} sin costo)</span>`:''}</div>
+          <div style="font-size:10.5px;color:var(--text-muted);margin-top:2px">Total: $${Math.round(tercTotal).toLocaleString('es-AR')} · sobre ${tercConCosto} OT con costo${sinCostoTerc?` <span onclick="dsRecuperadaFiltrarLog('__TERC__',true)" title="Ver todas las tercerizadas sin costo" style="color:#f59e0b;text-decoration:underline;cursor:pointer">(${sinCostoTerc} sin costo)</span>`:''}</div>
         </div>
         <div style="display:flex;gap:6px;flex-wrap:wrap">${claves.map(cardLog).join('')}</div>
       </div>`;
@@ -10120,12 +10140,38 @@ async function dsRecuperadaFiltrarPorMes(mesKey, esInicial){
     costoHtml=`<div style="font-size:11px;color:var(--red);margin-bottom:10px">⚠️ No se pudo calcular el costo promedio: ${e.message}</div>`;
   }
 
-  cont.innerHTML=`${costoHtml}<div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:10px 12px;overflow-x:auto">
+  const TERC_EXCLUIR=['ALLEATA','SIN DATO','SIN LOGÍSTICA'];
+  const f=_dsRecFiltroLog;
+  const listaTabla = !f.log ? lista : lista.filter(o=>{
+    const inf=infoOT[o.ot];
+    const log=inf ? inf.log : 'SIN DATO';
+    const sinCosto=!inf || !(inf.costo>0);
+    if(f.log==='__TERC__'){ if(TERC_EXCLUIR.includes(log)) return false; }
+    else if(log!==f.log) return false;
+    return f.sinCosto ? sinCosto : true;
+  });
+  const LBL_FILTRO={'__TERC__':'todas las tercerizadas','ALLEATA':'Alleata','EPSA':'EPSA','CORREO ARGENTINO':'Correo Argentino','CABIFY':'Cabify','SIN DATO':'sin dato'};
+  const barraFiltro = !f.log ? '' : `<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;font-size:11.5px">
+    <span style="color:var(--text-muted)">Mostrando <b style="color:var(--text)">${listaTabla.length}</b> OT · ${LBL_FILTRO[f.log]||f.log}${f.sinCosto?' · <b style="color:#f59e0b">sin costo cargado</b>':''}</span>
+    <button class="btn-sm" onclick="dsRecuperadaFiltrarLog(null,false)" style="font-size:10.5px">✕ Quitar filtro</button>
+  </div>`;
+  const fmtCostoCelda=o=>{
+    const inf=infoOT[o.ot];
+    if(!inf) return `<span style="color:var(--text-muted)">—</span>`;
+    if(inf.log==='ALLEATA') return `<span style="color:var(--text-muted)">propia</span>`;
+    return inf.costo>0
+      ? `<span style="font-family:'JetBrains Mono',monospace">$${Math.round(inf.costo).toLocaleString('es-AR')}</span>`
+      : `<span style="color:#f59e0b;font-weight:700">sin costo</span>`;
+  };
+
+  cont.innerHTML=`${costoHtml}${barraFiltro}<div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:10px 12px;overflow-x:auto">
     <table style="width:100%;border-collapse:collapse;font-size:11px;white-space:nowrap">
       <thead><tr style="text-align:left;color:var(--text-muted);text-transform:uppercase;font-size:9px;letter-spacing:.03em">
         <th style="padding:4px 8px 4px 0">OT</th>
         <th style="padding:4px 8px">Fecha creación</th>
         <th style="padding:4px 8px">Fecha recuperación</th>
+        <th style="padding:4px 8px">Logística</th>
+        <th style="padding:4px 8px">Costo</th>
         <th style="padding:4px 8px">Cuenta</th>
         <th style="padding:4px 8px">CUIT</th>
         <th style="padding:4px 8px">Comercio</th>
@@ -10136,12 +10182,14 @@ async function dsRecuperadaFiltrarPorMes(mesKey, esInicial){
         <th style="padding:4px 0">Ciudad</th>
       </tr></thead>
       <tbody>
-        ${lista.map(o=>`<tr style="border-top:1px solid var(--border)">
+        ${listaTabla.map(o=>`<tr style="border-top:1px solid var(--border)">
           <td style="padding:5px 8px 5px 0;font-family:'JetBrains Mono',monospace;font-weight:700">${o.sf_id
             ? `<a href="https://alleata.lightning.force.com/lightning/r/WorkOrder/${o.sf_id}/view" target="_blank" rel="noopener" style="color:var(--teal);text-decoration:none" title="Abrir OT en Salesforce">${o.ot} ↗</a>`
             : (o.ot || '—')}</td>
           <td style="padding:5px 8px;font-size:10px;color:var(--text-muted)">${o.fecha_creacion?new Date(o.fecha_creacion).toLocaleDateString('es-AR'):'—'}</td>
           <td style="padding:5px 8px;font-size:10px;color:var(--text-muted)">${o.fecha_recuperada?new Date(o.fecha_recuperada).toLocaleDateString('es-AR'):'—'}</td>
+          <td style="padding:5px 8px;font-size:10px">${(infoOT[o.ot]||{}).log||'<span style="color:var(--text-muted)">—</span>'}</td>
+          <td style="padding:5px 8px">${fmtCostoCelda(o)}</td>
           <td style="padding:5px 8px">${celda(o.cuenta)}</td>
           <td style="padding:5px 8px;font-family:'JetBrains Mono',monospace">${celda(o.cuit)}</td>
           <td style="padding:5px 8px">${celda(o.comercio)}</td>
