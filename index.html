@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.7.40</title>
+<title>Alleata · Operaciones v4.7.41</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -408,7 +408,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.40 · 18 sep 2026
+      v4.7.41 · 18 sep 2026
     </div>
   </div>
 </div>
@@ -517,7 +517,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.40 · 18 sep 2026
+      v4.7.41 · 18 sep 2026
     </div>
   </div>
 </nav>
@@ -572,7 +572,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.40</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.41</div>
   </div>
   <div class="content">
 
@@ -5200,7 +5200,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.7.40] OK');
+console.log('[Alleata v4.7.41] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -7177,7 +7177,7 @@ function mrRenderExplorador(){
   contMes.style.display='block';
   contMes.innerHTML=`<div class="card" style="padding:14px 18px">
     <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;margin-bottom:10px">
-      <div style="font-size:12px;font-weight:700;color:${cfg.color||'var(--text)'};text-transform:uppercase;letter-spacing:.5px">${cfg.label} — por mes (click para filtrar)</div>
+      <div style="font-size:12px;font-weight:700;color:${cfg.color||'var(--text)'};text-transform:uppercase;letter-spacing:.5px">${cfg.label} — por mes (click para ver las OTs)</div>
       <button class="btn btn-sm" style="padding:4px 10px;font-size:11px" onclick="mrLimpiarFiltros()">✕ Limpiar filtros</button>
     </div>
     <div style="display:flex;gap:10px;flex-wrap:wrap">
@@ -7283,7 +7283,14 @@ function mrRenderGeoDrilldown(dataMes){
   }
 
   if(contOts){
-    if(!_mrFiltro.zona){ contOts.innerHTML=''; return; }
+    // Pedido 21/09: el listado aparece al elegir un MES, no solo al bajar a
+    // una zona. Sin zona se listan todas las OTs del mes elegido. En Total
+    // (sin mes) se sigue esperando a que se elija una zona: listar 860 filas
+    // de entrada tapa la distribucion geografica que esta arriba.
+    if(!_mrFiltro.zona){
+      contOts.innerHTML = _mrFiltro.mes ? mrRenderTablaOts(dataMes) : '';
+      return;
+    }
     let lista=buckets[_mrFiltro.zona]||[];
     if(_mrFiltro.zona==='RESTO' && _mrFiltro.provincia){
       lista=lista.filter(r=>((r.provincia||'').trim()||'(sin provincia)')===_mrFiltro.provincia);
@@ -7301,6 +7308,8 @@ let _mrOtsSortKey='ot';
 let _mrOtsSortDir='asc';
 const MR_OTS_COLS=[
   {key:'ot',        label:'OT'},
+  {key:'tipo',      label:'Tipo'},
+  {key:'perfil',    label:'Perfil'},
   {key:'cuenta',    label:'Cuenta'},
   {key:'ciudad',    label:'Ciudad'},
   {key:'provincia', label:'Provincia'},
@@ -7312,6 +7321,8 @@ const MR_OTS_COLS=[
 function mrOtsValorDe(r,key){
   switch(key){
     case 'ot':        return r.workorder_number||'';
+    case 'tipo':      return mrTipoDe(r);
+    case 'perfil':    return (r.perfil||'').trim();
     case 'cuenta':    return r.cuenta||'';
     case 'ciudad':    return r.ciudad||'';
     case 'provincia': return r.provincia||'';
@@ -7327,6 +7338,25 @@ function mrOrdenarOts(key){
   _mrOtsSortKey = key;
   const cont=document.getElementById('mrGeoOtsList');
   if(cont) cont.innerHTML=mrRenderTablaOts(_mrOtsListaActual);
+}
+
+// Pedido 21/09: marcar si cada OT es realmente un Cambio o un Rollout.
+// Todas las OTs de este modulo tienen record_type = 'Cambio de Terminal'; lo
+// que las separa es el flag rollout. Pero Ally (mobile.html, esRolloutOT) usa
+// un criterio MAS estricto: rollout=true Y perfil='NAPSE'. Una OT con rollout
+// = true y otro perfil cuenta como Rollout aca y como CAMBIO en el reporte de
+// Ally — es la razon por la que los dos numeros no coinciden. Se marca con ⚠
+// para que la diferencia quede a la vista en vez de escondida.
+function mrTipoDe(r){ return r.rollout===true ? 'Rollout' : 'Cambio'; }
+function mrRolloutInconsistente(r){
+  return r.rollout===true && (r.perfil||'').trim().toUpperCase()!=='NAPSE';
+}
+function mrTipoHtml(r){
+  if(r.rollout!==true) return '<span style="color:#1a9fd4;font-weight:700">Cambio</span>';
+  const warn = mrRolloutInconsistente(r)
+    ? ` <span title="rollout=true pero perfil ${r.perfil||'vacío'}: Ally la reporta como CAMBIO (exige perfil NAPSE)" style="color:#f59e0b;cursor:help">⚠</span>`
+    : '';
+  return `<span style="color:#8b5cf6;font-weight:700">Rollout</span>${warn}`;
 }
 
 function mrRenderTablaOts(lista){
@@ -7347,13 +7377,20 @@ function mrRenderTablaOts(lista){
     : (r.cuenta||'—');
 
   return `<div class="card" style="margin-top:14px;padding:0;overflow-x:auto">
-    <div style="padding:12px 16px;font-size:12px;font-weight:700;color:var(--text-muted);border-bottom:1px solid var(--border)">📋 OTs (${lista.length})</div>
+    <div style="padding:12px 16px;font-size:12px;font-weight:700;color:var(--text-muted);border-bottom:1px solid var(--border);display:flex;gap:14px;flex-wrap:wrap;align-items:center">
+      <span>📋 OTs (${lista.length})</span>
+      <span style="font-weight:600"><span style="color:#1a9fd4">${lista.filter(r=>r.rollout!==true).length} Cambio</span> · <span style="color:#8b5cf6">${lista.filter(r=>r.rollout===true).length} Rollout</span></span>
+      ${(()=>{const inc=lista.filter(mrRolloutInconsistente).length;
+        return inc?`<span style="font-weight:600;color:#f59e0b" title="Marcadas rollout en SF pero con perfil distinto de NAPSE: aca cuentan como Rollout, en el reporte de Ally como Cambio">⚠ ${inc} rollout con perfil ≠ NAPSE</span>`:'';})()}
+    </div>
     <table class="table">
       <thead><tr>
         ${MR_OTS_COLS.map(c=>`<th style="cursor:pointer;user-select:none;${c.num?'text-align:right':''}" onclick="mrOrdenarOts('${c.key}')" title="Ordenar">${c.label}${arrow(c.key)}</th>`).join('')}
       </tr></thead>
       <tbody>${ordenadas.map(r=>`<tr>
         <td style="font-family:'JetBrains Mono',monospace;font-weight:700">${linkOT(r)}</td>
+        <td>${mrTipoHtml(r)}</td>
+        <td style="font-size:11px;color:var(--text-muted)">${r.perfil||'—'}</td>
         <td>${linkCuenta(r)}</td>
         <td>${r.ciudad||'—'}</td>
         <td>${r.provincia||'—'}</td>
@@ -7373,7 +7410,7 @@ async function cargarIndicadoresMisionRollout(){
   if(contCostos)contCostos.innerHTML='';
 
   const{data,error}=await sb.from('sf_workorders')
-    .select('sf_id,account_id,workorder_number,status,rollout,logistica,costo_envio,tracking_envio,fecha_configurar_terminal,cuenta,ciudad,provincia,codigo_postal')
+    .select('sf_id,account_id,workorder_number,status,rollout,perfil,logistica,costo_envio,tracking_envio,fecha_configurar_terminal,cuenta,ciudad,provincia,codigo_postal')
     .eq('record_type','Cambio de Terminal')
     .not('fecha_configurar_terminal','is',null)
     .gte('fecha_configurar_terminal',MR_FECHA_CORTE);
