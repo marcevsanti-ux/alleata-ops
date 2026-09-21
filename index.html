@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.7.38</title>
+<title>Alleata · Operaciones v4.7.39</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -408,7 +408,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.38 · 18 sep 2026
+      v4.7.39 · 18 sep 2026
     </div>
   </div>
 </div>
@@ -517,7 +517,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.38 · 18 sep 2026
+      v4.7.39 · 18 sep 2026
     </div>
   </div>
 </nav>
@@ -572,7 +572,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.38</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.39</div>
   </div>
   <div class="content">
 
@@ -5200,7 +5200,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.7.38] OK');
+console.log('[Alleata v4.7.39] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -10054,15 +10054,66 @@ async function dsRecuperadaFiltrarPorMes(mesKey, esInicial){
   try{
     const numeros=lista.map(o=>o.ot).filter(Boolean);
     if(numeros.length){
-      const {data,error}=await sb.from('sf_workorders').select('workorder_number,costo_envio').in('workorder_number',numeros);
+      const {data,error}=await sb.from('sf_workorders').select('workorder_number,costo_envio,logistica').in('workorder_number',numeros);
       if(error) throw new Error(error.message);
-      const costos=(data||[]).map(r=>Number(r.costo_envio)).filter(n=>Number.isFinite(n)&&n>0);
-      const totalCosto=costos.reduce((s,n)=>s+n,0);
-      const promedio=costos.length?totalCosto/costos.length:0;
-      const sinCosto=numeros.length-costos.length;
-      costoHtml=`<div style="display:flex;gap:18px;flex-wrap:wrap;align-items:baseline;background:${color}10;border:1px solid ${color}30;border-radius:10px;padding:10px 14px;margin-bottom:12px">
-        <div><span style="font-size:20px;font-weight:800;color:${color}">$${Math.round(promedio).toLocaleString('es-AR')}</span><span style="font-size:11px;color:var(--text-muted);margin-left:6px">costo promedio</span></div>
-        <div style="font-size:11px;color:var(--text-muted)">Total: $${Math.round(totalCosto).toLocaleString('es-AR')} · sobre ${costos.length} OT con costo cargado${sinCosto?` (${sinCosto} sin costo)`:''}</div>
+
+      // Pedido 20/09: desglose por logistica en la misma linea del promedio.
+      //
+      // Y de paso se corrige el promedio: antes sumaba todo costo > 0, pero en
+      // ALLEATA el costo es la convencion de $1 por OT (Ticket 05,
+      // allyCostoEnvioCheck.js), no un gasto real. Cada OT de Alleata entraba
+      // como un envio de $1 y tiraba el promedio para abajo. El numero grande
+      // ahora es solo tercerizadas; Alleata queda en su card con la cantidad.
+      const porLog={};
+      const encontradas=new Set();
+      (data||[]).forEach(r=>{
+        encontradas.add(r.workorder_number);
+        const log=(r.logistica||'Sin logística').toUpperCase().trim();
+        if(!porLog[log]) porLog[log]={n:0,conCosto:0,total:0};
+        porLog[log].n++;
+        const c=Number(r.costo_envio);
+        if(Number.isFinite(c)&&c>0){ porLog[log].conCosto++; porLog[log].total+=c; }
+      });
+      // OTs de la lista que no existen en sf_workorders: no hay de donde sacar
+      // la logistica, se cuentan aparte para que la suma de las cards cierre.
+      const noEncontradas=numeros.filter(n=>!encontradas.has(n)).length;
+      if(noEncontradas){ porLog['SIN DATO']={n:noEncontradas,conCosto:0,total:0}; }
+
+      const terc=Object.entries(porLog).filter(([l])=>l!=='ALLEATA'&&l!=='SIN DATO'&&l!=='SIN LOGÍSTICA');
+      const tercConCosto=terc.reduce((a,[,d])=>a+d.conCosto,0);
+      const tercTotal=terc.reduce((a,[,d])=>a+d.total,0);
+      const tercN=terc.reduce((a,[,d])=>a+d.n,0);
+      const promedio=tercConCosto?tercTotal/tercConCosto:0;
+      const sinCostoTerc=tercN-tercConCosto;
+
+      const LOG_COL={'ALLEATA':'#1dbf8e','EPSA':'#0EA5E9','CORREO ARGENTINO':'#E30613','CABIFY':'#7C3AED'};
+      const LOG_LBL={'ALLEATA':'Alleata','EPSA':'EPSA','CORREO ARGENTINO':'Correo Arg.','CABIFY':'Cabify','SIN DATO':'Sin dato','SIN LOGÍSTICA':'Sin logística'};
+      const orden=['ALLEATA','EPSA','CORREO ARGENTINO','CABIFY'];
+      const claves=Object.keys(porLog).sort((a,b)=>{
+        const ia=orden.indexOf(a), ib=orden.indexOf(b);
+        return (ia<0?99:ia)-(ib<0?99:ib) || porLog[b].n-porLog[a].n;
+      });
+      const cardLog=k=>{
+        const d=porLog[k];
+        const col=LOG_COL[k]||'#94a3b8';
+        // Alleata no muestra promedio: es la convencion de $1, no un costo.
+        const sub=k==='ALLEATA'
+          ? 'logística propia'
+          : (d.conCosto ? `prom $${Math.round(d.total/d.conCosto).toLocaleString('es-AR')}` : 'sin costos')
+            + (d.n-d.conCosto && k!=='SIN DATO' ? ` · <span style="color:#f59e0b">${d.n-d.conCosto} sin costo</span>` : '');
+        return `<div style="background:var(--navy-900);border:1px solid var(--border);border-left:3px solid ${col};border-radius:8px;padding:5px 11px;min-width:92px">
+          <div style="font-size:16px;font-weight:800;color:${col};line-height:1.1">${d.n}</div>
+          <div style="font-size:9px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em">${LOG_LBL[k]||k}</div>
+          <div style="font-size:9.5px;color:var(--text-muted);margin-top:1px">${sub}</div>
+        </div>`;
+      };
+
+      costoHtml=`<div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;background:${color}10;border:1px solid ${color}30;border-radius:10px;padding:10px 14px;margin-bottom:12px">
+        <div style="min-width:170px">
+          <div><span style="font-size:20px;font-weight:800;color:${color}">$${Math.round(promedio).toLocaleString('es-AR')}</span><span style="font-size:11px;color:var(--text-muted);margin-left:6px">costo promedio tercerizado</span></div>
+          <div style="font-size:10.5px;color:var(--text-muted);margin-top:2px">Total: $${Math.round(tercTotal).toLocaleString('es-AR')} · sobre ${tercConCosto} OT con costo${sinCostoTerc?` <span style="color:#f59e0b">(${sinCostoTerc} sin costo)</span>`:''}</div>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">${claves.map(cardLog).join('')}</div>
       </div>`;
     }
   }catch(e){
