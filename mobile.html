@@ -165,7 +165,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
       <div class="login-logo">
         <img id="loginLogo" src="" alt="Alleata">
         <div class="login-sub">Portal de Operaciones</div>
-        <div class="login-version">v2.14.57 · mobile</div>
+        <div class="login-version">v2.14.59 · mobile</div>
       </div>
       <div class="field"><label class="label">Email</label><input class="input" id="lEmail" type="email" placeholder="usuario@alleata.com" autocomplete="email"></div>
       <div class="field"><label class="label">Contraseña</label><input class="input" id="lPass" type="password" placeholder="••••••••" autocomplete="current-password"></div>
@@ -182,7 +182,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
     <img id="appLogo" src="" alt="Alleata">
     <div class="topbar-title" id="topbarTitle">Operaciones</div>
     <button id="btnSyncRapido" onclick="syncRapido()" title="Actualizar estados desde Salesforce (sin esperar los 10min)" style="background:none;border:none;color:#fff;font-size:18px;cursor:pointer;padding:4px 6px;line-height:1">🔄</button>
-    <div class="topbar-version" onclick="_tocarVersion()">v2.14.57</div>
+    <div class="topbar-version" onclick="_tocarVersion()">v2.14.59</div>
     <div class="topbar-avatar" id="topbarAvatar" onclick="openDrawer()">?</div>
   </div>
 
@@ -1012,8 +1012,16 @@ async function initApp(user){
     document.getElementById('tab-buscar').style.display='none';
     document.getElementById('tab-historial').style.display='none';
   }
-  // Ruta tab: visible para logistica y admin
-  if(!isAdmin&&!isLogistica){
+  // Ruta tab: admin, logistica, o cualquiera con el modulo "Hoja de Ruta"
+  // habilitado en Ajustes.
+  //
+  // FIX 22/09 (pedido: Angel empieza a hacer entregas): antes esto dependia
+  // SOLO del rol, asi que para darle la app habia que pasarlo a 'logistica'
+  // — y ese rol le recorta el portal desktop a Envios/ALLEATA, sin rotulos
+  // ni sus otros modulos. Ahora se habilita por modulo, como el resto del
+  // sistema: se tilda "Hoja de Ruta" en Ajustes y listo, sin tocarle el rol.
+  const hasRuta=isAdmin||isLogistica||mods.includes('hoja-ruta');
+  if(!hasRuta){
     document.getElementById('tab-ruta').style.display='none';
     switchTab('sims');
   }
@@ -1458,16 +1466,32 @@ function generarTextoResumen(paradasDB){
       entregasProveedor.forEach(c=>{ txt+=`📤 ${c.cuenta}${c.ot_numero?` (OT ${c.ot_numero})`:''}\n`; });
     }
   }
-  if(!cierresHoy.length){
+  const nParadasDB=Array.isArray(paradasDB)?paradasDB.length:0;
+  const nParadasHechas=Array.isArray(paradasDB)?paradasDB.filter(p=>p.completado).length:0;
+  if(!cierresHoy.length && !nParadasDB){
     txt+=`\nSin movimientos registrados hoy.`;
   }
-  txt+=`\n🚚 Total gestionado hoy: ${cierresHoy.length}`;
+  // El total suma las paradas realizadas que no hayan pasado por cierresHoy
+  // (las que se marcaron desde otro dispositivo o se perdieron del
+  // localStorage), sin contar dos veces las que si estan.
+  const yaEnCierres=cierresHoy.filter(c=>c.tipo==='parada_manual').length;
+  const totalGestionado=cierresHoy.length + Math.max(0, nParadasHechas - yaEnCierres);
+  txt+=`\n🚚 Total gestionado hoy: ${totalGestionado}`;
   return txt;
 }
 
 async function abrirResumenModal(){
-  if(!cierresHoy.length){
+  // FIX 22/09 (caso real: Ignacio no podia cerrar la ruta y el boton
+  // "parecia no hacer nada"). El guardian miraba SOLO cierresHoy, que se
+  // llena con OTs cerradas. Un dia de puros retiros/entregas en proveedor
+  // —sin ninguna OT— quedaba sin poder cerrarse ni informarse por Ally, y el
+  // unico feedback era un toast chico que pasa desapercibido. Ahora tambien
+  // cuentan las paradas del dia, y si de verdad no hay NADA el aviso es un
+  // alert que no se puede no ver.
+  const paradasDB=await paradasProveedorHoy();
+  if(!cierresHoy.length && !paradasDB.length){
     showScanFeedback('Todavía no cerraste ninguna OT hoy','warn');
+    alert('No hay nada para informar todavía: ninguna OT cerrada ni retiros/entregas en proveedor cargados hoy.');
     return;
   }
   // FIX "OT viejas" (2026-07): "Finalizar ruta" es el momento explícito en
@@ -1478,7 +1502,6 @@ async function abrirResumenModal(){
   // ninguna OT que siga genuinamente sin cerrar — esas tienen que seguir
   // apareciendo mañana hasta que alguien las cierre.
   await loadEnTransito();
-  const paradasDB=await paradasProveedorHoy();
   document.getElementById('resumenTexto').value=generarTextoResumen(paradasDB);
   document.getElementById('modalResumen').classList.add('show');
   avisarRolloutCierreRuta(); // fire-and-forget, no bloquea la apertura del modal

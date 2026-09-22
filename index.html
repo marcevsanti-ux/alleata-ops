@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.7.43</title>
+<title>Alleata · Operaciones v4.7.44</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -408,7 +408,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.43 · 18 sep 2026
+      v4.7.44 · 18 sep 2026
     </div>
   </div>
 </div>
@@ -517,7 +517,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.43 · 18 sep 2026
+      v4.7.44 · 18 sep 2026
     </div>
   </div>
 </nav>
@@ -572,7 +572,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.43</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.44</div>
   </div>
   <div class="content">
 
@@ -5200,7 +5200,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.7.43] OK');
+console.log('[Alleata v4.7.44] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -8121,14 +8121,16 @@ async function cargarIndicadoresRutaChofer() {
         buckets,
       };
     };
-    const marce = contar(_mrEsMarce);
-    const nacho = contar(_mrEsNacho);
-    _hrDiaBuckets['Marce'] = marce.buckets;
-    _hrDiaBuckets['Nacho'] = nacho.buckets;
+    const choferes = _hrChoferes(rutas, porUser, cerradosHoy);
+    const datos = choferes.map(c => {
+      const d = contar(n => _normResponsable(n) === c.clave);
+      _hrDiaBuckets[c.nombre] = d.buckets;
+      return { ...c, d };
+    });
 
     const bloque = (nombre, d, color) => {
       const mini = (bucket, label, valor, colorVal) => `
-          <div onclick="mostrarModalRutaOTs('${label} — ${nombre} (hoy)', (_hrDiaBuckets['${nombre}']||{})['${bucket}'])" style="cursor:pointer;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 14px;text-align:center;min-width:80px" title="Ver detalle de OTs">
+          <div onclick="mostrarModalRutaOTs('${label} — ${_hrEsc(nombre)} (hoy)', (_hrDiaBuckets['${_hrEsc(nombre)}']||{})['${bucket}'])" style="cursor:pointer;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 14px;text-align:center;min-width:80px" title="Ver detalle de OTs">
             <div style="font-size:20px;font-weight:800;color:${colorVal}">${valor}</div>
             <div style="font-size:9.5px;color:var(--text-muted);font-weight:700">${label}</div>
           </div>`;
@@ -8146,10 +8148,11 @@ async function cargarIndicadoresRutaChofer() {
 
 
     cont.innerHTML = `
-      <div style="font-size:13px;font-weight:700;margin-bottom:10px">🚚 Ruta — Marce / Nacho (hoy)</div>
+      <div style="font-size:13px;font-weight:700;margin-bottom:10px">🚚 Ruta por chofer (hoy)${datos.length?` <span style="font-weight:400;color:var(--text-muted);font-size:11px">— ${datos.length} en ruta</span>`:''}</div>
       <div style="display:flex;gap:12px;flex-wrap:wrap">
-        ${bloque('Marce', marce, 'var(--text)')}
-        ${bloque('Nacho', nacho, 'var(--text)')}
+        ${datos.length
+          ? datos.map(c => bloque(c.nombre, c.d, 'var(--text)')).join('')
+          : '<div class="card" style="padding:14px;color:var(--text-muted);font-size:12px">Nadie confirmó ruta hoy todavía.</div>'}
       </div>
       <div style="font-size:10px;color:var(--text-muted);margin-top:8px">rutas_diarias de hoy (lo abierto) + sf_workorders por entregado_por/fecha_cierre (lo cerrado, aunque ya no esté en rutas_diarias) — no incluye desinstalaciones/retiros ni paradas manuales. Click en cualquier número para ver el detalle.</div>`;
   } catch (e) {
@@ -8278,11 +8281,11 @@ async function cargarIndicadoresRutaMensual() {
         <div style="font-size:8px;color:var(--text-muted);font-weight:700">${label}</div>
       </div>`;
 
-    const filaChofer = (nombre) => `
+    const filaChofer = (nombre, clave) => `
       <div style="font-size:11px;font-weight:700;margin:8px 0 6px">👷 ${nombre}</div>
       <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:6px">
         ${meses.map(m => {
-          const d = contarMes(nombre === 'Marce' ? _mrEsMarce : _mrEsNacho, m.key);
+          const d = contarMes(n => _normResponsable(n) === clave, m.key);
           const key = nombre + '|' + m.key;  // ej: "Marce|2026-09"
           const tituloSufijo = `${nombre} · ${m.label}`;
           _hrMesBuckets[key] = d.buckets;
@@ -8298,11 +8301,13 @@ async function cargarIndicadoresRutaMensual() {
         }).join('')}
       </div>`;
 
+    const choferesMes = _hrChoferes(rutas, porUser, cerradosRango);
     cont.innerHTML = `
       <div class="card">
-        <div style="font-size:13px;font-weight:700;margin-bottom:4px">🚚 Ruta — Marce / Nacho, general por mes</div>
-        ${filaChofer('Marce')}
-        ${filaChofer('Nacho')}
+        <div style="font-size:13px;font-weight:700;margin-bottom:4px">🚚 Ruta por chofer, general por mes</div>
+        ${choferesMes.length
+          ? choferesMes.map(c => filaChofer(c.nombre, c.clave)).join('')
+          : '<div style="font-size:12px;color:var(--text-muted);padding:6px 0">Sin rutas registradas en el período.</div>'}
         <div style="font-size:10px;color:var(--text-muted);margin-top:8px">rutas_diarias + sf_workorders por fecha_cierre (retroactivo — recupera lo que rutas_diarias haya podado en su momento) — no incluye desinstalaciones/retiros ni paradas manuales. Cada OT cuenta una sola vez por mes. Click en cualquier número para ver el detalle.</div>
       </div>`;
   } catch (e) {
@@ -8318,6 +8323,31 @@ async function cargarIndicadoresRutaMensual() {
 // "Ignacio", ajustar _mrEsMarce/_mrEsNacho de abajo.
 function _normResponsable(v){ return String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().trim(); }
 const _mrEsMarce = n => _normResponsable(n).includes('MARCE');
+// FIX 22/09: las cards de ruta estaban clavadas a Marce y Nacho. Angel
+// empieza a hacer entregas y despues van Gonzalo y Andres, asi que el
+// panel se arma solo con quien efectivamente tuvo ruta o cerro OTs en el
+// periodo. Antes, un chofer nuevo quedaba invisible en el dashboard aunque
+// sus cierres estuvieran bien guardados y Ally los reportara por WhatsApp.
+//
+// Dos fuentes, porque los nombres no siempre coinciden: profiles.nombre
+// (quien confirmo la ruta) y sf_workorders.entregado_por (quien cerro). Se
+// unifican por nombre normalizado y se muestra el mas completo de los dos.
+function _hrChoferes(rutas, porUser, cerrados){
+  const m = {};
+  const sumar = nombre => {
+    const n = (nombre || '').trim();
+    if (!n) return;
+    const k = _normResponsable(n);
+    if (!m[k] || n.length > m[k].length) m[k] = n;
+  };
+  (rutas || []).forEach(r => sumar(porUser[r.user_id]?.nombre || porUser[r.user_id]?.email));
+  (cerrados || []).forEach(o => sumar(o.entregado_por));
+  return Object.entries(m)
+    .map(([clave, nombre]) => ({ clave, nombre }))
+    .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+}
+// Para usar el nombre dentro de un onclick sin romper el HTML.
+const _hrEsc = t => String(t).replace(/'/g, "\\'").replace(/"/g, '&quot;');
 const _mrEsNacho = n => _normResponsable(n).includes('NACHO') || _normResponsable(n).includes('IGNACIO');
 
 async function cargarCambiosPorResponsable() {
