@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.7.42</title>
+<title>Alleata · Operaciones v4.7.43</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -408,7 +408,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.42 · 18 sep 2026
+      v4.7.43 · 18 sep 2026
     </div>
   </div>
 </div>
@@ -517,7 +517,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.42 · 18 sep 2026
+      v4.7.43 · 18 sep 2026
     </div>
   </div>
 </nav>
@@ -572,7 +572,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.42</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.43</div>
   </div>
   <div class="content">
 
@@ -5200,7 +5200,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.7.42] OK');
+console.log('[Alleata v4.7.43] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -5511,7 +5511,10 @@ function showApp(){
   // Angel pero sobre las OTs de antes del 1/4.
   const isCustomer=currentProfile.rol==='customer';
   window._isCustomerRole=isCustomer;
-  const modulos=currentProfile.modulos||['sims','envios','desinstalaciones'];
+  // Un customer sin modulos cargados conserva el comportamiento original (solo
+  // Desinstalaciones), para no abrirle de golpe SIMs/Envios, que es el default
+  // generico de los demas roles.
+  const modulos=currentProfile.modulos||(isCustomer?['desinstalaciones']:['sims','envios','desinstalaciones']);
   document.getElementById('sideUserName').textContent=nombre;
   const rolLabel={'admin':'Administrador','logistica':'Logística','operador':'Operador','ceo':'CEO','customer':'Customer'}[currentProfile.rol]||'Operador';
   document.getElementById('sideUserRole').textContent=rolLabel;
@@ -5557,8 +5560,19 @@ function showApp(){
      'nav-napse','nav-churn-producto','nav-hoja-ruta','nav-zonas-amba','nav-indicadores',
      'nav-despacho-epsa','nav-presupuesto','nav-auditoria']
       .forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display='none'; });
-    const navDesinst=document.getElementById('nav-desinstalaciones');
-    if(navDesinst){ navDesinst.style.display='flex'; navDesinst.classList.remove('locked'); navDesinst.onclick=()=>goTo('desinstalaciones'); }
+    // FIX 22/09: antes el customer quedaba clavado en Desinstalaciones sin
+    // importar que modulos se le asignaran en Ajustes — a Rosario se le
+    // agrego Napse y Mision Rollout y no le aparecian, y seguia entrando a
+    // Desinstalaciones, que ni tenia asignado. Ahora el menu muestra
+    // exactamente los modulos de su perfil y nada mas.
+    ['nav-desinstalaciones'].forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display='none'; });
+    modulos.forEach(mod=>{
+      const el=document.getElementById('nav-'+mod);
+      if(!el) return;
+      el.style.display='flex';
+      el.classList.remove('locked');
+      el.onclick=()=>goTo(mod);
+    });
   }
   const navStore=document.getElementById('nav-store');
   if(navStore&&!isCeo&&(isAdmin||modulos.includes('store')))navStore.style.display='flex';
@@ -5592,8 +5606,13 @@ function showApp(){
   // Vista Customer (pedido 26/08): aterriza directo en Desinstalaciones →
   // pestaña Backlog histórico, que es el único trabajo que tienen que ver.
   if(isCustomer){
-    goTo('desinstalaciones');
-    setTimeout(()=>{ if(typeof dsTabSwitch==='function') dsTabSwitch('backlog'); }, 300);
+    // Aterriza en el primer modulo que tenga asignado. Si es Desinstalaciones
+    // se mantiene el comportamiento del 26/08: pestaña Backlog historico.
+    const destino=modulos.find(m=>document.getElementById('nav-'+m)) || 'desinstalaciones';
+    goTo(destino);
+    if(destino==='desinstalaciones'){
+      setTimeout(()=>{ if(typeof dsTabSwitch==='function') dsTabSwitch('backlog'); }, 300);
+    }
   }
 
   // ── Realtime: refrescar módulo activo cuando el sync de Railway actualiza sf_workorders ──
