@@ -165,7 +165,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
       <div class="login-logo">
         <img id="loginLogo" src="" alt="Alleata">
         <div class="login-sub">Portal de Operaciones</div>
-        <div class="login-version">v2.14.60 · mobile</div>
+        <div class="login-version">v2.14.61 · mobile</div>
       </div>
       <div class="field"><label class="label">Email</label><input class="input" id="lEmail" type="email" placeholder="usuario@alleata.com" autocomplete="email"></div>
       <div class="field"><label class="label">Contraseña</label><input class="input" id="lPass" type="password" placeholder="••••••••" autocomplete="current-password"></div>
@@ -182,7 +182,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
     <img id="appLogo" src="" alt="Alleata">
     <div class="topbar-title" id="topbarTitle">Operaciones</div>
     <button id="btnSyncRapido" onclick="syncRapido()" title="Actualizar estados desde Salesforce (sin esperar los 10min)" style="background:none;border:none;color:#fff;font-size:18px;cursor:pointer;padding:4px 6px;line-height:1">🔄</button>
-    <div class="topbar-version" onclick="_tocarVersion()">v2.14.60</div>
+    <div class="topbar-version" onclick="_tocarVersion()">v2.14.61</div>
     <div class="topbar-avatar" id="topbarAvatar" onclick="openDrawer()">?</div>
   </div>
 
@@ -1426,10 +1426,47 @@ function lineaParadaProveedor(p){
   return `${p.proveedor_nombre||'Proveedor'}${detOts}${que}`;
 }
 
-function generarTextoResumen(paradasDB){
-  const envios=cierresHoy.filter(c=>c.tipo==='envio');
+// FIX 22/09 (caso real: el reporte generado desde la notebook salio con
+// "Total gestionado hoy: 1" y sin el detalle, cuando Ignacio habia cerrado
+// 18 OTs desde su celular). cierresHoy vive en el localStorage de CADA
+// dispositivo: si el resumen se genera desde otro equipo —o se limpio el
+// navegador, o se cambio de telefono— el detalle sale vacio aunque los
+// cierres esten perfectos en la base.
+//
+// Esto lee los cierres del dia desde sf_workorders, que es donde
+// /entregar-ot los deja, y da igual desde donde se genere el resumen.
+async function cierresHoyDB(){
+  const nombre=(currentProfile?.nombre||'').trim();
+  if(!nombre) return null;
+  try{
+    const{data,error}=await sb.from('sf_workorders')
+      .select('workorder_number,status,cuenta,record_type,rollout,ciudad,notas_cierre')
+      .eq('fecha_cierre',hoyArgentina()).eq('entregado_por',nombre);
+    if(error) throw error;
+    const mapa={'Exitoso':'Entregado','Exitosa':'Entregado','Entregado':'Entregado',
+                'Reprogramar':'Reprogramar','Fallido':'Fallido'};
+    return (data||[]).map(o=>({
+      tipo:'envio',
+      ot_numero:o.workorder_number,
+      cuenta:o.cuenta,
+      ot_tipo:o.record_type,
+      rollout:o.rollout===true,
+      ciudad:o.ciudad,
+      motivo:o.notas_cierre||'',
+      // Un estado que no mapea (ej. 'Despachado' porque el writeback a SF
+      // todavia no volvio) se informa como Entregado: el chofer lo cerro.
+      resultado:mapa[o.status]||'Entregado',
+    }));
+  }catch(e){ console.warn('[cierresHoyDB]',e.message); return null; }
+}
+
+function generarTextoResumen(paradasDB, cierresDB){
+  // La base manda; cierresHoy queda solo como respaldo si la consulta falla.
+  const base = Array.isArray(cierresDB) ? cierresDB : cierresHoy;
+  const envios=base.filter(c=>c.tipo==='envio');
   const desinst=cierresHoy.filter(c=>c.tipo==='desinst');
   const paradas=cierresHoy.filter(c=>c.tipo==='parada_manual');
+  const nCierres=envios.length+desinst.length;
   const exitosos=envios.filter(c=>c.resultado==='Entregado');
   const fallidos=envios.filter(c=>c.resultado==='Fallido');
   const reprogramados=envios.filter(c=>c.resultado==='Reprogramar');
@@ -1439,7 +1476,16 @@ function generarTextoResumen(paradasDB){
   const entregasProveedor=paradas.filter(c=>c.subtipo==='entrega_proveedor');
 
   const tecnico=(currentProfile?.nombre||currentUser?.email||'').trim();
-  let txt=`📦 *Reporte Log. Alleata*\n👷 ${tecnico}\n🕐 ${fechaLargaHoy()}\n🛣️ Kmts Recorridos: ${_kmRutaHoyTotal||0} km\n`;
+  // Km recalculados acá y no tomados de _kmRutaHoyTotal: ese valor sale de
+  // rutas_diarias, que guarda lo calculado la ultima vez que se confirmo una
+  // ruta — con el criterio viejo (destino del cliente, sin excluir lo
+  // despachado en proveedor). Recalcular con los cierres reales del dia es
+  // lo que hace que el numero deje de inflarse.
+  const otsProv=(paradasDB||[]).flatMap(p=>String(p.ot_numero||'').split(/[,;\s]+/).filter(Boolean));
+  const kmCalc = Array.isArray(cierresDB) && cierresDB.length
+    ? calcKmRuta(cierresDB.filter(c=>c.ciudad), otsProv).kmTotal
+    : (_kmRutaHoyTotal||0);
+  let txt=`📦 *Reporte Log. Alleata*\n👷 ${tecnico}\n🕐 ${fechaLargaHoy()}\n🛣️ Kmts Recorridos: ${kmCalc} km\n`;
 
   // Marca por tipo de OT — mismo estilo que ya se usaba para Rollout
   // (ícono + palabra en mayúscula). Rollout tiene prioridad: una OT puede
@@ -1499,14 +1545,14 @@ function generarTextoResumen(paradasDB){
   }
   const nParadasDB=Array.isArray(paradasDB)?paradasDB.length:0;
   const nParadasHechas=Array.isArray(paradasDB)?paradasDB.filter(p=>p.completado).length:0;
-  if(!cierresHoy.length && !nParadasDB){
+  if(!nCierres && !nParadasDB){
     txt+=`\nSin movimientos registrados hoy.`;
   }
   // El total suma las paradas realizadas que no hayan pasado por cierresHoy
   // (las que se marcaron desde otro dispositivo o se perdieron del
   // localStorage), sin contar dos veces las que si estan.
   const yaEnCierres=cierresHoy.filter(c=>c.tipo==='parada_manual').length;
-  const totalGestionado=cierresHoy.length + Math.max(0, nParadasHechas - yaEnCierres);
+  const totalGestionado=nCierres + Math.max(0, nParadasHechas - yaEnCierres);
   txt+=`\n🚚 Total gestionado hoy: ${totalGestionado}`;
   return txt;
 }
@@ -1520,7 +1566,9 @@ async function abrirResumenModal(){
   // cuentan las paradas del dia, y si de verdad no hay NADA el aviso es un
   // alert que no se puede no ver.
   const paradasDB=await paradasProveedorHoy();
-  if(!cierresHoy.length && !paradasDB.length){
+  const cierresDB=await cierresHoyDB();
+  const hayCierres=(cierresDB||cierresHoy).length;
+  if(!hayCierres && !paradasDB.length){
     showScanFeedback('Todavía no cerraste ninguna OT hoy','warn');
     alert('No hay nada para informar todavía: ninguna OT cerrada ni retiros/entregas en proveedor cargados hoy.');
     return;
@@ -1533,7 +1581,7 @@ async function abrirResumenModal(){
   // ninguna OT que siga genuinamente sin cerrar — esas tienen que seguir
   // apareciendo mañana hasta que alguien las cierre.
   await loadEnTransito();
-  document.getElementById('resumenTexto').value=generarTextoResumen(paradasDB);
+  document.getElementById('resumenTexto').value=generarTextoResumen(paradasDB,cierresDB);
   document.getElementById('modalResumen').classList.add('show');
   avisarRolloutCierreRuta(); // fire-and-forget, no bloquea la apertura del modal
   // Envío automático 12/08: antes había que elegir canal a mano (Compartir/
