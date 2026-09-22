@@ -165,7 +165,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
       <div class="login-logo">
         <img id="loginLogo" src="" alt="Alleata">
         <div class="login-sub">Portal de Operaciones</div>
-        <div class="login-version">v2.14.59 · mobile</div>
+        <div class="login-version">v2.14.60 · mobile</div>
       </div>
       <div class="field"><label class="label">Email</label><input class="input" id="lEmail" type="email" placeholder="usuario@alleata.com" autocomplete="email"></div>
       <div class="field"><label class="label">Contraseña</label><input class="input" id="lPass" type="password" placeholder="••••••••" autocomplete="current-password"></div>
@@ -182,7 +182,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
     <img id="appLogo" src="" alt="Alleata">
     <div class="topbar-title" id="topbarTitle">Operaciones</div>
     <button id="btnSyncRapido" onclick="syncRapido()" title="Actualizar estados desde Salesforce (sin esperar los 10min)" style="background:none;border:none;color:#fff;font-size:18px;cursor:pointer;padding:4px 6px;line-height:1">🔄</button>
-    <div class="topbar-version" onclick="_tocarVersion()">v2.14.59</div>
+    <div class="topbar-version" onclick="_tocarVersion()">v2.14.60</div>
     <div class="topbar-avatar" id="topbarAvatar" onclick="openDrawer()">?</div>
   </div>
 
@@ -1158,17 +1158,44 @@ function getDistKm(ciudad){
 // ── KM DE RUTA ──
 const BASE_LAT=-34.648,BASE_LNG=-58.377; // California 2082, Barracas
 
-function calcKmRuta(ots){
+// FIX 22/09 (caso real: el reporte de Ignacio del 22/09 informo 399.7 km en
+// un dia de 18 entregas en AMBA). El calculo usa COORDS_CIUDAD[ot.ciudad],
+// o sea la ciudad de DESTINO DEL CLIENTE — no donde estuvo el chofer. Las
+// OTs que se despachan en una sucursal de Correo Argentino tienen como
+// ciudad la del interior (el cliente final), asi que la ruta sumaba cientos
+// de km como si el auto hubiera ido hasta alla, cuando en realidad fue hasta
+// el correo y volvio.
+//
+// Dos correcciones:
+//  1. Las OTs entregadas en un proveedor (las que figuran en las paradas
+//     manuales del dia) no suman distancia propia: el viaje real es la
+//     parada al proveedor, no el destino del cliente.
+//  2. Tope de seguridad: la logistica Alleata es AMBA, ~70km desde Barracas
+//     (MASTER_CONTEXT §7). Cualquier ciudad a mas de TOPE_KM_AMBA se
+//     considera destino de correo/interior y no se maneja hasta ahi.
+const TOPE_KM_AMBA=120;
+function calcKmRuta(ots, otsEnProveedor){
   // Calcula km totales: BASE → OT1 → OT2 → ... → OTn → BASE
   if(!ots.length)return{kmTotal:0,detalle:[]};
+  const enProveedor=new Set((otsEnProveedor||[]).map(n=>String(n).replace(/^0+/,'')));
   let kmTotal=0;
   const detalle=[];
   let prevLat=BASE_LAT,prevLng=BASE_LNG;
 
   for(const ot of ots){
+    const num=String(ot.ot_numero||'');
+    if(enProveedor.has(num.replace(/^0+/,''))){
+      detalle.push({ot_numero:ot.ot_numero,ciudad:ot.ciudad,km_desde_anterior:null,nota:'despachada en proveedor — no se maneja hasta el destino'});
+      continue;
+    }
     const key=(ot.ciudad||'').toLowerCase().trim();
     const coords=COORDS_CIUDAD[key];
     if(!coords){detalle.push({ot_numero:ot.ot_numero,ciudad:ot.ciudad,km_desde_anterior:null,nota:'sin coordenadas'});continue;}
+    const kmDesdeBase=haversine(BASE_LAT,BASE_LNG,coords.lat,coords.lng);
+    if(kmDesdeBase>TOPE_KM_AMBA){
+      detalle.push({ot_numero:ot.ot_numero,ciudad:ot.ciudad,km_desde_anterior:null,nota:`destino a ${Math.round(kmDesdeBase)}km — fuera de AMBA, no computa`});
+      continue;
+    }
     const km=Math.round(haversine(prevLat,prevLng,coords.lat,coords.lng)*10)/10;
     kmTotal+=km;
     detalle.push({ot_numero:ot.ot_numero,ciudad:ot.ciudad,km_desde_anterior:km});
@@ -1189,7 +1216,11 @@ async function guardarRutaDiaria(){
   const rutaReal=rutaDelDia.filter(o=>!o._esPrueba);
   if(!rutaReal.length)return;
   const fecha=hoyArgentina();
-  const{kmTotal,detalle}=calcKmRuta(rutaReal);
+  // Las OTs listadas en las paradas del dia se despacharon en el proveedor:
+  // no computan distancia hasta el destino del cliente.
+  const paradasHoy=await paradasProveedorHoy();
+  const otsProveedor=paradasHoy.flatMap(p=>String(p.ot_numero||'').split(/[,;\s]+/).filter(Boolean));
+  const{kmTotal,detalle}=calcKmRuta(rutaReal,otsProveedor);
   const ots_ids=rutaReal.map(o=>o.id);
   const ots_numeros=rutaReal.map(o=>o.ot_numero||o.id);
 
