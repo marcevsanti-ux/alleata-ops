@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.7.45</title>
+<title>Alleata · Operaciones v4.7.46</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -408,7 +408,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.45 · 18 sep 2026
+      v4.7.46 · 18 sep 2026
     </div>
   </div>
 </div>
@@ -517,7 +517,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.45 · 18 sep 2026
+      v4.7.46 · 18 sep 2026
     </div>
   </div>
 </nav>
@@ -572,7 +572,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.45</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.46</div>
   </div>
   <div class="content">
 
@@ -5200,7 +5200,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.7.45] OK');
+console.log('[Alleata v4.7.46] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -10036,8 +10036,15 @@ function dsToggleEstadoGenerico(estado, estadoDetalleObj, detalleElId){
 
   const celda=v=>v?`<span>${v}</span>`:`<span style="color:var(--text-muted)">—</span>`;
   const color=ESTADO_COLORS_NAPSE[estado]||'#6b7280';
+  // Pedido 23/09: exportar la lista del estado a Excel con el Id de SF. Se
+  // guarda la lista visible en window para que el boton exporte exactamente
+  // lo que se esta viendo, sin recalcular filtros.
+  window._dsEstadoExport = { estado, lista };
   el.innerHTML=`<div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:10px 12px;overflow-x:auto;margin-top:12px">
-    <div style="font-size:12px;font-weight:700;color:${color};margin-bottom:8px">${estado} (${lista.length})</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px">
+      <div style="font-size:12px;font-weight:700;color:${color}">${estado} (${lista.length})</div>
+      <button class="btn-sm" onclick="dsExportarEstado()" style="background:var(--teal);border:1px solid var(--teal);color:#04342c;font-weight:700;font-size:10.5px;white-space:nowrap">⬇️ Exportar a Excel</button>
+    </div>
     <table style="width:100%;border-collapse:collapse;font-size:11px;white-space:nowrap">
       <thead><tr style="text-align:left;color:var(--text-muted);text-transform:uppercase;font-size:9px;letter-spacing:.03em">
         <th style="padding:4px 8px 4px 0">OT</th>
@@ -10069,6 +10076,36 @@ function dsToggleEstadoGenerico(estado, estadoDetalleObj, detalleElId){
       </tbody>
     </table>
   </div>`;
+}
+
+// Exporta la lista del estado abierto. Incluye el Id de Salesforce (sf_id) y
+// el link directo al WorkOrder, que es lo que permite volver del Excel a SF
+// sin buscar la OT a mano.
+function dsExportarEstado(){
+  const data=window._dsEstadoExport;
+  if(!data||!data.lista?.length){ alert('No hay OTs para exportar.'); return; }
+  const filas=data.lista.map(o=>({
+    'OT': o.ot||'',
+    'Id Salesforce': o.sf_id||'',
+    'Link SF': o.sf_id?`https://alleata.lightning.force.com/lightning/r/WorkOrder/${o.sf_id}/view`:'',
+    'Estado': data.estado,
+    'Fecha creación': o.fecha_creacion?new Date(o.fecha_creacion).toLocaleDateString('es-AR'):'',
+    'Cuenta': o.cuenta||'',
+    'CUIT': o.cuit||'',
+    'Comercio': o.comercio||'',
+    'Motivo': o.motivo||'',
+    'Propietario cta.': o.propietario||'',
+    'Contacto': o.contacto||'',
+    'Terminal ID': o.terminal_id||'',
+    'Ciudad': o.ciudad||'',
+    'Provincia': o.provincia||'',
+  }));
+  const ws=XLSX.utils.json_to_sheet(filas);
+  ws['!cols']=[{wch:12},{wch:20},{wch:62},{wch:14},{wch:14},{wch:42},{wch:14},{wch:28},{wch:14},{wch:20},{wch:18},{wch:26},{wch:20},{wch:18}];
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,data.estado.slice(0,28));
+  const slug=data.estado.normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^A-Za-z0-9]+/g,'_');
+  XLSX.writeFile(wb,`Desinstalaciones_${slug}_${new Date().toISOString().slice(0,10)}.xlsx`);
 }
 
 // Pedido 04/09: desglose de "Recuperada" por mes (cantidad de recuperos
