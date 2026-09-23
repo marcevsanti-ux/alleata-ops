@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.7.46</title>
+<title>Alleata · Operaciones v4.7.47</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -408,7 +408,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.46 · 18 sep 2026
+      v4.7.47 · 18 sep 2026
     </div>
   </div>
 </div>
@@ -517,7 +517,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.46 · 18 sep 2026
+      v4.7.47 · 18 sep 2026
     </div>
   </div>
 </nav>
@@ -572,7 +572,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.46</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.47</div>
   </div>
   <div class="content">
 
@@ -5200,7 +5200,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.7.46] OK');
+console.log('[Alleata v4.7.47] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -6636,13 +6636,19 @@ async function loadHojaRuta(){
     const itemsParadas=paradasDeEste.map(renderParadaItem).join('');
 
     const items=[itemsEnvios,itemsDesinst,itemsParadas].filter(Boolean).join('')||'<div style="font-size:12px;color:var(--text-muted)">Sin OTs en su ruta.</div>';
-    const totalCount=numsPropios.length+desinstDeEste.length+paradasDeEste.length;
+    // FIX 23/09: esto mostraba "22 OT(s)" sumando envios + desinstalaciones +
+    // paradas en proveedor, mientras la app del chofer mostraba 20 (solo
+    // envios, que es lo que va a entregar). Los dos numeros estaban bien pero
+    // parecia que faltaban OTs. Ahora cada cosa se cuenta por su nombre.
+    const partesCount=[`${numsPropios.length} OT(s)`];
+    if(desinstDeEste.length) partesCount.push(`${desinstDeEste.length} desinst.`);
+    if(paradasDeEste.length) partesCount.push(`${paradasDeEste.length} parada${paradasDeEste.length!==1?'s':''}`);
     const enColaEste=(porChoferCola[r.user_id]||[]).length;
     const rolloutCount=numsPropios.filter(num=>esRollout(otsMap[num]||{})).length;
 
     return `<div>
       <div style="font-size:14px;font-weight:700;margin-bottom:8px;display:flex;align-items:center;gap:8px">
-        👤 ${chofer} <span style="font-size:11px;font-weight:400;color:var(--text-muted)">${totalCount} OT(s)${r.km_total?' · ~'+Math.round(r.km_total)+' km':''}</span>
+        👤 ${chofer} <span style="font-size:11px;font-weight:400;color:var(--text-muted)">${partesCount.join(' · ')}${r.km_total?' · ~'+Math.round(r.km_total)+' km':''}</span>
         ${rolloutCount?`<span style="font-size:10px;font-weight:700;color:#8b5cf6;background:rgba(139,92,246,.15);border:1px solid rgba(139,92,246,.35);border-radius:12px;padding:2px 8px">🔄 ${rolloutCount} rollout</span>`:''}
         ${enColaEste?`<span style="font-size:10px;font-weight:700;color:var(--orange);background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.3);border-radius:12px;padding:2px 8px">🕓 ${enColaEste} en cola</span>`:''}
       </div>
