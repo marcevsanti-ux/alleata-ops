@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.7.44</title>
+<title>Alleata · Operaciones v4.7.45</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -408,7 +408,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.44 · 18 sep 2026
+      v4.7.45 · 18 sep 2026
     </div>
   </div>
 </div>
@@ -517,7 +517,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.44 · 18 sep 2026
+      v4.7.45 · 18 sep 2026
     </div>
   </div>
 </nav>
@@ -572,7 +572,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.44</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.45</div>
   </div>
   <div class="content">
 
@@ -5200,7 +5200,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.7.44] OK');
+console.log('[Alleata v4.7.45] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -10091,8 +10091,16 @@ function dsRecuperadaFiltrarLog(log, sinCosto){
   _dsRecFiltroLog = mismo ? {log:null,sinCosto:false} : {log, sinCosto:!!sinCosto};
   dsRecuperadaFiltrarPorMes(_dsRecuperadaMesActivo, true);
 }
+// FIX 23/09: Gestión OPS y Backlog histórico renderizaban los DOS en el
+// mismo id ("ds-recuperada-tabla") y con los mismos ids de card de mes
+// ("ds-rec-mes-..."). getElementById devuelve el primero del documento, asi
+// que estando en Backlog la tabla se pintaba dentro del contenedor oculto de
+// Gestión OPS: los meses parecian botones muertos y el desglose de costos no
+// aparecia nunca. Ahora cada pestaña tiene su propio prefijo.
 function dsRecuperadaRenderPorMes(lista, el){
   _dsRecuperadaMesActivo=null;
+  const ns = el.id || 'ds-generico';
+  window._dsRecuperadaNS = ns;
   const color=ESTADO_COLORS_NAPSE['Recuperada']||'#10b981';
   const porMes={};
   lista.forEach(o=>{
@@ -10105,10 +10113,11 @@ function dsRecuperadaRenderPorMes(lista, el){
   if(porMes['sin-fecha']) mesesOrdenados.push('sin-fecha');
 
   window._dsRecuperadaPorMes=porMes;
+  (window._dsRecuperadaPorMesNS = window._dsRecuperadaPorMesNS || {})[ns] = porMes;
 
   const chips=mesesOrdenados.map(k=>{
     const label=k==='sin-fecha' ? 'Sin fecha' : `${MESES_LABEL[k.slice(5)]} ${k.slice(0,4)}`;
-    return `<div onclick="dsRecuperadaFiltrarPorMes('${k}')" id="ds-rec-mes-${k}" style="cursor:pointer;background:${color}18;border:1px solid ${color}40;border-radius:10px;padding:8px 14px;min-width:70px;text-align:center">
+    return `<div onclick="dsRecuperadaFiltrarPorMes('${k}')" id="${ns}-rec-mes-${k}" style="cursor:pointer;background:${color}18;border:1px solid ${color}40;border-radius:10px;padding:8px 14px;min-width:70px;text-align:center">
       <div style="font-size:17px;font-weight:800;color:${color}">${porMes[k].length}</div>
       <div style="font-size:10px;color:var(--text-muted)">${label}</div>
     </div>`;
@@ -10118,21 +10127,23 @@ function dsRecuperadaRenderPorMes(lista, el){
     <div style="margin-top:12px">
       <div style="font-size:12px;font-weight:700;color:${color};margin-bottom:8px">Recuperada (${lista.length}) — por mes de recuperación${porMes['sin-fecha']?` (${porMes['sin-fecha'].length} sin fecha de recuperación identificada en el historial)`:''}</div>
       <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px">${chips}</div>
-      <div id="ds-recuperada-tabla"></div>
+      <div id="${ns}-recuperada-tabla"></div>
     </div>`;
   dsRecuperadaFiltrarPorMes(null, true);
 }
 
 async function dsRecuperadaFiltrarPorMes(mesKey, esInicial){
-  const cont=document.getElementById('ds-recuperada-tabla');
+  const ns = window._dsRecuperadaNS || 'ds-generico';
+  const cont=document.getElementById(`${ns}-recuperada-tabla`);
   if(!cont)return;
+  window._dsRecuperadaPorMes = (window._dsRecuperadaPorMesNS||{})[ns] || window._dsRecuperadaPorMes;
   // Toggle: click en el mismo mes ya activo vuelve a mostrar todos.
   if(!esInicial){
     _dsRecuperadaMesActivo = (_dsRecuperadaMesActivo===mesKey) ? null : mesKey;
   }
-  document.querySelectorAll('[id^="ds-rec-mes-"]').forEach(c=>{ c.style.boxShadow=''; });
+  document.querySelectorAll(`[id^="${ns}-rec-mes-"]`).forEach(c=>{ c.style.boxShadow=''; });
   if(_dsRecuperadaMesActivo){
-    const activo=document.getElementById(`ds-rec-mes-${_dsRecuperadaMesActivo}`);
+    const activo=document.getElementById(`${ns}-rec-mes-${_dsRecuperadaMesActivo}`);
     if(activo) activo.style.boxShadow=`0 0 0 2px ${ESTADO_COLORS_NAPSE['Recuperada']||'#10b981'}`;
   }
   const porMes=window._dsRecuperadaPorMes||{};
@@ -10201,6 +10212,9 @@ async function dsRecuperadaFiltrarPorMes(mesKey, esInicial){
         // Alleata no muestra promedio ni "sin costo": en logistica propia no
         // se carga costo de envio (verificado 20/09: las 361 estan en null),
         // asi que marcarlas como faltantes seria una alarma falsa.
+        // Pedido 23/09: además del promedio, el gasto total de la logística.
+        const totalTxt = k==='ALLEATA' || !d.total ? '' :
+          `<div style="font-size:10.5px;font-weight:700;color:var(--teal);margin-top:1px">$${Math.round(d.total).toLocaleString('es-AR')}</div>`;
         const sub=k==='ALLEATA'
           ? 'logística propia'
           : (d.conCosto ? `prom $${Math.round(d.total/d.conCosto).toLocaleString('es-AR')}` : 'sin costos')
@@ -10211,6 +10225,7 @@ async function dsRecuperadaFiltrarPorMes(mesKey, esInicial){
           <div style="font-size:16px;font-weight:800;color:${col};line-height:1.1">${d.n}</div>
           <div style="font-size:9px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em">${LOG_LBL[k]||k}</div>
           <div style="font-size:9.5px;color:var(--text-muted);margin-top:1px">${sub}</div>
+          ${totalTxt}
         </div>`;
       };
 
