@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Alleata · Presupuesto Operaciones v1.14.2</title>
+<title>Alleata · Presupuesto Operaciones v1.14.3</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -200,7 +200,7 @@
   <div class="login-box">
     <h2>💰 Presupuesto</h2>
     <p class="login-sub">Alleata · Acceso restringido</p>
-    <div style="position:absolute;bottom:12px;right:16px;font-size:10px;font-family:'JetBrains Mono',monospace;color:rgba(232,237,243,.2)">v1.14.2</div>
+    <div style="position:absolute;bottom:12px;right:16px;font-size:10px;font-family:'JetBrains Mono',monospace;color:rgba(232,237,243,.2)">v1.14.3</div>
     <div class="login-field">
       <label>Email</label>
       <input type="email" id="loginEmail" placeholder="tu@email.com" onkeydown="if(event.key==='Enter')doLogin()">
@@ -216,7 +216,7 @@
 
 <div id="appContent" style="display:none">
 <h1>💰 Presupuesto Operaciones</h1>
-<p class="sub">Alleata · 2026 <span style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 8px;border-radius:4px;border:1px solid var(--border2);font-size:10px;margin-left:6px">v1.14.2</span></p>
+<p class="sub">Alleata · 2026 <span style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 8px;border-radius:4px;border:1px solid var(--border2);font-size:10px;margin-left:6px">v1.14.3</span></p>
 
 <div class="toolbar">
   <div class="mes-bar" id="mesBar"></div>
@@ -1679,15 +1679,15 @@ function napseRenderFacturas(){
       <th style="text-align:right">Total USD</th>
       <th style="text-align:right;color:var(--teal)">▶ REAL $</th>
     </tr></thead>
-    <tbody>${facs.map(f=>`<tr>
-      <td style="font-family:'JetBrains Mono',monospace;font-size:11px">${f.numero}</td>
+    <tbody>${facs.map(f=>`<tr${f.esND?' style="background:rgba(245,158,11,.06)"':''}>
+      <td style="font-family:'JetBrains Mono',monospace;font-size:11px">${f.numero}${f.esND?`<div style="font-size:9px;color:#f59e0b;font-weight:700;margin-top:2px">ND${f.refFactura?' → '+f.refFactura:''}</div>`:''}</td>
       <td>${presupRenderAdjuntosConBoton(f.adjuntos, ['pdf'], 'napseAdjuntarArchivo', f.numero)}</td>
       <td>${f.fecha}</td>
       <td style="font-size:11px;max-width:160px">${f.desc}</td>
-      <td class="nr">${f.tc.toLocaleString('es-AR')}</td>
-      <td class="nr" style="color:var(--text-muted)">${fmtUSD(f.brutoUSD)}</td>
-      <td class="nr" style="color:var(--text-muted)">${fmtUSD(f.ivaUSD)}</td>
-      <td class="nr" style="color:var(--text-muted)">${fmtUSD(f.totalUSD)}</td>
+      <td class="nr">${f.esND?'<span style="color:var(--text-muted)">—</span>':f.tc.toLocaleString('es-AR')}</td>
+      <td class="nr" style="color:var(--text-muted)">${f.esND?'—':fmtUSD(f.brutoUSD)}</td>
+      <td class="nr" style="color:var(--text-muted)">${f.esND?'—':fmtUSD(f.ivaUSD)}</td>
+      <td class="nr" style="color:var(--text-muted)">${f.esND?'—':fmtUSD(f.totalUSD)}</td>
       <td class="nr" style="color:var(--teal);font-weight:800">$ ${Math.round(f.totalUSD*f.tc).toLocaleString('es-AR')}</td>
     </tr>`).join('')}</tbody>
   </table></div>`;
@@ -1717,6 +1717,25 @@ async function napseHandlePDF(input){
     const mesOk = !mesFac || mesFac===napseMesActual;
 
     document.getElementById('napseZonePdf').classList.add('loaded');
+    if(fac.esND){
+      napseShowPreview([
+        ['Tipo', '🧾 Nota de Débito (ajuste por tipo de cambio)'],
+        ['N° ND', fac.numero],
+        ['Fecha', fac.fecha],
+        ['Ajusta la factura', fac.refFactura||'— no se pudo leer la referencia —'],
+        ['Bruto $', fmt(fac.brutoUSD)],
+        ['IVA $', fmt(fac.ivaUSD)],
+        ['▶ REAL en $', fmt(fac.totalUSD)],
+      ]);
+      if(!mesOk){ napseShowMsg('⛔ Esta ND es de '+MESES_LABEL[mesFac]+' pero estás cargando '+MESES_LABEL[napseMesActual]+'.','err'); return; }
+      const facsND=napseFacturas[napseMesActual]||[];
+      if(facsND.find(f=>f.numero===fac.numero)){ napseShowMsg('⚠️ Ya cargaste la ND '+fac.numero,'err'); return; }
+      napseShowMsg('✓ Nota de Débito leída · REAL: '+fmt(fac.totalUSD),'ok');
+      document.getElementById('napseBtnConfirm').style.display='block';
+      fac._filePdf=file;
+      document.getElementById('napseBtnConfirm')._pendingFac=fac;
+      return;
+    }
     napseShowPreview([
       ['N° factura', fac.numero],
       ['Fecha', fac.fecha],
@@ -1747,8 +1766,41 @@ async function napseHandlePDF(input){
   }catch(e){ napseShowMsg('Error: '+e.message,'err'); }
 }
 
+// Pedido 22/09 (marcelos): una "Nota de Débito Electrónica A" NO es una
+// factura de servicio: es el ajuste en pesos por la diferencia de cambio al
+// pagar una factura anterior, y trae la referencia a esa factura en
+// Observaciones ("Diferencia de cambio generada por pago de FC A-0002-
+// 00008158"). El parser de Napse asume siempre dólares + tipo de cambio, asi
+// que una ND cargada como factura quedaba en cero.
+//
+// Se guarda como una línea propia (decisión de Marce) con tc = 1 y los
+// importes EN PESOS en los campos USD. Suena raro pero es a proposito: todo
+// el resto del modulo calcula el real como total_usd × tc, asi que con tc=1
+// la ND suma su importe exacto sin tocar ninguna otra cuenta ni la tabla de
+// la base. La marca esND viaja en la columna series (jsonb), que para Napse
+// estaba sin usar.
+function napseEsND(text){ return /nota\s+de\s+d[ée]bito/i.test(text); }
+
+function napseParseND(text){
+  const numero=(text.match(/Numero[:\s]*([\d\-]+)/i)||text.match(/(000\d-[\d]+)/))?.[1]||'—';
+  const fecha=(text.match(/Fecha[:\s]*(\d{1,2}\/\d{2}\/\d{4})/i))?.[1]||'—';
+  // "...pago de FC A-0002-00008158" — la factura que origina el ajuste
+  const ref=(text.match(/FC\s*([A-Z]?-?\s?\d{4}-\d{6,8})/i))?.[1]?.trim()||'';
+  const num=(re)=>{ const m=text.match(re); return m?logiParseNum(m[1]):0; };
+  const bruto=num(/Bruto[:\s]*\$?\s*([\d.,]+)/i);
+  const iva=num(/IVA[:\s]*\$?\s*([\d.,]+)/i);
+  let total=num(/Total[:\s]*\$?\s*([\d.,]+)/i);
+  if(!total) total=bruto+iva;
+  return {
+    numero, fecha, esND:true, refFactura:ref,
+    desc:'Nota de Débito — dif. de cambio'+(ref?' s/ FC '+ref:''),
+    tc:1, brutoUSD:bruto, ivaUSD:iva, totalUSD:total,
+  };
+}
+
 function napseParsePDF(text){
   try{
+    if(napseEsND(text)) return napseParseND(text);
     const numero=(text.match(/Numero[:\s]*([\d\-]+)/i)||text.match(/(0002-[\d]+)/))?.[1]||'—';
     const fecha=(text.match(/Fecha[:\s]*(\d{1,2}\/\d{2}\/\d{4})/i))?.[1]||'—';
     const descM=text.match(/(?:40|60|100)%[^\r\n]{0,80}/i)||text.match(/HOSTING[^\r\n]{0,40}/i);
@@ -1803,7 +1855,8 @@ async function napseSaveDB(fac){
     user_id:currentUser.id, mes:napseMesActual,
     numero:fac.numero, fecha:fac.fecha, descripcion:fac.desc,
     tc:fac.tc, subtotal_usd:fac.brutoUSD, iva_usd:fac.ivaUSD,
-    otros_imp:0, total_usd:fac.totalUSD, terminales:0, series:[],
+    otros_imp:0, total_usd:fac.totalUSD, terminales:0,
+    series: fac.esND ? [{nd:true, ref:fac.refFactura||''}] : [],
     adjuntos:fac.adjuntos||[]
   };
   // Reusar tabla presupuesto_facturas con proveedor en descripción
@@ -4460,6 +4513,8 @@ async function loadFacturasFromDB() {
         napseFacturas[m].push({
           numero:row.numero, fecha:row.fecha, desc:row.descripcion,
           tc:row.tc, brutoUSD:row.subtotal_usd, ivaUSD:row.iva_usd, totalUSD:row.total_usd,
+          esND: !!(row.series&&row.series[0]&&row.series[0].nd),
+          refFactura: (row.series&&row.series[0]&&row.series[0].ref)||'',
           adjuntos:row.adjuntos||[]
         });
       }
