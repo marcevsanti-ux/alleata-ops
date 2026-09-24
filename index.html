@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.7.53</title>
+<title>Alleata · Operaciones v4.7.55</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -408,7 +408,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.53 · 18 sep 2026
+      v4.7.55 · 18 sep 2026
     </div>
   </div>
 </div>
@@ -517,7 +517,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.53 · 18 sep 2026
+      v4.7.55 · 18 sep 2026
     </div>
   </div>
 </nav>
@@ -572,7 +572,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.53</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.55</div>
   </div>
   <div class="content">
 
@@ -1345,7 +1345,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
   <div id="hr-asignar-box" style="display:none;background:var(--navy-800);border:1px solid var(--border2);border-radius:10px;padding:12px 16px;margin-bottom:18px;align-items:flex-end;gap:10px;flex-wrap:wrap">
     <div>
       <label class="label">N° de OT</label>
-      <input class="input" id="hr-asignar-ot" placeholder="00022742" style="width:150px;font-family:'JetBrains Mono',monospace">
+      <input class="input" id="hr-asignar-ot" placeholder="00024357 00024441 00024414..." title="Podés pegar varias OTs separadas por espacio, coma o salto de línea" placeholder="00022742" style="width:150px;font-family:'JetBrains Mono',monospace">
     </div>
     <div>
       <label class="label">Chofer</label>
@@ -5200,7 +5200,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.7.53] OK');
+console.log('[Alleata v4.7.55] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -6765,7 +6765,40 @@ async function agregarParadaManualDesktop(){
 // Ya existe el endpoint que hace exactamente eso (/despachar-ot, usado por
 // el flujo normal de escanear QR) — ahora se llama automáticamente acá
 // también, para no depender de un paso manual en Salesforce.
+// Pedido 23/09: asignación por lote. Antes había que cargar las OTs de a
+// una, y una hoja de ruta de 16 paradas eran 16 operaciones a mano. Ahora el
+// mismo campo acepta varias pegadas —separadas por coma, espacio, punto y
+// coma o salto de línea— y las procesa en secuencia. Se mantiene el flujo de
+// a una por OT (misma validación, mismo despacho a SF) para no cambiar nada
+// de la lógica que ya funciona: lo único nuevo es el bucle.
 async function asignarOTAChofer(){
+  if(currentProfile?.rol!=='admin'){alert('Solo un admin puede asignar OTs desde acá.');return;}
+  const inp=document.getElementById('hr-asignar-ot');
+  const nums=(inp.value||'').split(/[\s,;]+/).map(x=>x.trim()).filter(Boolean);
+  const msgBox=document.getElementById('hr-asignar-msg');
+  if(nums.length<=1) return asignarUnaOTAChofer();
+
+  if(!document.getElementById('hr-asignar-chofer').value){
+    msgBox.style.color='var(--red)';msgBox.textContent='Elegí un chofer.';return;
+  }
+  const btnL=document.getElementById('hr-asignar-btn');
+  btnL.disabled=true;
+  const ok=[],fallo=[];
+  for(let i=0;i<nums.length;i++){
+    btnL.textContent=`Asignando ${i+1}/${nums.length}...`;
+    inp.value=nums[i];
+    try{ await asignarUnaOTAChofer(true); ok.push(nums[i]); }
+    catch(e){ fallo.push(`${nums[i]}: ${e.message}`); }
+  }
+  inp.value = fallo.length ? fallo.map(f=>f.split(':')[0]).join(' ') : '';
+  btnL.disabled=false; btnL.textContent='➕ Asignar a su ruta de hoy';
+  msgBox.style.color = fallo.length ? 'var(--orange)' : 'var(--teal)';
+  msgBox.innerHTML = `✅ ${ok.length} de ${nums.length} asignadas.` +
+    (fallo.length ? `<br><span style="color:var(--red)">No se pudieron (quedaron en el campo para reintentar):</span><br>${fallo.join('<br>')}` : '');
+  if(typeof cargarHojaRuta==='function') cargarHojaRuta();
+}
+
+async function asignarUnaOTAChofer(enLote){
   if(currentProfile?.rol!=='admin'){alert('Solo un admin puede asignar OTs desde acá.');return;}
   const otNum=(document.getElementById('hr-asignar-ot').value||'').trim();
   const otNumBusqueda=/^\d+$/.test(otNum)?otNum.padStart(8,'0'):otNum;
@@ -6868,9 +6901,12 @@ async function asignarOTAChofer(){
     const msg2=document.getElementById('hr-asignar-msg');
     if(msg2){msg2.style.color=msg.style.color;msg2.textContent=msg.textContent;}
   }catch(e){
+    // En lote el error se propaga: lo junta el wrapper y lo informa al final,
+    // sin frenar las OTs que faltan.
+    if(enLote){ btn.disabled=false; throw e; }
     msg.style.color='var(--red)';msg.textContent='Error: '+e.message;
   }finally{
-    btn.disabled=false;btn.textContent='➕ Asignar a su ruta de hoy';
+    if(!enLote){ btn.disabled=false;btn.textContent='➕ Asignar a su ruta de hoy'; }
   }
 }
 
@@ -8445,7 +8481,7 @@ async function cargarPendienteRetiroExitosa() {
   const fmtCorto = d => new Date(d).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' });
 
   const { data, error } = await sb.from('sf_workorders')
-    .select('workorder_number,status,rollout,fecha_exitoso,sf_last_modified,logistica,entregado_por')
+    .select('workorder_number,status,rollout,fecha_exitoso,sf_last_modified,logistica,entregado_por,fecha_cierre')
     .eq('record_type', 'Cambio de Terminal')
     .in('status', ['Retirar Terminal', 'Exitoso'])
     .or(`fecha_exitoso.gte.${primerLunesMesStr},sf_last_modified.gte.${primerLunesMesStr}`);
@@ -8559,8 +8595,16 @@ async function cargarPendienteRetiroExitosa() {
         // transiciona Angel, no entregas, y ya tienen la línea naranja.
         if (logOT === 'EPSA') return;
         choferRuta = choferDeRuta(r.workorder_number, diaOT);
+        // FIX 24/09: /entregar-ot SACA la OT de rutas_diarias al cerrarla, asi
+        // que apenas el chofer entrega, la OT deja de estar "en la ruta de
+        // hoy" y el filtro por ruta la descartaba. Resultado: cuantas mas
+        // cerraba Angel, menos contaba el calendario (6 entregadas, 1
+        // mostrada). Por eso tambien entra si la cerro alguien ese dia, que es
+        // lo que registra fecha_cierre + entregado_por — la misma fuente que
+        // usa la card "Ruta por chofer" de arriba, que por eso iba bien.
+        const cerradaEseDia = !!r.entregado_por && String(r.fecha_cierre || '').slice(0, 10) === diaOT;
         const cerradaEnSF = !r.entregado_por;
-        if (choferRuta === null && !cerradaEnSF) return;
+        if (choferRuta === null && !cerradaEnSF && !cerradaEseDia) return;
       } else if (logOT !== criterio) return;
       const key = claveDiaAR(r[campoFecha]);
       if (!porDia[key]) porDia[key] = { cambio: 0, rollout: 0, porLog: {} };
@@ -8578,6 +8622,8 @@ async function cargarPendienteRetiroExitosa() {
       // Si la OT se cerró desde SF no tiene entregado_por, pero igual sabemos
       // en la ruta de quién estaba: se le acredita a esa persona.
       // choferRuta puede venir null (no estuvo en ruta ese día) → SF.
+      // entregado_por manda: es quien efectivamente cerró. choferRuta queda
+      // como respaldo para las que se cerraron desde SF estando en una ruta.
       const quien = r.entregado_por || choferRuta || '';
       if (!quien) { cel.sinChofer++; return; }
       const k = _normResponsable(quien);
