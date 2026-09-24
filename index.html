@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.7.51</title>
+<title>Alleata · Operaciones v4.7.52</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -408,7 +408,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.51 · 18 sep 2026
+      v4.7.52 · 18 sep 2026
     </div>
   </div>
 </div>
@@ -517,7 +517,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.51 · 18 sep 2026
+      v4.7.52 · 18 sep 2026
     </div>
   </div>
 </nav>
@@ -572,7 +572,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.51</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.52</div>
   </div>
   <div class="content">
 
@@ -5200,7 +5200,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.7.51] OK');
+console.log('[Alleata v4.7.52] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -8462,20 +8462,39 @@ async function cargarPendienteRetiroExitosa() {
   // sirve para cuando maneja un vendedor o el propio Marce: lo que define
   // que la hizo logística propia es haber estado en la ruta, no un campo
   // que se carga a mano en SF.
-  const rutasOT = {};   // ot_numero -> nombre del chofer de la hoja de ruta
+  // FIX 23/09: la primera versión de esto ignoraba la fecha — guardaba
+  // "esta OT estuvo en la ruta de X" sin importar qué día. Resultado: la OT
+  // 00024210, que estuvo en una ruta vieja de Marcelo, se cerró hoy desde SF
+  // por Cabify y el calendario se la acreditó a Marcelo en el día de hoy,
+  // que ni trabajó. Ahora la ruta se busca POR DÍA: la OT cuenta el día en
+  // que estuvo en una hoja de ruta, no cualquier día.
+  const rutasPorDia = {};   // 'YYYY-MM-DD' -> { ot_numero: chofer }
   try {
     const { data: rutas } = await sb.from('rutas_diarias')
-      .select('user_id,ots_numeros').gte('fecha', primerLunesMesStr);
+      .select('user_id,fecha,ots_numeros').gte('fecha', primerLunesMesStr);
     const ids = [...new Set((rutas || []).map(r => r.user_id).filter(Boolean))];
     const porUser = {};
     if (ids.length) {
       const { data: perfs } = await sb.from('profiles').select('id,nombre,email').in('id', ids);
       (perfs || []).forEach(pf => { porUser[pf.id] = pf.nombre || pf.email; });
     }
-    (rutas || []).forEach(r => (r.ots_numeros || []).forEach(n => {
-      if (n && !rutasOT[n]) rutasOT[n] = porUser[r.user_id] || '';
-    }));
+    (rutas || []).forEach(r => {
+      const f = String(r.fecha || '').slice(0, 10);
+      if (!f) return;
+      if (!rutasPorDia[f]) rutasPorDia[f] = {};
+      (r.ots_numeros || []).forEach(n => { if (n) rutasPorDia[f][n] = porUser[r.user_id] || ''; });
+    });
   } catch (e) { console.warn('[calendario] no se pudieron leer las hojas de ruta:', e.message); }
+
+  // Una OT cerrada 20:30 puede sincronizar con fecha_exitoso del día
+  // siguiente, así que se acepta también la ruta del día anterior.
+  const choferDeRuta = (ot, dia) => {
+    if (rutasPorDia[dia] && ot in rutasPorDia[dia]) return rutasPorDia[dia][ot] || '';
+    const ayer = new Date(dia + 'T12:00:00'); ayer.setDate(ayer.getDate() - 1);
+    const a = ayer.toLocaleDateString('en-CA');
+    if (rutasPorDia[a] && ot in rutasPorDia[a]) return rutasPorDia[a][ot] || '';
+    return null;   // no estuvo en ninguna ruta de ese día
+  };
 
   // Pedido 07/09 (v1): card chica con cuántas OT de Cambio de Terminal
   // están AHORA en "Configurar Terminal" (arranque del flujo, previo a
@@ -8527,8 +8546,11 @@ async function cargarPendienteRetiroExitosa() {
     const porDia = {};
     (data || []).forEach(r => {
       if (r.status !== status || !r[campoFecha]) return;
+      const diaOT = new Date(r[campoFecha]).toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' });
+      let choferRuta = null;
       if (criterio === 'RUTA') {
-        if (!(r.workorder_number in rutasOT)) return;
+        choferRuta = choferDeRuta(r.workorder_number, diaOT);
+        if (choferRuta === null) return;   // ese día no estuvo en ninguna ruta
       } else if ((r.logistica || '').toUpperCase().trim() !== criterio) return;
       const key = claveDiaAR(r[campoFecha]);
       if (!porDia[key]) porDia[key] = { cambio: 0, rollout: 0, porLog: {} };
@@ -8545,7 +8567,7 @@ async function cargarPendienteRetiroExitosa() {
       cel.total++;
       // Si la OT se cerró desde SF no tiene entregado_por, pero igual sabemos
       // en la ruta de quién estaba: se le acredita a esa persona.
-      const quien = r.entregado_por || rutasOT[r.workorder_number] || '';
+      const quien = r.entregado_por || choferRuta || '';
       if (!quien) { cel.sinChofer++; return; }
       const k = _normResponsable(quien);
       if (!cel.porChofer) cel.porChofer = {};
