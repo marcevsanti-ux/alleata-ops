@@ -556,6 +556,7 @@ function renderTabla(items, filtro) {
       const isCoto=it.id==='coto';
       const isML=it.id==='mercadolibre';
       const isSpb=it.id==='superbol';
+      const isCorrucart=it.id==='corrucart';
       // Nro facturas para columna
       const logiFacs = isLogi ? logiGetFacturas(mes) : [];
       const napseFacsRow = isNapse ? (napseFacturas[mes]||[]) : [];
@@ -565,6 +566,7 @@ function renderTabla(items, filtro) {
       const cotoFacsRow = isCoto ? (cotoFacturas[mes]||[]) : [];
       const mlFacsRow = isML ? (mlFacturas[mes]||[]) : [];
       const spbFacsRow = isSpb ? (spbFacturas[mes]||[]) : [];
+      const corrucartFacsRow = isCorrucart ? (corrucartFacturas[mes]||[]) : [];
       // Envíos del mes (solo paquetería, no viajes de personas de Cabify "varios")
       if(isEpsa) totalEnvios += epsaFacsRow.reduce((s,f)=>s+(f.cantidadTotal||0),0);
       if(isCA) totalEnvios += caFacsRow.reduce((s,f)=>s+(f.cantidadAlleata||0),0);
@@ -618,6 +620,12 @@ function renderTabla(items, filtro) {
             <span style="font-family:'JetBrains Mono',monospace;font-size:10px;background:rgba(29,191,142,.08);color:var(--teal);padding:1px 6px;border-radius:4px;border:1px solid rgba(29,191,142,.2);display:block">${f.numero}</span>
             ${f.cantidad?`<span style="font-size:9px;color:var(--text-muted);margin-top:2px;display:block">${f.cantidad} unid.</span>`:''}
           </div>`).join('');
+      else if(isCorrucart && corrucartFacsRow.length)
+        nroFacCell = corrucartFacsRow.map(f=>`
+          <div style="display:inline-block;margin:2px;vertical-align:top;text-align:center">
+            <span style="font-family:'JetBrains Mono',monospace;font-size:10px;background:rgba(29,191,142,.08);color:var(--teal);padding:1px 6px;border-radius:4px;border:1px solid rgba(29,191,142,.2);display:block">${f.numero}</span>
+            ${f.remito?`<span style="font-size:9px;color:var(--text-muted);margin-top:2px;display:block">Remito ${f.remito}</span>`:''}
+          </div>`).join('');
       else if(isClaro && claroData[mes])
         nroFacCell = getChip(claroData[mes].nroFac||'—', claroData[mes].nroFac&&claroData[mes].nroFac!=='—'?'Claro':'');
       else if(isTelecom && telecomData[mes])
@@ -642,7 +650,7 @@ function renderTabla(items, filtro) {
           <td class="mono" style="color:${dc}">${(prev||real)?fmtDesv(desv,prev):'—'}</td>
           <td style="text-align:center">${pctBadge}</td>
           <td style="text-align:center">
-            <button class="btn-edit${(isLogi||isClaro)?' logi':''}" onclick="${isLogi?`openLogiModal('${mes}')`:isClaro?`openClaroModal('${mes}')`:isNapse?`openNapseModal('${mes}')`:isTelecom?`openTelecomModal('${mes}')`:isAmazon?`openAmazonModal('${mes}')`:isCA?`openCaModal('${mes}')`:isCabify?`openCabifyModal('${mes}')`:isEpsa?`openEpsaModal('${mes}')`:isCoto?`openCotoModal('${mes}')`:isML?`openMlModal('${mes}')`:isSpb?`openSpbModal('${mes}')`:`openModal('${it.id}','${it.p}','${it.d}')`}">${(isLogi||isClaro||isNapse||isTelecom||isAmazon||isCA||isCabify||isEpsa||isCoto||isML||isSpb)?'📎':'✏️'}</button>
+            <button class="btn-edit${(isLogi||isClaro)?' logi':''}" onclick="${isLogi?`openLogiModal('${mes}')`:isClaro?`openClaroModal('${mes}')`:isNapse?`openNapseModal('${mes}')`:isTelecom?`openTelecomModal('${mes}')`:isAmazon?`openAmazonModal('${mes}')`:isCA?`openCaModal('${mes}')`:isCabify?`openCabifyModal('${mes}')`:isEpsa?`openEpsaModal('${mes}')`:isCoto?`openCotoModal('${mes}')`:isML?`openMlModal('${mes}')`:isSpb?`openSpbModal('${mes}')`:isCorrucart?`openCorrucartModal('${mes}')`:`openModal('${it.id}','${it.p}','${it.d}')`}">${(isLogi||isClaro||isNapse||isTelecom||isAmazon||isCA||isCabify||isEpsa||isCoto||isML||isSpb||isCorrucart)?'📎':'✏️'}</button>
           </td>
         </tr>`;
     });
@@ -1325,6 +1333,10 @@ let mlPendingFactura = null;
 const spbFacturas = {};
 let spbMesActual = 'jun';
 let spbPendingFactura = null;
+
+const corrucartFacturas = {};
+let corrucartMesActual = 'jun';
+let corrucartPendingFactura = null;
 
 let logiCurrentTC     = 1428;
 // (logiPendingFac declarado arriba)
@@ -3808,6 +3820,287 @@ async function spbEliminarFactura(numero){
 
 function spbShowMsg(txt,type){ const e=document.getElementById('spbMsgFile');if(e){e.className='up-msg '+type;e.textContent=txt;} }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// CORRUCART SRL / Insumos — proveedor dedicado (cajas troqueladas, embalaje).
+// Clon del flujo de SuperBol: factura AFIP estándar, un solo proveedor fijo,
+// sin conversión de moneda. Solo PDF (Corrucart siempre factura electrónica).
+// Particularidad del formato Corrucart: los montos van con coma de miles y
+// punto decimal ("2,975,329.50"), igual que SuperBol/AWS — se reusa spbParseNum
+// vía la misma lógica de limpieza. El campo "Real" se carga con el TOTAL
+// (con IVA incluido), no el Neto — así lo definió Marcelo el 25/09.
+// ═══════════════════════════════════════════════════════════════════════════
+
+function openCorrucartModal(m){
+  corrucartMesActual=m;
+  document.getElementById('corrucartBg').classList.add('open');
+  document.getElementById('corrucartSub').textContent=MESES_LABEL[m]+' 2026 · Insumos (Corrucart SRL — cajas de embalaje)';
+  corrucartResetForm();
+  corrucartRenderKPIs();
+  corrucartRenderFacturas();
+}
+function closeCorrucartModal(){
+  document.getElementById('corrucartBg').classList.remove('open');
+  corrucartSyncReal(); render();
+}
+function corrucartResetForm(){
+  const inp=document.getElementById('corrucartFileInp'); if(inp) inp.value='';
+  document.getElementById('corrucartZoneFile')?.classList.remove('loaded');
+  const fn=document.getElementById('corrucartFileName'); if(fn){fn.style.display='none';fn.textContent='';}
+  const msg=document.getElementById('corrucartMsgFile'); if(msg){msg.className='up-msg';msg.textContent='';}
+  const prev=document.getElementById('corrucartPendingWrap'); if(prev){prev.style.display='none';prev.innerHTML='';}
+  corrucartPendingFactura=null;
+}
+function corrucartSyncReal(){
+  MESES.forEach(m=>{
+    const facs=corrucartFacturas[m]||[];
+    const real=facs.reduce((s,f)=>s+f.total,0);
+    if(real>0) reales['corrucart_'+m]=real;
+  });
+}
+function corrucartRenderKPIs(){
+  const m=corrucartMesActual;
+  const prev=DATA.find(i=>i.id==='corrucart').prev[m]||0;
+  const facs=corrucartFacturas[m]||[];
+  const real=facs.reduce((s,f)=>s+f.total,0);
+  const desvPct=prev>0?((real-prev)/prev)*100:0;
+  const el=document.getElementById('corrucartKpis'); if(!el) return;
+  el.innerHTML=[
+    {label:'PREV '+MESES_LABEL[m].substring(0,3).toUpperCase()+' 26', val:fmt(prev)||'—', sub:'presupuestado', cls:''},
+    {label:'REAL', val:real>0?fmt(real):'—', sub:facs.length+' factura(s) · total con IVA', cls:real>0?'green':''},
+    {label:'DESVÍO', val:real>0?fmtPct(desvPct):'—', sub:desvPct<=0?'por debajo':'por encima', cls:real>0?(Math.abs(desvPct)>20?'warn':'ok'):''},
+  ].map(k=>`<div class="lk"><div class="lk-label">${k.label}</div><div class="lk-val ${k.cls}">${k.val}</div><div class="lk-sub">${k.sub}</div></div>`).join('');
+}
+
+function corrucartRenderFacturas(){
+  const m=corrucartMesActual;
+  const facs=corrucartFacturas[m]||[];
+  const wrap=document.getElementById('corrucartFacWrap');
+  const sec=document.getElementById('corrucartFacSecLbl');
+  const badge=document.getElementById('corrucartFacBadge');
+  if(!wrap) return;
+  if(!facs.length){ wrap.innerHTML=''; if(sec) sec.style.display='none'; return; }
+  if(sec) sec.style.display='flex';
+  if(badge) badge.textContent=facs.length+' factura'+(facs.length!==1?'s':'');
+  wrap.innerHTML=facs.map(f=>`
+    <div style="background:var(--navy-900);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px">
+        <div>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700">${f.numero}</span>
+          <span style="font-size:11px;color:var(--text-muted);margin-left:8px">${f.fecha}${f.remito?' · Remito '+f.remito:''}</span>
+        </div>
+        <div style="text-align:right;display:flex;align-items:center;gap:10px">
+          <div style="font-family:'JetBrains Mono',monospace;font-weight:800;color:var(--teal)">${fmt(f.total)}</div>
+          <button onclick="corrucartEliminarFactura('${f.numero}')" title="Eliminar factura" class="btn-del-fac" style="background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.25);color:#f87171;border-radius:6px;padding:5px 9px;cursor:pointer;font-size:12px">🗑️</button>
+        </div>
+      </div>
+      ${presupRenderAdjuntosConBoton(f.adjuntos, ['pdf'], 'corrucartAdjuntarArchivo', f.numero)}
+    </div>`).join('');
+}
+
+// Parser de la factura Corrucart (AFIP Factura A estándar, formato propio del
+// sistema de facturación del proveedor). Montos en formato "1,234.56" (coma
+// miles, punto decimal) — igual que SuperBol/AWS, no formato argentino.
+function corrucartParseInvoiceText(text){
+  try{
+    const joined=text.replace(/\r/g,'');
+    const numParse=s=>parseFloat(String(s).replace(/,/g,''))||0;
+
+    // N° de factura: "Factura A 0002-00034065" (sin prefijo "N°", pegado a
+    // la palabra "Factura" + la letra de tipo) — mismo patrón que el
+    // fallback de SuperBol/ML.
+    let nroM=joined.match(/Factura\s+[A-Z]\s*\n?\s*(\d{4}-\d{8})/i);
+    const numero=nroM?nroM[1]:'—';
+
+    // Fecha de emisión: "Fecha:24/09/2026"
+    const fechaM=joined.match(/Fecha:\s*(\d{2})[\/\-](\d{2})[\/\-](\d{4})/i);
+    const fecha=fechaM?`${fechaM[1]}-${fechaM[2]}-${fechaM[3]}`:'—';
+    const MESES_NUM=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+    const mesFactura=fechaM?(MESES_NUM[parseInt(fechaM[2],10)-1]||null):null;
+
+    // CUIT del proveedor: el primer C.U.I.T. del documento es el del emisor
+    // (Corrucart) — el del cliente (Moretti) aparece más abajo, cerca de
+    // "Cond. de Pago".
+    const cuitM=joined.match(/C\.?U\.?I\.?T\.?:?\s*([\d-]{11,13})/i);
+    const cuit=cuitM?cuitM[1]:'—';
+
+    // N° de Remito
+    const remitoM=joined.match(/N[°ºo]\s*Remito:?\s*([\d.,]+)/i);
+    const remito=remitoM?remitoM[1]:'';
+
+    // Total: se toma el ÚLTIMO importe con "$" del documento — en este
+    // formato la fila de totales (Neto/IVA/TOTAL) imprime los montos en ese
+    // orden y "TOTAL" es siempre la última columna, así que su valor es el
+    // último "$" que aparece antes del bloque de CAE.
+    const caeIdx=joined.search(/CAE:/i);
+    const zonaTotales=caeIdx>0?joined.slice(0,caeIdx):joined;
+    const dollarMs=[...zonaTotales.matchAll(/\$\s*([\d.,]+\.\d{2})/g)];
+    const total=dollarMs.length?numParse(dollarMs[dollarMs.length-1][1]):0;
+
+    return {numero, fecha, mesFactura, cuit, remito, total};
+  }catch(e){ return null; }
+}
+
+async function corrucartHandleFile(input){
+  const file=input.files[0]; if(!file) return;
+  document.getElementById('corrucartFileName').textContent=file.name;
+  document.getElementById('corrucartFileName').style.display='block';
+  document.getElementById('corrucartZoneFile').classList.add('loaded');
+  corrucartShowMsg('📄 Leyendo el PDF...','ok');
+  try{
+    const buf=await file.arrayBuffer();
+    const pdf=await pdfjsLib.getDocument({data:buf}).promise;
+    let rawText='';
+    for(let i=1;i<=pdf.numPages;i++){
+      const pg=await pdf.getPage(i);
+      const ct=await pg.getTextContent();
+      rawText+=ct.items.map(it=>it.str).join(' ')+'\n';
+    }
+    const parsed=corrucartParseInvoiceText(rawText);
+    if(!parsed){ corrucartShowMsg('No se pudo leer el PDF. Completá los datos a mano.','err'); }
+
+    corrucartPendingFactura={
+      numero:parsed?.numero||'—',
+      fecha:parsed?.fecha||'—',
+      cuit:parsed?.cuit||'—',
+      remito:parsed?.remito||'',
+      total:Number(parsed?.total)||0,
+      rawText,
+      _file:file,
+    };
+
+    let mesFac=corrucartMesActual;
+    if(parsed?.mesFactura) mesFac=parsed.mesFactura;
+    const mesOk=mesFac===corrucartMesActual;
+
+    corrucartRenderPending();
+    if(!mesOk){
+      corrucartShowMsg('⛔ Esta factura parece ser de '+MESES_LABEL[mesFac]+' pero estás cargando '+MESES_LABEL[corrucartMesActual]+'. Revisá la fecha abajo (podés corregirla si el parseo se equivocó).','err');
+    } else if(parsed?.total){
+      corrucartShowMsg('✓ Factura leída · Total (con IVA): '+fmt(parsed.total)+' · revisá los datos antes de confirmar','ok');
+    } else {
+      corrucartShowMsg('⚠️ No se detectó el total automáticamente. Completalo a mano.','err');
+    }
+  }catch(e){
+    corrucartShowMsg('Error leyendo el PDF: '+e.message+' — completá los datos a mano.','err');
+    corrucartPendingFactura={numero:'—',fecha:'—',cuit:'—',remito:'',total:0,rawText:'',_file:file};
+    corrucartRenderPending();
+  }
+}
+
+function corrucartRenderPending(){
+  const t=corrucartPendingFactura;
+  const wrap=document.getElementById('corrucartPendingWrap');
+  if(!wrap) return;
+  if(!t){ wrap.style.display='none'; wrap.innerHTML=''; return; }
+  wrap.style.display='block';
+  wrap.innerHTML=`
+    <div style="background:var(--navy-900);border:1px solid var(--border2);border-radius:10px;padding:14px;margin-top:10px">
+      <div class="ml-field-row" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+        <div>
+          <label style="font-size:10px;color:var(--text-muted);display:block;margin-bottom:3px">N° de factura</label>
+          <input type="text" value="${(t.numero||'').replace(/"/g,'&quot;')}" oninput="corrucartPendingFactura.numero=this.value" style="width:100%;background:var(--navy-800);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:12px;padding:6px 8px;box-sizing:border-box">
+        </div>
+        <div>
+          <label style="font-size:10px;color:var(--text-muted);display:block;margin-bottom:3px">Fecha (DD-MM-YYYY)</label>
+          <input type="text" value="${(t.fecha||'').replace(/"/g,'&quot;')}" oninput="corrucartPendingFactura.fecha=this.value" style="width:100%;background:var(--navy-800);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:12px;padding:6px 8px;box-sizing:border-box">
+        </div>
+        <div>
+          <label style="font-size:10px;color:var(--text-muted);display:block;margin-bottom:3px">N° Remito</label>
+          <input type="text" value="${(t.remito||'').replace(/"/g,'&quot;')}" oninput="corrucartPendingFactura.remito=this.value" style="width:100%;background:var(--navy-800);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:12px;padding:6px 8px;box-sizing:border-box">
+        </div>
+        <div>
+          <label style="font-size:10px;color:var(--text-muted);display:block;margin-bottom:3px">Total con IVA ($)</label>
+          <input type="number" step="0.01" value="${t.total}" oninput="corrucartPendingFactura.total=parseFloat(this.value)||0" style="width:100%;background:var(--navy-800);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:12px;padding:6px 8px;box-sizing:border-box;text-align:right">
+        </div>
+      </div>
+      ${t.rawText?`<details style="margin-bottom:10px"><summary style="cursor:pointer;font-size:10px;color:var(--text-muted)">Ver texto crudo leído (por si algún dato quedó mal)</summary><pre style="white-space:pre-wrap;font-size:10px;color:var(--text-muted);background:var(--navy-800);border:1px solid var(--border2);padding:8px;border-radius:6px;margin-top:6px;max-height:180px;overflow:auto">${t.rawText.replace(/</g,'&lt;')}</pre></details>`:''}
+      <button class="btn-confirm" onclick="corrucartGuardar()" style="display:block">✓ Confirmar y guardar REAL</button>
+    </div>`;
+}
+
+async function corrucartGuardar(){
+  if(isReadonlyBlocked()) return;
+  const t=corrucartPendingFactura; if(!t) return;
+  if(!t.total){ corrucartShowMsg('El total no puede ser $0 — completalo antes de guardar.','err'); return; }
+  const facsExist=corrucartFacturas[corrucartMesActual]||[];
+  if(facsExist.find(f=>f.numero===t.numero && t.numero!=='—')){
+    corrucartShowMsg('⚠️ Ya cargaste la factura '+t.numero+' este mes.','err');
+    return;
+  }
+
+  let mesFac=corrucartMesActual;
+  const fm=(t.fecha||'').match(/^\d{2}-(\d{2})-\d{4}$/);
+  if(fm && CA_MES_MAP[fm[1]]) mesFac=CA_MES_MAP[fm[1]];
+  if(mesFac!==corrucartMesActual){
+    corrucartMesActual=mesFac;
+    document.getElementById('corrucartSub').textContent=MESES_LABEL[mesFac]+' 2026 · Insumos (Corrucart SRL) · (mes detectado de la fecha de la factura)';
+  }
+
+  const factura={
+    numero:t.numero, fecha:t.fecha, cuit:t.cuit||'—', remito:t.remito||'', total:t.total,
+    adjuntos:await presupSubirAdjuntos([{file:t._file, etiqueta:'pdf'}], 'corrucart', corrucartMesActual),
+  };
+  if(!corrucartFacturas[corrucartMesActual]) corrucartFacturas[corrucartMesActual]=[];
+  corrucartFacturas[corrucartMesActual].push(factura);
+  reales['corrucart_'+corrucartMesActual]=(corrucartFacturas[corrucartMesActual]||[]).reduce((s,f)=>s+f.total,0);
+
+  if(!currentUser){
+    corrucartShowMsg('⚠️ No hay sesión activa: se guardó solo en este navegador, NO en la base.','err');
+  } else {
+    const ok=await corrucartSaveDB(factura);
+    if(!ok){ corrucartShowMsg('⛔ Error al guardar en la base de datos. Revisá la consola (F12).','err'); return; }
+  }
+  showToast('✅ Corrucart '+factura.numero+' guardado · '+fmt(factura.total));
+  corrucartResetForm();
+  corrucartRenderKPIs();
+  corrucartRenderFacturas();
+  render();
+}
+
+async function corrucartSaveDB(factura){
+  const row={
+    user_id:currentUser.id, mes:corrucartMesActual, proveedor:'corrucart',
+    numero:factura.numero, fecha:factura.fecha, vto:factura.fecha,
+    descripcion:'Corrucart SRL'+(factura.remito?' · Remito '+factura.remito:'')+(factura.cuit&&factura.cuit!=='—'?' · CUIT '+factura.cuit:''),
+    tc:1, subtotal_usd:factura.total, iva_usd:0, otros_imp:0, total_usd:factura.total,
+    adjuntos:factura.adjuntos||[]
+  };
+  const {error}=await sb.from('presupuesto_facturas').upsert(row,{onConflict:'numero,mes'});
+  if(error){ console.error('Corrucart DB error:',error); return false; }
+  return true;
+}
+
+async function corrucartAdjuntarArchivo(numero, tipo){
+  const t=(corrucartFacturas[corrucartMesActual]||[]).find(f=>f.numero===numero);
+  if(!t) return;
+  presupAdjuntarArchivo(t, 'corrucart', corrucartMesActual, tipo, async ()=>{
+    if(currentUser) await corrucartSaveDB(t);
+    corrucartRenderFacturas();
+  });
+}
+
+async function corrucartEliminarFactura(numero){
+  if(isReadonlyBlocked()) return;
+  const m=corrucartMesActual;
+  const facs=corrucartFacturas[m]||[];
+  const f=facs.find(x=>x.numero===numero);
+  if(!f) return;
+  if(!confirm('¿Eliminar la factura '+numero+' ('+fmt(f.total)+') de '+MESES_LABEL[m]+'? Esta acción no se puede deshacer.')) return;
+  if(currentUser){
+    const {error}=await sb.from('presupuesto_facturas').delete().eq('numero',numero).eq('mes',m).eq('proveedor','corrucart');
+    if(error){ showToast('⛔ Error al eliminar en la base de datos. Revisá la consola (F12).'); console.error('Corrucart delete error:',error); return; }
+  }
+  corrucartFacturas[m]=facs.filter(x=>x.numero!==numero);
+  const real=(corrucartFacturas[m]||[]).reduce((s,x)=>s+x.total,0);
+  if(real>0) reales['corrucart_'+m]=real; else delete reales['corrucart_'+m];
+  showToast('🗑️ Factura '+numero+' eliminada');
+  corrucartRenderKPIs();
+  corrucartRenderFacturas();
+  render();
+}
+
+function corrucartShowMsg(txt,type){ const e=document.getElementById('corrucartMsgFile');if(e){e.className='up-msg '+type;e.textContent=txt;} }
+
 // ── Fin Cabify + CALOG ────────────────────────────────────────────────────────
 
 // ── Telecom Personal state ───────────────────────────────────────────────────
@@ -5067,6 +5360,41 @@ logiAgregar = async function() {
 
     <div class="logi-footer">
       <button class="btn-cancel" onclick="closeSpbModal()">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<div class="claro-bg" id="corrucartBg">
+  <div class="claro-modal">
+    <h3>Corrucart SRL (Insumos)</h3>
+    <p class="msub" id="corrucartSub" style="font-size:12px;color:var(--text-muted);margin-bottom:22px"></p>
+
+    <div class="claro-kpis" id="corrucartKpis" style="grid-template-columns:repeat(3,1fr)"></div>
+
+    <div style="font-size:11px;color:var(--text-muted);background:var(--navy-900);border:1px solid var(--border2);border-radius:9px;padding:10px 14px;margin-bottom:16px">
+      💡 Subí la factura (PDF) de Corrucart — se lee automáticamente el N° de factura, fecha, remito y el total con IVA. Revisá los datos antes de confirmar.
+    </div>
+
+    <div class="up-title">📦 Factura (PDF)</div>
+    <div class="up-zone" id="corrucartZoneFile"
+      ondragover="event.preventDefault();this.classList.add('drag')"
+      ondragleave="this.classList.remove('drag')"
+      ondrop="this.classList.remove('drag');corrucartHandleFile({files:event.dataTransfer.files});event.preventDefault()">
+      <input type="file" id="corrucartFileInp" accept=".pdf" onchange="corrucartHandleFile(this)">
+      <div class="uz-icon">📦</div>
+      <div class="uz-lbl">Soltá o seleccioná el PDF</div>
+      <div class="uz-sub">Factura A de Corrucart — se lee automáticamente</div>
+      <div class="uz-fn" id="corrucartFileName"></div>
+    </div>
+    <div class="up-msg" id="corrucartMsgFile"></div>
+
+    <div id="corrucartPendingWrap" style="display:none"></div>
+
+    <div class="sec-lbl" id="corrucartFacSecLbl" style="display:none">Facturas cargadas este mes <span></span> <span id="corrucartFacBadge" style="background:rgba(29,191,142,.15);color:var(--teal);padding:1px 10px;border-radius:20px;font-size:10px;font-weight:700"></span></div>
+    <div id="corrucartFacWrap"></div>
+
+    <div class="logi-footer">
+      <button class="btn-cancel" onclick="closeCorrucartModal()">Cerrar</button>
     </div>
   </div>
 </div>
