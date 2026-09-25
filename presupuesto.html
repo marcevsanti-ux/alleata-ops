@@ -3906,9 +3906,12 @@ function corrucartParseInvoiceText(text){
     const numParse=s=>parseFloat(String(s).replace(/,/g,''))||0;
 
     // N° de factura: "Factura A 0002-00034065" (sin prefijo "N°", pegado a
-    // la palabra "Factura" + la letra de tipo) — mismo patrón que el
-    // fallback de SuperBol/ML.
-    let nroM=joined.match(/Factura\s+[A-Z]\s*\n?\s*(\d{4}-\d{8})/i);
+    // la palabra "Factura" + la letra de tipo). OJO: pdf.js no respeta el
+    // orden visual del PDF — en la factura real de Corrucart el número sale
+    // ANTES de la palabra "Factura" en el stream de texto, no después. Se
+    // prueban las dos direcciones (bug detectado 25/09 con factura real).
+    let nroM=joined.match(/Factura\s+[A-Z]\s*\n?\s*(\d{4}-\d{8})/i)
+      || joined.match(/(\d{4}-\d{8})\s*Factura\s+[A-Z]/i);
     const numero=nroM?nroM[1]:'—';
 
     // Fecha de emisión: "Fecha:24/09/2026"
@@ -3923,8 +3926,9 @@ function corrucartParseInvoiceText(text){
     const cuitM=joined.match(/C\.?U\.?I\.?T\.?:?\s*([\d-]{11,13})/i);
     const cuit=cuitM?cuitM[1]:'—';
 
-    // N° de Remito
-    const remitoM=joined.match(/N[°ºo]\s*Remito:?\s*([\d.,]+)/i);
+    // N° de Remito — mismo problema de orden invertido que el N° de factura.
+    const remitoM=joined.match(/N[°ºo]\s*Remito:?\s*([\d.,]+)/i)
+      || joined.match(/([\d.,]{4,})\s*N[°ºo]\s*Remito/i);
     const remito=remitoM?remitoM[1]:'';
 
     // Total: se toma el ÚLTIMO importe con "$" del documento — en este
