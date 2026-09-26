@@ -5429,12 +5429,19 @@ async function abrirStockSimsVivo() {
           <div style="font-size:14px;font-weight:700;color:var(--text)">🛰️ Stock en vivo — Salesforce</div>
           <button onclick="document.getElementById('modalStockSims').remove()" style="background:none;border:none;color:var(--text-muted);font-size:18px;cursor:pointer;line-height:1;">×</button>
         </div>
-        <div style="padding:12px 20px 0;display:flex;gap:8px;flex-wrap:wrap;flex-shrink:0;">
-          <select id="stockSimsFiltroEstado" class="input" style="flex:1;min-width:150px;font-size:12px" onchange="_stockSimsRefrescar()"><option value="">Estado — todos</option></select>
-          <select id="stockSimsFiltroUbicacion" class="input" style="flex:1;min-width:150px;font-size:12px" onchange="_stockSimsRefrescar()"><option value="">Ubicación — todas</option></select>
+        <div style="padding:12px 20px 0;display:flex;gap:8px;flex-wrap:wrap;flex-shrink:0;align-items:flex-end;">
+          <div style="flex:1;min-width:150px">
+            <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Estado</div>
+            <select id="stockSimsFiltroEstado" class="input" style="width:100%;font-size:12px" onchange="_stockSimsRefrescar()"><option value="">Todos</option></select>
+          </div>
+          <div style="flex:1;min-width:150px">
+            <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Ubicación</div>
+            <select id="stockSimsFiltroUbicacion" class="input" style="width:100%;font-size:12px" onchange="_stockSimsRefrescar()"><option value="">Todas</option></select>
+          </div>
           <button class="btn-ghost btn-sm" onclick="_stockSimsRefrescar()" title="Volver a consultar">↺</button>
         </div>
         <div id="modalStockSimsBody" style="padding:14px 20px;overflow-y:auto;flex:1;"></div>
+        <div id="modalStockSimsInventario" style="padding:12px 20px;border-top:1px solid var(--border);flex-shrink:0;display:none"></div>
       </div>`;
     document.body.appendChild(m);
     m.addEventListener('click', (e) => { if (e.target === m) m.remove(); });
@@ -5451,6 +5458,18 @@ async function abrirStockSimsVivo() {
     }
     filtros.estados.forEach(v => selEstado.insertAdjacentHTML('beforeend', `<option value="${v}">${v}</option>`));
     filtros.ubicaciones.forEach(v => selUbic.insertAdjacentHTML('beforeend', `<option value="${v}">${v}</option>`));
+
+    // Corrección de inventario única — pedido 26/09, solo admin (escribe en SF).
+    if (currentProfile?.rol === 'admin') {
+      const inv = document.getElementById('modalStockSimsInventario');
+      inv.style.display = 'block';
+      inv.innerHTML = `
+        <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px">
+          🧹 <strong style="color:var(--text)">Corrección de inventario (única vez)</strong> — CHIP CLARO/PERSONAL en Disponible+Barracas que NO se leyeron hoy pasan a Ubicación "NO TIENE".
+        </div>
+        <button class="btn-ghost btn-sm" onclick="_stockSimsInventarioPreview()">Ver vista previa</button>
+        <div id="stockSimsInventarioResultado" style="margin-top:8px"></div>`;
+    }
   }
   await _stockSimsRefrescar();
 }
@@ -5511,6 +5530,64 @@ async function _stockSimsRefrescar() {
     `;
   } catch (err) {
     body.innerHTML = `<div style="text-align:center;color:#f87171;font-size:13px;padding:30px 0">⛔ ${err.message}</div>`;
+  }
+}
+
+// ── Corrección de inventario única — vista previa + aplicar ────────────────
+// Flujo en 2 pasos a propósito: primero SOLO lee y muestra los números
+// (/sims/inventario-preview), y recién con "Confirmar" real ejecuta la
+// escritura (/sims/inventario-aplicar con confirmar:true) — no hay forma de
+// que un solo click reescriba cientos de registros en Salesforce.
+async function _stockSimsInventarioPreview() {
+  const cont = document.getElementById('stockSimsInventarioResultado');
+  cont.innerHTML = `<div style="font-size:11px;color:var(--text-muted)">Consultando Salesforce...</div>`;
+  try {
+    const res = await fetch(`${SF_AGENT_URL}/automations/sims/inventario-preview`, { headers: { 'x-automation-secret': SF_SYNC_SECRET } });
+    const data = await res.json();
+    if (!res.ok || !data.ok) throw new Error(data.error || 'Error consultando la vista previa');
+
+    if (!data.valor_destino_valido) {
+      cont.innerHTML = `<div style="font-size:12px;color:#f87171">⛔ "NO TIENE" no aparece como valor activo de Ubicacion__c en Salesforce. Valores reales encontrados: ${data.valores_ubicacion_reales.join(', ') || '(ninguno)'}. No se puede aplicar el cambio hasta confirmar el valor correcto.</div>`;
+      return;
+    }
+
+    cont.innerHTML = `
+      <div style="background:var(--navy-900);border:1px solid var(--border2);border-radius:8px;padding:10px 12px;font-size:12px">
+        <div>✅ Quedan en <strong>BARRACAS</strong> (leídos hoy): <strong style="color:var(--teal)">${data.quedan_en_barracas.total}</strong></div>
+        <div style="margin-top:4px">➡️ Pasan a <strong>NO TIENE</strong> (no leídos hoy): <strong style="color:#f59e0b">${data.pasan_a_no_tiene.total}</strong></div>
+      </div>
+      ${data.pasan_a_no_tiene.total > 0 ? `
+        <button class="btn-confirm" style="margin-top:10px" onclick="_stockSimsInventarioAplicar(${data.pasan_a_no_tiene.total})">
+          Confirmar cambio de ${data.pasan_a_no_tiene.total} chips a "NO TIENE"
+        </button>` : `<div style="font-size:11px;color:var(--text-muted);margin-top:8px">Nada para corregir — ya está todo al día.</div>`}
+    `;
+  } catch (err) {
+    cont.innerHTML = `<div style="font-size:12px;color:#f87171">⛔ ${err.message}</div>`;
+  }
+}
+
+async function _stockSimsInventarioAplicar(totalEsperado) {
+  if (!confirm(`Esto va a escribir en Salesforce: ${totalEsperado} chips van a quedar con Ubicación = "NO TIENE". Esta acción no se puede deshacer con un click — ¿confirmás?`)) return;
+  const cont = document.getElementById('stockSimsInventarioResultado');
+  cont.innerHTML = `<div style="font-size:11px;color:var(--text-muted)">Aplicando cambios en Salesforce (puede tardar unos segundos)...</div>`;
+  try {
+    const res = await fetch(`${SF_AGENT_URL}/automations/sims/inventario-aplicar`, {
+      method: 'POST',
+      headers: { 'x-automation-secret': SF_SYNC_SECRET, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ confirmar: true }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.ok) throw new Error(data.error || 'Error aplicando el cambio');
+
+    cont.innerHTML = `
+      <div style="font-size:12px;color:var(--teal)">✅ ${data.actualizados}/${data.total} chips actualizados a "NO TIENE".</div>
+      ${data.errores?.length ? `<div style="font-size:11px;color:#f87171;margin-top:6px">⚠️ ${data.errores.length} con error — ver consola (F12) para el detalle por serie.</div>` : ''}
+    `;
+    if (data.errores?.length) console.error('[Inventario SIMs] Errores por chip:', data.errores);
+    showToast(`✅ Inventario SIMs: ${data.actualizados} chips → NO TIENE`);
+    await _stockSimsRefrescar(); // refresca totales arriba con el nuevo estado
+  } catch (err) {
+    cont.innerHTML = `<div style="font-size:12px;color:#f87171">⛔ ${err.message}</div>`;
   }
 }
 
