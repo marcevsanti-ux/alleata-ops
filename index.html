@@ -8005,6 +8005,20 @@ async function mostrarModalDiaPorChofer(fecha) {
   body.innerHTML = avisoContaminadas + Object.keys(porChofer).sort().map(seccionChofer).join('');
 }
 
+// Badge de tipo de OT (Instalación / Cambio / Desinstalación) para el modal
+// de detalle de la Hoja de Ruta — pedido 26/09. Reusa el mismo esquema de
+// colores que instTipoBadge() del módulo Instalaciones, pero agrupado en
+// las 3 categorías que importan acá (esa función tiene más granularidad,
+// pensada para otra pantalla).
+function _hrTipoBadge(recordType) {
+  if (!recordType) return '';
+  const t = recordType.toLowerCase();
+  if (t.includes('desinstalaci')) return `<span class="badge badge-purple" style="font-size:9px">Desinstalación</span>`;
+  if (t.includes('cambio'))       return `<span class="badge badge-blue" style="font-size:9px">Cambio</span>`;
+  if (t.includes('instalaci'))    return `<span class="badge badge-teal" style="font-size:9px">Instalación</span>`;
+  return `<span class="badge badge-gray" style="font-size:9px">${recordType}</span>`;
+}
+
 function mostrarModalRutaOTs(titulo, lista) {
   lista = lista || [];
   if (!document.getElementById('modalRutaOTs')) {
@@ -8052,6 +8066,7 @@ function mostrarModalRutaOTs(titulo, lista) {
           <div>
             <div class="ot-num" style="font-size:13px;color:var(--text)">${otNumHtml}${o.status ? ` <span style="font-weight:400;color:var(--text-muted);font-family:Inter,sans-serif">· ${o.status}</span>` : ''}</div>
             <div style="font-size:11px;color:var(--text-muted);margin-top:2px">${o.cuenta || '—'}</div>
+            ${o.tipo ? `<div style="margin-top:4px">${_hrTipoBadge(o.tipo)}</div>` : ''}
           </div>
           <div style="text-align:right;flex-shrink:0">
             <div style="font-size:11px;color:var(--teal);font-weight:600;white-space:nowrap">${fechaHora}</div>
@@ -8096,7 +8111,7 @@ async function cargarIndicadoresRutaChofer() {
     // mes (ver cargarIndicadoresRutaMensual) sin necesidad de ningún
     // backfill — el dato bueno siempre estuvo ahí, solo no se miraba.
     const { data: cerradosHoy, error: errCerrados } = await sb.from('sf_workorders')
-      .select('workorder_number,status,cuenta,entregado_por,fecha_exitoso,updated_at,sf_id,notas_cierre,fecha_cierre')
+      .select('workorder_number,status,cuenta,entregado_por,fecha_exitoso,updated_at,sf_id,notas_cierre,fecha_cierre,record_type')
       .eq('fecha_cierre', hoy)
       .not('entregado_por', 'is', null);
     if (errCerrados) throw new Error(errCerrados.message);
@@ -8109,7 +8124,7 @@ async function cargarIndicadoresRutaChofer() {
     let otsInfo = {};
     if (todosNumeros.length) {
       const { data: ots, error: errOts } = await sb.from('sf_workorders')
-        .select('workorder_number,status,cuenta,entregado_por,fecha_exitoso,updated_at,sf_id,notas_cierre')
+        .select('workorder_number,status,cuenta,entregado_por,fecha_exitoso,updated_at,sf_id,notas_cierre,record_type')
         .in('workorder_number', todosNumeros);
       if (errOts) throw new Error(errOts.message);
       (ots || []).forEach(o => { otsInfo[o.workorder_number] = o; });
@@ -8131,6 +8146,7 @@ async function cargarIndicadoresRutaChofer() {
           fechaHora: info.fecha_exitoso || info.updated_at || null,
           sf_id: info.sf_id,
           notas_cierre: info.notas_cierre,
+          tipo: info.record_type,
         };
         buckets.todas.push(item);
         if (st === 'Exitoso' || st === 'Exitosa') buckets.exitosas.push(item);
@@ -8243,7 +8259,7 @@ async function cargarIndicadoresRutaMensual() {
     // retroactivo de una: no hace falta ningún backfill, el dato bueno de
     // meses anteriores ya estaba en sf_workorders, solo no se miraba.
     const { data: cerradosRango, error: errCerrados } = await sb.from('sf_workorders')
-      .select('workorder_number,status,cuenta,entregado_por,fecha_exitoso,updated_at,sf_id,notas_cierre,fecha_cierre')
+      .select('workorder_number,status,cuenta,entregado_por,fecha_exitoso,updated_at,sf_id,notas_cierre,fecha_cierre,record_type')
       .gte('fecha_cierre', desde)
       .not('entregado_por', 'is', null);
     if (errCerrados) throw new Error(errCerrados.message);
@@ -8257,7 +8273,7 @@ async function cargarIndicadoresRutaMensual() {
     let otsInfo = {};
     if (todosNumeros.length) {
       const { data: ots, error: errOts } = await sb.from('sf_workorders')
-        .select('workorder_number,status,cuenta,entregado_por,fecha_exitoso,updated_at,sf_id,notas_cierre')
+        .select('workorder_number,status,cuenta,entregado_por,fecha_exitoso,updated_at,sf_id,notas_cierre,record_type')
         .in('workorder_number', todosNumeros);
       if (errOts) throw new Error(errOts.message);
       (ots || []).forEach(o => { otsInfo[o.workorder_number] = o; });
@@ -8287,6 +8303,7 @@ async function cargarIndicadoresRutaMensual() {
           fechaHora: info.fecha_exitoso || info.updated_at || null,
           sf_id: info.sf_id,
           notas_cierre: info.notas_cierre,
+          tipo: info.record_type,
         };
         buckets.todas.push(item);
         if (st === 'Exitoso' || st === 'Exitosa') buckets.exitosas.push(item);
