@@ -5553,12 +5553,14 @@ async function _stockSimsInventarioPreview() {
 
     cont.innerHTML = `
       <div style="background:var(--navy-900);border:1px solid var(--border2);border-radius:8px;padding:10px 12px;font-size:12px">
-        <div>✅ Quedan en <strong>BARRACAS</strong> (leídos hoy): <strong style="color:var(--teal)">${data.quedan_en_barracas.total}</strong></div>
-        <div style="margin-top:4px">➡️ Pasan a <strong>NO TIENE</strong> (no leídos hoy): <strong style="color:#f59e0b">${data.pasan_a_no_tiene.total}</strong></div>
+        <div>✅ Leídos hoy → quedan/pasan a <strong>BARRACAS</strong>: <strong style="color:var(--teal)">${data.leidos_hoy.total}</strong>
+          ${data.leidos_hoy.se_corrigen > 0 ? `<span style="color:var(--text-muted)"> (${data.leidos_hoy.se_corrigen} tenían otra ubicación y se corrigen)</span>` : ''}
+        </div>
+        <div style="margin-top:4px">➡️ El resto de Disponibles pasan a <strong>NO TIENE</strong>: <strong style="color:#f59e0b">${data.pasan_a_no_tiene.total}</strong></div>
       </div>
-      ${data.pasan_a_no_tiene.total > 0 ? `
-        <button class="btn-confirm" style="margin-top:10px" onclick="_stockSimsInventarioAplicar(${data.pasan_a_no_tiene.total})">
-          Confirmar cambio de ${data.pasan_a_no_tiene.total} chips a "NO TIENE"
+      ${(data.leidos_hoy.total + data.pasan_a_no_tiene.total) > 0 ? `
+        <button class="btn-confirm" style="margin-top:10px" onclick="_stockSimsInventarioAplicar(${data.leidos_hoy.total}, ${data.pasan_a_no_tiene.total})">
+          Confirmar (${data.leidos_hoy.total} → Barracas · ${data.pasan_a_no_tiene.total} → No tiene)
         </button>` : `<div style="font-size:11px;color:var(--text-muted);margin-top:8px">Nada para corregir — ya está todo al día.</div>`}
     `;
   } catch (err) {
@@ -5566,8 +5568,8 @@ async function _stockSimsInventarioPreview() {
   }
 }
 
-async function _stockSimsInventarioAplicar(totalEsperado) {
-  if (!confirm(`Esto va a escribir en Salesforce: ${totalEsperado} chips van a quedar con Ubicación = "NO TIENE". Esta acción no se puede deshacer con un click — ¿confirmás?`)) return;
+async function _stockSimsInventarioAplicar(totalBarracas, totalNoTiene) {
+  if (!confirm(`Esto va a escribir en Salesforce:\n· ${totalBarracas} chips → Ubicación "BARRACAS"\n· ${totalNoTiene} chips → Ubicación "NO TIENE"\n\nEsta acción no se puede deshacer con un click — ¿confirmás?`)) return;
   const cont = document.getElementById('stockSimsInventarioResultado');
   cont.innerHTML = `<div style="font-size:11px;color:var(--text-muted)">Aplicando cambios en Salesforce (puede tardar unos segundos)...</div>`;
   try {
@@ -5579,12 +5581,16 @@ async function _stockSimsInventarioAplicar(totalEsperado) {
     const data = await res.json();
     if (!res.ok || !data.ok) throw new Error(data.error || 'Error aplicando el cambio');
 
+    const erroresTotales = (data.barracas.errores?.length || 0) + (data.no_tiene.errores?.length || 0);
     cont.innerHTML = `
-      <div style="font-size:12px;color:var(--teal)">✅ ${data.actualizados}/${data.total} chips actualizados a "NO TIENE".</div>
-      ${data.errores?.length ? `<div style="font-size:11px;color:#f87171;margin-top:6px">⚠️ ${data.errores.length} con error — ver consola (F12) para el detalle por serie.</div>` : ''}
+      <div style="font-size:12px;color:var(--teal)">
+        ✅ ${data.barracas.actualizados}/${data.barracas.total} → BARRACAS<br>
+        ✅ ${data.no_tiene.actualizados}/${data.no_tiene.total} → NO TIENE
+      </div>
+      ${erroresTotales ? `<div style="font-size:11px;color:#f87171;margin-top:6px">⚠️ ${erroresTotales} con error — ver consola (F12) para el detalle por serie.</div>` : ''}
     `;
-    if (data.errores?.length) console.error('[Inventario SIMs] Errores por chip:', data.errores);
-    showToast(`✅ Inventario SIMs: ${data.actualizados} chips → NO TIENE`);
+    if (erroresTotales) console.error('[Inventario SIMs] Errores:', { barracas: data.barracas.errores, no_tiene: data.no_tiene.errores });
+    showToast(`✅ Inventario SIMs actualizado`);
     await _stockSimsRefrescar(); // refresca totales arriba con el nuevo estado
   } catch (err) {
     cont.innerHTML = `<div style="font-size:12px;color:#f87171">⛔ ${err.message}</div>`;
