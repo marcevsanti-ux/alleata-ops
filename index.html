@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.7.58</title>
+<title>Alleata · Operaciones v4.7.59</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -408,7 +408,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.58 · 28 sep 2026
+      v4.7.59 · 28 sep 2026
     </div>
   </div>
 </div>
@@ -520,7 +520,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.58 · 28 sep 2026
+      v4.7.59 · 28 sep 2026
     </div>
   </div>
 </nav>
@@ -575,7 +575,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.58</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.59</div>
   </div>
   <div class="content">
 
@@ -5266,7 +5266,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.7.58] OK');
+console.log('[Alleata v4.7.59] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -6038,11 +6038,25 @@ function showApp(){
     }
   }
   if(navPresupuesto&&(isAdmin||isCeo)) navPresupuesto.style.display='flex';
-  // ── Vista CEO: SOLO Dashboard + Napse + Presupuesto, nada más en el nav ──
+  // ── Vista CEO: nav mínimo por defecto (Dashboard + Presupuesto + lo que
+  // tenga asignado en "Módulos" desde Ajustes). FIX 28/09: antes esta lista
+  // ocultaba SIEMPRE estos módulos sin mirar `modulos` — habilitarle uno a
+  // un CEO desde Ajustes (ej. Desinstalaciones a Diego) no hacía nada,
+  // porque este bloque los tapaba igual apenas cargaba la página. Mismo
+  // criterio que ya usa el resto de los roles (`modulos.includes(mod)`) más
+  // abajo — un módulo del CEO se oculta solo si NO está en su lista. ──
   if(isCeo){
     ['nav-sims','nav-envios','nav-rollout','nav-rollout-vip','nav-desinstalaciones','nav-store','nav-recuperadas',
      'nav-ally','nav-distri','nav-ajustes','nav-retencion','nav-terminales','nav-section-config','nav-napse']
-      .forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display='none'; });
+      .forEach(id=>{
+        const mod=id.replace('nav-','');
+        if(modulos.includes(mod)) return; // asignado en Ajustes → se muestra igual
+        const el=document.getElementById(id); if(el) el.style.display='none';
+      });
+    modulos.forEach(mod=>{
+      const el=document.getElementById('nav-'+mod);
+      if(el){ el.style.display='flex'; el.classList.remove('locked'); el.onclick=()=>goTo(mod); }
+    });
   }
   // ── Vista Customer: SOLO Desinstalaciones, nada más en el nav (pedido
   // 26/08) — Rosario/Juan Ignacio no necesitan ver el resto del portal. ──
