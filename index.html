@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.7.65</title>
+<title>Alleata · Operaciones v4.7.66</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -409,7 +409,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.65 · 29 sep 2026
+      v4.7.66 · 29 sep 2026
     </div>
   </div>
 </div>
@@ -524,7 +524,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.65 · 29 sep 2026
+      v4.7.66 · 29 sep 2026
     </div>
   </div>
 </nav>
@@ -579,7 +579,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.65</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.66</div>
   </div>
   <div class="content">
 
@@ -5341,7 +5341,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.7.65] OK');
+console.log('[Alleata v4.7.66] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -12700,11 +12700,17 @@ async function loadOpsPanel(isAdmin, modulos){
   if(isAdmin||modulos.includes('desinstalaciones')) loadNapseDesinstPanel();
 
   // ── GRÁFICOS — solo admin ──
-  if(isAdmin){
-    // NOTA: la línea de abajo referencia 'chart-desins', un contenedor que ya
-    // no existe en el HTML actual (dashboard viejo con donas/gráficos, hoy
-    // reemplazado por dashGrid con cards). Tira excepción silenciosa y corta
-    // el resto de este bloque.
+  // FIX 29/09: 'chart-desins' (y el resto de los contenedores de este
+  // bloque: chart-instaladas, chart-precolecta, chart-entregas) ya no
+  // existen en el HTML actual — el dashboard viejo con donas/gráficos se
+  // reemplazó por dashGrid con cards. Antes esto tiraba una excepción sin
+  // capturar (Cannot read properties of null) que cortaba en seco el resto
+  // de loadOpsPanel() para cualquier admin, en CUALQUIER módulo (no solo
+  // Dashboard) — porque loadOpsPanel corre una sola vez al cargar la
+  // sesión, no por módulo. Se condiciona a que el contenedor exista, así
+  // si en algún momento se reintroduce el dashboard viejo esto vuelve a
+  // andar solo, y mientras tanto no rompe nada.
+  if(isAdmin && document.getElementById('chart-desins')){
     document.getElementById('chart-desins').style.display='';
 
   // ── GRÁFICO 1: Instaladas hoy (KPI grande) ──
