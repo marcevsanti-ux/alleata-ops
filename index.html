@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.7.71</title>
+<title>Alleata · Operaciones v4.7.72</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -409,7 +409,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.71 · 29 sep 2026
+      v4.7.72 · 29 sep 2026
     </div>
   </div>
 </div>
@@ -524,7 +524,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.71 · 29 sep 2026
+      v4.7.72 · 29 sep 2026
     </div>
   </div>
 </nav>
@@ -579,7 +579,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.71</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.72</div>
   </div>
   <div class="content">
 
@@ -5341,7 +5341,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.7.71] OK');
+console.log('[Alleata v4.7.72] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -11100,9 +11100,10 @@ async function dsGestionOpsCargar(){
 
     if(resumenEl){
       const entriesPerfil=Object.entries(j.totalPorPerfil||{}).sort((a,b)=>b[1]-a[1]);
+      const nativasTotal=Object.values(window._gestionOpsEstadoDetalle).flat().filter(dsEsNativaNapse).length;
       resumenEl.innerHTML=`<div style="width:100%;display:flex;flex-wrap:wrap;align-items:center;gap:8px">`+
         `<div style="font-size:22px;font-weight:800;color:var(--teal);margin-right:6px">${j.totalGeneral}</div>`+
-        `<div style="font-size:11px;color:var(--text-muted);align-self:center;margin-right:10px">total desde 1/4/2026</div>`+
+        `<div style="font-size:11px;color:var(--text-muted);align-self:center;margin-right:10px">total desde 1/4/2026${nativasTotal?` · <span style="color:#a78bfa;font-weight:700">🟣 ${nativasTotal} nativas Napse</span>`:''}</div>`+
         entries.map(([estado,cant])=>
           dsCardEstadoConNapse(estado, cant, window._gestionOpsEstadoDetalle[estado], `dsGestionOpsToggleEstado('${estado.replace(/'/g,"\\'")}')`)
         ).join('')+
@@ -11340,19 +11341,21 @@ async function dsRecuperadaFiltrarPorMes(mesKey, esInicial){
       // ahora es solo tercerizadas; Alleata queda en su card con la cantidad.
       const porLog={};
       const encontradas=new Set();
+      const listaByOt=new Map(lista.map(o=>[o.ot,o])); // para saber si cada OT es nativa Napse, cruzando por N° de OT
       (data||[]).forEach(r=>{
         encontradas.add(r.workorder_number);
         const log=(r.logistica||'Sin logística').toUpperCase().trim();
         infoOT[r.workorder_number]={log, costo:Number(r.costo_envio)};
-        if(!porLog[log]) porLog[log]={n:0,conCosto:0,total:0};
+        if(!porLog[log]) porLog[log]={n:0,conCosto:0,total:0,nativas:0};
         porLog[log].n++;
+        if(dsEsNativaNapse(listaByOt.get(r.workorder_number))) porLog[log].nativas++;
         const c=Number(r.costo_envio);
         if(Number.isFinite(c)&&c>0){ porLog[log].conCosto++; porLog[log].total+=c; }
       });
       // OTs de la lista que no existen en sf_workorders: no hay de donde sacar
       // la logistica, se cuentan aparte para que la suma de las cards cierre.
       const noEncontradas=numeros.filter(n=>!encontradas.has(n)).length;
-      if(noEncontradas){ porLog['SIN DATO']={n:noEncontradas,conCosto:0,total:0}; }
+      if(noEncontradas){ porLog['SIN DATO']={n:noEncontradas,conCosto:0,total:0,nativas:0}; }
 
       const terc=Object.entries(porLog).filter(([l])=>l!=='ALLEATA'&&l!=='SIN DATO'&&l!=='SIN LOGÍSTICA');
       const tercConCosto=terc.reduce((a,[,d])=>a+d.conCosto,0);
@@ -11391,6 +11394,7 @@ async function dsRecuperadaFiltrarPorMes(mesKey, esInicial){
           <div style="font-size:9px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em">${LOG_LBL[k]||k}</div>
           <div style="font-size:9.5px;color:var(--text-muted);margin-top:1px">${sub}</div>
           ${totalTxt}
+          ${d.nativas?`<div style="font-size:8.5px;color:#a78bfa;margin-top:2px;font-weight:600">🟣 ${d.nativas} Napse</div>`:''}
         </div>`;
       };
 
@@ -11563,9 +11567,10 @@ async function dsBacklogCargar(){
     if(resumenEl){
       resumenEl.style.display='flex';
       const entriesPerfil=Object.entries(j.totalPorPerfil||{}).sort((a,b)=>b[1]-a[1]);
+      const nativasTotal=Object.values(estadoDetalle).flat().filter(dsEsNativaNapse).length;
       resumenEl.innerHTML=`<div style="width:100%;display:flex;flex-wrap:wrap;align-items:center;gap:8px">`+
         `<div style="font-size:22px;font-weight:800;color:var(--teal);margin-right:6px">${j.totalGeneral}</div>`+
-        `<div style="font-size:11px;color:var(--text-muted);align-self:center;margin-right:10px">total anterior al 1/4/2026</div>`+
+        `<div style="font-size:11px;color:var(--text-muted);align-self:center;margin-right:10px">total anterior al 1/4/2026${nativasTotal?` · <span style="color:#a78bfa;font-weight:700">🟣 ${nativasTotal} nativas Napse</span>`:''}</div>`+
         entries.map(([estado,cant])=>{
           const nota=estado==='En Proceso'?' title="Excluye OTs asignadas a Angel"':'';
           return dsCardEstadoConNapse(estado, cant, estadoDetalle[estado], `dsBacklogToggleEstado('${estado.replace(/'/g,"\\'")}')`, nota);
