@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.7.64</title>
+<title>Alleata · Operaciones v4.7.65</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -409,7 +409,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.64 · 29 sep 2026
+      v4.7.65 · 29 sep 2026
     </div>
   </div>
 </div>
@@ -524,7 +524,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.64 · 29 sep 2026
+      v4.7.65 · 29 sep 2026
     </div>
   </div>
 </nav>
@@ -579,7 +579,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.64</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.65</div>
   </div>
   <div class="content">
 
@@ -1298,7 +1298,6 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
        rollout_vip + vista v_rollout_vip: ver setup_rollout_vip.sql. -->
   <div class="stats-row" id="rvKpis" style="margin-bottom:8px"></div>
   <div id="rvKpiNota" style="font-size:10px;color:var(--text-muted);margin:0 0 12px 2px"></div>
-  <div id="rvKpiDetalle" style="display:none;margin-bottom:14px"></div>
 
   <div class="card" style="margin-bottom:14px">
     <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
@@ -1334,6 +1333,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <tbody id="rvBody"></tbody>
     </table>
   </div>
+  <div id="rvKpiDetalle" style="display:none;margin-top:14px"></div>
 </div>
 
 <div class="module" id="mod-rollout-piloto">
@@ -5341,7 +5341,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.7.64] OK');
+console.log('[Alleata v4.7.65] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -5530,6 +5530,13 @@ let _rvZona = 'AMBA';
 const _rvRows = { AMBA: null, INTERIOR: null };
 
 const rvEsc = t => String(t ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+// Link directo a la OT en Salesforce — hace falta el sf_id (Id real del
+// registro), el número de OT solo no alcanza para armar la URL. Si todavía
+// no llegó ese dato de la vista (setup_rollout_vip.sql viejo, sin
+// wo.sf_id), se muestra el número como texto plano, sin romper nada.
+const rvOtLink = (numero, sfId) => sfId
+  ? `<a href="https://alleata.lightning.force.com/lightning/r/WorkOrder/${rvEsc(sfId)}/view" target="_blank" rel="noopener" class="mono" style="color:var(--teal);text-decoration:none;font-weight:600">${rvEsc(numero)} ↗</a>`
+  : `<span class="mono" style="font-weight:600">${rvEsc(numero)}</span>`;
 const rvMillones = v => ((Number(v)||0)/1e6).toLocaleString('es-AR',{maximumFractionDigits:1}) + ' M';
 
 function rvEtapaEfectiva(r) {
@@ -5634,7 +5641,7 @@ function rvMostrarDetalle(key) {
               <td><div style="font-weight:600">${rvEsc(r.razon_social||'—')}</div><div class="mono" style="color:var(--text-muted);font-size:10px">${rvEsc(r.cuit||'—')} · ${rvEsc(r.terminal_id)}</div></td>
               <td>${rvEsc(r.via||'—')}</td>
               <td class="mono" style="text-align:right">${rvMillones(r.vol_total)}</td>
-              <td>${r.ot_numero ? rvEsc(r.ot_numero) : '—'}</td>
+              <td>${r.ot_numero ? rvOtLink(r.ot_numero, r.ot_sf_id) : '—'}</td>
             </tr>`).join('') : `<tr><td colspan="5" style="color:var(--text-muted);text-align:center;padding:14px">Sin resultados.</td></tr>`}</tbody>
         </table>
       </div>
@@ -5676,7 +5683,7 @@ function rvRender() {
     // rollout de esa cuenta; entonces se llena sola (vista v_rollout_vip, por CUIT).
     const otFecha = r.ot_creada ? new Date(r.ot_creada).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' }) : '';
     const otCell = r.ot_numero
-      ? `<div class="mono" style="color:var(--text);font-weight:600;white-space:nowrap">${rvEsc(r.ot_numero)}</div>
+      ? `<div style="white-space:nowrap">${rvOtLink(r.ot_numero, r.ot_sf_id)}</div>
          <div style="font-size:10px;color:var(--text-muted);margin-top:2px">${rvEsc(r.ot_status || '—')}${r.ot_logistica ? ' · ' + rvEsc(r.ot_logistica) : ''}${otFecha ? ' · ' + otFecha : ''}</div>`
       : `<span style="color:var(--text-muted)" title="Todavía no hay OT de rollout en Salesforce para este CUIT">—</span>`;
     const bloq = r.estado_terminal && r.estado_terminal !== 'Activo'
