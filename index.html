@@ -10,10 +10,11 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.7.60</title>
+<title>Alleata · Operaciones v4.7.62</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&family=IBM+Plex+Mono:wght@700&display=swap" rel="stylesheet">
 <style>
 :root {
@@ -408,7 +409,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.60 · 29 sep 2026
+      v4.7.62 · 29 sep 2026
     </div>
   </div>
 </div>
@@ -523,7 +524,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.60 · 29 sep 2026
+      v4.7.62 · 29 sep 2026
     </div>
   </div>
 </nav>
@@ -578,7 +579,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.60</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.62</div>
   </div>
   <div class="content">
 
@@ -1235,9 +1236,17 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
         <div style="font-size:13px;font-weight:700">📊 Resumen general</div>
         <div id="ttAdminBar" style="display:none">
-          <input type="file" id="ttFileInp" accept=".xlsx" style="display:none" onchange="ttImportarTem(this)">
-          <button class="btn btn-sm" style="background:rgba(29,191,142,.12);color:var(--teal);border:1px solid rgba(29,191,142,.3)" onclick="document.getElementById('ttFileInp').click()" title="Reporte de TEM (Ingenico), hoja globalReport">📥 Importar reporte TEM (Excel)</button>
+          <input type="file" id="ttFileInp" accept=".xlsx,.zip" style="display:none" onchange="ttImportarTem(this)">
+          <button class="btn btn-sm" style="background:rgba(29,191,142,.12);color:var(--teal);border:1px solid rgba(29,191,142,.3)" onclick="document.getElementById('ttFileInp').click()" title="Reporte de TEM (Ingenico) — acepta el .zip tal cual lo descarga TEM, o el .xlsx si ya lo descomprimiste">📥 Importar reporte TEM (Excel o .zip)</button>
         </div>
+      </div>
+      <div style="margin-top:10px">
+        <select class="input" id="ttFiltroPerfil" style="max-width:200px" onchange="ttCargarResumen()">
+          <option value="">Perfil — todos</option>
+          <option value="NAPSE">NAPSE</option>
+          <option value="PRISMA">PRISMA</option>
+          <option value="__sin_perfil__">Sin perfil</option>
+        </select>
       </div>
       <div id="ttResumenMsg" style="font-size:11px;color:var(--text-muted);margin-top:8px"></div>
     </div>
@@ -5330,7 +5339,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.7.60] OK');
+console.log('[Alleata v4.7.62] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -5759,14 +5768,28 @@ function ttSetTab(tab) {
 }
 
 // ── Tab Resumen ──────────────────────────────────────────────────────────
+// Historial de versiones conocido (pedido 29/09): 2.5.6 fue la primera,
+// 2.5.9 la siguiente, y 2.5.11 es la actual — con apenas 1 semana de vida al
+// 29/09/2026. Es esperable que la mayoría todavía esté en 2.5.9 mientras el
+// rollout de 2.5.11 avanza; no es una alarma, es el estado normal de una
+// migración recién arrancada. Si sale una versión nueva, actualizar acá.
+const TT_VERSION_ACTUAL = '2.5.11';
+const TT_VERSION_ANTERIOR = '2.5.9';
+
 async function ttCargarResumen() {
   const msg = document.getElementById('ttResumenMsg');
+  const perfilSel = document.getElementById('ttFiltroPerfil')?.value || '';
   msg.textContent = 'Cargando...';
   try {
     // TEM: última foto por terminal (v_terminal_tem_ultimo) — para distribución de versiones.
-    const { data: tem, error: e1 } = await sb.from('v_terminal_tem_ultimo').select('serial_sf,application_version,last_call_date,encontrada_en_sf');
+    let q = sb.from('v_terminal_tem_ultimo').select('serial_sf,application_version,last_call_date,encontrada_en_sf,perfil_en_momento');
+    if (perfilSel === '__sin_perfil__') q = q.is('perfil_en_momento', null);
+    else if (perfilSel) q = q.eq('perfil_en_momento', perfilSel);
+    const { data: tem, error: e1 } = await q;
     if (e1) throw e1;
     // Logicalis: TODO el historial (no solo la última foto) — para contar intervenciones totales.
+    // El perfil no se filtra acá porque Logicalis es el "génesis" de la terminal
+    // (cómo la recibimos) y no siempre coincide con el perfil que tiene HOY en SF.
     const { data: logi, error: e2 } = await sb.from('terminal_logicalis_historial').select('serial_sf,es_error,importado_en');
     if (e2) throw e2;
 
@@ -5774,17 +5797,19 @@ async function ttCargarResumen() {
     const porVersion = {};
     temOk.forEach(r => { const v = r.application_version || '(sin versión)'; porVersion[v] = (porVersion[v]||0) + 1; });
     const versiones = Object.entries(porVersion).sort((a,b) => b[1]-a[1]);
-    const top = versiones[0]?.[0] || '—';
-    const enTop = versiones[0]?.[1] || 0;
+    const enActual = porVersion[TT_VERSION_ACTUAL] || 0;
+    const enAnterior = porVersion[TT_VERSION_ANTERIOR] || 0;
+    const enVieja = temOk.length - enActual - enAnterior;
     const hace30 = Date.now() - 30*24*3600*1000;
     const activas30d = temOk.filter(r => r.last_call_date && new Date(r.last_call_date).getTime() > hace30).length;
 
     const box = (cls, num, label, sub) => `<div class="stat-box ${cls}"><div class="stat-num">${num}</div><div class="stat-label">${label}</div>${sub?`<div style="font-size:10px;color:var(--text-muted);margin-top:2px">${sub}</div>`:''}</div>`;
     document.getElementById('ttKpisTem').innerHTML =
-      box('s-purple', temOk.length, 'Terminales con TEM importado', '') +
-      box('s-teal', top, 'Versión más común', `${enTop} terminal${enTop===1?'':'es'}`) +
-      box('s-green', activas30d, 'Conectadas en los últimos 30 días', '') +
-      box('', temOk.length - activas30d, 'Sin conexión hace 30+ días', '');
+      box('s-purple', temOk.length, 'Terminales con TEM importado', perfilSel ? `perfil: ${perfilSel==='__sin_perfil__'?'sin perfil':perfilSel}` : 'todos los perfiles') +
+      box('s-green', enActual, `En ${TT_VERSION_ACTUAL} (actual)`, temOk.length ? Math.round(100*enActual/temOk.length)+'%' : '') +
+      box('s-teal', enAnterior, `En ${TT_VERSION_ANTERIOR} (anterior)`, temOk.length ? Math.round(100*enAnterior/temOk.length)+'%' : '') +
+      box('', enVieja, 'En versión más vieja o sin dato', '') +
+      box('', activas30d, 'Conectadas en 30 días', '');
 
     const totalInterv = (logi||[]).length;
     const conError = (logi||[]).filter(r => r.es_error).length;
@@ -5792,10 +5817,10 @@ async function ttCargarResumen() {
     document.getElementById('ttKpisLogi').innerHTML =
       box('', totalInterv, 'Intervenciones totales', 'todas las importaciones') +
       box('s-orange', conError, 'Con error / reparación', totalInterv ? Math.round(100*conError/totalInterv)+'%' : '') +
-      box('', seriesUnicas, 'Terminales distintas', 'pasaron por Logicalis alguna vez');
+      box('', seriesUnicas, 'Terminales distintas', 'pasaron por Logicalis alguna vez (génesis)');
 
     msg.textContent = versiones.length
-      ? `Distribución de versiones: ${versiones.map(([v,n]) => `${ttEsc(v)} (${n})`).join(' · ')}`
+      ? `Rollout de ${TT_VERSION_ACTUAL} en curso (arrancó hace ~1 semana) · distribución: ${versiones.map(([v,n]) => `${ttEsc(v)} (${n})`).join(' · ')}`
       : 'Todavía no se importó ningún reporte de TEM.';
   } catch (e) {
     console.error('[Trazabilidad Terminal]', e);
@@ -5881,9 +5906,9 @@ async function ttBuscarFicha() {
       </div>`;
 
     html += `<div class="card" style="margin-bottom:14px">
-      <div style="font-size:13px;font-weight:700;margin-bottom:6px">🔧 Historial Logicalis (${(logi||[]).length})</div>
-      ${(logi||[]).length ? (logi||[]).map(r => linea(r.importado_en, r.es_error?'⚠️':'✅',
-          r.es_error ? `Error / reparación — ${ttEsc(r.solucion||'sin detalle')}` : 'Personalización (sin error)',
+      <div style="font-size:13px;font-weight:700;margin-bottom:6px">🔧 Historial Logicalis (${(logi||[]).length}) <span style="font-weight:400;color:var(--text-muted);font-size:11px">— la más antigua es el génesis: cómo recibimos la terminal</span></div>
+      ${(logi||[]).length ? (logi||[]).map((r, i) => linea(r.importado_en, i === (logi.length-1) ? '🌱' : (r.es_error?'⚠️':'✅'),
+          (i === (logi.length-1) ? 'Génesis — ' : '') + (r.es_error ? `Error / reparación — ${ttEsc(r.solucion||'sin detalle')}` : 'Personalización (sin error)'),
           `${ttEsc(r.mes_ano||'')} · Estado ${ttEsc(r.estado_anterior||'—')} → ${ttEsc(r.estado_nuevo||'—')}${r.cuenta_en_momento?` · Cuenta: ${ttEsc(r.cuenta_en_momento)}`:''}${r.importado_por?` · cargó ${ttEsc(r.importado_por)}`:''}`
         )).join('') : `<div style="font-size:11px;color:var(--text-muted)">Sin registros.</div>`}
     </div>`;
@@ -5925,9 +5950,23 @@ async function ttImportarTem(input) {
   if (!file) return;
   if (currentProfile?.rol !== 'admin') { showToastPortal('Solo un administrador puede importar el reporte TEM'); return; }
   const msg = document.getElementById('ttResumenMsg');
-  msg.textContent = 'Leyendo el Excel...';
+  msg.textContent = 'Leyendo el archivo...';
   try {
-    const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' });
+    // TEM entrega el reporte como .zip con el Excel adentro (ej. "MORETTI.xlsx")
+    // — se descomprime en el navegador con JSZip antes de pasárselo a XLSX.
+    let bufferExcel;
+    const esZip = /\.zip$/i.test(file.name);
+    if (esZip) {
+      const zip = await JSZip.loadAsync(await file.arrayBuffer());
+      const nombreXlsx = Object.keys(zip.files).find(n => /\.xlsx$/i.test(n) && !zip.files[n].dir);
+      if (!nombreXlsx) throw new Error('El .zip no tiene ningún archivo .xlsx adentro.');
+      msg.textContent = `Descomprimí "${nombreXlsx}", leyéndolo...`;
+      bufferExcel = await zip.files[nombreXlsx].async('arraybuffer');
+    } else {
+      bufferExcel = await file.arrayBuffer();
+    }
+
+    const wb = XLSX.read(bufferExcel, { type: 'array' });
     const hoja = wb.Sheets['globalReport'] || wb.Sheets[wb.SheetNames[0]];
     if (!hoja) throw new Error('No encontré ninguna hoja en el Excel.');
     const filas = XLSX.utils.sheet_to_json(hoja, { defval: '' });
