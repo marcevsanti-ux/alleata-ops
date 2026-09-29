@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.7.59</title>
+<title>Alleata · Operaciones v4.7.60</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -408,7 +408,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.59 · 28 sep 2026
+      v4.7.60 · 29 sep 2026
     </div>
   </div>
 </div>
@@ -485,6 +485,9 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     <div class="nav-item" data-mod="terminales" id="nav-terminales" onclick="goTo('terminales')">
       <div class="active-bar"></div><span class="nav-icon-wrap">🖥️</span> Terminales
     </div>
+    <div class="nav-item" data-mod="terminal-trazabilidad" id="nav-terminal-trazabilidad" onclick="goTo('terminal-trazabilidad')">
+      <div class="active-bar"></div><span class="nav-icon-wrap">🔎</span> Trazabilidad Terminal
+    </div>
     <div class="nav-item" data-mod="recuperadas" id="nav-recuperadas" onclick="goTo('recuperadas')" style="display:none">
       <div class="active-bar"></div><span class="nav-icon-wrap">🔁</span> Recuperadas
       <span class="nav-badge" id="nb-recuperadas">0</span>
@@ -520,7 +523,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.59 · 28 sep 2026
+      v4.7.60 · 29 sep 2026
     </div>
   </div>
 </nav>
@@ -575,7 +578,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.59</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.60</div>
   </div>
   <div class="content">
 
@@ -1214,7 +1217,68 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
   </div>
 </div>
 
+<div class="module" id="mod-terminal-trazabilidad">
+  <!-- Trazabilidad Terminal (pedido 28/09): cruza lo que ya hace el módulo
+       Logicalis (reparaciones/errores, escribe en SF) con el reporte de TEM
+       de Ingenico (versión de app instalada). Historial propio en Supabase
+       (terminal_logicalis_historial / terminal_tem_historial), que nunca se
+       pisa — cada import agrega filas nuevas. Ver setup_terminal_trazabilidad.sql. -->
+  <div style="display:flex;gap:6px;margin-bottom:14px">
+    <button class="btn btn-sm" id="ttTabResumen" onclick="ttSetTab('resumen')">📊 Resumen</button>
+    <button class="btn btn-sm" id="ttTabCuenta" onclick="ttSetTab('cuenta')">🏢 Por cuenta</button>
+    <button class="btn btn-sm" id="ttTabFicha" onclick="ttSetTab('ficha')">🔎 Ficha por serial</button>
+  </div>
+
+  <!-- ── Tab Resumen ── -->
+  <div id="ttPanelResumen">
+    <div class="card" style="margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+        <div style="font-size:13px;font-weight:700">📊 Resumen general</div>
+        <div id="ttAdminBar" style="display:none">
+          <input type="file" id="ttFileInp" accept=".xlsx" style="display:none" onchange="ttImportarTem(this)">
+          <button class="btn btn-sm" style="background:rgba(29,191,142,.12);color:var(--teal);border:1px solid rgba(29,191,142,.3)" onclick="document.getElementById('ttFileInp').click()" title="Reporte de TEM (Ingenico), hoja globalReport">📥 Importar reporte TEM (Excel)</button>
+        </div>
+      </div>
+      <div id="ttResumenMsg" style="font-size:11px;color:var(--text-muted);margin-top:8px"></div>
+    </div>
+    <div class="stats-row" id="ttKpisTem" style="margin-bottom:8px"></div>
+    <div style="font-size:11px;color:var(--text-muted);margin:0 0 14px 2px">Versión de app (TEM) — última importación conocida por terminal</div>
+    <div class="stats-row" id="ttKpisLogi"></div>
+    <div style="font-size:11px;color:var(--text-muted);margin:8px 0 0 2px">Intervenciones Logicalis (historial completo, todas las importaciones)</div>
+  </div>
+
+  <!-- ── Tab Por cuenta ── -->
+  <div id="ttPanelCuenta" style="display:none">
+    <div class="card" style="margin-bottom:14px">
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <input class="input" id="ttCuentaBuscar" placeholder="Nombre de la cuenta..." style="max-width:320px" onkeydown="if(event.key==='Enter')ttBuscarCuenta()">
+        <button class="btn btn-sm" onclick="ttBuscarCuenta()">Buscar</button>
+      </div>
+      <div id="ttCuentaMsg" style="font-size:11px;color:var(--text-muted);margin-top:8px"></div>
+    </div>
+    <div class="card" style="padding:0;overflow-x:auto">
+      <table class="table" id="ttCuentaTabla" style="min-width:820px">
+        <thead><tr><th>Terminal (SF)</th><th>Estado</th><th>Versión TEM</th><th>Última conexión</th><th>Último Logicalis</th><th></th></tr></thead>
+        <tbody id="ttCuentaBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ── Tab Ficha por serial ── -->
+  <div id="ttPanelFicha" style="display:none">
+    <div class="card" style="margin-bottom:14px">
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <input class="input" id="ttFichaSerial" placeholder="Serial completo o corto de TEM..." style="max-width:320px" onkeydown="if(event.key==='Enter')ttBuscarFicha()">
+        <button class="btn btn-sm" onclick="ttBuscarFicha()">Buscar</button>
+      </div>
+      <div id="ttFichaMsg" style="font-size:11px;color:var(--text-muted);margin-top:8px"></div>
+    </div>
+    <div id="ttFichaResultado"></div>
+  </div>
+</div>
+
 <div class="module" id="mod-rollout-vip">
+
   <!-- Rollout VIP (pedido 27/09): tablero para que el equipo Customer (Rosario)
        y Operaciones vean en qué punto está cada terminal del ranking de
        Ventas. El ranking NO se recalcula acá: viene tal cual del Excel de
@@ -5266,7 +5330,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.7.59] OK');
+console.log('[Alleata v4.7.60] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -5655,6 +5719,252 @@ async function rvImportar(input) {
   } catch (e) {
     console.error('[Rollout VIP] importar', e);
     msg.innerHTML = `<span style="color:#f87171">⛔ ${rvEsc(e.message || e)}</span>`;
+  }
+}
+
+// ── Trazabilidad Terminal (pedido 28/09) ────────────────────────────────────
+// Cruza el historial de Logicalis (ya se guarda al confirmar el import de ese
+// módulo, ver termUpdateSF) con el historial de TEM (se importa acá mismo).
+// Las 3 vistas leen de las vistas de Supabase v_terminal_* — nunca le pegan
+// directo a Salesforce salvo la importación de TEM (necesita el cruce masivo
+// del backend) y la ficha individual (para traer el estado MÁS actual, por
+// si cambió en SF después del último import).
+let _ttTab = 'resumen';
+
+const ttEsc = t => String(t ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+const ttFecha = (iso, conHora) => {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (isNaN(d)) return '—';
+  const opt = { day:'2-digit', month:'2-digit', year:'numeric', timeZone:'America/Argentina/Buenos_Aires' };
+  if (conHora) { opt.hour='2-digit'; opt.minute='2-digit'; }
+  return d.toLocaleString('es-AR', opt);
+};
+
+async function ttInit() {
+  const bar = document.getElementById('ttAdminBar');
+  if (bar) bar.style.display = currentProfile?.rol === 'admin' ? 'block' : 'none';
+  ttSetTab(_ttTab);
+  await ttCargarResumen();
+}
+
+function ttSetTab(tab) {
+  _ttTab = tab;
+  ['resumen','cuenta','ficha'].forEach(t => {
+    const panel = document.getElementById('ttPanel' + t[0].toUpperCase() + t.slice(1));
+    const btn = document.getElementById('ttTab' + t[0].toUpperCase() + t.slice(1));
+    if (panel) panel.style.display = t === tab ? 'block' : 'none';
+    if (btn) { btn.style.background = t === tab ? '' : 'var(--surface2)'; btn.style.color = t === tab ? '' : 'var(--text-muted)'; }
+  });
+}
+
+// ── Tab Resumen ──────────────────────────────────────────────────────────
+async function ttCargarResumen() {
+  const msg = document.getElementById('ttResumenMsg');
+  msg.textContent = 'Cargando...';
+  try {
+    // TEM: última foto por terminal (v_terminal_tem_ultimo) — para distribución de versiones.
+    const { data: tem, error: e1 } = await sb.from('v_terminal_tem_ultimo').select('serial_sf,application_version,last_call_date,encontrada_en_sf');
+    if (e1) throw e1;
+    // Logicalis: TODO el historial (no solo la última foto) — para contar intervenciones totales.
+    const { data: logi, error: e2 } = await sb.from('terminal_logicalis_historial').select('serial_sf,es_error,importado_en');
+    if (e2) throw e2;
+
+    const temOk = (tem || []).filter(r => r.encontrada_en_sf);
+    const porVersion = {};
+    temOk.forEach(r => { const v = r.application_version || '(sin versión)'; porVersion[v] = (porVersion[v]||0) + 1; });
+    const versiones = Object.entries(porVersion).sort((a,b) => b[1]-a[1]);
+    const top = versiones[0]?.[0] || '—';
+    const enTop = versiones[0]?.[1] || 0;
+    const hace30 = Date.now() - 30*24*3600*1000;
+    const activas30d = temOk.filter(r => r.last_call_date && new Date(r.last_call_date).getTime() > hace30).length;
+
+    const box = (cls, num, label, sub) => `<div class="stat-box ${cls}"><div class="stat-num">${num}</div><div class="stat-label">${label}</div>${sub?`<div style="font-size:10px;color:var(--text-muted);margin-top:2px">${sub}</div>`:''}</div>`;
+    document.getElementById('ttKpisTem').innerHTML =
+      box('s-purple', temOk.length, 'Terminales con TEM importado', '') +
+      box('s-teal', top, 'Versión más común', `${enTop} terminal${enTop===1?'':'es'}`) +
+      box('s-green', activas30d, 'Conectadas en los últimos 30 días', '') +
+      box('', temOk.length - activas30d, 'Sin conexión hace 30+ días', '');
+
+    const totalInterv = (logi||[]).length;
+    const conError = (logi||[]).filter(r => r.es_error).length;
+    const seriesUnicas = new Set((logi||[]).map(r => r.serial_sf)).size;
+    document.getElementById('ttKpisLogi').innerHTML =
+      box('', totalInterv, 'Intervenciones totales', 'todas las importaciones') +
+      box('s-orange', conError, 'Con error / reparación', totalInterv ? Math.round(100*conError/totalInterv)+'%' : '') +
+      box('', seriesUnicas, 'Terminales distintas', 'pasaron por Logicalis alguna vez');
+
+    msg.textContent = versiones.length
+      ? `Distribución de versiones: ${versiones.map(([v,n]) => `${ttEsc(v)} (${n})`).join(' · ')}`
+      : 'Todavía no se importó ningún reporte de TEM.';
+  } catch (e) {
+    console.error('[Trazabilidad Terminal]', e);
+    msg.innerHTML = `<span style="color:#f87171">⛔ ${ttEsc(e.message||e)}</span>${/does not exist|schema cache|Could not find/i.test(e.message||'')?' — falta correr setup_terminal_trazabilidad.sql en Supabase.':''}`;
+  }
+}
+
+// ── Tab Por cuenta ───────────────────────────────────────────────────────
+async function ttBuscarCuenta() {
+  const q = (document.getElementById('ttCuentaBuscar')?.value || '').trim();
+  const msg = document.getElementById('ttCuentaMsg');
+  const body = document.getElementById('ttCuentaBody');
+  if (!q) { msg.textContent = 'Escribí el nombre de una cuenta.'; return; }
+  msg.textContent = 'Buscando...';
+  body.innerHTML = '';
+  try {
+    const { data, error } = await sb.from('v_terminal_trazabilidad').select('*').ilike('cuenta', `%${q}%`).order('serial_sf');
+    if (error) throw error;
+    if (!data || !data.length) { msg.textContent = `Sin resultados para "${q}".`; return; }
+    msg.textContent = `${data.length} terminal${data.length===1?'':'es'} de cuentas que matchean "${q}".`;
+    body.innerHTML = data.map(r => `
+      <tr>
+        <td class="mono">${ttEsc(r.serial_sf)}</td>
+        <td>${ttEsc(r.logicalis_estado || '—')}</td>
+        <td>${ttEsc(r.tem_version || '—')}</td>
+        <td>${ttFecha(r.tem_ultima_conexion)}</td>
+        <td>${r.logicalis_ultima_solucion ? ttEsc(r.logicalis_ultima_solucion) + (r.logicalis_ultimo_es_error?' ⚠️':'') : '—'}</td>
+        <td><button class="btn-ghost btn-sm" onclick="document.getElementById('ttFichaSerial').value='${ttEsc(r.serial_sf)}'; ttSetTab('ficha'); ttBuscarFicha();">Ver ficha</button></td>
+      </tr>`).join('');
+  } catch (e) {
+    console.error('[Trazabilidad Terminal] por cuenta', e);
+    msg.innerHTML = `<span style="color:#f87171">⛔ ${ttEsc(e.message||e)}</span>`;
+  }
+}
+
+// ── Tab Ficha por serial ─────────────────────────────────────────────────
+// Acepta serial completo de SF o el corto de TEM — reusa el mismo endpoint
+// que ya devuelve el estado EN VIVO de Salesforce (más actual que cualquier
+// import guardado); el historial de abajo sale de Supabase.
+async function ttBuscarFicha() {
+  const serial = (document.getElementById('ttFichaSerial')?.value || '').trim();
+  const msg = document.getElementById('ttFichaMsg');
+  const cont = document.getElementById('ttFichaResultado');
+  if (!serial) { msg.textContent = 'Escribí un serial.'; return; }
+  msg.textContent = 'Buscando...';
+  cont.innerHTML = '';
+  try {
+    const res = await fetch(`${SF_AGENT_URL}/automations/terminales/buscar-por-serie-tem/${encodeURIComponent(serial)}`, { headers: { 'x-automation-secret': SF_SYNC_SECRET } });
+    const data = await res.json();
+    if (!res.ok || !data.ok) throw new Error(data.error || 'Error consultando Salesforce');
+
+    const serialSf = data.terminal?.serial_sf || (data.encontrada ? serial : null);
+    const [{ data: logi }, { data: tem }] = await Promise.all([
+      serialSf ? sb.from('terminal_logicalis_historial').select('*').eq('serial_sf', serialSf).order('importado_en', { ascending: false }) : { data: [] },
+      sb.from('terminal_tem_historial').select('*').or(`serial_sf.eq.${serialSf || '__none__'},serie_tem.eq.${serial}`).order('importado_en', { ascending: false }),
+    ]);
+
+    msg.textContent = '';
+    if (!data.encontrada && !(logi||[]).length && !(tem||[]).length) {
+      cont.innerHTML = `<div class="card" style="color:var(--text-muted)">No encontré nada con ese serial — ni en Salesforce (en vivo), ni en el historial de Logicalis o TEM.</div>`;
+      return;
+    }
+
+    let html = '';
+    if (data.encontrada) {
+      const t = data.terminal;
+      html += `<div class="card" style="margin-bottom:14px">
+        <div style="font-size:13px;font-weight:700;margin-bottom:8px">📍 Estado actual en Salesforce</div>
+        <div style="font-size:12px;line-height:1.8">
+          <span class="mono">${ttEsc(t.serial_sf)}</span> · ${ttEsc(t.producto||'—')}<br>
+          Cuenta: <strong>${ttEsc(t.cuenta || 'sin asignar')}</strong><br>
+          Estado: ${ttEsc(t.estado||'—')} · Ubicación: ${ttEsc(t.ubicacion||'—')} · Perfil: ${ttEsc(t.perfil||'—')}${t.banco?` · Banco: ${ttEsc(t.banco)}`:''}
+        </div>
+      </div>`;
+    } else {
+      html += `<div class="card" style="margin-bottom:14px;color:#f59e0b">⚠️ No se encontró esta terminal en Salesforce en este momento (puede haberse borrado, o el serial no matchea). Se muestra igual el historial guardado.</div>`;
+    }
+
+    const linea = (fecha, icono, titulo, detalle) => `
+      <div style="display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
+        <div style="font-size:10px;color:var(--text-muted);white-space:nowrap;min-width:75px">${ttFecha(fecha)}</div>
+        <div style="font-size:12px">${icono} <strong>${titulo}</strong>${detalle?`<div style="font-size:11px;color:var(--text-muted);margin-top:2px">${detalle}</div>`:''}</div>
+      </div>`;
+
+    html += `<div class="card" style="margin-bottom:14px">
+      <div style="font-size:13px;font-weight:700;margin-bottom:6px">🔧 Historial Logicalis (${(logi||[]).length})</div>
+      ${(logi||[]).length ? (logi||[]).map(r => linea(r.importado_en, r.es_error?'⚠️':'✅',
+          r.es_error ? `Error / reparación — ${ttEsc(r.solucion||'sin detalle')}` : 'Personalización (sin error)',
+          `${ttEsc(r.mes_ano||'')} · Estado ${ttEsc(r.estado_anterior||'—')} → ${ttEsc(r.estado_nuevo||'—')}${r.cuenta_en_momento?` · Cuenta: ${ttEsc(r.cuenta_en_momento)}`:''}${r.importado_por?` · cargó ${ttEsc(r.importado_por)}`:''}`
+        )).join('') : `<div style="font-size:11px;color:var(--text-muted)">Sin registros.</div>`}
+    </div>`;
+
+    html += `<div class="card">
+      <div style="font-size:13px;font-weight:700;margin-bottom:6px">📶 Historial TEM (${(tem||[]).length})</div>
+      ${(tem||[]).length ? (tem||[]).map(r => linea(r.importado_en, '📱',
+          `Versión ${ttEsc(r.application_version||'—')}`,
+          `Última conexión: ${ttFecha(r.last_call_date, true)}${r.cuenta_en_momento?` · Cuenta: ${ttEsc(r.cuenta_en_momento)}`:''}`
+        )).join('') : `<div style="font-size:11px;color:var(--text-muted)">Sin registros.</div>`}
+    </div>`;
+
+    cont.innerHTML = html;
+  } catch (e) {
+    console.error('[Trazabilidad Terminal] ficha', e);
+    msg.innerHTML = `<span style="color:#f87171">⛔ ${ttEsc(e.message||e)}</span>`;
+  }
+}
+
+// ── Importar reporte TEM (Excel, hoja "globalReport") ───────────────────
+// 1) Parsea el Excel acá mismo (igual que Rollout VIP).
+// 2) Manda las filas al backend, que hace el cruce masivo contra SF en UNA
+//    consulta (no una por fila).
+// 3) Inserta el resultado ya resuelto en terminal_tem_historial — cada
+//    import agrega filas nuevas, nunca pisa las anteriores.
+function ttParseFechaTem(s) {
+  // TEM manda "MM/DD/YYYY HH:mm:ss" (formato US) — Date() de JS no lo
+  // interpreta solo con el string, hay que armarlo a mano.
+  if (!s || typeof s !== 'string') return null;
+  const m = s.trim().match(/^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2}):(\d{2})$/);
+  if (!m) return null;
+  const [, mm, dd, yyyy, hh, mi, ss] = m;
+  return `${yyyy}-${mm}-${dd}T${hh}:${mi}:${ss}`;
+}
+
+async function ttImportarTem(input) {
+  const file = input.files[0];
+  input.value = '';
+  if (!file) return;
+  if (currentProfile?.rol !== 'admin') { showToastPortal('Solo un administrador puede importar el reporte TEM'); return; }
+  const msg = document.getElementById('ttResumenMsg');
+  msg.textContent = 'Leyendo el Excel...';
+  try {
+    const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' });
+    const hoja = wb.Sheets['globalReport'] || wb.Sheets[wb.SheetNames[0]];
+    if (!hoja) throw new Error('No encontré ninguna hoja en el Excel.');
+    const filas = XLSX.utils.sheet_to_json(hoja, { defval: '' });
+    const rows = filas
+      .filter(f => f['Name'] || f['Signature'])
+      .map(f => ({
+        serie_tem: String(f['Name'] || f['Signature']).trim(),
+        terminal_type: f['Terminal Type'] || null,
+        last_call_date: ttParseFechaTem(f['lastCallDate']),
+        next_call_date: ttParseFechaTem(f['nextCallDate']),
+        application_id: f['Application Id'] || null,
+        application_version: f['Application Version'] || null,
+      }));
+    if (!rows.length) throw new Error('No encontré filas con serial en el Excel.');
+
+    msg.textContent = `Cruzando ${rows.length} terminales contra Salesforce...`;
+    const res = await fetch(`${SF_AGENT_URL}/automations/terminales/tem-match`, {
+      method: 'POST',
+      headers: { 'x-automation-secret': SF_SYNC_SECRET, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rows }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.ok) throw new Error(data.error || 'Error consultando Salesforce');
+
+    msg.textContent = `Guardando ${data.resultados.length} registros en el historial...`;
+    const cargadoPor = (currentProfile?.nombre || currentProfile?.email || '—').trim();
+    const filasHistorial = data.resultados.map(r => ({ ...r, importado_por: cargadoPor }));
+    for (let i = 0; i < filasHistorial.length; i += 500) {
+      const { error } = await sb.from('terminal_tem_historial').insert(filasHistorial.slice(i, i + 500));
+      if (error) throw error;
+    }
+
+    showToastPortal(`✅ TEM importado: ${data.encontradas}/${data.resultados.length} resueltas contra SF`);
+    await ttCargarResumen();
+  } catch (e) {
+    console.error('[Trazabilidad Terminal] importar TEM', e);
+    msg.innerHTML = `<span style="color:#f87171">⛔ ${ttEsc(e.message||e)}</span>`;
   }
 }
 
@@ -6061,7 +6371,7 @@ function showApp(){
   // ── Vista Customer: SOLO Desinstalaciones, nada más en el nav (pedido
   // 26/08) — Rosario/Juan Ignacio no necesitan ver el resto del portal. ──
   if(isCustomer){
-    ['nav-sims','nav-envios','nav-rollout','nav-rollout-piloto','nav-rollout-vip','nav-store','nav-recuperadas',
+    ['nav-sims','nav-envios','nav-rollout','nav-rollout-piloto','nav-rollout-vip','nav-terminal-trazabilidad','nav-store','nav-recuperadas',
      'nav-ally','nav-distri','nav-ajustes','nav-retencion','nav-terminales','nav-section-config',
      'nav-napse','nav-churn-producto','nav-hoja-ruta','nav-zonas-amba','nav-indicadores',
      'nav-despacho-epsa','nav-presupuesto','nav-auditoria']
@@ -6096,7 +6406,7 @@ function showApp(){
   if(navIndicadores&&(isAdmin||isCeo||modulos.includes('indicadores')))navIndicadores.style.display='flex';
   const navDespachoEpsa=document.getElementById('nav-despacho-epsa');
   if(navDespachoEpsa&&!isCeo&&(isAdmin||modulos.includes('despacho-epsa')))navDespachoEpsa.style.display='flex';
-  ['sims','envios','desinstalaciones','churn-producto','hoja-ruta','napse','store','recuperadas','rollout','rollout-piloto','rollout-vip','retencion','terminales','zonas-amba'].forEach(mod=>{
+  ['sims','envios','desinstalaciones','churn-producto','hoja-ruta','napse','store','recuperadas','rollout','rollout-piloto','rollout-vip','retencion','terminales','terminal-trazabilidad','zonas-amba'].forEach(mod=>{
     const el=document.getElementById('nav-'+mod);
     if(el&&!modulos.includes(mod)&&!isAdmin&&!isCeo&&!isCustomer){el.classList.add('locked');el.onclick=null;}
   });
@@ -6173,6 +6483,7 @@ function buildDashCards(modulos,isAdmin,isCeo){
     {mod:'desinstalaciones',icon:'📦',title:'Desinstalaciones',desc:'Logística inversa',stat:'cargando...'},
     {mod:'napse',icon:'🔍',title:'NAPSE',desc:'Analizador de Logs VTOL',stat:''},
     {mod:'terminales',icon:'🖥️',title:'Terminales',desc:'Reporte Logicalis → Salesforce',stat:'Logicalis'},
+    {mod:'terminal-trazabilidad',icon:'🔎',title:'Trazabilidad Terminal',desc:'Logicalis + versión de app (TEM)',stat:''},
     {mod:'store',icon:'🏦',title:'Bancos',desc:'Terminales disponibles Barracas',stat:'cargando...'},
   ];
   if(isAdmin)all.push({mod:'ajustes',icon:'⚙️',title:'Ajustes',desc:'Usuarios y permisos',stat:'gestión'});
@@ -6194,7 +6505,7 @@ function buildDashCards(modulos,isAdmin,isCeo){
   loadOpsPanel(isAdmin, modulos);
 }
 
-const MOD_INFO={home:'Dashboard',sims:'Verificador SIMs',envios:'Envíos',rollout:'Rollout','rollout-piloto':'Misión Rollout — Trazabilidad','rollout-vip':'Rollout VIP — seguimiento del ranking de Ventas',desinstalaciones:'Desinstalaciones','churn-producto':'Churn Producto — NAPSE / PRISMA / Sin Perfil','hoja-ruta':'Hoja de Ruta — por chofer',napse:'NAPSE — Logs VTOL',instalaciones:'Instalaciones SF',retencion:'Retención de Cuentas',ajustes:'Ajustes',ally:'Configuración Ally',distri:'Distribuidores',terminales:'Terminales — Logicalis',store:'Bancos — Terminales disponibles',presupuesto:'Presupuesto de Operaciones','zonas-amba':'Zonas AMBA — correcciones por CP',indicadores:'Indicadores Operaciones — Logística','despacho-epsa':'Despacho EPSA — colecta'};
+const MOD_INFO={home:'Dashboard',sims:'Verificador SIMs',envios:'Envíos',rollout:'Rollout','rollout-piloto':'Misión Rollout — Trazabilidad','rollout-vip':'Rollout VIP — seguimiento del ranking de Ventas',desinstalaciones:'Desinstalaciones','churn-producto':'Churn Producto — NAPSE / PRISMA / Sin Perfil','hoja-ruta':'Hoja de Ruta — por chofer',napse:'NAPSE — Logs VTOL',instalaciones:'Instalaciones SF',retencion:'Retención de Cuentas',ajustes:'Ajustes',ally:'Configuración Ally',distri:'Distribuidores',terminales:'Terminales — Logicalis','terminal-trazabilidad':'Trazabilidad Terminal — Logicalis + TEM',store:'Bancos — Terminales disponibles',presupuesto:'Presupuesto de Operaciones','zonas-amba':'Zonas AMBA — correcciones por CP',indicadores:'Indicadores Operaciones — Logística','despacho-epsa':'Despacho EPSA — colecta'};
 
 function goTo(mod){
   const el=document.getElementById('nav-'+mod);
@@ -6233,6 +6544,7 @@ function goTo(mod){
   if(mod==='rollout')initRollout();
   if(mod==='rollout-piloto')loadRolloutPiloto();
   if(mod==='rollout-vip')rvInit();
+  if(mod==='terminal-trazabilidad')ttInit();
   // Pedido 31/08: este `goTo()` forzaba SIEMPRE la pestaña "Gestión OPS"
   // al entrar a Desinstalaciones, sin importar el rol — por eso a Rosario
   // (rol customer) le dejó de aparecer su vista simplificada (backlog) y
@@ -18467,6 +18779,35 @@ async function napseMatchSF(serialNumber, node, store, btn){
         archivo_nombre: (document.getElementById('term-file-input')?.files?.[0]?.name)||null,
         cargado_por: (currentProfile?.nombre||currentProfile?.email||'—').trim(),
       });
+
+      // Historial POR TERMINAL (pedido 28/09, trazabilidad) — complementa al
+      // resumen agregado de arriba, que no permite ver la historia de una
+      // terminal puntual. Una fila por terminal procesada en este import
+      // (tanto las actualizadas como las creadas), nunca se pisa.
+      const cargadoPor = (currentProfile?.nombre||currentProfile?.email||'—').trim();
+      const filasHistorial = termPreview
+        .filter(r => !termYaListo(r)) // solo lo que realmente se escribió en SF en esta corrida
+        .map(r => {
+          const nuevos = fieldsForSerie(r.serie);
+          const actual = r.current || {};
+          return {
+            serial_sf: r.serie,
+            modelo: (termMeta[r.serie]||{}).modelo || null,
+            solucion: (termMeta[r.serie]||{}).solucion || null,
+            es_error: !!(termMeta[r.serie]||{}).esError,
+            mes_ano: termMesAno,
+            estado_anterior: r.found ? (actual.Estado__c||null) : null,
+            estado_nuevo: nuevos.Estado__c,
+            perfil_anterior: r.found ? (actual.Perfil__c||null) : null,
+            perfil_nuevo: nuevos.Perfil__c,
+            cuenta_en_momento: r.found ? (actual.Cuenta||null) : null,
+            importado_por: cargadoPor,
+          };
+        });
+      if (filasHistorial.length) {
+        const { error: errHist } = await sb.from('terminal_logicalis_historial').insert(filasHistorial);
+        if (errHist) console.warn('[terminal_logicalis_historial] No se pudo guardar:', errHist.message);
+      }
     }catch(e){ console.warn('[logicalis_despachos_historico] No se pudo guardar:',e.message); }
   };
 })();
