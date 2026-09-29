@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.7.62</title>
+<title>Alleata · Operaciones v4.7.63</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -409,7 +409,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.62 · 29 sep 2026
+      v4.7.63 · 29 sep 2026
     </div>
   </div>
 </div>
@@ -524,7 +524,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.62 · 29 sep 2026
+      v4.7.63 · 29 sep 2026
     </div>
   </div>
 </nav>
@@ -579,7 +579,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.62</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.63</div>
   </div>
   <div class="content">
 
@@ -1254,6 +1254,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     <div style="font-size:11px;color:var(--text-muted);margin:0 0 14px 2px">Versión de app (TEM) — última importación conocida por terminal</div>
     <div class="stats-row" id="ttKpisLogi"></div>
     <div style="font-size:11px;color:var(--text-muted);margin:8px 0 0 2px">Intervenciones Logicalis (historial completo, todas las importaciones)</div>
+    <div id="ttKpiDetalle" style="display:none"></div>
   </div>
 
   <!-- ── Tab Por cuenta ── -->
@@ -5339,7 +5340,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.7.62] OK');
+console.log('[Alleata v4.7.63] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -5776,13 +5777,18 @@ function ttSetTab(tab) {
 const TT_VERSION_ACTUAL = '2.5.11';
 const TT_VERSION_ANTERIOR = '2.5.9';
 
+// Caché de los datos crudos de la última carga — así los clicks en las
+// tarjetas filtran en el navegador sin volver a pedirle nada a Supabase.
+let _ttTemCache = [], _ttLogiCache = [];
+
 async function ttCargarResumen() {
   const msg = document.getElementById('ttResumenMsg');
   const perfilSel = document.getElementById('ttFiltroPerfil')?.value || '';
   msg.textContent = 'Cargando...';
+  document.getElementById('ttKpiDetalle').innerHTML = ''; document.getElementById('ttKpiDetalle').style.display = 'none';
   try {
     // TEM: última foto por terminal (v_terminal_tem_ultimo) — para distribución de versiones.
-    let q = sb.from('v_terminal_tem_ultimo').select('serial_sf,application_version,last_call_date,encontrada_en_sf,perfil_en_momento');
+    let q = sb.from('v_terminal_tem_ultimo').select('serial_sf,application_version,last_call_date,encontrada_en_sf,perfil_en_momento,cuenta_en_momento');
     if (perfilSel === '__sin_perfil__') q = q.is('perfil_en_momento', null);
     else if (perfilSel) q = q.eq('perfil_en_momento', perfilSel);
     const { data: tem, error: e1 } = await q;
@@ -5790,10 +5796,12 @@ async function ttCargarResumen() {
     // Logicalis: TODO el historial (no solo la última foto) — para contar intervenciones totales.
     // El perfil no se filtra acá porque Logicalis es el "génesis" de la terminal
     // (cómo la recibimos) y no siempre coincide con el perfil que tiene HOY en SF.
-    const { data: logi, error: e2 } = await sb.from('terminal_logicalis_historial').select('serial_sf,es_error,importado_en');
+    const { data: logi, error: e2 } = await sb.from('terminal_logicalis_historial').select('serial_sf,es_error,solucion,mes_ano,cuenta_en_momento,importado_en');
     if (e2) throw e2;
 
     const temOk = (tem || []).filter(r => r.encontrada_en_sf);
+    _ttTemCache = temOk; _ttLogiCache = logi || [];
+
     const porVersion = {};
     temOk.forEach(r => { const v = r.application_version || '(sin versión)'; porVersion[v] = (porVersion[v]||0) + 1; });
     const versiones = Object.entries(porVersion).sort((a,b) => b[1]-a[1]);
@@ -5803,29 +5811,72 @@ async function ttCargarResumen() {
     const hace30 = Date.now() - 30*24*3600*1000;
     const activas30d = temOk.filter(r => r.last_call_date && new Date(r.last_call_date).getTime() > hace30).length;
 
-    const box = (cls, num, label, sub) => `<div class="stat-box ${cls}"><div class="stat-num">${num}</div><div class="stat-label">${label}</div>${sub?`<div style="font-size:10px;color:var(--text-muted);margin-top:2px">${sub}</div>`:''}</div>`;
+    const box = (cls, num, label, sub, key) => `<div class="stat-box ${cls}" style="cursor:pointer" onclick="ttMostrarDetalle('${key}')" title="Ver el detalle"><div class="stat-num">${num}</div><div class="stat-label">${label}</div>${sub?`<div style="font-size:10px;color:var(--text-muted);margin-top:2px">${sub}</div>`:''}</div>`;
     document.getElementById('ttKpisTem').innerHTML =
-      box('s-purple', temOk.length, 'Terminales con TEM importado', perfilSel ? `perfil: ${perfilSel==='__sin_perfil__'?'sin perfil':perfilSel}` : 'todos los perfiles') +
-      box('s-green', enActual, `En ${TT_VERSION_ACTUAL} (actual)`, temOk.length ? Math.round(100*enActual/temOk.length)+'%' : '') +
-      box('s-teal', enAnterior, `En ${TT_VERSION_ANTERIOR} (anterior)`, temOk.length ? Math.round(100*enAnterior/temOk.length)+'%' : '') +
-      box('', enVieja, 'En versión más vieja o sin dato', '') +
-      box('', activas30d, 'Conectadas en 30 días', '');
+      box('s-purple', temOk.length, 'Terminales con TEM importado', perfilSel ? `perfil: ${perfilSel==='__sin_perfil__'?'sin perfil':perfilSel}` : 'todos los perfiles', 'tem_todas') +
+      box('s-green', enActual, `En ${TT_VERSION_ACTUAL} (actual)`, temOk.length ? Math.round(100*enActual/temOk.length)+'%' : '', 'tem_actual') +
+      box('s-teal', enAnterior, `En ${TT_VERSION_ANTERIOR} (anterior)`, temOk.length ? Math.round(100*enAnterior/temOk.length)+'%' : '', 'tem_anterior') +
+      box('', enVieja, 'En versión más vieja o sin dato', '', 'tem_vieja') +
+      box('', activas30d, 'Conectadas en 30 días', '', 'tem_activas30');
 
     const totalInterv = (logi||[]).length;
     const conError = (logi||[]).filter(r => r.es_error).length;
     const seriesUnicas = new Set((logi||[]).map(r => r.serial_sf)).size;
     document.getElementById('ttKpisLogi').innerHTML =
-      box('', totalInterv, 'Intervenciones totales', 'todas las importaciones') +
-      box('s-orange', conError, 'Con error / reparación', totalInterv ? Math.round(100*conError/totalInterv)+'%' : '') +
-      box('', seriesUnicas, 'Terminales distintas', 'pasaron por Logicalis alguna vez (génesis)');
+      box('', totalInterv, 'Intervenciones totales', 'todas las importaciones', 'logi_todas') +
+      box('s-orange', conError, 'Con error / reparación', totalInterv ? Math.round(100*conError/totalInterv)+'%' : '', 'logi_error') +
+      box('', seriesUnicas, 'Terminales distintas', 'pasaron por Logicalis alguna vez (génesis)', 'logi_unicas');
 
     msg.textContent = versiones.length
-      ? `Rollout de ${TT_VERSION_ACTUAL} en curso (arrancó hace ~1 semana) · distribución: ${versiones.map(([v,n]) => `${ttEsc(v)} (${n})`).join(' · ')}`
+      ? `Rollout de ${TT_VERSION_ACTUAL} en curso (arrancó hace ~1 semana) · distribución: ${versiones.map(([v,n]) => `${ttEsc(v)} (${n})`).join(' · ')} — click en cualquier tarjeta para ver el detalle`
       : 'Todavía no se importó ningún reporte de TEM.';
   } catch (e) {
     console.error('[Trazabilidad Terminal]', e);
     msg.innerHTML = `<span style="color:#f87171">⛔ ${ttEsc(e.message||e)}</span>${/does not exist|schema cache|Could not find/i.test(e.message||'')?' — falta correr setup_terminal_trazabilidad.sql en Supabase.':''}`;
   }
+}
+
+// Arma la tablita de detalle debajo de las tarjetas, según cuál se clickeó.
+function ttMostrarDetalle(key) {
+  const cont = document.getElementById('ttKpiDetalle');
+  const hace30 = Date.now() - 30*24*3600*1000;
+  let filas = [], cols = [], titulo = '';
+
+  if (key.startsWith('tem_')) {
+    let lista = _ttTemCache;
+    if (key === 'tem_actual')    { lista = lista.filter(r => r.application_version === TT_VERSION_ACTUAL); titulo = `Terminales en ${TT_VERSION_ACTUAL}`; }
+    else if (key === 'tem_anterior') { lista = lista.filter(r => r.application_version === TT_VERSION_ANTERIOR); titulo = `Terminales en ${TT_VERSION_ANTERIOR}`; }
+    else if (key === 'tem_vieja')    { lista = lista.filter(r => r.application_version !== TT_VERSION_ACTUAL && r.application_version !== TT_VERSION_ANTERIOR); titulo = 'En versión más vieja o sin dato'; }
+    else if (key === 'tem_activas30'){ lista = lista.filter(r => r.last_call_date && new Date(r.last_call_date).getTime() > hace30); titulo = 'Conectadas en los últimos 30 días'; }
+    else titulo = 'Todas las terminales con TEM importado';
+    cols = ['Terminal (SF)', 'Cuenta', 'Versión', 'Última conexión', 'Perfil'];
+    filas = lista.map(r => [r.serial_sf, r.cuenta_en_momento||'—', r.application_version||'—', ttFecha(r.last_call_date, true), r.perfil_en_momento||'—']);
+  } else {
+    let lista = _ttLogiCache;
+    if (key === 'logi_error') { lista = lista.filter(r => r.es_error); titulo = 'Intervenciones con error / reparación'; }
+    else if (key === 'logi_unicas') {
+      const vistos = new Set();
+      lista = lista.filter(r => { if (vistos.has(r.serial_sf)) return false; vistos.add(r.serial_sf); return true; });
+      titulo = 'Terminales distintas (una fila por terminal, su evento más reciente)';
+    } else titulo = 'Todas las intervenciones de Logicalis';
+    cols = ['Terminal (SF)', 'Cuenta (en el momento)', 'Solución', 'Mes/Año', 'Fecha de import'];
+    filas = lista.map(r => [r.serial_sf, r.cuenta_en_momento||'—', r.es_error?`⚠️ ${r.solucion||'sin detalle'}`:'✅ Personalización', r.mes_ano||'—', ttFecha(r.importado_en, true)]);
+  }
+
+  cont.style.display = 'block';
+  cont.innerHTML = `
+    <div class="card" style="margin-top:8px;padding:0;overflow:hidden">
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid var(--border)">
+        <div style="font-size:12px;font-weight:700">${ttEsc(titulo)} <span style="font-weight:400;color:var(--text-muted)">(${filas.length})</span></div>
+        <button onclick="document.getElementById('ttKpiDetalle').style.display='none'" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:16px;line-height:1">×</button>
+      </div>
+      <div style="max-height:320px;overflow:auto">
+        <table class="table" style="min-width:700px">
+          <thead><tr>${cols.map(c=>`<th>${ttEsc(c)}</th>`).join('')}</tr></thead>
+          <tbody>${filas.length ? filas.map(f => `<tr>${f.map(v=>`<td class="mono" style="font-size:11px">${ttEsc(v)}</td>`).join('')}</tr>`).join('') : `<tr><td colspan="${cols.length}" style="color:var(--text-muted);text-align:center;padding:14px">Sin resultados.</td></tr>`}</tbody>
+        </table>
+      </div>
+    </div>`;
 }
 
 // ── Tab Por cuenta ───────────────────────────────────────────────────────
