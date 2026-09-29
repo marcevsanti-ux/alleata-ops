@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.7.63</title>
+<title>Alleata · Operaciones v4.7.64</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -409,7 +409,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.63 · 29 sep 2026
+      v4.7.64 · 29 sep 2026
     </div>
   </div>
 </div>
@@ -524,7 +524,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.63 · 29 sep 2026
+      v4.7.64 · 29 sep 2026
     </div>
   </div>
 </nav>
@@ -579,7 +579,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.63</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.64</div>
   </div>
   <div class="content">
 
@@ -1298,6 +1298,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
        rollout_vip + vista v_rollout_vip: ver setup_rollout_vip.sql. -->
   <div class="stats-row" id="rvKpis" style="margin-bottom:8px"></div>
   <div id="rvKpiNota" style="font-size:10px;color:var(--text-muted);margin:0 0 12px 2px"></div>
+  <div id="rvKpiDetalle" style="display:none;margin-bottom:14px"></div>
 
   <div class="card" style="margin-bottom:14px">
     <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
@@ -5340,7 +5341,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.7.63] OK');
+console.log('[Alleata v4.7.64] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -5579,7 +5580,13 @@ async function rvSetZona(zona, force) {
   }
 }
 
+// Caché de la última tanda de filas mostradas (AMBA o Interior, ya
+// filtradas) — así el click en una tarjeta arma la tabla de detalle sin
+// tener que volver a consultar Supabase.
+let _rvKpiRows = [];
+
 function rvRenderKpis(rows) {
+  _rvKpiRows = rows;
   const cont = {}; let volTot = 0, volInst = 0;
   rows.forEach(r => {
     const e = rvEtapaEfectiva(r); cont[e] = (cont[e] || 0) + 1;
@@ -5587,18 +5594,51 @@ function rvRenderKpis(rows) {
   });
   const enGestion = (cont['Notificado']||0) + (cont['Notificado 2da vez']||0) + (cont['Confirmado']||0);
   const pctVol = volTot ? Math.round(100 * volInst / volTot) : 0;
-  const box = (cls, num, label, sub) => `<div class="stat-box ${cls}"><div class="stat-num">${num}</div><div class="stat-label">${label}</div>${sub ? `<div style="font-size:10px;color:var(--text-muted);margin-top:2px">${sub}</div>` : ''}</div>`;
+  const box = (cls, num, label, sub, key) => `<div class="stat-box ${cls}" style="cursor:pointer" onclick="rvMostrarDetalle('${key}')" title="Ver el detalle"><div class="stat-num">${num}</div><div class="stat-label">${label}</div>${sub ? `<div style="font-size:10px;color:var(--text-muted);margin-top:2px">${sub}</div>` : ''}</div>`;
   document.getElementById('rvKpis').innerHTML =
-    box('s-purple', rows.length, 'Terminales en ranking', rvMillones(volTot) + ' de volumen') +
-    box('', cont['Sin contactar']||0, 'Sin contactar', '') +
-    box('s-blue', enGestion, 'En gestión', 'notificado / confirmado') +
-    box('s-teal', cont['OT creada']||0, 'OT creada', 'en Misión Rollout') +
-    box('s-green', cont['Instalado']||0, 'Instalado', pctVol + '% del volumen') +
-    box('', (cont['Sin respuesta']||0) + (cont['Frenado']||0), 'Sin respuesta / Frenado', '');
+    box('s-purple', rows.length, 'Terminales en ranking', rvMillones(volTot) + ' de volumen', 'todas') +
+    box('', cont['Sin contactar']||0, 'Sin contactar', '', 'Sin contactar') +
+    box('s-blue', enGestion, 'En gestión', 'notificado / confirmado', 'en_gestion') +
+    box('s-teal', cont['OT creada']||0, 'OT creada', 'en Misión Rollout', 'OT creada') +
+    box('s-green', cont['Instalado']||0, 'Instalado', pctVol + '% del volumen', 'Instalado') +
+    box('', (cont['Sin respuesta']||0) + (cont['Frenado']||0), 'Sin respuesta / Frenado', '', 'sin_respuesta_frenado');
   const multi = new Set(); const vistos = new Set();
   rows.forEach(r => { if (r.cuit) { if (vistos.has(r.cuit)) multi.add(r.cuit); vistos.add(r.cuit); } });
   document.getElementById('rvKpiNota').textContent = multi.size
     ? `${multi.size} ${multi.size === 1 ? 'CUIT tiene' : 'CUIT tienen'} más de una terminal en el ranking: la OT de Salesforce se cruza por CUIT, así que todas sus terminales muestran la misma OT.` : '';
+  document.getElementById('rvKpiDetalle').style.display = 'none'; // se cierra el detalle viejo si cambió de zona/filtro
+}
+
+// Arma la tabla de detalle debajo de las tarjetas, según cuál se clickeó.
+function rvMostrarDetalle(key) {
+  const cont = document.getElementById('rvKpiDetalle');
+  let lista = _rvKpiRows, titulo = '';
+  if (key === 'todas') titulo = 'Todas las terminales del ranking (esta zona)';
+  else if (key === 'en_gestion') { lista = lista.filter(r => ['Notificado','Notificado 2da vez','Confirmado'].includes(rvEtapaEfectiva(r))); titulo = 'En gestión (notificado / confirmado)'; }
+  else if (key === 'sin_respuesta_frenado') { lista = lista.filter(r => ['Sin respuesta','Frenado'].includes(rvEtapaEfectiva(r))); titulo = 'Sin respuesta / Frenado'; }
+  else { lista = lista.filter(r => rvEtapaEfectiva(r) === key); titulo = key; }
+
+  cont.style.display = 'block';
+  cont.innerHTML = `
+    <div class="card" style="padding:0;overflow:hidden">
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid var(--border)">
+        <div style="font-size:12px;font-weight:700">${rvEsc(titulo)} <span style="font-weight:400;color:var(--text-muted)">(${lista.length})</span></div>
+        <button onclick="document.getElementById('rvKpiDetalle').style.display='none'" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:16px;line-height:1">×</button>
+      </div>
+      <div style="max-height:340px;overflow:auto">
+        <table class="table" style="min-width:760px">
+          <thead><tr><th>#</th><th>Terminal</th><th>Vía</th><th style="text-align:right">Vol. Sep</th><th>OT</th></tr></thead>
+          <tbody>${lista.length ? lista.map(r => `
+            <tr>
+              <td class="mono">${r.ranking ?? '—'}</td>
+              <td><div style="font-weight:600">${rvEsc(r.razon_social||'—')}</div><div class="mono" style="color:var(--text-muted);font-size:10px">${rvEsc(r.cuit||'—')} · ${rvEsc(r.terminal_id)}</div></td>
+              <td>${rvEsc(r.via||'—')}</td>
+              <td class="mono" style="text-align:right">${rvMillones(r.vol_total)}</td>
+              <td>${r.ot_numero ? rvEsc(r.ot_numero) : '—'}</td>
+            </tr>`).join('') : `<tr><td colspan="5" style="color:var(--text-muted);text-align:center;padding:14px">Sin resultados.</td></tr>`}</tbody>
+        </table>
+      </div>
+    </div>`;
 }
 
 function rvRender() {
