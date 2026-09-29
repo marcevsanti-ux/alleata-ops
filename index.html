@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.7.69</title>
+<title>Alleata · Operaciones v4.7.70</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -409,7 +409,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.69 · 29 sep 2026
+      v4.7.70 · 29 sep 2026
     </div>
   </div>
 </div>
@@ -524,7 +524,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.69 · 29 sep 2026
+      v4.7.70 · 29 sep 2026
     </div>
   </div>
 </nav>
@@ -579,7 +579,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.69</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.70</div>
   </div>
   <div class="content">
 
@@ -5341,7 +5341,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.7.69] OK');
+console.log('[Alleata v4.7.70] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -11249,9 +11249,17 @@ function dsRecuperadaRenderPorMes(lista, el){
 
   const chips=mesesOrdenados.map(k=>{
     const label=k==='sin-fecha' ? 'Sin fecha' : `${MESES_LABEL[k.slice(5)]} ${k.slice(0,4)}`;
+    // Pedido 29/09: "nativa Napse" = Fecha de Instalación de la CUENTA >=
+    // 1/6/2026 — el perfil Napse recién se empezó a entregar después de esa
+    // fecha, así que una terminal instalada antes no nació Napse aunque hoy
+    // el Perfil__c diga otra cosa (puede haber migrado de otro perfil). NO
+    // se usa Perfil__c para este corte, se usa la fecha real de instalación.
+    const CORTE_NAPSE='2026-06-01';
+    const nativasNapse=porMes[k].filter(o=>o.fecha_instalacion && o.fecha_instalacion>=CORTE_NAPSE).length;
     return `<div onclick="dsRecuperadaFiltrarPorMes('${k}')" id="${ns}-rec-mes-${k}" style="cursor:pointer;background:${color}18;border:1px solid ${color}40;border-radius:10px;padding:8px 14px;min-width:70px;text-align:center">
       <div style="font-size:17px;font-weight:800;color:${color}">${porMes[k].length}</div>
       <div style="font-size:10px;color:var(--text-muted)">${label}</div>
+      ${nativasNapse?`<div style="font-size:9px;color:#a78bfa;margin-top:3px;font-weight:600" title="Fecha de Instalación de la cuenta ≥ 1/6/2026 — no se dio de baja el Perfil__c, se calcula por fecha real de instalación">🟣 ${nativasNapse} nativa${nativasNapse===1?'':'s'} Napse</div>`:''}
     </div>`;
   }).join('');
 
