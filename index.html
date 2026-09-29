@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.7.70</title>
+<title>Alleata · Operaciones v4.7.71</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -409,7 +409,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.70 · 29 sep 2026
+      v4.7.71 · 29 sep 2026
     </div>
   </div>
 </div>
@@ -524,7 +524,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.70 · 29 sep 2026
+      v4.7.71 · 29 sep 2026
     </div>
   </div>
 </nav>
@@ -579,7 +579,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.70</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.71</div>
   </div>
   <div class="content">
 
@@ -5341,7 +5341,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.7.70] OK');
+console.log('[Alleata v4.7.71] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -10477,6 +10477,23 @@ const ESTADO_COLORS_NAPSE={
   'NO RESPONDE':'#ef4444','Reactivado':'#8b5cf6','Cancelado':'#6b7280',
   'Extraviada':'#6b7280','Reprogramar':'#f97316',
 };
+const CORTE_NATIVA_NAPSE='2026-06-01'; // ver nota completa en dsRecuperadaRenderPorMes
+const dsEsNativaNapse=o=>!!(o&&o.fecha_instalacion&&o.fecha_instalacion>=CORTE_NATIVA_NAPSE);
+
+// Pedido 29/09: los 7 cards de estado (Pendiente/NO RESPONDE/.../Recuperada)
+// pasan de badges chicos a cards, cada uno con cuántos de esos casos son
+// "nativos Napse" (fecha de instalación de la cuenta ≥ 1/6/2026 — no se usa
+// Perfil__c, ver nota en dsRecuperadaRenderPorMes). Un solo helper para que
+// Gestión OPS y Backlog Histórico se vean y calculen exactamente igual.
+function dsCardEstadoConNapse(estado, cant, detalleArr, onclickFn, extra){
+  const color=ESTADO_COLORS_NAPSE[estado]||'#6b7280';
+  const nativas=(detalleArr||[]).filter(dsEsNativaNapse).length;
+  return `<div onclick="${onclickFn}" title="Ver el detalle"${extra||''} style="cursor:pointer;background:var(--navy-900);border:1px solid ${color}40;border-left:3px solid ${color};border-radius:10px;padding:8px 14px;min-width:100px">
+    <div style="font-size:19px;font-weight:800;color:${color};line-height:1.1">${cant}</div>
+    <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.02em">${estado}</div>
+    ${nativas?`<div style="font-size:9px;color:#a78bfa;margin-top:3px;font-weight:600">🟣 ${nativas} nativa${nativas===1?'':'s'} Napse</div>`:''}
+  </div>`;
+}
 const MESES_CORTOS_NAPSE=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
 
 // Pedido 28/08: los cards de mes (JUN/JUL/AGO) pasan a ser botones — al
@@ -11086,10 +11103,9 @@ async function dsGestionOpsCargar(){
       resumenEl.innerHTML=`<div style="width:100%;display:flex;flex-wrap:wrap;align-items:center;gap:8px">`+
         `<div style="font-size:22px;font-weight:800;color:var(--teal);margin-right:6px">${j.totalGeneral}</div>`+
         `<div style="font-size:11px;color:var(--text-muted);align-self:center;margin-right:10px">total desde 1/4/2026</div>`+
-        entries.map(([estado,cant])=>{
-          const color=ESTADO_COLORS_NAPSE[estado]||'#6b7280';
-          return `<div class="badge" style="background:${color}18;border:1px solid ${color}40;color:${color};cursor:pointer;padding:6px 12px;font-size:11px" onclick="dsGestionOpsToggleEstado('${estado.replace(/'/g,"\\'")}')">${estado} · ${cant}</div>`;
-        }).join('')+
+        entries.map(([estado,cant])=>
+          dsCardEstadoConNapse(estado, cant, window._gestionOpsEstadoDetalle[estado], `dsGestionOpsToggleEstado('${estado.replace(/'/g,"\\'")}')`)
+        ).join('')+
         `</div>`+
         `<div style="width:100%;display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:8px;padding-top:8px;border-top:1px solid var(--border2)">`+
         `<div style="font-size:10px;color:var(--text-muted);align-self:center;margin-right:4px">Por Perfil__c (diagnóstico 12/08 — para comparar contra Churn Producto):</div>`+
@@ -11118,7 +11134,9 @@ function dsToggleEstadoGenerico(estado, estadoDetalleObj, detalleElId){
   const el=document.getElementById(detalleElId);
   if(!el)return;
   if(el.dataset.actual===estado){ el.innerHTML=''; el.dataset.actual=''; return; }
-  const lista=estadoDetalleObj[estado]||[];
+  // Pedido 29/09: las cuentas nativas Napse siempre van primero, cualquiera
+  // sea el estado — el resto mantiene el orden en que vino de SF.
+  const lista=(estadoDetalleObj[estado]||[]).slice().sort((a,b)=>dsEsNativaNapse(b)-dsEsNativaNapse(a));
   el.dataset.actual=estado;
 
   // Pedido 28/07: SOLO "Pendiente" tiene la vista de investigación agrupada
@@ -11249,13 +11267,8 @@ function dsRecuperadaRenderPorMes(lista, el){
 
   const chips=mesesOrdenados.map(k=>{
     const label=k==='sin-fecha' ? 'Sin fecha' : `${MESES_LABEL[k.slice(5)]} ${k.slice(0,4)}`;
-    // Pedido 29/09: "nativa Napse" = Fecha de Instalación de la CUENTA >=
-    // 1/6/2026 — el perfil Napse recién se empezó a entregar después de esa
-    // fecha, así que una terminal instalada antes no nació Napse aunque hoy
-    // el Perfil__c diga otra cosa (puede haber migrado de otro perfil). NO
-    // se usa Perfil__c para este corte, se usa la fecha real de instalación.
-    const CORTE_NAPSE='2026-06-01';
-    const nativasNapse=porMes[k].filter(o=>o.fecha_instalacion && o.fecha_instalacion>=CORTE_NAPSE).length;
+    // "nativa Napse" — ver definición completa en dsEsNativaNapse / CORTE_NATIVA_NAPSE.
+    const nativasNapse=porMes[k].filter(dsEsNativaNapse).length;
     return `<div onclick="dsRecuperadaFiltrarPorMes('${k}')" id="${ns}-rec-mes-${k}" style="cursor:pointer;background:${color}18;border:1px solid ${color}40;border-radius:10px;padding:8px 14px;min-width:70px;text-align:center">
       <div style="font-size:17px;font-weight:800;color:${color}">${porMes[k].length}</div>
       <div style="font-size:10px;color:var(--text-muted)">${label}</div>
@@ -11287,9 +11300,11 @@ async function dsRecuperadaFiltrarPorMes(mesKey, esInicial){
     if(activo) activo.style.boxShadow=`0 0 0 2px ${ESTADO_COLORS_NAPSE['Recuperada']||'#10b981'}`;
   }
   const porMes=window._dsRecuperadaPorMes||{};
+  // Nativas Napse primero (pedido 29/09); dentro de cada grupo, se mantiene
+  // el orden por fecha de recuperación que ya tenía.
   const lista=(_dsRecuperadaMesActivo ? (porMes[_dsRecuperadaMesActivo]||[]) : Object.values(porMes).flat())
     .slice()
-    .sort((a,b)=>(a.fecha_recuperada||'').localeCompare(b.fecha_recuperada||''));
+    .sort((a,b)=>dsEsNativaNapse(b)-dsEsNativaNapse(a) || (a.fecha_recuperada||'').localeCompare(b.fecha_recuperada||''));
   const color=ESTADO_COLORS_NAPSE['Recuperada']||'#10b981';
   const celda=v=>v?`<span>${v}</span>`:`<span style="color:var(--text-muted)">—</span>`;
 
@@ -11552,9 +11567,8 @@ async function dsBacklogCargar(){
         `<div style="font-size:22px;font-weight:800;color:var(--teal);margin-right:6px">${j.totalGeneral}</div>`+
         `<div style="font-size:11px;color:var(--text-muted);align-self:center;margin-right:10px">total anterior al 1/4/2026</div>`+
         entries.map(([estado,cant])=>{
-          const color=ESTADO_COLORS_NAPSE[estado]||'#6b7280';
           const nota=estado==='En Proceso'?' title="Excluye OTs asignadas a Angel"':'';
-          return `<div class="badge" style="background:${color}18;border:1px solid ${color}40;color:${color};cursor:pointer;padding:6px 12px;font-size:11px"${nota} onclick="dsBacklogToggleEstado('${estado.replace(/'/g,"\\'")}')">${estado} · ${cant}</div>`;
+          return dsCardEstadoConNapse(estado, cant, estadoDetalle[estado], `dsBacklogToggleEstado('${estado.replace(/'/g,"\\'")}')`, nota);
         }).join('')+
         `</div>`+
         `<div style="width:100%;display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:8px;padding-top:8px;border-top:1px solid var(--border2)">`+
