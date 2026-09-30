@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.7.74</title>
+<title>Alleata · Operaciones v4.7.75</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -409,7 +409,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.74 · 29 sep 2026
+      v4.7.75 · 29 sep 2026
     </div>
   </div>
 </div>
@@ -524,7 +524,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.74 · 29 sep 2026
+      v4.7.75 · 29 sep 2026
     </div>
   </div>
 </nav>
@@ -579,7 +579,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.74</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.75</div>
   </div>
   <div class="content">
 
@@ -1333,7 +1333,6 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <tbody id="rvBody"></tbody>
     </table>
   </div>
-  <div id="rvKpiDetalle" style="display:none;margin-top:14px"></div>
 </div>
 
 <div class="module" id="mod-rollout-piloto">
@@ -5341,7 +5340,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.7.74] OK');
+console.log('[Alleata v4.7.75] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -5613,26 +5612,36 @@ function rvRenderKpis(rows) {
   rows.forEach(r => { if (r.cuit) { if (vistos.has(r.cuit)) multi.add(r.cuit); vistos.add(r.cuit); } });
   document.getElementById('rvKpiNota').textContent = multi.size
     ? `${multi.size} ${multi.size === 1 ? 'CUIT tiene' : 'CUIT tienen'} más de una terminal en el ranking: la OT de Salesforce se cruza por CUIT, así que todas sus terminales muestran la misma OT.` : '';
-  document.getElementById('rvKpiDetalle').style.display = 'none'; // se cierra el detalle viejo si cambió de zona/filtro
+  document.getElementById('rvModalDetalle')?.remove(); // se cierra el detalle si estaba abierto y cambió de zona/filtro
 }
 
 // Arma la tabla de detalle debajo de las tarjetas, según cuál se clickeó.
 function rvMostrarDetalle(key) {
-  const cont = document.getElementById('rvKpiDetalle');
   let lista = _rvKpiRows, titulo = '';
   if (key === 'todas') titulo = 'Todas las terminales del ranking (esta zona)';
   else if (key === 'en_gestion') { lista = lista.filter(r => ['Notificado','Notificado 2da vez','Confirmado'].includes(rvEtapaEfectiva(r))); titulo = 'En gestión (notificado / confirmado)'; }
   else if (key === 'sin_respuesta_frenado') { lista = lista.filter(r => ['Sin respuesta','Frenado'].includes(rvEtapaEfectiva(r))); titulo = 'Sin respuesta / Frenado'; }
   else { lista = lista.filter(r => rvEtapaEfectiva(r) === key); titulo = key; }
 
-  cont.style.display = 'block';
-  cont.innerHTML = `
-    <div class="card" style="padding:0;overflow:hidden">
-      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid var(--border)">
-        <div style="font-size:12px;font-weight:700">${rvEsc(titulo)} <span style="font-weight:400;color:var(--text-muted)">(${lista.length})</span></div>
-        <button onclick="document.getElementById('rvKpiDetalle').style.display='none'" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:16px;line-height:1">×</button>
+  // FIX 29/09: esto vivía como <div> DEBAJO de la tabla grande (238+ filas) —
+  // técnicamente aparecía, pero había que scrollear muchísimo para verlo y
+  // parecía que no pasaba nada al hacer click. Pasa a modal flotante, igual
+  // que Stock en Vivo (SIMs), así se ve siempre sin importar el scroll.
+  let m = document.getElementById('rvModalDetalle');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'rvModalDetalle';
+    m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px;';
+    document.body.appendChild(m);
+    m.addEventListener('click', (e) => { if (e.target === m) m.remove(); });
+  }
+  m.innerHTML = `
+    <div style="background:var(--navy-800);border:1px solid var(--border2);border-radius:16px;width:100%;max-width:820px;max-height:80vh;display:flex;flex-direction:column;box-shadow:var(--shadow-lg);">
+      <div style="padding:14px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-shrink:0;">
+        <div style="font-size:13px;font-weight:700">${rvEsc(titulo)} <span style="font-weight:400;color:var(--text-muted)">(${lista.length})</span></div>
+        <button onclick="document.getElementById('rvModalDetalle').remove()" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:18px;line-height:1">×</button>
       </div>
-      <div style="max-height:340px;overflow:auto">
+      <div style="overflow:auto;flex:1;padding:0 20px 14px">
         <table class="table" style="min-width:760px">
           <thead><tr><th>#</th><th>Terminal</th><th>Vía</th><th style="text-align:right">Vol. Sep</th><th>OT</th></tr></thead>
           <tbody>${lista.length ? lista.map(r => `
