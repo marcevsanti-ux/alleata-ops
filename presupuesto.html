@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Alleata · Presupuesto Operaciones v1.14.5</title>
+<title>Alleata · Presupuesto Operaciones v1.14.6</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -200,7 +200,7 @@
   <div class="login-box">
     <h2>💰 Presupuesto</h2>
     <p class="login-sub">Alleata · Acceso restringido</p>
-    <div style="position:absolute;bottom:12px;right:16px;font-size:10px;font-family:'JetBrains Mono',monospace;color:rgba(232,237,243,.2)">v1.14.5</div>
+    <div style="position:absolute;bottom:12px;right:16px;font-size:10px;font-family:'JetBrains Mono',monospace;color:rgba(232,237,243,.2)">v1.14.6</div>
     <div class="login-field">
       <label>Email</label>
       <input type="email" id="loginEmail" placeholder="tu@email.com" onkeydown="if(event.key==='Enter')doLogin()">
@@ -216,7 +216,7 @@
 
 <div id="appContent" style="display:none">
 <h1>💰 Presupuesto Operaciones</h1>
-<p class="sub">Alleata · 2026 <span style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 8px;border-radius:4px;border:1px solid var(--border2);font-size:10px;margin-left:6px">v1.14.5</span></p>
+<p class="sub">Alleata · 2026 <span style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 8px;border-radius:4px;border:1px solid var(--border2);font-size:10px;margin-left:6px">v1.14.6</span></p>
 
 <div class="toolbar">
   <div class="mes-bar" id="mesBar"></div>
@@ -1107,6 +1107,7 @@ async function logiHandleXLS(input){
     const wb=XLSX.read(buf,{type:'array'});
     let terminales=0,series=[];
 
+    let irreparables=0;
     const nameInf=wb.SheetNames.find(n=>n.toLowerCase().includes('informe')||n.toLowerCase().includes('final'))||wb.SheetNames[0];
     if(nameInf){
       const data=XLSX.utils.sheet_to_json(wb.Sheets[nameInf],{header:1,defval:''});
@@ -1115,16 +1116,32 @@ async function logiHandleXLS(input){
       // fila "Cuenta de Serie" — más robusto que "agarrar el primer número
       // después de Cuenta de Serie", que se rompe si el pivot cambia el orden
       // de columnas (ej. si algún mes "Sin reparación" queda antes).
-      let colPersonalizacion=-1;
+      let colPersonalizacion=-1,colIrreparable=-1;
       for(const row of data){
         const ci=row.findIndex(c=>/personalizaci/i.test(String(c)));
-        if(ci>=0){ colPersonalizacion=ci; break; }
+        if(ci>=0&&colPersonalizacion<0) colPersonalizacion=ci;
+        const cj=row.findIndex(c=>/irreparable/i.test(String(c)));
+        if(cj>=0&&colIrreparable<0) colIrreparable=cj;
+        if(colPersonalizacion>=0&&colIrreparable>=0) break;
       }
       if(colPersonalizacion>=0){
         for(const row of data){
           if(/cuenta de serie/i.test(String(row[0]))){
             const n=parseInt(row[colPersonalizacion]);
             if(!isNaN(n)&&n>=0&&n<5000) terminales=n;
+            break;
+          }
+        }
+      }
+      // Irreparables (pedido 01/10): se facturan a USD 0 — por eso
+      // "terminales" (la cantidad facturable) nunca las incluyó, pero son
+      // terminales físicas recibidas igual, y hacían falta aparte para que
+      // el total real (Indicadores) no quede subestimado.
+      if(colIrreparable>=0){
+        for(const row of data){
+          if(/cuenta de serie/i.test(String(row[0]))){
+            const n=parseInt(row[colIrreparable]);
+            if(!isNaN(n)&&n>=0&&n<5000) irreparables=n;
             break;
           }
         }
@@ -1184,14 +1201,16 @@ async function logiHandleXLS(input){
         }
       }
     }
-    logiPendingRTO={terminales:terminales||series.length, series, totalUSD:rtoTotalUSD, _fileXls:file};
+    logiPendingRTO={terminales:terminales||series.length, irreparables, series, totalUSD:rtoTotalUSD, _fileXls:file};
     document.getElementById('upZoneXls').classList.add('loaded');
     logiShowPreview('prevXls',[
-      ['Terminales despachadas',(terminales||series.length).toString()],
+      ['Terminales facturables (Personalización)',(terminales||series.length).toString()],
+      ...(irreparables?[['Irreparables (USD 0, no facturan)',irreparables.toString()]]:[]),
+      ['Total físico recibido',((terminales||series.length)+irreparables).toString()],
       ['Series registradas',series.length.toString()],
       ...(rtoTotalUSD?[['Total RTO (sin IVA)','USD '+rtoTotalUSD.toLocaleString('en-US',{minimumFractionDigits:2})]]:[]),
     ]);
-    logiShowMsg('msgXls','✓ RTO leído: '+series.length+' series','ok');
+    logiShowMsg('msgXls','✓ RTO leído: '+series.length+' series'+(irreparables?' + '+irreparables+' irreparables':''),'ok');
     logiCheckBtn();
   }catch(e){logiShowMsg('msgXls','Error: '+e.message,'err');}
 }
@@ -1211,7 +1230,7 @@ function logiAgregar(){
     numero:'RTO s/factura', fecha:'—', vto:'—', desc:'Pendiente adjuntar PDF',
     subtotalUSD:0, ivaUSD:0, otrosImp:0, totalUSD:0, tc:logiCurrentTC
   };
-  if(logiPendingRTO){fac.terminales=logiPendingRTO.terminales;fac.series=logiPendingRTO.series;}
+  if(logiPendingRTO){fac.terminales=logiPendingRTO.terminales;fac.irreparables=logiPendingRTO.irreparables||0;fac.series=logiPendingRTO.series;}
   if(!logiFacturas[logiMesActual]) logiFacturas[logiMesActual]=[];
   // Validación duplicado
   const yaExiste = logiFacturas[logiMesActual].find(f => f.numero === fac.numero && fac.numero !== 'RTO s/factura');
@@ -4443,6 +4462,7 @@ async function saveFacturaDB(fac, mesKey) {
     otros_imp:    fac.otrosImp,
     total_usd:    fac.totalUSD,
     terminales:   fac.terminales || 0,
+    irreparables: fac.irreparables || 0,
     series:       fac.series || [],
     adjuntos:     fac.adjuntos || []
   };
@@ -4467,7 +4487,7 @@ async function loadFacturasFromDB() {
           numero:row.numero, fecha:row.fecha, vto:row.vto, desc:row.descripcion,
           tc:row.tc, subtotalUSD:row.subtotal_usd, ivaUSD:row.iva_usd,
           otrosImp:row.otros_imp, totalUSD:row.total_usd,
-          terminales:row.terminales, series:row.series||[],
+          terminales:row.terminales, irreparables:row.irreparables||0, series:row.series||[],
           adjuntos:row.adjuntos||[]
         });
       }
@@ -4692,7 +4712,7 @@ const _logiAgregarOrig = logiAgregar;
 logiAgregar = async function() {
   if(!logiPendingFac||!logiPendingRTO) return; // ambos requeridos
   let fac = {...logiPendingFac, tc:logiCurrentTC};
-  if(logiPendingRTO){fac.terminales=logiPendingRTO.terminales;fac.series=logiPendingRTO.series;}
+  if(logiPendingRTO){fac.terminales=logiPendingRTO.terminales;fac.irreparables=logiPendingRTO.irreparables||0;fac.series=logiPendingRTO.series;}
   if(!logiFacturas[logiMesActual]) logiFacturas[logiMesActual]=[];
   const yaExiste=logiFacturas[logiMesActual].find(f=>f.numero===fac.numero&&fac.numero!=='RTO s/factura');
   if(yaExiste){ showToast('⚠️ Boludo, ya cargaste la '+fac.numero); return; }

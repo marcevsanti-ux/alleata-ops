@@ -83,7 +83,7 @@
   <header>
     <div class="brand">
       <div class="brand-logo">alleata</div>
-      <div class="brand-sub">· Indicadores Operaciones <span style="opacity:.5">v2.9.0</span></div>
+      <div class="brand-sub">· Indicadores Operaciones <span style="opacity:.5">v2.9.1</span></div>
     </div>
     <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
       <div style="font-size:11px;color:var(--text-dim);text-align:right;line-height:1.4">
@@ -205,7 +205,7 @@
 </div>
 
 <script>
-// indicadores.html — v2.9.0 (01 sep 2026)
+// indicadores.html — v2.9.1 (01 oct 2026)
 // Changelog:
 //  v1.0.0 — versión inicial (costo logística por mes, Logicalis, % Pre-Colecta, SLA Operaciones/Logística)
 //  v1.1.0 — suma Alleata (logística propia) al reporte de costos a $1/envío (costo simbólico,
@@ -282,6 +282,19 @@
 //           ser el dashboard de Diego, embebido vía iframe en index.html.
 //  v2.9.0 — cards de logística discriminan Prom. de costo por Altas y por Cambios además
 //           del Prom. general (antes solo mostraba la cantidad de cada uno, sin su costo).
+//  v2.9.1 — FIX "Logicalis — terminales entregadas": el total salía de
+//           logicalis_despachos_historico (tabla que se llena como acción
+//           manual aparte, al procesar el Excel en el módulo Terminales) y
+//           quedaba por debajo del total real (587 vs 715 en sep, porque no
+//           todos los despachos facturados se habían vuelto a procesar
+//           ahí). Pasa a sumar directo presupuesto_facturas (terminales +
+//           el nuevo campo irreparables) — mismo RTO que ya se carga en
+//           Presupuesto para cada factura real de Logicalis, sin depender
+//           de un segundo proceso manual. Requiere el campo
+//           presupuesto_facturas.irreparables (ver
+//           setup_presupuesto_irreparables.sql) y que presupuesto.html esté
+//           en v1.14.6+ para que ese campo se guarde con las facturas
+//           nuevas. Facturas cargadas antes de ese fix muestran "*s/d".
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_ANON);
@@ -715,30 +728,24 @@ function renderVista(){
 }
 
 // ── Logicalis — terminales entregadas por mes ───────────────────────────
-// FIX 01/10 (pedido explícito, "el número correcto es el de Presupuesto"):
-// el total de "Recibidas" pasa a salir de presupuesto_facturas (mismo
-// origen que usa el módulo Presupuesto: la cantidad de terminales de cada
-// RTO adjunto a cada factura real de Logicalis). Antes sumaba
-// logicalis_despachos_historico, una tabla APARTE que se llena cada vez
-// que alguien procesa el Excel desde el módulo "Terminales" — son dos
-// acciones manuales independientes (cargar la factura en Presupuesto vs.
-// procesar el Excel en Terminales), y si no se hacen siempre las dos para
-// el mismo despacho, los totales se desalinean (587 vs 715 en septiembre:
-// faltaban procesar en Terminales despachos que sí estaban facturados).
-// El desglose Óptimas/Scrap sigue viniendo de logicalis_despachos_historico
-// (es el único lugar con ese dato, "Terminales" es el único módulo que
-// sabe qué llegó roto) — se muestra como referencia y SOLO si ese número no
-// supera el total real; si no hay dato o no coincide, se avisa en vez de
-// inventar un desglose.
+// FIX 01/10 — vuelta 2: la primera corrección (sumar presupuesto_facturas.
+// terminales) seguía mal, porque ese campo SOLO cuenta las terminales
+// facturables ("Personalización") — las "Irreparable" se facturan a USD 0
+// a propósito y quedaban afuera del conteo, aunque son terminales físicas
+// recibidas igual. Ahora presupuesto.html también guarda
+// presupuesto_facturas.irreparables (mismo Excel RTO, columna "Irreparable"
+// de la hoja Informe Final) — "Recibidas" = terminales + irreparables,
+// "Óptimas" = terminales, "Scrap/repuestos" = irreparables, los TRES del
+// mismo origen (ya no hace falta cruzar con logicalis_despachos_historico).
+// Facturas guardadas ANTES de este fix tienen irreparables=0 (no se puede
+// reconstruir sin volver a procesar su RTO) — se marcan con *s/d.
 const MES_KEY_A_NUM={ene:1,feb:2,mar:3,abr:4,may:5,jun:6,jul:7,ago:8,sep:9,oct:10,nov:11,dic:12};
 async function cargarLogicalis(){
   const wrap=document.getElementById('logicalisWrap');
-  const [{data:facs,error:errFacs},{data:despachos,error:errDesp}]=await Promise.all([
-    sb.from('presupuesto_facturas').select('mes,terminales').eq('proveedor','logicalis'),
-    sb.from('logicalis_despachos_historico').select('fecha_despacho,cantidad,con_error').gte('fecha_despacho',FECHA_CORTE),
-  ]);
+  const{data:facs,error}=await sb.from('presupuesto_facturas')
+    .select('mes,terminales,irreparables').eq('proveedor','logicalis');
 
-  if(errFacs){ wrap.innerHTML=`<div class="empty" style="color:var(--red)">Error: ${errFacs.message}</div>`; return; }
+  if(error){ wrap.innerHTML=`<div class="empty" style="color:var(--red)">Error: ${error.message}</div>`; return; }
   if(!facs?.length){ wrap.innerHTML='<div class="empty">Sin facturas de Logicalis cargadas todavía en Presupuesto para este período.</div>'; return; }
 
   const porMes={};
@@ -747,26 +754,17 @@ async function cargarLogicalis(){
     if(!num)return; // mes no reconocido — no debería pasar, pero no lo cuenta en vez de romper
     const key='2026-'+String(num).padStart(2,'0'); // Presupuesto solo maneja el año en curso
     if(key<FECHA_CORTE.slice(0,7))return; // respeta el mismo corte 1/6/2026 que el resto del panel
-    if(!porMes[key])porMes[key]={key,label:MESES_NOMBRE[num-1]+' 2026',cantidad:0,con_error:null};
-    porMes[key].cantidad+=Number(r.terminales)||0;
-  });
-
-  // Desglose Óptimas/Scrap de referencia, cuando exista y no contradiga el total real.
-  const errorPorMes={};
-  (despachos||[]).forEach(r=>{
-    const d=new Date(r.fecha_despacho+'T00:00:00');
-    const key=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
-    errorPorMes[key]=(errorPorMes[key]||0)+(r.con_error||0);
-  });
-  Object.keys(porMes).forEach(key=>{
-    if(errorPorMes[key]!=null && errorPorMes[key]<=porMes[key].cantidad) porMes[key].con_error=errorPorMes[key];
+    if(!porMes[key])porMes[key]={key,label:MESES_NOMBRE[num-1]+' 2026',optimas:0,irreparables:0,sinDatoIrrep:false};
+    porMes[key].optimas+=Number(r.terminales)||0;
+    if(r.irreparables==null) porMes[key].sinDatoIrrep=true; // factura vieja, cargada antes de este fix
+    porMes[key].irreparables+=Number(r.irreparables)||0;
   });
 
   const meses=Object.values(porMes).sort((a,b)=>b.key.localeCompare(a.key));
   _mesesLogicalis=meses;
 
   wrap.className='';
-  wrap.innerHTML=`<div style="font-size:11px;color:var(--text-dim);margin-bottom:8px">"Recibidas" = terminales facturadas por Logicalis (fuente: Presupuesto). "Óptimas"/"Scrap" es un desglose de referencia (fuente: módulo Terminales) — aparece "s/d" cuando ese mes no se procesó también ahí.</div>
+  wrap.innerHTML=`<div style="font-size:11px;color:var(--text-dim);margin-bottom:8px">Las tres columnas salen del mismo RTO cargado en Presupuesto. "Óptimas" = Personalización (facturable). "Scrap/repuestos" = Irreparable (se factura USD 0, igual son terminales físicas recibidas).</div>
   <table><thead><tr>
     <th>Mes</th>
     <th style="text-align:right">Recibidas (total)</th>
@@ -774,21 +772,21 @@ async function cargarLogicalis(){
     <th style="text-align:right">Scrap / repuestos</th>
   </tr></thead><tbody>${
     meses.map(m=>{
-      const sinDato=m.con_error==null;
-      const optimas=sinDato?null:m.cantidad-m.con_error;
+      const total=m.optimas+m.irreparables;
+      const nota=m.sinDatoIrrep?' <span style="color:var(--amber);font-size:10px" title="Esta factura se cargó antes de que Presupuesto guardara los irreparables — hay que volver a procesar su RTO para completar el dato.">*s/d</span>':'';
       return `<tr>
         <td style="font-weight:700">${m.label}</td>
-        <td class="num" style="color:var(--text-dim)">${m.cantidad}</td>
-        <td class="num" style="color:${sinDato?'var(--text-dim)':'var(--teal)'};font-weight:700">${sinDato?'s/d':optimas}</td>
-        <td class="num" style="color:${sinDato?'var(--text-dim)':(m.con_error?'var(--amber)':'var(--text-dim)')}">${sinDato?'s/d':m.con_error}</td>
+        <td class="num" style="color:var(--text-dim)">${total}${nota}</td>
+        <td class="num" style="color:var(--teal);font-weight:700">${m.optimas}</td>
+        <td class="num" style="color:${m.irreparables?'var(--amber)':'var(--text-dim)'}">${m.irreparables}</td>
       </tr>`;
     }).join('')+(()=>{
-      const tot=meses.reduce((a,m)=>({cantidad:a.cantidad+m.cantidad,con_error:a.con_error+(m.con_error||0)}),{cantidad:0,con_error:0});
-      const conDesglose=meses.filter(m=>m.con_error!=null).reduce((s,m)=>s+m.cantidad,0);
+      const tot=meses.reduce((a,m)=>({optimas:a.optimas+m.optimas,irreparables:a.irreparables+m.irreparables}),{optimas:0,irreparables:0});
       return `<tr style="border-top:2px solid var(--border2)">
         <td style="font-weight:800;color:var(--teal)">TOTAL</td>
-        <td class="num" style="font-weight:800;color:var(--text-dim)">${tot.cantidad}</td>
-        <td class="num" style="font-weight:800;color:var(--teal)" colspan="2">${tot.con_error} con error, sobre ${conDesglose} de ${tot.cantidad} con desglose disponible</td>
+        <td class="num" style="font-weight:800;color:var(--text-dim)">${tot.optimas+tot.irreparables}</td>
+        <td class="num" style="font-weight:800;color:var(--teal)">${tot.optimas}</td>
+        <td class="num" style="font-weight:800;color:${tot.irreparables?'var(--amber)':'var(--text-dim)'}">${tot.irreparables}</td>
       </tr>`;
     })()
   }</tbody></table>`;
