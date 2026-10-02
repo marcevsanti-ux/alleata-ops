@@ -165,7 +165,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
       <div class="login-logo">
         <img id="loginLogo" src="" alt="Alleata">
         <div class="login-sub">Portal de Operaciones</div>
-        <div class="login-version">v2.15.1 · mobile</div>
+        <div class="login-version">v2.15.2 · mobile</div>
       </div>
       <div class="field"><label class="label">Email</label><input class="input" id="lEmail" type="email" placeholder="usuario@alleata.com" autocomplete="email"></div>
       <div class="field"><label class="label">Contraseña</label><input class="input" id="lPass" type="password" placeholder="••••••••" autocomplete="current-password"></div>
@@ -182,7 +182,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
     <img id="appLogo" src="" alt="Alleata">
     <div class="topbar-title" id="topbarTitle">Operaciones</div>
     <button id="btnSyncRapido" onclick="syncRapido()" title="Actualizar estados desde Salesforce (sin esperar los 10min)" style="background:none;border:none;color:#fff;font-size:18px;cursor:pointer;padding:4px 6px;line-height:1">🔄</button>
-    <div class="topbar-version" onclick="_tocarVersion()">v2.15.1</div>
+    <div class="topbar-version" onclick="_tocarVersion()">v2.15.2</div>
     <div class="topbar-avatar" id="topbarAvatar" onclick="openDrawer()">?</div>
   </div>
 
@@ -660,6 +660,14 @@ const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSI
 //     control" que ya tenía el lado de Supabase.
 //   - Resultado de SIM ahora muestra la fuente: "Confirmado en vivo con
 //     Salesforce" vs "Caché local — no se pudo confirmar"
+// Cambios v2.15.2 (02/10):
+//   - Fix: el botón "Aceptar OT" se quedaba con el texto "⏳ Despachando..." en
+//     la OT SIGUIENTE (el éxito de aceptarOT nunca lo reseteaba; solo el catch).
+//     Parecía que la nueva OT estaba trabada despachando. Ahora se restaura al
+//     cerrar la tarjeta y al abrir una OT nueva.
+//   - Los dlog de aceptarOT ahora informan los ms que tardó cada paso.
+//   - (backend) despachar-ot ya no espera los avisos de Ally antes de responder
+//     — era lo que mantenía el botón 6-12s en "Despachando…" de verdad.
 // Cambios v2.15.1 (02/10):
 //   - "Salir a ruta": después del aviso de texto, Ally manda al MISMO grupo una
 //     planilla Excel con la data de las OT de la ruta (OT, tipo, comercio,
@@ -2749,7 +2757,7 @@ async function validarTerminalNuevaOT(ot){
   const alertaEl=document.getElementById('otS-alerta-terminal');
   const btnEl=document.getElementById('otS-btn-aceptar');
   alertaEl.style.display='none';
-  if(btnEl){ btnEl.disabled=false; btnEl.style.opacity='1'; btnEl.style.cursor='pointer'; }
+  if(btnEl){ btnEl.disabled=false; btnEl.textContent='✅ Aceptar OT'; btnEl.style.opacity='1'; btnEl.style.cursor='pointer'; }
 
   // Solo aplica a Cambio de Terminal + NAPSE con serial de terminal nueva cargado
   const esCambioNapse=(ot.tipo==='Cambio de Terminal')&&(ot.perfil==='NAPSE');
@@ -2854,6 +2862,7 @@ async function aceptarOT(){
   const btn=document.querySelector('#otScaneadaCard button');
   if(btn?.disabled)return; // bloqueada por validarTerminalNuevaOT() — terminal nueva no está lista en SF
   btn.disabled=true;btn.textContent='⏳ Despachando...';
+  const _t0=Date.now();
 
   // ── Modo prueba: nunca toca SF/Railway/Supabase. Solo simula los pasos
   // y los deja en el log de debug, para poder ver la pantalla funcionando
@@ -2895,7 +2904,7 @@ async function aceptarOT(){
         body:JSON.stringify({ sf_id:sfId, tecnico:tecnicoNombre })
       });
       const data=await res.json();
-      dlog('Respuesta despachar-ot',{status:res.status,ok:data.ok,error:data.error||null});
+      dlog('Respuesta despachar-ot',{status:res.status,ok:data.ok,error:data.error||null,ms:Date.now()-_t0});
       if(!data.ok) throw new Error(data.error||'Error '+res.status);
       showScanFeedback('✅ OT '+otScaneadaActual.ot_numero+' despachada en SF','ok');
     } else {
@@ -2915,7 +2924,7 @@ async function aceptarOT(){
     guardarRutaPendienteLocal();
     await guardarRutaDiaria();
     iniciarTrackingUbicacionSiHaceFalta(); // Ticket 06 — arranca (o sigue) el tracking de ubicación
-    dlog('✅ aceptarOT() completo',{ot:otScaneadaActual.ot_numero});
+    dlog('✅ aceptarOT() completo',{ot:otScaneadaActual.ot_numero,ms:Date.now()-_t0});
 
     const otParaNotif={...otScaneadaActual};
     otScaneadaActual=null;
@@ -2952,6 +2961,10 @@ async function aceptarOT(){
 
 function cancelarOTScaneada(){
   otScaneadaActual=null;
+  // FIX 02/10: aceptarOT deja el botón en "⏳ Despachando..." y solo lo
+  // restauraba si fallaba. En el éxito quedaba así para la OT siguiente.
+  const _btnAc=document.getElementById('otS-btn-aceptar');
+  if(_btnAc){ _btnAc.disabled=false; _btnAc.textContent='✅ Aceptar OT'; }
   document.getElementById('otScaneadaCard').style.display='none';
   document.getElementById('rutaScanStatus').textContent='📷 Cámara activa — apuntá al QR del rótulo';
 }
