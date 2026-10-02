@@ -165,7 +165,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
       <div class="login-logo">
         <img id="loginLogo" src="" alt="Alleata">
         <div class="login-sub">Portal de Operaciones</div>
-        <div class="login-version">v2.15.2 · mobile</div>
+        <div class="login-version">v2.15.3 · mobile</div>
       </div>
       <div class="field"><label class="label">Email</label><input class="input" id="lEmail" type="email" placeholder="usuario@alleata.com" autocomplete="email"></div>
       <div class="field"><label class="label">Contraseña</label><input class="input" id="lPass" type="password" placeholder="••••••••" autocomplete="current-password"></div>
@@ -182,7 +182,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
     <img id="appLogo" src="" alt="Alleata">
     <div class="topbar-title" id="topbarTitle">Operaciones</div>
     <button id="btnSyncRapido" onclick="syncRapido()" title="Actualizar estados desde Salesforce (sin esperar los 10min)" style="background:none;border:none;color:#fff;font-size:18px;cursor:pointer;padding:4px 6px;line-height:1">🔄</button>
-    <div class="topbar-version" onclick="_tocarVersion()">v2.15.2</div>
+    <div class="topbar-version" onclick="_tocarVersion()">v2.15.3</div>
     <div class="topbar-avatar" id="topbarAvatar" onclick="openDrawer()">?</div>
   </div>
 
@@ -660,6 +660,11 @@ const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSI
 //     control" que ya tenía el lado de Supabase.
 //   - Resultado de SIM ahora muestra la fuente: "Confirmado en vivo con
 //     Salesforce" vs "Caché local — no se pudo confirmar"
+// Cambios v2.15.3 (02/10):
+//   - Planilla de "Salir a ruta": el backend ahora responde enseguida y manda el
+//     Excel en segundo plano, esperando el límite de WaSender (1 msg / ~5s) —
+//     antes el archivo salía pegado al aviso de texto y WaSender lo rechazaba.
+//     La app avisa "Planilla en camino" en vez de esperar el envío.
 // Cambios v2.15.2 (02/10):
 //   - Fix: el botón "Aceptar OT" se quedaba con el texto "⏳ Despachando..." en
 //     la OT SIGUIENTE (el éxito de aceptarOT nunca lo reseteaba; solo el catch).
@@ -2290,7 +2295,7 @@ async function enviarPlanillaSalidaRuta(logisticaSalida){
     });
     const data=await res.json();
     if(!res.ok||!data.ok) throw new Error(data.error||('Error '+res.status));
-    showScanFeedback('📎 Planilla de la ruta enviada a Ops/Sales'+(data.faltantes?.length?' ('+data.faltantes.length+' OT sin datos)':''),'ok');
+    showScanFeedback('📎 Planilla en camino a Ops/Sales (llega en unos segundos)'+(data.faltantes?.length?' — '+data.faltantes.length+' OT sin datos':''),'ok');
     return true;
   }catch(e){
     console.warn('[enviarPlanillaSalidaRuta]',e);
