@@ -296,6 +296,20 @@ async function cargar(){
   document.getElementById('lastSync').innerHTML = '<span class="live-dot"></span>Cargando…<span id="proximaUpd"></span>';
   actualizarIndicadorProxima();
   try{
+    // 02/10: esta página NO tiene login propio — usa la sesión que el portal
+    // (index.html) guarda en el navegador. Sin sesión, Supabase la trata como
+    // anónima y la RLS de sf_workorders devuelve 0 filas SIN dar error, y
+    // la pantalla mostraba "0 / No hay OTs 🎉" como si fuera verdad. Pasó
+    // entre la PC de la oficina (sesión vencida) y otra con sesión activa.
+    const{data:{session}}=await sb.auth.getSession();
+    if(!session){
+      document.getElementById('lastSync').innerHTML = '<span class="live-dot" style="background:var(--red);box-shadow:0 0 8px var(--red)"></span>Sin sesión iniciada<span id="proximaUpd"></span><button onclick="cargar()">↺ Recargar</button>';
+      actualizarIndicadorProxima();
+      document.getElementById('strip').innerHTML = '';
+      document.getElementById('main').innerHTML = '<div class="empty" style="grid-column:1/-1;padding:40px 20px">🔒 <b>No hay sesión iniciada en este navegador.</b><br>Esta página usa la sesión del portal. <a href="index.html" target="_blank" style="color:var(--teal)">Abrí el portal</a>, iniciá sesión y volvé acá: se actualiza sola en 2 minutos, o tocá ↺ Recargar.</div>';
+      return;
+    }
+
     await cargarZonaOverrides();
 
     const campos='workorder_number,cuenta,ciudad,provincia,codigo_postal,horario,horario_entrega,logistica,status,rollout,fecha_configurar_terminal,created_at,responsable,notas_cierre';
