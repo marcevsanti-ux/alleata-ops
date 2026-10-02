@@ -165,7 +165,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
       <div class="login-logo">
         <img id="loginLogo" src="" alt="Alleata">
         <div class="login-sub">Portal de Operaciones</div>
-        <div class="login-version">v2.14.62 · mobile</div>
+        <div class="login-version">v2.15.0 · mobile</div>
       </div>
       <div class="field"><label class="label">Email</label><input class="input" id="lEmail" type="email" placeholder="usuario@alleata.com" autocomplete="email"></div>
       <div class="field"><label class="label">Contraseña</label><input class="input" id="lPass" type="password" placeholder="••••••••" autocomplete="current-password"></div>
@@ -182,7 +182,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
     <img id="appLogo" src="" alt="Alleata">
     <div class="topbar-title" id="topbarTitle">Operaciones</div>
     <button id="btnSyncRapido" onclick="syncRapido()" title="Actualizar estados desde Salesforce (sin esperar los 10min)" style="background:none;border:none;color:#fff;font-size:18px;cursor:pointer;padding:4px 6px;line-height:1">🔄</button>
-    <div class="topbar-version" onclick="_tocarVersion()">v2.14.62</div>
+    <div class="topbar-version" onclick="_tocarVersion()">v2.15.0</div>
     <div class="topbar-avatar" id="topbarAvatar" onclick="openDrawer()">?</div>
   </div>
 
@@ -612,6 +612,18 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
   </div>
 </div>
 
+<!-- Cabify Flota (02/10): selector al tocar "Salir a ruta" -->
+<div class="modal-overlay" id="modalLogisticaSalida">
+  <div class="modal">
+    <div class="modal-title">🚀 ¿Con qué logística salís?</div>
+    <div id="modalLogSalida-resumen" style="font-size:12px;color:var(--text-muted);margin-bottom:14px"></div>
+    <button class="btn" onclick="elegirLogisticaSalida('ALLEATA')" style="margin-bottom:10px">1 · Logística Alleata</button>
+    <button class="btn" onclick="elegirLogisticaSalida('CABIFY FLOTA')" style="margin-bottom:6px;background:#7C3AED">2 · Logística Cabify Flota</button>
+    <div style="font-size:11px;color:var(--text-muted);text-align:center;margin-bottom:12px">Cabify Flota carga en SF logística y $<span id="modalLogSalida-costo">8.000</span> por cada OT de tu ruta</div>
+    <button class="btn btn-cancel" onclick="cerrarModalLogisticaSalida()">Cancelar</button>
+  </div>
+</div>
+
 <script>
 // Iconos reutilizables — reemplazan el texto plano "WA" y el emoji 🗺️ por
 // algo que se vea de verdad en cualquier teléfono/fuente.
@@ -648,6 +660,18 @@ const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSI
 //     control" que ya tenía el lado de Supabase.
 //   - Resultado de SIM ahora muestra la fuente: "Confirmado en vivo con
 //     Salesforce" vs "Caché local — no se pudo confirmar"
+// Cambios v2.15.0 (02/10) — Cabify Flota:
+//   - "Salir a ruta" ahora pregunta primero con qué logística sale el operador:
+//     1) Logística Alleata (flujo de siempre, sin cambios) o
+//     2) Logística Cabify Flota (un chofer de Cabify lleva al operador).
+//   - Opción 2: además del aviso a Ops/Sales y la búsqueda de desinstalaciones,
+//     llama a /automations/ruta-cabify-flota, que a cada OT de la ruta le carga
+//     en SF Logistica__c='CABIFY FLOTA' y Costo_de_envio__c=8000 (por OT) y lo
+//     refleja en sf_workorders. El aviso de Ally sale como "Logística Cabify
+//     Flota" e informa si alguna OT no pudo actualizarse en SF.
+//   - esRolloutOT() y la alerta de fallido NAPSE reconocen CABIFY FLOTA además
+//     de ALLEATA (la OT cambia de logística DESPUÉS de aceptarse).
+//   - En modo prueba (OT simuladas) no se llama a SF/Railway.
 // Cambios v2.14.34 (24/07):
 //   - Renombrado botón "Cerrar hoja de ruta..." a "🚀 Salir a ruta..." — el
 //     nombre viejo confundía porque suena a acción de fin de día, cuando en
@@ -1372,7 +1396,7 @@ ${ot.cuenta||''}
   // arriba (que puede perderse entre el resto de la actividad del grupo).
   // Va en un try/catch aparte para que, si esto falla, no rompa ni demore
   // el flujo normal de notificación por grupo de arriba.
-  if(evento==='fallido' && (ot.logistica||'').toUpperCase()==='ALLEATA' && (ot.perfil||'').toUpperCase()==='NAPSE'){
+  if(evento==='fallido' && ['ALLEATA','CABIFY FLOTA'].includes((ot.logistica||'').toUpperCase()) && (ot.perfil||'').toUpperCase()==='NAPSE'){
     try{
       const msgMarcelos=
 `🚨 *ALERTA — OT Fallida (Alleata-Napse)*
@@ -2166,7 +2190,7 @@ async function allyRuta_enviarMensaje(mensaje,contexto){
   }catch(e){ console.warn('[ALLY RUTA] error general:',e.message); return false; }
 }
 
-async function generarMensajeSalidaRuta(){
+async function generarMensajeSalidaRuta(logisticaSalida='ALLEATA', resultadoFlota=null){
   const nombreCompleto=(currentProfile?.nombre||currentUser?.email||'Operador').trim();
   const primerNombre=nombreCompleto.split(' ')[0];
   const fecha=new Date().toLocaleDateString('es-AR',{weekday:'long',day:'2-digit',month:'2-digit'});
@@ -2201,8 +2225,13 @@ async function generarMensajeSalidaRuta(){
   const bloqueParadas=[];
   if(retP.length) bloqueParadas.push(``,`📦 ${retP.length} retiro${retP.length!==1?'s':''} en proveedor:`,...retP.map(p=>`• ${lineaParadaProveedor(p)}`));
   if(entP.length) bloqueParadas.push(``,`📤 ${entP.length} entrega${entP.length!==1?'s':''} en proveedor:`,...entP.map(p=>`• ${lineaParadaProveedor(p)}`));
+  // Cabify Flota: si alguna OT no se pudo pasar en SF, Ops tiene que saberlo
+  // para corregirla a mano (logística + costo).
+  const bloqueErroresFlota=(resultadoFlota?.errores?.length)
+    ? [``,`⚠️ No se pudo cargar Cabify Flota ($${(resultadoFlota.costo||COSTO_CABIFY_FLOTA).toLocaleString('es-AR')}) en SF para:`,...resultadoFlota.errores.map(e=>`• OT ${e.ot} — ${e.error}`)]
+    : [];
   return [
-    `📦 Salida de ruta — Logística Alleata`,
+    `📦 Salida de ruta — Logística ${logisticaSalida==='CABIFY FLOTA'?'Cabify Flota':'Alleata'}`,
     ``,
     `👤 Operador: ${nombreCompleto}`,
     `📅 Hoy, ${fecha}`,
@@ -2210,30 +2239,99 @@ async function generarMensajeSalidaRuta(){
     `🚚 ${rutaDelDia.length} OT en ruta hoy:`,
     ...lineas,
     ...bloqueParadas,
+    ...bloqueErroresFlota,
     ``,
     `ℹ️ Si un comercio consulta por su OT, está en ruta con ${primerNombre} hoy.`,
   ].join('\n');
 }
 
-async function enviarAvisoSalidaRuta(){
+async function enviarAvisoSalidaRuta(logisticaSalida='ALLEATA', resultadoFlota=null){
   try{
-    const msg=await generarMensajeSalidaRuta();
+    const msg=await generarMensajeSalidaRuta(logisticaSalida, resultadoFlota);
     const ok=await allyRuta_enviarMensaje(msg,'salida_ruta');
     if(ok) showScanFeedback('📲 Aviso de salida de ruta enviado a Ops/Sales','ok');
   }catch(e){ console.warn('[enviarAvisoSalidaRuta] error:',e.message); }
 }
 
-async function cerrarHojaDeRuta(){
+// Cabify Flota (02/10): costo por OT que se carga en SF. Es solo para mostrar
+// en pantalla — el valor real lo define el backend (env CABIFY_FLOTA_COSTO).
+const COSTO_CABIFY_FLOTA=8000;
+
+// Paso 1: el botón "Salir a ruta" ya no arranca directo, primero pregunta
+// con qué logística sale el operador.
+function cerrarHojaDeRuta(){
   if(!rutaDelDia.length){
     showScanFeedback('⚠️ Todavía no aceptaste ninguna OT hoy — no hay ruta para cerrar','warn');
     return;
   }
+  document.getElementById('modalLogSalida-resumen').textContent=
+    rutaDelDia.length+' OT'+(rutaDelDia.length!==1?'s':'')+' en tu ruta de hoy';
+  document.getElementById('modalLogSalida-costo').textContent=COSTO_CABIFY_FLOTA.toLocaleString('es-AR');
+  document.getElementById('modalLogisticaSalida').classList.add('show');
+}
+function cerrarModalLogisticaSalida(){
+  document.getElementById('modalLogisticaSalida').classList.remove('show');
+}
+function elegirLogisticaSalida(logistica){
+  cerrarModalLogisticaSalida();
+  ejecutarSalidaARuta(logistica);
+}
+
+// Cabify Flota: pasa cada OT real de la ruta a CABIFY FLOTA + costo en SF y
+// Supabase (vía Railway). Nunca tira: devuelve {ok, errores[]} para que el
+// flujo de salida siga aunque alguna OT falle (el viaje sale igual).
+async function aplicarCabifyFlotaARuta(){
+  const reales=rutaDelDia.filter(o=>!o._esPrueba&&o.sf_id);
+  if(!reales.length){
+    // Modo prueba o sin sf_id: nada que escribir. No se toca SF.
+    return {ok:true,total:0,actualizadas:0,saltadas:0,errores:[],omitido:true};
+  }
+  try{
+    const res=await railwayFetch('/automations/ruta-cabify-flota',{
+      method:'POST',
+      body:JSON.stringify({
+        sf_ids:reales.map(o=>o.sf_id),
+        tecnico:(currentProfile?.nombre||currentUser?.email||'Operador').trim()
+      })
+    });
+    const data=await res.json();
+    if(!data||(!res.ok&&!Array.isArray(data.errores))) throw new Error(data?.error||('Error '+res.status));
+    return data;
+  }catch(e){
+    console.error('[aplicarCabifyFlotaARuta]',e);
+    const msg=/failed to fetch/i.test(e.message)?'sin conexión con el servidor':e.message;
+    return {ok:false,total:reales.length,actualizadas:0,saltadas:0,errores:[{ot:'todas las OTs',error:msg}]};
+  }
+}
+
+// Paso 2: lo que antes hacía cerrarHojaDeRuta(), ahora con la logística elegida.
+async function ejecutarSalidaARuta(logisticaSalida='ALLEATA'){
   const btn=document.getElementById('btnCerrarHojaRuta');
-  btn.disabled=true; btn.textContent='⏳ Avisando a Ops/Sales...';
+  btn.disabled=true;
+
+  // Cabify Flota: cargar logística + costo en SF ANTES del aviso, así el
+  // mensaje a Ops puede informar si alguna OT quedó sin actualizar.
+  let resultadoFlota=null;
+  if(logisticaSalida==='CABIFY FLOTA'){
+    btn.textContent='⏳ Cargando Cabify Flota en SF...';
+    resultadoFlota=await aplicarCabifyFlotaARuta();
+    if(resultadoFlota.omitido){
+      showScanFeedback('🧪 [PRUEBA] Cabify Flota simulado — no se tocó SF','ok');
+    } else if(resultadoFlota.errores.length){
+      showScanFeedback('⚠️ Cabify Flota: '+resultadoFlota.errores.length+' OT no se actualizaron en SF ('+resultadoFlota.errores.map(e=>e.ot).join(', ')+') — Ops fue avisado','warn');
+    } else {
+      showScanFeedback('🚗 Cabify Flota cargado en SF: '+(resultadoFlota.actualizadas+resultadoFlota.saltadas)+' OT × $'+COSTO_CABIFY_FLOTA.toLocaleString('es-AR'),'ok');
+    }
+  }
+
+  btn.textContent='⏳ Avisando a Ops/Sales...';
 
   // Aviso de salida de ruta — no bloquea la búsqueda de desinstalaciones
   // aunque falle el envío por WhatsApp (ej: sin conexión momentánea)
-  await enviarAvisoSalidaRuta();
+  await enviarAvisoSalidaRuta(logisticaSalida, resultadoFlota);
+
+  // Refrescar la lista para que las tarjetas reflejen la logística nueva
+  if(logisticaSalida==='CABIFY FLOTA'&&!resultadoFlota.omitido){ try{ await loadEnTransito(); }catch(e){} }
 
   btn.textContent='⏳ Buscando desinstalaciones cercanas...';
 
@@ -2942,7 +3040,9 @@ function esRolloutOT(ot){
   const tipo=(ot.record_type||ot.tipo||'').toLowerCase();
   const perfil=(ot.perfil||'').trim().toUpperCase();
   const logistica=(ot.logistica||'').trim().toUpperCase();
-  return tipo.includes('cambio') && perfil==='NAPSE' && ot.rollout===true && logistica==='ALLEATA';
+  // CABIFY FLOTA (02/10): la OT pasa de ALLEATA a CABIFY FLOTA al "Salir a
+  // ruta", antes de cerrarse — sigue siendo Rollout igual.
+  return tipo.includes('cambio') && perfil==='NAPSE' && ot.rollout===true && (logistica==='ALLEATA'||logistica==='CABIFY FLOTA');
 }
 
 // Pedido 26/08 (caso OT 23523, reporte Ignacio Maciel): a diferencia de
