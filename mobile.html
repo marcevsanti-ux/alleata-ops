@@ -165,7 +165,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
       <div class="login-logo">
         <img id="loginLogo" src="" alt="Alleata">
         <div class="login-sub">Portal de Operaciones</div>
-        <div class="login-version">v2.15.0 · mobile</div>
+        <div class="login-version">v2.15.1 · mobile</div>
       </div>
       <div class="field"><label class="label">Email</label><input class="input" id="lEmail" type="email" placeholder="usuario@alleata.com" autocomplete="email"></div>
       <div class="field"><label class="label">Contraseña</label><input class="input" id="lPass" type="password" placeholder="••••••••" autocomplete="current-password"></div>
@@ -182,7 +182,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
     <img id="appLogo" src="" alt="Alleata">
     <div class="topbar-title" id="topbarTitle">Operaciones</div>
     <button id="btnSyncRapido" onclick="syncRapido()" title="Actualizar estados desde Salesforce (sin esperar los 10min)" style="background:none;border:none;color:#fff;font-size:18px;cursor:pointer;padding:4px 6px;line-height:1">🔄</button>
-    <div class="topbar-version" onclick="_tocarVersion()">v2.15.0</div>
+    <div class="topbar-version" onclick="_tocarVersion()">v2.15.1</div>
     <div class="topbar-avatar" id="topbarAvatar" onclick="openDrawer()">?</div>
   </div>
 
@@ -660,6 +660,15 @@ const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSI
 //     control" que ya tenía el lado de Supabase.
 //   - Resultado de SIM ahora muestra la fuente: "Confirmado en vivo con
 //     Salesforce" vs "Caché local — no se pudo confirmar"
+// Cambios v2.15.1 (02/10):
+//   - "Salir a ruta": después del aviso de texto, Ally manda al MISMO grupo una
+//     planilla Excel con la data de las OT de la ruta (OT, tipo, comercio,
+//     dirección, ciudad, CP, contacto, horario, propietario, solicitante,
+//     logística + hoja Resumen y, si hay, Paradas proveedor). La arma el
+//     backend desde sf_workorders (POST /automations/salida-ruta-planilla); la
+//     app solo manda los sf_id, los grupos que recibieron el aviso y el
+//     "Solicitado por" que ya había calculado. Si la planilla falla, el aviso
+//     de texto ya salió y se avisa en pantalla — nunca bloquea la salida.
 // Cambios v2.15.0 (02/10) — Cabify Flota:
 //   - "Salir a ruta" ahora pregunta primero con qué logística sale el operador:
 //     1) Logística Alleata (flujo de siempre, sin cambios) o
@@ -2168,7 +2177,10 @@ let _esFallbackFueraDeRadio=false; // true = ninguna entró en el radio, se mues
 // Los grupos NO están hardcodeados: se buscan en ally_grupos por tipo
 // ('ops','intel'), igual que ya hace el resto de los avisos de Ally — si se
 // agrega/saca un grupo desde Configuración Ally, este aviso se ajusta solo.
+let _ultimoSolicitantes={}; // sf_id → {solicitante}; lo calcula generarMensajeSalidaRuta() y lo reusa la planilla
+let _ultimosGruposRutaOk=[]; // 02/10: grupos que recibieron OK el último mensaje — la planilla va a esos mismos
 async function allyRuta_enviarMensaje(mensaje,contexto){
+  _ultimosGruposRutaOk=[];
   try{
     const{data:grupos,error}=await sb.from('ally_grupos')
       .select('group_id,nombre').in('tipo',['ops','intel']).eq('activo',true);
@@ -2182,7 +2194,7 @@ async function allyRuta_enviarMensaje(mensaje,contexto){
           headers:{'Content-Type':'application/json','x-automation-secret':'123456'},
           body:JSON.stringify({group_id:g.group_id,message:mensaje,context:contexto})
         });
-        if(res.ok) okCount++;
+        if(res.ok){ okCount++; _ultimosGruposRutaOk.push(g.group_id); }
         else console.warn('[ALLY RUTA] error enviando a',g.nombre,res.status);
       }catch(e){ console.warn('[ALLY RUTA] fetch error a',g.nombre,e.message); }
     }
@@ -2200,6 +2212,7 @@ async function generarMensajeSalidaRuta(logisticaSalida='ALLEATA', resultadoFlot
   // endpoint que ya usa avisarRolloutCierreRuta(). Fire-and-forget con el
   // resto del mensaje: si falla, el aviso sale igual sin ese dato.
   let solicitantePorSfId={};
+  _ultimoSolicitantes={};
   try{
     const sfIdsRollout=rutaDelDia.filter(ot=>ot.rollout&&ot.sf_id).map(ot=>ot.sf_id);
     if(sfIdsRollout.length){
@@ -2207,7 +2220,7 @@ async function generarMensajeSalidaRuta(logisticaSalida='ALLEATA', resultadoFlot
         method:'POST', body:JSON.stringify({sf_ids:sfIdsRollout})
       });
       const jSol=await rSol.json();
-      if(jSol.ok) solicitantePorSfId=jSol.porOt||{};
+      if(jSol.ok){ solicitantePorSfId=jSol.porOt||{}; _ultimoSolicitantes=solicitantePorSfId; }
     }
   }catch(e){
     console.warn('[generarMensajeSalidaRuta] no se pudo traer "Solicitado por":',e);
@@ -2245,11 +2258,48 @@ async function generarMensajeSalidaRuta(logisticaSalida='ALLEATA', resultadoFlot
   ].join('\n');
 }
 
+// Planilla Excel de la ruta → al mismo grupo del aviso. La arma el backend
+// (sf_workorders → xlsx → Ally). Nunca tira: si falla, el aviso de texto ya
+// salió y solo se avisa en pantalla.
+async function enviarPlanillaSalidaRuta(logisticaSalida){
+  const reales=rutaDelDia.filter(o=>!o._esPrueba&&o.sf_id);
+  if(!reales.length||!_ultimosGruposRutaOk.length) return false; // modo prueba, o el aviso no llegó a ningún grupo
+  const btn=document.getElementById('btnCerrarHojaRuta');
+  if(btn) btn.textContent='⏳ Enviando planilla a Ops/Sales...';
+  const ctrl=new AbortController(); const to=setTimeout(()=>ctrl.abort(),40000);
+  try{
+    const paradas=await paradasProveedorHoy();
+    const res=await railwayFetch('/automations/salida-ruta-planilla',{
+      method:'POST', signal:ctrl.signal,
+      body:JSON.stringify({
+        sf_ids:reales.map(o=>o.sf_id),
+        group_ids:_ultimosGruposRutaOk,
+        operador:(currentProfile?.nombre||currentUser?.email||'Operador').trim(),
+        logistica:logisticaSalida,
+        solicitantes:_ultimoSolicitantes,
+        paradas
+      })
+    });
+    const data=await res.json();
+    if(!res.ok||!data.ok) throw new Error(data.error||('Error '+res.status));
+    showScanFeedback('📎 Planilla de la ruta enviada a Ops/Sales'+(data.faltantes?.length?' ('+data.faltantes.length+' OT sin datos)':''),'ok');
+    return true;
+  }catch(e){
+    console.warn('[enviarPlanillaSalidaRuta]',e);
+    const m=e.name==='AbortError'?'tardó demasiado':(/failed to fetch/i.test(e.message)?'sin conexión con el servidor':e.message);
+    showScanFeedback('⚠️ El aviso salió, pero la planilla no: '+m,'warn');
+    return false;
+  }finally{ clearTimeout(to); }
+}
+
 async function enviarAvisoSalidaRuta(logisticaSalida='ALLEATA', resultadoFlota=null){
   try{
     const msg=await generarMensajeSalidaRuta(logisticaSalida, resultadoFlota);
     const ok=await allyRuta_enviarMensaje(msg,'salida_ruta');
-    if(ok) showScanFeedback('📲 Aviso de salida de ruta enviado a Ops/Sales','ok');
+    if(ok){
+      showScanFeedback('📲 Aviso de salida de ruta enviado a Ops/Sales','ok');
+      await enviarPlanillaSalidaRuta(logisticaSalida);
+    }
   }catch(e){ console.warn('[enviarAvisoSalidaRuta] error:',e.message); }
 }
 
