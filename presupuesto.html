@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Alleata · Presupuesto Operaciones v1.14.6</title>
+<title>Alleata · Presupuesto Operaciones v1.14.7</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -200,7 +200,7 @@
   <div class="login-box">
     <h2>💰 Presupuesto</h2>
     <p class="login-sub">Alleata · Acceso restringido</p>
-    <div style="position:absolute;bottom:12px;right:16px;font-size:10px;font-family:'JetBrains Mono',monospace;color:rgba(232,237,243,.2)">v1.14.6</div>
+    <div style="position:absolute;bottom:12px;right:16px;font-size:10px;font-family:'JetBrains Mono',monospace;color:rgba(232,237,243,.2)">v1.14.7</div>
     <div class="login-field">
       <label>Email</label>
       <input type="email" id="loginEmail" placeholder="tu@email.com" onkeydown="if(event.key==='Enter')doLogin()">
@@ -216,7 +216,7 @@
 
 <div id="appContent" style="display:none">
 <h1>💰 Presupuesto Operaciones</h1>
-<p class="sub">Alleata · 2026 <span style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 8px;border-radius:4px;border:1px solid var(--border2);font-size:10px;margin-left:6px">v1.14.6</span></p>
+<p class="sub">Alleata · 2026 <span style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 8px;border-radius:4px;border:1px solid var(--border2);font-size:10px;margin-left:6px">v1.14.7</span></p>
 
 <div class="toolbar">
   <div class="mes-bar" id="mesBar"></div>
@@ -762,10 +762,14 @@ function logiRenderFacturas() {
       <th style="text-align:right;color:var(--teal);font-size:10px">▶ REAL EN $ (Total×TC)</th>
       <th style="text-align:right">IVA USD</th><th style="text-align:right">Otros imp.</th>
       <th style="text-align:right">Total USD</th>
-      <th style="text-align:center">Term.</th><th style="text-align:center">Series</th>
+      <th style="text-align:center">Term.</th>
+      <th style="text-align:center" title="Irreparables — se facturan USD 0, igual son terminales físicas recibidas">Irrep.</th>
+      <th style="text-align:center">Series</th>
+      <th style="text-align:center">RTO</th>
     </tr></thead>
     <tbody>${facs.map(f=>{
       const sub$=f.subtotalUSD*logiCurrentTC;
+      const sinIrrepDato=f.irreparables==null; // factura cargada antes del fix de irreparables (01/10)
       return `<tr>
         <td style="font-family:'JetBrains Mono',monospace">${f.numero}</td>
         <td>${presupRenderAdjuntosConBoton(f.adjuntos, ['pdf','xls'], 'logiAdjuntarArchivo', f.numero)}</td>
@@ -778,7 +782,9 @@ function logiRenderFacturas() {
         <td class="nr" style="color:var(--text-muted)">${fmtUSD(f.otrosImp)}</td>
         <td class="nr" style="color:var(--text-muted)">${fmtUSD(f.totalUSD)}</td>
         <td style="text-align:center;font-weight:700">${f.terminales||'—'}</td>
+        <td style="text-align:center;font-weight:700;color:${sinIrrepDato?'var(--text-muted)':'#f59e0b'}">${sinIrrepDato?'s/d':(f.irreparables||0)}</td>
         <td style="text-align:center"><span class="tag-ok">${f.series?f.series.length:0}</span></td>
+        <td style="text-align:center"><button onclick="logiReprocesarRTO('${f.numero}')" title="Volver a leer el Excel RTO de esta factura, sin tocar el PDF ni el resto de los datos" style="background:rgba(29,191,142,.12);border:1px solid var(--teal);color:var(--teal);border-radius:6px;padding:4px 9px;font-size:11px;cursor:pointer;white-space:nowrap">🔄 RTO</button></td>
       </tr>`;
     }).join('')}</tbody>
   </table></div>`;
@@ -1097,6 +1103,110 @@ function logiParseNum(s){
   return parseFloat(s)||0;
 }
 
+// Parseo puro del Excel RTO — sin tocar el DOM ni logiPendingRTO, para poder
+// reusarlo tanto al cargar una factura nueva (logiHandleXLS) como al
+// reprocesar el Excel de una factura YA guardada sin pedir el PDF de nuevo
+// (logiReprocesarRTO, pedido 01/10).
+async function logiParsearRTOExcel(buf){
+  const wb=XLSX.read(buf,{type:'array'});
+  let terminales=0,series=[],irreparables=0;
+
+  const nameInf=wb.SheetNames.find(n=>n.toLowerCase().includes('informe')||n.toLowerCase().includes('final'))||wb.SheetNames[0];
+  if(nameInf){
+    const data=XLSX.utils.sheet_to_json(wb.Sheets[nameInf],{header:1,defval:''});
+    // Cruce por HEADER, no por posición: busca la fila que tiene "Personalización"
+    // como encabezado de columna, y lee el valor de esa misma columna en la
+    // fila "Cuenta de Serie" — más robusto que "agarrar el primer número
+    // después de Cuenta de Serie", que se rompe si el pivot cambia el orden
+    // de columnas (ej. si algún mes "Sin reparación" queda antes).
+    let colPersonalizacion=-1,colIrreparable=-1;
+    for(const row of data){
+      const ci=row.findIndex(c=>/personalizaci/i.test(String(c)));
+      if(ci>=0&&colPersonalizacion<0) colPersonalizacion=ci;
+      const cj=row.findIndex(c=>/irreparable/i.test(String(c)));
+      if(cj>=0&&colIrreparable<0) colIrreparable=cj;
+      if(colPersonalizacion>=0&&colIrreparable>=0) break;
+    }
+    if(colPersonalizacion>=0){
+      for(const row of data){
+        if(/cuenta de serie/i.test(String(row[0]))){
+          const n=parseInt(row[colPersonalizacion]);
+          if(!isNaN(n)&&n>=0&&n<5000) terminales=n;
+          break;
+        }
+      }
+    }
+    // Irreparables (pedido 01/10): se facturan a USD 0 — por eso
+    // "terminales" (la cantidad facturable) nunca las incluyó, pero son
+    // terminales físicas recibidas igual, y hacían falta aparte para que
+    // el total real (Indicadores) no quede subestimado.
+    if(colIrreparable>=0){
+      for(const row of data){
+        if(/cuenta de serie/i.test(String(row[0]))){
+          const n=parseInt(row[colIrreparable]);
+          if(!isNaN(n)&&n>=0&&n<5000) irreparables=n;
+          break;
+        }
+      }
+    }
+    // Fallback (comportamiento anterior) si no se encontró el header "Personalización"
+    if(!terminales){
+      for(const row of data){
+        const rowStr = row.map(c=>String(c).trim()).join('|');
+        if(/cuenta de serie/i.test(rowStr)){
+          for(let ci=0;ci<row.length;ci++){
+            const cell=String(row[ci]).trim();
+            if(/cuenta de serie/i.test(cell)){
+              for(let cj=ci+1;cj<row.length;cj++){
+                const n=parseInt(row[cj]);
+                if(!isNaN(n)&&n>0&&n<5000&&String(row[cj]).trim()===String(n)){
+                  terminales=n;
+                  break;
+                }
+              }
+            }
+          }
+          break;
+        }
+      }
+    }
+  }
+  const nameDet=wb.SheetNames.find(n=>n.toLowerCase().includes('detalle')||n.toLowerCase().includes('despacho'))||wb.SheetNames[1];
+  if(nameDet){
+    const data=XLSX.utils.sheet_to_json(wb.Sheets[nameDet],{header:1,defval:''});
+    const header=data[0]||[];
+    const col=Math.max(0,header.findIndex(h=>String(h).toLowerCase().includes('serie')));
+    const colSolucion=header.findIndex(h=>String(h).toLowerCase().includes('soluci'));
+    for(let i=1;i<data.length;i++){
+      // Solo contar terminales con Solución = Personalización — "Sin
+      // reparación" se factura a USD 0 y no debe sumar a la lista de
+      // series ni al conteo de terminales de esta factura.
+      if(colSolucion>=0){
+        const solucion=String(data[i][colSolucion]||'').trim().toLowerCase();
+        if(!solucion.startsWith('personalizaci')) continue;
+      }
+      const v=String(data[i][col]||'').trim();
+      if(v&&v.length>8&&/^\d+$/.test(v)) series.push(v);
+    }
+  }
+  // Capturar total USD del RTO (Total sin IVA = Qty × precio unitario)
+  let rtoTotalUSD = 0;
+  if(nameInf){
+    const data2=XLSX.utils.sheet_to_json(wb.Sheets[nameInf],{header:1,defval:''});
+    for(const row of data2){
+      const rowStr=row.map(c=>String(c)).join('|');
+      // Buscar fila de Personalización o Total sin IVA
+      if(/personal|total sin iva/i.test(rowStr)){
+        for(const cell of row){
+          const v=logiParseNum(String(cell));
+          if(v>50&&v<100000) rtoTotalUSD=v;
+        }
+      }
+    }
+  }
+  return {terminales:terminales||series.length, irreparables, series, totalUSD:rtoTotalUSD};
+}
+
 async function logiHandleXLS(input){
   const file=input.files[0]; if(!file) return;
   document.getElementById('xlsName').textContent=file.name;
@@ -1104,115 +1214,52 @@ async function logiHandleXLS(input){
   logiShowMsg('msgXls','Leyendo Excel...','ok');
   try{
     const buf=await file.arrayBuffer();
-    const wb=XLSX.read(buf,{type:'array'});
-    let terminales=0,series=[];
-
-    let irreparables=0;
-    const nameInf=wb.SheetNames.find(n=>n.toLowerCase().includes('informe')||n.toLowerCase().includes('final'))||wb.SheetNames[0];
-    if(nameInf){
-      const data=XLSX.utils.sheet_to_json(wb.Sheets[nameInf],{header:1,defval:''});
-      // Cruce por HEADER, no por posición: busca la fila que tiene "Personalización"
-      // como encabezado de columna, y lee el valor de esa misma columna en la
-      // fila "Cuenta de Serie" — más robusto que "agarrar el primer número
-      // después de Cuenta de Serie", que se rompe si el pivot cambia el orden
-      // de columnas (ej. si algún mes "Sin reparación" queda antes).
-      let colPersonalizacion=-1,colIrreparable=-1;
-      for(const row of data){
-        const ci=row.findIndex(c=>/personalizaci/i.test(String(c)));
-        if(ci>=0&&colPersonalizacion<0) colPersonalizacion=ci;
-        const cj=row.findIndex(c=>/irreparable/i.test(String(c)));
-        if(cj>=0&&colIrreparable<0) colIrreparable=cj;
-        if(colPersonalizacion>=0&&colIrreparable>=0) break;
-      }
-      if(colPersonalizacion>=0){
-        for(const row of data){
-          if(/cuenta de serie/i.test(String(row[0]))){
-            const n=parseInt(row[colPersonalizacion]);
-            if(!isNaN(n)&&n>=0&&n<5000) terminales=n;
-            break;
-          }
-        }
-      }
-      // Irreparables (pedido 01/10): se facturan a USD 0 — por eso
-      // "terminales" (la cantidad facturable) nunca las incluyó, pero son
-      // terminales físicas recibidas igual, y hacían falta aparte para que
-      // el total real (Indicadores) no quede subestimado.
-      if(colIrreparable>=0){
-        for(const row of data){
-          if(/cuenta de serie/i.test(String(row[0]))){
-            const n=parseInt(row[colIrreparable]);
-            if(!isNaN(n)&&n>=0&&n<5000) irreparables=n;
-            break;
-          }
-        }
-      }
-      // Fallback (comportamiento anterior) si no se encontró el header "Personalización"
-      if(!terminales){
-        for(const row of data){
-          const rowStr = row.map(c=>String(c).trim()).join('|');
-          if(/cuenta de serie/i.test(rowStr)){
-            for(let ci=0;ci<row.length;ci++){
-              const cell=String(row[ci]).trim();
-              if(/cuenta de serie/i.test(cell)){
-                for(let cj=ci+1;cj<row.length;cj++){
-                  const n=parseInt(row[cj]);
-                  if(!isNaN(n)&&n>0&&n<5000&&String(row[cj]).trim()===String(n)){
-                    terminales=n;
-                    break;
-                  }
-                }
-              }
-            }
-            break;
-          }
-        }
-      }
-    }
-    const nameDet=wb.SheetNames.find(n=>n.toLowerCase().includes('detalle')||n.toLowerCase().includes('despacho'))||wb.SheetNames[1];
-    if(nameDet){
-      const data=XLSX.utils.sheet_to_json(wb.Sheets[nameDet],{header:1,defval:''});
-      const header=data[0]||[];
-      const col=Math.max(0,header.findIndex(h=>String(h).toLowerCase().includes('serie')));
-      const colSolucion=header.findIndex(h=>String(h).toLowerCase().includes('soluci'));
-      for(let i=1;i<data.length;i++){
-        // Solo contar terminales con Solución = Personalización — "Sin
-        // reparación" se factura a USD 0 y no debe sumar a la lista de
-        // series ni al conteo de terminales de esta factura.
-        if(colSolucion>=0){
-          const solucion=String(data[i][colSolucion]||'').trim().toLowerCase();
-          if(!solucion.startsWith('personalizaci')) continue;
-        }
-        const v=String(data[i][col]||'').trim();
-        if(v&&v.length>8&&/^\d+$/.test(v)) series.push(v);
-      }
-    }
-    // Capturar total USD del RTO (Total sin IVA = Qty × precio unitario)
-    let rtoTotalUSD = 0;
-    if(nameInf){
-      const data2=XLSX.utils.sheet_to_json(wb.Sheets[nameInf],{header:1,defval:''});
-      for(const row of data2){
-        const rowStr=row.map(c=>String(c)).join('|');
-        // Buscar fila de Personalización o Total sin IVA
-        if(/personal|total sin iva/i.test(rowStr)){
-          for(const cell of row){
-            const v=logiParseNum(String(cell));
-            if(v>50&&v<100000) rtoTotalUSD=v;
-          }
-        }
-      }
-    }
-    logiPendingRTO={terminales:terminales||series.length, irreparables, series, totalUSD:rtoTotalUSD, _fileXls:file};
+    const {terminales,irreparables,series,totalUSD:rtoTotalUSD}=await logiParsearRTOExcel(buf);
+    logiPendingRTO={terminales, irreparables, series, totalUSD:rtoTotalUSD, _fileXls:file};
     document.getElementById('upZoneXls').classList.add('loaded');
     logiShowPreview('prevXls',[
-      ['Terminales facturables (Personalización)',(terminales||series.length).toString()],
+      ['Terminales facturables (Personalización)',terminales.toString()],
       ...(irreparables?[['Irreparables (USD 0, no facturan)',irreparables.toString()]]:[]),
-      ['Total físico recibido',((terminales||series.length)+irreparables).toString()],
+      ['Total físico recibido',(terminales+irreparables).toString()],
       ['Series registradas',series.length.toString()],
       ...(rtoTotalUSD?[['Total RTO (sin IVA)','USD '+rtoTotalUSD.toLocaleString('en-US',{minimumFractionDigits:2})]]:[]),
     ]);
     logiShowMsg('msgXls','✓ RTO leído: '+series.length+' series'+(irreparables?' + '+irreparables+' irreparables':''),'ok');
     logiCheckBtn();
   }catch(e){logiShowMsg('msgXls','Error: '+e.message,'err');}
+}
+
+// Reprocesa SOLO el Excel RTO de una factura de Logicalis ya guardada — sin
+// tocar el PDF ni ningún otro dato de la factura. Pedido 01/10: backfill de
+// "irreparables" para facturas cargadas antes de que ese campo existiera,
+// sin tener que re-cargar todo de cero.
+function logiReprocesarRTO(numero){
+  const fac=(logiFacturas[logiMesActual]||[]).find(f=>f.numero===numero);
+  if(!fac) return;
+  const inp=document.createElement('input');
+  inp.type='file'; inp.accept='.xls,.xlsx';
+  inp.onchange=async ()=>{
+    const file=inp.files[0]; if(!file) return;
+    showToast('Leyendo Excel...');
+    try{
+      const buf=await file.arrayBuffer();
+      const {terminales,irreparables,series,totalUSD}=await logiParsearRTOExcel(buf);
+      fac.terminales=terminales; fac.irreparables=irreparables; fac.series=series;
+      // Chequeo de consistencia: si el Excel que soltaron no es el de esta
+      // factura (otro número/monto), el total USD del RTO no va a coincidir
+      // con lo que ya tenía guardado la factura — se avisa, no se bloquea,
+      // por si la diferencia es la misma tolerancia de centavos de siempre.
+      const diff=Math.abs((totalUSD||0)-(fac.subtotalUSD||0));
+      if(totalUSD && diff>1){
+        showToast(`⚠️ Guardado, pero el RTO (USD ${totalUSD.toFixed(2)}) no coincide con la factura (USD ${fac.subtotalUSD.toFixed(2)}) — ¿es el Excel correcto?`);
+      } else {
+        showToast(`✅ RTO actualizado: ${terminales} óptimas + ${irreparables} irreparables`);
+      }
+      if(currentUser) await saveFacturaDB(fac, logiMesActual);
+      logiRenderFacturas(); logiRenderSeries(); logiRenderAcum(); logiRenderKPIs();
+    }catch(e){ showToast('⛔ Error leyendo el Excel: '+e.message); }
+  };
+  inp.click();
 }
 
 async function logiAdjuntarArchivo(numero, tipo){
