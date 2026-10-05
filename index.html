@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.7.79</title>
+<title>Alleata · Operaciones v4.7.80</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -409,7 +409,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.79 · 30 sep 2026
+      v4.7.80 · 30 sep 2026
     </div>
   </div>
 </div>
@@ -524,7 +524,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.79 · 30 sep 2026
+      v4.7.80 · 30 sep 2026
     </div>
   </div>
 </nav>
@@ -579,7 +579,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.79</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.80</div>
   </div>
   <div class="content">
 
@@ -1500,7 +1500,10 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         Desde acá se puede cerrar una OT (✅ Entregado / ❌ Fallido) sin pasar por el celular — usa el mismo endpoint (<code>entregar-ot</code>) que el botón de la app.
       </div>
     </div>
-    <button class="btn btn-sm" onclick="loadHojaRuta()">↺ Actualizar</button>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-sm" onclick="exportarHojaRutaExcel('all',this)" title="Una sola planilla con las rutas de todos los choferes de hoy">📥 Exportar Excel (todos)</button>
+      <button class="btn btn-sm" onclick="loadHojaRuta()">↺ Actualizar</button>
+    </div>
   </div>
 
   <!-- Dejar una OT "en cola" para un chofer — solo admin. NO la mete directo
@@ -5367,7 +5370,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.7.79] OK');
+console.log('[Alleata v4.7.80] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -7508,9 +7511,21 @@ function seleccionarProveedorFrecuenteDesktop(nombre){
   document.getElementById('hr-parada-direccion').value=p.direccion;
 }
 
+// ── Exportar hoja de ruta a Excel (pedido 03/10) ─────────────────────────────
+// La planilla se le da a Cabify (Cabify Flota): OT, comercio y sobre todo
+// DIRECCIÓN y LOCALIDAD de cada parada. Mientras se arma la pantalla,
+// loadHojaRuta() guarda acá, por bloque (chofer), lo que tiene en su ruta; el
+// botón 📥 Excel usa esto y completa los datos de las OT de envío (contacto,
+// horario, CP…) con una consulta puntual a sf_workorders.
+let _hrExportData={};
+function _hrBtnExport(key){
+  return `<button class="btn-sm" style="background:none;border:1px solid var(--teal);color:var(--teal);font-size:11px;margin-left:auto" onclick="exportarHojaRutaExcel('${key}',this)" title="Descargar la hoja de ruta de este chofer en Excel">📥 Excel</button>`;
+}
+
 async function loadHojaRuta(){
   const cont=document.getElementById('hr-content');
   if(!cont)return;
+  _hrExportData={};
   cont.innerHTML='<div style="text-align:center;padding:30px;color:var(--text-muted)">Cargando...</div>';
 
   // Caja de "Asignar OT a chofer" — solo admin (pedido explícito de marcelos).
@@ -7780,12 +7795,15 @@ async function loadHojaRuta(){
     const totalCount=numsPropios.length+desinstDeEste.length+paradasDeEste.length;
     const enColaEste=(porChoferCola[r.user_id]||[]).length;
     const rolloutCount=numsPropios.filter(num=>esRollout(otsMap[num]||{})).length;
+    const _hrKey='r_'+r.user_id;
+    _hrExportData[_hrKey]={chofer,nums:numsPropios,desinst:desinstDeEste,paradas:paradasDeEste};
 
     return `<div>
       <div style="font-size:14px;font-weight:700;margin-bottom:8px;display:flex;align-items:center;gap:8px">
         👤 ${chofer} <span style="font-size:11px;font-weight:400;color:var(--text-muted)">${totalCount} OT(s)${r.km_total?' · ~'+Math.round(r.km_total)+' km':''}</span>
         ${rolloutCount?`<span style="font-size:10px;font-weight:700;color:#8b5cf6;background:rgba(139,92,246,.15);border:1px solid rgba(139,92,246,.35);border-radius:12px;padding:2px 8px">🔄 ${rolloutCount} rollout</span>`:''}
         ${enColaEste?`<span style="font-size:10px;font-weight:700;color:var(--orange);background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.3);border-radius:12px;padding:2px 8px">🕓 ${enColaEste} en cola</span>`:''}
+        ${_hrBtnExport(_hrKey)}
       </div>
       <div style="display:flex;flex-direction:column;gap:8px">${items}</div>
     </div>`;
@@ -7796,9 +7814,12 @@ async function loadHojaRuta(){
   // invisibles en esta pantalla.
   const bloquesSoloDesinst=Object.values(desinstPorNombre).map(items=>{
     const nombreOriginal=items[0]?.operador_id||'—';
+    const _hrKeyD='d_'+norm(nombreOriginal);
+    _hrExportData[_hrKeyD]={chofer:nombreOriginal,nums:[],desinst:items,paradas:[]};
     return `<div>
       <div style="font-size:14px;font-weight:700;margin-bottom:8px;display:flex;align-items:center;gap:8px">
         👤 ${nombreOriginal} <span style="font-size:11px;font-weight:400;color:var(--text-muted)">${items.length} OT(s) · solo desinstalaciones/retiros</span>
+        ${_hrBtnExport(_hrKeyD)}
       </div>
       <div style="display:flex;flex-direction:column;gap:8px">${items.map(renderDesinstItem).join('')}</div>
     </div>`;
@@ -7807,6 +7828,7 @@ async function loadHojaRuta(){
   // Desinstalaciones/retiros sin operador_id (ej: generadas desde el módulo
   // de checkboxes del desktop, que no setea operador_id) — así no quedan
   // huérfanas y sin ningún lugar donde verlas.
+  if(desinstSinChofer.length||paradasSinChofer.length) _hrExportData['sin_chofer']={chofer:'Sin operador asignado',nums:[],desinst:desinstSinChofer,paradas:paradasSinChofer};
   const bloqueSinChofer=(desinstSinChofer.length||paradasSinChofer.length)?[`<div>
       <div style="font-size:14px;font-weight:700;margin-bottom:8px;display:flex;align-items:center;gap:8px;color:var(--text-muted)">
         📋 Sin operador asignado <span style="font-size:11px;font-weight:400">${desinstSinChofer.length+paradasSinChofer.length} OT(s)</span>
@@ -7818,9 +7840,12 @@ async function loadHojaRuta(){
   // sin ruta de envíos ni desinstalaciones asignadas todavía).
   const bloquesSoloParadas=Object.values(paradasPorNombre).map(items=>{
     const nombreOriginal=items[0]?.chofer_nombre||'—';
+    const _hrKeyP='p_'+norm(nombreOriginal);
+    _hrExportData[_hrKeyP]={chofer:nombreOriginal,nums:[],desinst:[],paradas:items};
     return `<div>
       <div style="font-size:14px;font-weight:700;margin-bottom:8px;display:flex;align-items:center;gap:8px">
         👤 ${nombreOriginal} <span style="font-size:11px;font-weight:400;color:var(--text-muted)">${items.length} parada(s) · solo retiros en proveedor</span>
+        ${_hrBtnExport(_hrKeyP)}
       </div>
       <div style="display:flex;flex-direction:column;gap:8px">${items.map(renderParadaItem).join('')}</div>
     </div>`;
@@ -7831,6 +7856,65 @@ async function loadHojaRuta(){
     || '<div style="text-align:center;padding:30px;color:var(--text-muted)">Nadie confirmó una ruta hoy todavía.</div>';
 
   const nb=document.getElementById('nb-hoja-ruta');if(nb)nb.textContent=totalAbiertas;
+}
+
+async function exportarHojaRutaExcel(key,btn){
+  const bloques=key==='all'?Object.values(_hrExportData):[_hrExportData[key]].filter(Boolean);
+  if(!bloques.length){showToastPortal('No hay rutas cargadas para exportar');return;}
+  if(!window.XLSX){showToastPortal('No se pudo cargar la librería de Excel');return;}
+  const txtBtn=btn?btn.textContent:'';
+  if(btn){btn.disabled=true;btn.textContent='⏳ Armando…';}
+  try{
+    // Datos completos de las OT de envío (select * para no depender de nombres de columna)
+    const nums=[...new Set(bloques.flatMap(b=>b.nums||[]).filter(Boolean))];
+    const otsFull={};
+    for(let i=0;i<nums.length;i+=100){
+      const{data,error}=await sb.from('sf_workorders').select('*').in('workorder_number',nums.slice(i,i+100));
+      if(error)throw new Error('sf_workorders: '+error.message);
+      (data||[]).forEach(o=>{otsFull[o.workorder_number]=o;});
+    }
+    const filas=[];
+    const push=(chofer,f)=>filas.push({'#':filas.length+1,'Chofer':chofer,...f});
+    bloques.forEach(b=>{
+      (b.nums||[]).forEach(num=>{
+        const o=otsFull[num];
+        if(!o){push(b.chofer,{'Tipo':'Envío','OT':num,'Comercio / Cuenta':'(OT no encontrada en la caché)','Dirección':'','Localidad':'','Provincia':'','CP':'','Contacto':'','Horario':'','Estado':'','Observaciones':''});return;}
+        push(b.chofer,{
+          'Tipo':o.record_type||'Envío','OT':o.workorder_number,
+          'Comercio / Cuenta':o.nombre_comercio||o.cuenta||o.propietario_cuenta||'',
+          'Dirección':o.direccion||o.direccion_formula||'',
+          'Localidad':o.ciudad||o.localidad||'','Provincia':o.provincia||'','CP':o.codigo_postal||'',
+          'Contacto':o.contacto_celular||o.contacto||'','Horario':o.horario_entrega||o.horario||'',
+          'Estado':o.status||'','Observaciones':o.observaciones||o.notas||''
+        });
+      });
+      (b.desinst||[]).forEach(d=>push(b.chofer,{
+        'Tipo':d.subtipo==='retiro_cambio_terminal'?'Retiro (cambio de terminal)':'Desinstalación','OT':d.ot||'',
+        'Comercio / Cuenta':d.comercio||d.cuenta||'','Dirección':d.direccion||d.calle||'',
+        'Localidad':d.ciudad||'','Provincia':'','CP':'','Contacto':'','Horario':'','Estado':d.estado||'','Observaciones':''
+      }));
+      (b.paradas||[]).forEach(p=>push(b.chofer,{
+        'Tipo':'Retiro en proveedor','OT':p.ot_numero||'','Comercio / Cuenta':p.proveedor_nombre||'',
+        'Dirección':p.direccion||'','Localidad':p.localidad||p.ciudad||'','Provincia':'','CP':'','Contacto':'','Horario':'',
+        'Estado':'','Observaciones':p.que_retirar||''
+      }));
+    });
+    if(!filas.length){showToastPortal('La ruta no tiene paradas para exportar');return;}
+    const cols=['#','Chofer','Tipo','OT','Comercio / Cuenta','Dirección','Localidad','Provincia','CP','Contacto','Horario','Estado','Observaciones'];
+    const ws=XLSX.utils.json_to_sheet(filas,{header:cols});
+    ws['!cols']=[{wch:4},{wch:22},{wch:22},{wch:11},{wch:34},{wch:40},{wch:20},{wch:16},{wch:8},{wch:16},{wch:20},{wch:14},{wch:34}];
+    ws['!autofilter']={ref:`A1:M${filas.length+1}`};
+    const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Hoja de ruta');
+    const fecha=hoyArgentina();
+    const slug=key==='all'?'todos':(bloques[0].chofer||'chofer').trim().replace(/\s+/g,'_').replace(/[^\w\-]/g,'');
+    XLSX.writeFile(wb,`Hoja_de_ruta_${slug}_${fecha}.xlsx`);
+    showToastPortal(`✅ Excel generado: ${filas.length} parada(s)`);
+  }catch(e){
+    console.error('[exportarHojaRutaExcel]',e);
+    showToastPortal('⛔ No se pudo exportar: '+e.message);
+  }finally{
+    if(btn){btn.disabled=false;btn.textContent=txtBtn;}
+  }
 }
 
 // Puebla el <select> de choferes para "Asignar OT" — solo se llama si es admin.
