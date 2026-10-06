@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.7.81</title>
+<title>Alleata · Operaciones v4.7.82</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -409,7 +409,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.81 · 30 sep 2026
+      v4.7.82 · 30 sep 2026
     </div>
   </div>
 </div>
@@ -524,7 +524,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.81 · 30 sep 2026
+      v4.7.82 · 30 sep 2026
     </div>
   </div>
 </nav>
@@ -579,7 +579,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.81</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.82</div>
   </div>
   <div class="content">
 
@@ -5377,7 +5377,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.7.81] OK');
+console.log('[Alleata v4.7.82] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -5585,7 +5585,11 @@ async function rvInit() {
   if (bar) bar.style.display = currentProfile?.rol === 'admin' ? 'flex' : 'none';
   const opt = (arr, primero) => `<option value="">${primero}</option>` + arr.map(x => `<option value="${rvEsc(x)}">${rvEsc(x)}</option>`).join('');
   const fe = document.getElementById('rvFiltroEtapa');
-  if (fe && !fe.options.length) fe.innerHTML = opt([...RV_ETAPAS_MANUALES.slice(0,4), 'OT creada', 'Instalado', ...RV_ETAPAS_MANUALES.slice(4)], 'Todas las etapas');
+  if (fe && !fe.options.length) {
+    fe.innerHTML = opt([...RV_ETAPAS_MANUALES.slice(0,4), 'OT creada', 'Instalado', ...RV_ETAPAS_MANUALES.slice(4)], 'Todas las etapas');
+    // El filtro usa la etapa efectiva (excluyente): "OT creada" = con OT y SIN instalar.
+    const oc = fe.querySelector('option[value="OT creada"]'); if (oc) oc.textContent = 'OT creada (sin instalar)';
+  }
   const fv = document.getElementById('rvFiltroVia');
   if (fv && !fv.options.length) fv.innerHTML = opt(RV_VIAS, 'Todas las vías');
   await rvSetZona(_rvZona, true);
@@ -5636,15 +5640,24 @@ function rvRenderKpis(rows) {
     const v = Number(r.vol_total) || 0; volTot += v; if (e === 'Instalado') volInst += v;
   });
   const enGestion = (cont['Notificado']||0) + (cont['Notificado 2da vez']||0) + (cont['Confirmado']||0);
+  // FIX 05/10: las etapas son EXCLUYENTES (una terminal con OT es "OT creada" solo si todavía NO
+  // está instalada), así que "Instalado" podía superar a "OT creada" y parecía un error de datos.
+  // Ahora la tarjeta "OT creada" es ACUMULADA: todas las terminales con OT, instaladas o no.
+  const esRetirarTerm = r => (r.ot_status || '').trim().toLowerCase() === 'retirar terminal';
+  const conOT = rows.filter(r => r.ot_numero).length;
+  const sinInstalar = conOT - (cont['Instalado'] || 0);
+  const retirarTerm = rows.filter(r => r.ot_numero && esRetirarTerm(r)).length;
   const pctVol = volTot ? Math.round(100 * volInst / volTot) : 0;
   const box = (cls, num, label, sub, key) => `<div class="stat-box ${cls}" style="cursor:pointer" onclick="rvMostrarDetalle('${key}')" title="Ver el detalle"><div class="stat-num">${num}</div><div class="stat-label">${label}</div>${sub ? `<div style="font-size:10px;color:var(--text-muted);margin-top:2px">${sub}</div>` : ''}</div>`;
   document.getElementById('rvKpis').innerHTML =
     box('s-purple', rows.length, 'Terminales en ranking', rvMillones(volTot) + ' de volumen', 'todas') +
     box('', cont['Sin contactar']||0, 'Sin contactar', '', 'Sin contactar') +
     box('s-blue', enGestion, 'En gestión', 'notificado / confirmado', 'en_gestion') +
-    box('s-teal', cont['OT creada']||0, 'OT creada', 'en Misión Rollout', 'OT creada') +
+    box('s-teal', conOT, 'OT creada', sinInstalar + ' sin instalar · ' + (cont['Instalado']||0) + ' instaladas', 'con_ot') +
     box('s-green', cont['Instalado']||0, 'Instalado', pctVol + '% del volumen', 'Instalado') +
-    box('', (cont['Sin respuesta']||0) + (cont['Frenado']||0), 'Sin respuesta / Frenado', '', 'sin_respuesta_frenado');
+    // "Sin respuesta / Frenado" oculta (pedido 05/10). Las etapas siguen existiendo en los filtros.
+    // Retirar terminal: solo en AMBA (pedido 05/10) — OT cuya terminal nueva ya se entregó y falta retirar la vieja.
+    (_rvZona === 'AMBA' ? box('', retirarTerm, 'Retirar terminal', 'nueva entregada · falta retiro', 'retirar_terminal') : '');
   const multi = new Set(); const vistos = new Set();
   rows.forEach(r => { if (r.cuit) { if (vistos.has(r.cuit)) multi.add(r.cuit); vistos.add(r.cuit); } });
   document.getElementById('rvKpiNota').textContent = multi.size
@@ -5657,6 +5670,8 @@ function rvMostrarDetalle(key) {
   let lista = _rvKpiRows, titulo = '';
   if (key === 'todas') titulo = 'Todas las terminales del ranking (esta zona)';
   else if (key === 'en_gestion') { lista = lista.filter(r => ['Notificado','Notificado 2da vez','Confirmado'].includes(rvEtapaEfectiva(r))); titulo = 'En gestión (notificado / confirmado)'; }
+  else if (key === 'con_ot') { lista = lista.filter(r => r.ot_numero); titulo = 'OT creada (incluye las ya instaladas)'; }
+  else if (key === 'retirar_terminal') { lista = lista.filter(r => r.ot_numero && (r.ot_status || '').trim().toLowerCase() === 'retirar terminal'); titulo = 'Retirar terminal'; }
   else if (key === 'sin_respuesta_frenado') { lista = lista.filter(r => ['Sin respuesta','Frenado'].includes(rvEtapaEfectiva(r))); titulo = 'Sin respuesta / Frenado'; }
   else { lista = lista.filter(r => rvEtapaEfectiva(r) === key); titulo = key; }
 
@@ -8696,11 +8711,28 @@ async function cargarIndicadoresMisionRollout(){
   if(cont)cont.innerHTML='<div style="text-align:center;padding:20px;color:var(--text-muted)">Cargando...</div>';
   if(contCostos)contCostos.innerHTML='';
 
-  const{data,error}=await sb.from('sf_workorders')
-    .select('sf_id,account_id,workorder_number,status,rollout,perfil,logistica,costo_envio,tracking_envio,fecha_configurar_terminal,cuenta,ciudad,provincia,codigo_postal')
-    .eq('record_type','Cambio de Terminal')
-    .not('fecha_configurar_terminal','is',null)
-    .gte('fecha_configurar_terminal',MR_FECHA_CORTE);
+  // FIX 05/10: esta consulta no paginaba ni ordenaba, así que Supabase devolvía SIEMPRE
+  // exactamente 1.000 filas (su tope por pedido) y en cualquier orden — por eso "Total OTs"
+  // quedó clavado en 1000 y las OT nuevas (Pre-Colecta de hoy, entregadas de octubre, etc.)
+  // faltaban en todas las tarjetas, en los meses y en la distribución geográfica. Ahora se
+  // piden todas las páginas con un orden fijo (el orden fijo evita saltear/repetir filas).
+  let data=[],error=null;
+  {
+    const PAG=1000; let desde=0;
+    for(let pag=0;pag<30;pag++){
+      const r=await sb.from('sf_workorders')
+        .select('sf_id,account_id,workorder_number,status,rollout,perfil,logistica,costo_envio,tracking_envio,fecha_configurar_terminal,cuenta,ciudad,provincia,codigo_postal')
+        .eq('record_type','Cambio de Terminal')
+        .not('fecha_configurar_terminal','is',null)
+        .gte('fecha_configurar_terminal',MR_FECHA_CORTE)
+        .order('fecha_configurar_terminal',{ascending:false}).order('sf_id',{ascending:true})
+        .range(desde,desde+PAG-1);
+      if(r.error){error=r.error;break;}
+      data=data.concat(r.data||[]);
+      if(!r.data||r.data.length<PAG)break;
+      desde+=PAG;
+    }
+  }
 
   if(error){
     if(cont)cont.innerHTML=`<div style="color:var(--red);padding:14px">Error: ${error.message}</div>`;
