@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.7.80</title>
+<title>Alleata · Operaciones v4.7.81</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -409,7 +409,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.80 · 30 sep 2026
+      v4.7.81 · 30 sep 2026
     </div>
   </div>
 </div>
@@ -524,7 +524,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.80 · 30 sep 2026
+      v4.7.81 · 30 sep 2026
     </div>
   </div>
 </nav>
@@ -579,7 +579,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.80</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.81</div>
   </div>
   <div class="content">
 
@@ -838,6 +838,13 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
           <span id="envContador" style="background:rgba(26,159,212,.15);color:var(--blue);font-size:11px;font-weight:700;padding:2px 9px;border-radius:20px;font-family:'JetBrains Mono',monospace;display:none">0</span>
         </div>
         <div style="display:flex;align-items:center;gap:8px">
+          <!-- Pedido 05/10: reimprimir el rótulo de CUALQUIER OT por número, sin importar su
+               estado (la tabla de abajo solo lista Pre-Colecta/Despachado/En Proceso, así que
+               una OT en Reprogramar no aparece y no tenía botón 🖨️). -->
+          <div style="display:flex;align-items:center;gap:4px" title="Reimprimir el rótulo de cualquier OT por su número (incluso Reprogramar)">
+            <input id="envReimprimirOT" class="input" style="width:150px;font-size:12px;padding:6px 10px" placeholder="Reimprimir OT n°…" onkeydown="if(event.key==='Enter'){reimprimirRotuloPorOT()}">
+            <button class="btn-ghost btn-sm" onclick="reimprimirRotuloPorOT()">🖨️</button>
+          </div>
           <button id="btnPrintSelected" onclick="printSelectedRotulos()" style="display:none;background:var(--grad);color:#fff;border:none;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;gap:6px;align-items:center">
             🖨️ Imprimir seleccionados (<span id="selectedCount">0</span>)
           </button>
@@ -5370,7 +5377,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.7.80] OK');
+console.log('[Alleata v4.7.81] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -16501,6 +16508,23 @@ async function printRotulo(id) {
   if (!rawR) { alert('No se encontró la OT.'); return; }
   const e = normalizarSFWorkorder(rawR);
   _imprimirRotuloHTML([e]);
+}
+
+// Reimprimir por número de OT (pedido 05/10). Busca en sf_workorders SIN filtrar por estado
+// ni logística: sirve para OT en Reprogramar, rótulos rotos o perdidos, etc.
+async function reimprimirRotuloPorOT() {
+  const inp = document.getElementById('envReimprimirOT');
+  const limpio = (inp?.value || '').replace(/\D/g, '').replace(/^0+/, '');
+  if (!limpio) { showToastPortal('Ingresá el número de OT'); return; }
+  let { data, error } = await sb.from('sf_workorders').select('id,workorder_number,status,logistica').eq('workorder_number', limpio.padStart(8, '0')).limit(2);
+  if (!error && !(data || []).length) {
+    ({ data, error } = await sb.from('sf_workorders').select('id,workorder_number,status,logistica').ilike('workorder_number', '%' + limpio).limit(2));
+  }
+  if (error) { alert('Error buscando la OT: ' + error.message); return; }
+  if (!data?.length) { alert('No se encontró la OT ' + limpio + ' en sf_workorders. Si es muy reciente, hacé un SF Sync.'); return; }
+  if (data.length > 1) { alert('Hay más de una OT que termina en ' + limpio + '. Ingresá el número completo.'); return; }
+  showToastPortal(`Imprimiendo rótulo OT ${data[0].workorder_number} · ${data[0].status || '—'} · ${data[0].logistica || '—'}`);
+  printRotulo(data[0].id);
 }
 
 // ── Imprimir rótulos seleccionados ────────────────────────────
