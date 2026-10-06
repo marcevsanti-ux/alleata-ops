@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.7.83</title>
+<title>Alleata · Operaciones v4.7.85</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -409,7 +409,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.83 · 30 sep 2026
+      v4.7.85 · 30 sep 2026
     </div>
   </div>
 </div>
@@ -524,7 +524,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.83 · 30 sep 2026
+      v4.7.85 · 30 sep 2026
     </div>
   </div>
 </nav>
@@ -579,7 +579,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.83</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.85</div>
   </div>
   <div class="content">
 
@@ -5377,7 +5377,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.7.83] OK');
+console.log('[Alleata v4.7.85] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -5647,14 +5647,18 @@ function rvRenderKpis(rows) {
   const conOT = rows.filter(r => r.ot_numero).length;
   const sinInstalar = conOT - (cont['Instalado'] || 0);
   const retirarTerm = rows.filter(r => r.ot_numero && esRetirarTerm(r)).length;
+  // Despachado (pedido 05/10, solo Interior): OT creada cuyo estado en SF es Despachado (ya salió, no se instaló).
+  const despachadoN = rows.filter(r => r.ot_numero && (r.ot_status || '').trim().toLowerCase() === 'despachado').length;
   const pctVol = volTot ? Math.round(100 * volInst / volTot) : 0;
   const box = (cls, num, label, sub, key) => `<div class="stat-box ${cls}" style="cursor:pointer" onclick="rvMostrarDetalle('${key}')" title="Ver el detalle"><div class="stat-num">${num}</div><div class="stat-label">${label}</div>${sub ? `<div style="font-size:10px;color:var(--text-muted);margin-top:2px">${sub}</div>` : ''}</div>`;
   document.getElementById('rvKpis').innerHTML =
     box('s-purple', rows.length, 'Terminales en ranking', rvMillones(volTot) + ' de volumen', 'todas') +
-    box('', cont['Sin contactar']||0, 'Sin contactar', '', 'Sin contactar') +
-    // "En gestión" oculta en Interior (pedido 05/10); en AMBA se sigue mostrando.
-    (_rvZona === 'INTERIOR' ? '' : box('s-blue', enGestion, 'En gestión', 'notificado / confirmado', 'en_gestion')) +
+    // "Sin contactar": solo AMBA (pedido 05/10; en Interior se oculta y entra "Despachado").
+    (_rvZona === 'INTERIOR' ? '' : box('', cont['Sin contactar']||0, 'Sin contactar', '', 'Sin contactar')) +
+    // "En gestión": oculta en AMBA e Interior (pedido 05/10). Las etapas Notificado/Confirmado
+    // siguen existiendo y se pueden filtrar con el desplegable; solo se sacó la tarjeta.
     box('s-teal', conOT, 'OT creada', sinInstalar + ' sin instalar · ' + (cont['Instalado']||0) + ' instaladas', 'con_ot') +
+    (_rvZona === 'INTERIOR' ? box('s-blue', despachadoN, 'Despachado', 'OT ya salió · sin instalar', 'despachado') : '') +
     box('s-green', cont['Instalado']||0, 'Instalado', pctVol + '% del volumen', 'Instalado') +
     // "Sin respuesta / Frenado" oculta (pedido 05/10). Las etapas siguen existiendo en los filtros.
     // Retirar terminal: solo en INTERIOR (pedido 05/10; en AMBA se oculta) — OT cuya terminal
@@ -5673,6 +5677,7 @@ function rvMostrarDetalle(key) {
   if (key === 'todas') titulo = 'Todas las terminales del ranking (esta zona)';
   else if (key === 'en_gestion') { lista = lista.filter(r => ['Notificado','Notificado 2da vez','Confirmado'].includes(rvEtapaEfectiva(r))); titulo = 'En gestión (notificado / confirmado)'; }
   else if (key === 'con_ot') { lista = lista.filter(r => r.ot_numero); titulo = 'OT creada (incluye las ya instaladas)'; }
+  else if (key === 'despachado') { lista = lista.filter(r => r.ot_numero && (r.ot_status || '').trim().toLowerCase() === 'despachado'); titulo = 'Despachado'; }
   else if (key === 'retirar_terminal') { lista = lista.filter(r => r.ot_numero && (r.ot_status || '').trim().toLowerCase() === 'retirar terminal'); titulo = 'Retirar terminal'; }
   else if (key === 'sin_respuesta_frenado') { lista = lista.filter(r => ['Sin respuesta','Frenado'].includes(rvEtapaEfectiva(r))); titulo = 'Sin respuesta / Frenado'; }
   else { lista = lista.filter(r => rvEtapaEfectiva(r) === key); titulo = key; }
@@ -8385,7 +8390,19 @@ const MR_METRICA_PREDICADO={
 };
 
 function mrFmt$(n){ return n?'$'+Math.round(n).toLocaleString('es-AR'):'$0'; }
-function mrMesKeyDe(r){ const d=new Date(r.fecha_configurar_terminal); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
+// FIX 05/10: el mes de una OT era SIEMPRE el de Configurar Terminal. Entonces una OT configurada en
+// septiembre y entregada hoy contaba en SEPTIEMBRE, y la tarjeta "Oct 2026" mostraba 4 exitosas
+// mientras que el Dashboard (que cuenta por fecha de entrega) mostraba 12 solo hoy. Ahora las
+// EXITOSAS se ubican en el mes de su ENTREGA (fecha_exitoso, en hora Argentina — mismo criterio
+// que el calendario del Dashboard) y todo lo demás sigue por Configurar Terminal. Cada OT sigue
+// contando una sola vez, así que Total OTs y la suma de las tarjetas no cambian.
+function mrMesKeyDe(r){
+  if((r.status||'').trim()==='Exitoso' && r.fecha_exitoso){
+    const dia=new Date(r.fecha_exitoso).toLocaleDateString('en-CA',{timeZone:'America/Argentina/Buenos_Aires'});
+    if(/^\d{4}-\d{2}/.test(dia)) return dia.slice(0,7);
+  }
+  const d=new Date(r.fecha_configurar_terminal); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+}
 function mrMesLabelDe(key){ const [y,mo]=key.split('-'); return MR_MESES_NOMBRE[Number(mo)-1]+' '+y; }
 function mrZonaBucketDe(r){
   const z=detectarZona(r.ciudad,r.provincia,r.codigo_postal);
@@ -8481,7 +8498,10 @@ function mrRenderExplorador(){
   contMes.style.display='block';
   contMes.innerHTML=`<div class="card" style="padding:14px 18px">
     <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;margin-bottom:10px">
-      <div style="font-size:12px;font-weight:700;color:${cfg.color||'var(--text)'};text-transform:uppercase;letter-spacing:.5px">${cfg.label} — por mes (click para ver las OTs)</div>
+      <div>
+        <div style="font-size:12px;font-weight:700;color:${cfg.color||'var(--text)'};text-transform:uppercase;letter-spacing:.5px">${cfg.label} — por mes (click para ver las OTs)</div>
+        ${['precolecta','despachado','otros'].includes(_mrFiltro.metrica)?'':'<div style="font-size:10px;color:var(--text-muted);margin-top:2px;text-transform:none;letter-spacing:0">Las Exitosas cuentan en el mes de su entrega; el resto, en el mes de Configurar Terminal.</div>'}
+      </div>
       <button class="btn btn-sm" style="padding:4px 10px;font-size:11px" onclick="mrLimpiarFiltros()">✕ Limpiar filtros</button>
     </div>
     <div style="display:flex;gap:10px;flex-wrap:wrap">
@@ -8723,7 +8743,7 @@ async function cargarIndicadoresMisionRollout(){
     const PAG=1000; let desde=0;
     for(let pag=0;pag<30;pag++){
       const r=await sb.from('sf_workorders')
-        .select('sf_id,account_id,workorder_number,status,rollout,perfil,logistica,costo_envio,tracking_envio,fecha_configurar_terminal,cuenta,ciudad,provincia,codigo_postal')
+        .select('sf_id,account_id,workorder_number,status,rollout,perfil,logistica,costo_envio,tracking_envio,fecha_configurar_terminal,fecha_exitoso,cuenta,ciudad,provincia,codigo_postal')
         .eq('record_type','Cambio de Terminal')
         .not('fecha_configurar_terminal','is',null)
         .gte('fecha_configurar_terminal',MR_FECHA_CORTE)
@@ -8760,9 +8780,8 @@ function renderIndicadoresMisionRollout(){
 
   const porMes={};
   data.forEach(r=>{
-    const d=new Date(r.fecha_configurar_terminal);
-    const key=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
-    if(!porMes[key])porMes[key]={key,label:MR_MESES_NOMBRE[d.getMonth()]+' '+d.getFullYear(),
+    const key=mrMesKeyDe(r);
+    if(!porMes[key])porMes[key]={key,label:mrMesLabelDe(key),
       total:0,cambio:0,rollout:0,precolecta:0,despachado:0,exitoso:0,otros:0,retirarTerminal:0,costo_total:0,logs:{}};
     const m=porMes[key];
     m.total+=1;
