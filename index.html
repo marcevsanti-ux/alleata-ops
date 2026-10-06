@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.7.85</title>
+<title>Alleata · Operaciones v4.7.86</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -409,7 +409,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.85 · 30 sep 2026
+      v4.7.86 · 30 sep 2026
     </div>
   </div>
 </div>
@@ -524,7 +524,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.85 · 30 sep 2026
+      v4.7.86 · 30 sep 2026
     </div>
   </div>
 </nav>
@@ -579,7 +579,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.85</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.86</div>
   </div>
   <div class="content">
 
@@ -5377,7 +5377,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.7.85] OK');
+console.log('[Alleata v4.7.86] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -7557,14 +7557,17 @@ async function loadHojaRuta(){
   _hrExportData={};
   cont.innerHTML='<div style="text-align:center;padding:30px;color:var(--text-muted)">Cargando...</div>';
 
-  // Caja de "Asignar OT a chofer" — solo admin (pedido explícito de marcelos).
+  // Caja de "Asignar OT a chofer". Pedido 06/10 (marcelos): ahora también la ve y la usa quien
+  // no es admin (ej. Angel Flores), pero SOLO para su propia ruta: el chofer queda fijo en su
+  // nombre. El admin sigue eligiendo cualquier chofer y es el único con el alta de paradas.
   const asignarBox=document.getElementById('hr-asignar-box');
   const paradaBox=document.getElementById('hr-parada-box');
   if(asignarBox){
     const esAdmin=currentProfile?.rol==='admin';
-    asignarBox.style.display=esAdmin?'flex':'none';
+    asignarBox.style.display='flex';
     if(paradaBox)paradaBox.style.display=esAdmin?'flex':'none';
     if(esAdmin){_poblarChoferesAsignar();renderProveedoresFrecuentesDesktop();}
+    else{_prepararAsignarPropio();}
   }
 
   const hoy=hoyArgentina();
@@ -7954,6 +7957,16 @@ async function marcarParadaRetiradaDesktop(id,btn){
   await loadHojaRuta();
 }
 
+// No-admin: el selector queda con una sola opción (él mismo) y bloqueado.
+function _prepararAsignarPropio(){
+  const sel=document.getElementById('hr-asignar-chofer');
+  if(!sel)return;
+  const miId=currentProfile?.id||currentUser?.id||'';
+  const miNombre=(currentProfile?.nombre||currentProfile?.email||currentUser?.email||'Mi ruta').trim();
+  sel.innerHTML=`<option value="${miId}">${miNombre} (mi ruta)</option>`;
+  sel.value=miId; sel.disabled=true;
+}
+
 async function _poblarChoferesAsignar(){
   const sel=document.getElementById('hr-asignar-chofer');
   const sel2=document.getElementById('hr-parada-chofer');
@@ -8026,7 +8039,7 @@ async function agregarParadaManualDesktop(){
 // a una por OT (misma validación, mismo despacho a SF) para no cambiar nada
 // de la lógica que ya funciona: lo único nuevo es el bucle.
 async function asignarOTAChofer(){
-  if(currentProfile?.rol!=='admin'){alert('Solo un admin puede asignar OTs desde acá.');return;}
+  if(currentProfile?.rol!=='admin' && !(currentProfile?.id||currentUser?.id)){alert('No se pudo identificar tu usuario. Cerrá sesión y volvé a entrar.');return;}
   const inp=document.getElementById('hr-asignar-ot');
   const nums=(inp.value||'').split(/[\s,;]+/).map(x=>x.trim()).filter(Boolean);
   const msgBox=document.getElementById('hr-asignar-msg');
@@ -8053,12 +8066,16 @@ async function asignarOTAChofer(){
 }
 
 async function asignarUnaOTAChofer(enLote){
-  if(currentProfile?.rol!=='admin'){alert('Solo un admin puede asignar OTs desde acá.');return;}
+  const esAdmin=currentProfile?.rol==='admin';
+  const miId=currentProfile?.id||currentUser?.id||'';
+  if(!esAdmin && !miId){alert('No se pudo identificar tu usuario. Cerrá sesión y volvé a entrar.');return;}
   const otNum=(document.getElementById('hr-asignar-ot').value||'').trim();
   const otNumBusqueda=/^\d+$/.test(otNum)?otNum.padStart(8,'0'):otNum;
-  const choferId=document.getElementById('hr-asignar-chofer').value;
-  const choferNombre=(_hrChoferesCache||[]).find(p=>p.id===choferId)?.nombre
-    || document.getElementById('hr-asignar-chofer').selectedOptions?.[0]?.textContent || '';
+  // No-admin: SIEMPRE su propia ruta, aunque alguien toque el selector desde la consola.
+  const choferId=esAdmin?document.getElementById('hr-asignar-chofer').value:miId;
+  const choferNombre=esAdmin
+    ? ((_hrChoferesCache||[]).find(p=>p.id===choferId)?.nombre || document.getElementById('hr-asignar-chofer').selectedOptions?.[0]?.textContent || '')
+    : (currentProfile?.nombre||currentProfile?.email||currentUser?.email||'');
   const msg=document.getElementById('hr-asignar-msg');
   msg.style.color='var(--text-muted)';msg.textContent='';
   if(!otNum){msg.style.color='var(--red)';msg.textContent='Ingresá el número de OT.';return;}
@@ -8085,8 +8102,10 @@ async function asignarUnaOTAChofer(enLote){
     // desinstalación. Mismo criterio que ya usan mostrarOTScaneada() y
     // buscarOTManual() en mobile.html (las dos ya filtran logistica=ALLEATA
     // desde la query) — acá faltaba el mismo bloqueo.
-    if((ot.logistica||'').toUpperCase()!=='ALLEATA'){
-      throw new Error(`OT ${ot.workorder_number} es logística "${ot.logistica||'—'}" (no ALLEATA) — Marce/Nacho no pueden cargar OTs de otra logística en su ruta.`);
+    // 06/10: también CABIFY FLOTA — una OT que salió en Flota y quedó en Reprogramar se vuelve a
+    // cargar (mismo criterio que mobile.html v2.15.4 y despachar-ot).
+    if(!['ALLEATA','CABIFY FLOTA'].includes((ot.logistica||'').toUpperCase())){
+      throw new Error(`OT ${ot.workorder_number} es logística "${ot.logistica||'—'}" (ni ALLEATA ni CABIFY FLOTA) — no se puede cargar en una ruta propia.`);
     }
 
     const hoy=hoyArgentina();
@@ -8099,6 +8118,7 @@ async function asignarUnaOTAChofer(enLote){
     let sacadaDe=null;
     for(const otraRuta of (otrasRutas||[])){
       if((otraRuta.ots_numeros||[]).includes(ot.workorder_number)){
+        if(!esAdmin)throw new Error(`La OT ${ot.workorder_number} ya está en la ruta de otro chofer hoy — pedile a un admin que la mueva.`);
         const pares=(otraRuta.ots_ids||[]).map((id,i)=>({id,num:otraRuta.ots_numeros?.[i]})).filter(p=>p.num!==ot.workorder_number);
         await sb.from('rutas_diarias').update({ots_ids:pares.map(p=>p.id),ots_numeros:pares.map(p=>p.num)}).eq('id',otraRuta.id);
         sacadaDe=otraRuta.user_id;
@@ -8127,7 +8147,7 @@ async function asignarUnaOTAChofer(enLote){
     let avisoDespacho=notaSacada;
     if(ot.status==='Despachado'){
       avisoDespacho=notaSacada+' Ya estaba Despachada — visible en su app.';
-    }else if((ot.logistica||'').toUpperCase()!=='ALLEATA'){
+    }else if(!['ALLEATA','CABIFY FLOTA'].includes((ot.logistica||'').toUpperCase())){
       // NOTA 12/09: esta rama quedó inalcanzable a propósito — el chequeo de
       // logística ahora corta arriba, antes de tocar rutas_diarias. Se deja
       // el código acá sin tocar (no vale la pena el riesgo de un diff más
@@ -8141,7 +8161,9 @@ async function asignarUnaOTAChofer(enLote){
           body:JSON.stringify({sf_id:ot.sf_id, tecnico:choferNombre})
         });
         const j=await resp.json();
-        if(j.ok) avisoDespacho=notaSacada+' Despachada en SF (Costo $1 + seguimiento) — ya la tiene que ver en "En Ruta Hoy".';
+        if(j.ok) avisoDespacho=notaSacada+((ot.logistica||'').toUpperCase()==='CABIFY FLOTA'
+          ? ' Despachada en SF (mantiene logística Cabify Flota y su costo) — ya la tiene que ver en "En Ruta Hoy".'
+          : ' Despachada en SF (Costo $1 + seguimiento) — ya la tiene que ver en "En Ruta Hoy".');
         else avisoDespacho=notaSacada+` ⚠️ No se pudo despachar automáticamente (${j.error||'error desconocido'}) — quedó asignada pero puede no verse en "En Ruta Hoy" todavía.`;
       }catch(eDesp){
         avisoDespacho=notaSacada+` ⚠️ No se pudo despachar automáticamente (${eDesp.message}) — quedó asignada pero puede no verse en "En Ruta Hoy" todavía.`;
