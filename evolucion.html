@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Alleata · Evolución de OT</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<style>
+  :root{--n9:#0d1b2a;--n8:#112236;--n7:#162d45;--teal:#1dbf8e;--blue:#1a9fd4;--text:#e6edf3;--muted:#8aa0b5;--red:#ef4444;--amber:#f59e0b;--bd:#1f3a57}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--n9);color:var(--text);font-family:Inter,system-ui,sans-serif;padding:20px 18px 60px}
+  .wrap{max-width:1180px;margin:0 auto}
+  h1{font-size:19px;margin:0}
+  .sub{color:var(--muted);font-size:12px;margin:4px 0 16px}
+  .card{background:var(--n8);border:1px solid var(--bd);border-radius:12px;padding:16px;margin-bottom:14px}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .chip{background:var(--n7);border:1px solid var(--bd);color:var(--muted);border-radius:8px;padding:7px 12px;font-size:12px;cursor:pointer;font-weight:600}
+  .chip.on{background:linear-gradient(135deg,var(--teal),var(--blue));color:#fff;border-color:transparent}
+  input[type=date],select{background:var(--n7);border:1px solid var(--bd);color:var(--text);border-radius:8px;padding:7px 10px;font-size:12px;font-family:inherit}
+  button.act{background:var(--n7);border:1px solid var(--teal);color:var(--teal);border-radius:8px;padding:7px 12px;font-size:12px;cursor:pointer;font-weight:600}
+  button.act:disabled{opacity:.5;cursor:wait}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-bottom:14px}
+  .kpi{background:var(--n8);border:1px solid var(--bd);border-radius:12px;padding:12px 14px}
+  .kpi b{display:block;font-size:26px;font-family:'JetBrains Mono',monospace}
+  .kpi span{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:700}
+  h2{font-size:13px;margin:0 0 4px;text-transform:uppercase;letter-spacing:.05em}
+  .hint{font-size:11px;color:var(--muted);margin-bottom:10px}
+  .chartbox{position:relative;height:320px}
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  th,td{padding:6px 8px;border-bottom:1px solid var(--bd);text-align:right}
+  th:first-child,td:first-child{text-align:left}
+  th{color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.05em}
+  .up{color:var(--teal)} .down{color:var(--red)}
+  #msg{font-size:12px;color:var(--muted);margin:6px 0}
+  #msg.err{color:var(--red)}
+  a{color:var(--teal)}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:860px){.grid2{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>📈 Evolución de OT en el tiempo</h1>
+  <div class="sub" id="histInfo">Cargando…</div>
+
+  <div class="card">
+    <div class="row" style="margin-bottom:10px">
+      <button class="chip on" id="g_cambio" onclick="setGrupo('cambio')">🔄 Rollout / Cambio de Terminal</button>
+      <button class="chip" id="g_desinstalacion" onclick="setGrupo('desinstalacion')">📦 Desinstalaciones</button>
+      <span id="subWrap" class="row" style="margin-left:14px;gap:6px">
+        <button class="chip on" id="s_todos" onclick="setSub('todos')">Todos</button>
+        <button class="chip" id="s_rollout" onclick="setSub('rollout')">Rollout</button>
+        <button class="chip" id="s_cambio" onclick="setSub('cambio')">Cambio</button>
+      </span>
+    </div>
+    <div class="row">
+      <span style="font-size:11px;color:var(--muted)">Período:</span>
+      <button class="chip" onclick="rango(30)">30 días</button>
+      <button class="chip on" id="r90" onclick="rango(90)">90 días</button>
+      <button class="chip" onclick="rango(180)">6 meses</button>
+      <button class="chip" onclick="rango('todo')">Desde el inicio</button>
+      <input type="date" id="fDesde"> <span style="color:var(--muted)">→</span> <input type="date" id="fHasta">
+      <button class="act" onclick="cargar()">Aplicar</button>
+      <span id="adminTools" class="row" style="display:none;margin-left:auto;gap:6px">
+        <button class="act" id="btnInc" onclick="sincronizar('incremental')">↻ Actualizar historial</button>
+        <button class="act" id="btnFull" onclick="sincronizar('full')" title="Solo la primera vez o si falta historia">⬇ Carga inicial completa</button>
+      </span>
+    </div>
+    <div id="msg"></div>
+  </div>
+
+  <div id="contenido" style="display:none">
+    <div class="kpis" id="kpis"></div>
+
+    <div class="card">
+      <h2>🕰️ Cómo estábamos un día puntual</h2>
+      <div class="hint">Elegí una fecha y mirá cuántas OT había en cada estado ese día, comparado con hoy.</div>
+      <div class="row" style="margin-bottom:10px"><input type="date" id="fFoto" onchange="foto()"> <span id="fotoTitulo" style="font-size:12px;color:var(--muted)"></span></div>
+      <div style="overflow-x:auto"><table id="fotoTabla"></table></div>
+    </div>
+
+    <div class="card">
+      <h2>Estado de las OT cada día</h2>
+      <div class="hint">Cuántas OT había en cada estado, día por día. La altura total es la cantidad de OT existentes ese día.</div>
+      <div class="chartbox"><canvas id="cA"></canvas></div>
+    </div>
+
+    <div class="grid2">
+      <div class="card">
+        <div class="row" style="justify-content:space-between"><h2>Altas vs entregas</h2>
+          <span class="row" style="gap:6px"><button class="chip" id="b_dia" onclick="setBucket('dia')">Por día</button><button class="chip on" id="b_sem" onclick="setBucket('sem')">Por semana</button></span></div>
+        <div class="hint">Barras: OT creadas y OT entregadas (Exitosas). Línea: entregas acumuladas en el período.</div>
+        <div class="chartbox"><canvas id="cB"></canvas></div>
+      </div>
+      <div class="card">
+        <h2>Tiempo de ciclo</h2>
+        <div class="hint">Días desde que se creó la OT hasta su primera entrega exitosa, según la semana en que se entregó.</div>
+        <div class="chartbox"><canvas id="cC"></canvas></div>
+      </div>
+    </div>
+    <div class="sub">El historial empieza cuando se activó el seguimiento del campo Estado en Salesforce. La clasificación Rollout / Cambio es la actual de cada OT, no la que tenía en el pasado.</div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
+const SUPABASE_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
+const RAILWAY_URL='https://alleata-agent-production.up.railway.app';
+const sb=supabase.createClient(SUPABASE_URL,SUPABASE_ANON);
+const $=id=>document.getElementById(id);
+const COLORES={'Exitoso':'#1dbf8e','Exitosa':'#1dbf8e','Entregado':'#34d399','Despachado':'#1a9fd4','Pre-Colecta':'#8b5cf6','Configurar Terminal':'#64748b','Retirar Terminal':'#f59e0b','En Proceso':'#06b6d4','Fallido':'#ef4444','Fallida':'#ef4444','Reprogramar':'#f97316','Cancelada':'#475569','Credenciales Pendientes':'#ec4899'};
+const PALETA=['#a3e635','#22d3ee','#fb7185','#facc15','#c084fc','#38bdf8','#4ade80','#f472b6'];
+const state={grupo:'cambio',sub:'todos',desde:null,hasta:null,data:null,bucket:'sem',token:null,esAdmin:false};
+let chA,chB,chC;
+
+const hoyAR=()=>new Date(Date.now()-3*3600*1000).toISOString().slice(0,10);
+const sumar=(f,n)=>{const [y,m,d]=f.split('-').map(Number);return new Date(Date.UTC(y,m-1,d)+n*864e5).toISOString().slice(0,10)};
+const lunes=f=>{const [y,m,d]=f.split('-').map(Number);const dow=(new Date(Date.UTC(y,m-1,d)).getUTCDay()+6)%7;return sumar(f,-dow)};
+const fmt=f=>f.slice(8,10)+'/'+f.slice(5,7);
+const colorDe=(k,i)=>COLORES[k]||PALETA[i%PALETA.length];
+function msg(t,err){const m=$('msg');m.textContent=t||'';m.className=err?'err':''}
+
+async function api(path,opts={}){
+  const r=await fetch(RAILWAY_URL+path,{...opts,headers:{'Authorization':'Bearer '+state.token,'Content-Type':'application/json',...(opts.headers||{})}});
+  const j=await r.json().catch(()=>({}));
+  if(!r.ok&&!j.error)j.error='Error '+r.status;
+  return {ok:r.ok&&j.ok!==false,status:r.status,j};
+}
+
+async function init(){
+  const{data:{session}}=await sb.auth.getSession();
+  if(!session){$('histInfo').innerHTML='🔒 No hay sesión iniciada. <a href="index.html" target="_blank">Abrí el portal</a>, iniciá sesión y volvé a esta página.';return}
+  state.token=session.access_token;
+  try{const{data:p}=await sb.from('profiles').select('rol').eq('id',session.user.id).single();state.esAdmin=p?.rol==='admin';}catch(e){}
+  $('adminTools').style.display=state.esAdmin?'flex':'none';
+  state.hasta=hoyAR();state.desde=sumar(state.hasta,-89);
+  $('fFoto').value=state.hasta;
+  await cargar();
+}
+
+function setGrupo(g){state.grupo=g;['cambio','desinstalacion'].forEach(x=>$('g_'+x).classList.toggle('on',x===g));$('subWrap').style.display=g==='cambio'?'flex':'none';state.sub='todos';setSubUI();cargar()}
+function setSub(s){state.sub=s;setSubUI();if(state.data)dibujar()}
+function setSubUI(){['todos','rollout','cambio'].forEach(x=>$('s_'+x).classList.toggle('on',x===state.sub))}
+function setBucket(b){state.bucket=b;$('b_dia').classList.toggle('on',b==='dia');$('b_sem').classList.toggle('on',b==='sem');if(state.data)dibujarB()}
+function rango(n){
+  state.hasta=hoyAR();
+  if(n==='todo'){const c=state.data?.cobertura_desde;state.desde=c?new Date(Date.parse(c)-3*3600*1000).toISOString().slice(0,10):'2025-04-07';}
+  else state.desde=sumar(state.hasta,-(n-1));
+  $('fDesde').value=state.desde;$('fHasta').value=state.hasta;   // si no, cargar() las pisa con las fechas viejas del formulario
+  document.querySelectorAll('.chip[onclick^="rango"]').forEach(b=>b.classList.remove('on'));
+  if(typeof event!=='undefined'&&event&&event.currentTarget&&event.currentTarget.classList)event.currentTarget.classList.add('on');
+  cargar();
+}
+
+async function cargar(){
+  if($('fDesde').value)state.desde=$('fDesde').value;
+  if($('fHasta').value)state.hasta=$('fHasta').value;
+  $('fDesde').value=state.desde;$('fHasta').value=state.hasta;
+  msg('⏳ Reconstruyendo la historia día por día… (la primera vez puede tardar unos segundos)');
+  const r=await api(`/automations/evolucion?grupo=${state.grupo}&desde=${state.desde}&hasta=${state.hasta}`);
+  if(!r.ok){msg('⛔ '+r.j.error,true);return}
+  if(r.j.sin_historial){
+    $('contenido').style.display='none';
+    $('histInfo').textContent='Todavía no hay historial cargado.';
+    msg(state.esAdmin?'Falta la carga inicial del historial de Salesforce. Tocá "⬇ Carga inicial completa" (tarda un par de minutos).':'Falta cargar el historial. Pedile a un admin que haga la carga inicial.',true);
+    return;
+  }
+  state.data=r.j;msg('');
+  const e=r.j.estado_historial;
+  $('histInfo').textContent=`Historial: ${e.filas.toLocaleString('es-AR')} cambios de estado · desde ${e.primera?new Date(e.primera).toLocaleDateString('es-AR'):'—'} · último ${e.ultima?new Date(e.ultima).toLocaleString('es-AR'):'—'} · ${r.j.ots_consideradas.toLocaleString('es-AR')} OT analizadas`;
+  $('contenido').style.display='block';
+  dibujar();
+}
+
+// ── datos según el filtro Rollout / Cambio ──
+function filas(){
+  return state.data.dias.map(d=>{
+    const s=(state.grupo==='cambio'&&state.sub!=='todos')?d.sub[state.sub]:d;
+    return {fecha:d.fecha,total:s.total,creadas:s.creadas??d.creadas,exitosas:s.exitosas??d.exitosas,por_estado:s.por_estado};
+  });
+}
+function ciclo(){const d=state.data;return (state.grupo==='cambio'&&state.sub!=='todos'&&d.ciclo_semanal_sub)?d.ciclo_semanal_sub[state.sub]:d.ciclo_semanal}
+
+function dibujar(){kpis();foto();dibujarA();dibujarB();dibujarC()}
+
+function kpis(){
+  const f=filas(),hoy=f[f.length-1];
+  const cre=f.reduce((a,x)=>a+x.creadas,0),exi=f.reduce((a,x)=>a+x.exitosas,0);
+  const cs=ciclo(),tot=cs.reduce((a,x)=>a+x.n,0);
+  // mediana ponderada simple: promedio de las medianas semanales pesado por cantidad de entregas
+  const med=tot?cs.reduce((a,x)=>a+x.mediana*x.n,0)/tot:null;
+  const abiertas=Object.entries(hoy.por_estado).filter(([k])=>!['Exitoso','Exitosa','Entregado','Fallido','Fallida','Cancelada'].includes(k)).reduce((a,[,n])=>a+n,0);
+  $('kpis').innerHTML=[
+    ['OT existentes al '+fmt(hoy.fecha),hoy.total.toLocaleString('es-AR')],
+    ['En curso (no cerradas)',abiertas.toLocaleString('es-AR')],
+    ['Creadas en el período',cre.toLocaleString('es-AR')],
+    ['Entregadas en el período',exi.toLocaleString('es-AR')],
+    ['Tiempo de ciclo típico',med==null?'—':med.toFixed(1)+' días']
+  ].map(([l,v])=>`<div class="kpi"><b>${v}</b><span>${l}</span></div>`).join('');
+}
+
+async function foto(){
+  const f=$('fFoto').value;if(!f)return;
+  if(f<state.desde||f>state.hasta){ // fuera del período cargado: se amplía
+    if(f<state.desde)state.desde=f;if(f>state.hasta)state.hasta=f;
+    $('fDesde').value=state.desde;$('fHasta').value=state.hasta;await cargar();return;
+  }
+  const fl=filas(),dia=fl.find(x=>x.fecha===f),hoy=fl[fl.length-1];
+  if(!dia)return;
+  const ks=[...new Set([...Object.keys(dia.por_estado),...Object.keys(hoy.por_estado)])].sort((a,b)=>(dia.por_estado[b]||0)-(dia.por_estado[a]||0));
+  $('fotoTitulo').textContent=`Al cierre del ${new Date(f+'T12:00:00').toLocaleDateString('es-AR',{weekday:'long',day:'2-digit',month:'long'})}`;
+  const fila=(k,a,b,neg)=>{const dif=b-a;return `<tr><td>${k}</td><td>${a}</td><td>${b}</td><td class="${dif>0?'up':dif<0?'down':''}">${dif>0?'+':''}${dif}</td></tr>`};
+  $('fotoTabla').innerHTML=`<tr><th>Estado</th><th>${fmt(f)}</th><th>Hoy (${fmt(hoy.fecha)})</th><th>Cambio</th></tr>`+ks.map(k=>fila(k,dia.por_estado[k]||0,hoy.por_estado[k]||0)).join('')+`<tr style="font-weight:700"><td>Total de OT</td><td>${dia.total}</td><td>${hoy.total}</td><td class="${hoy.total>dia.total?'up':''}">+${hoy.total-dia.total}</td></tr>`;
+}
+
+function dibujarA(){
+  const fl=filas();const tot={};fl.forEach(d=>Object.entries(d.por_estado).forEach(([k,n])=>tot[k]=(tot[k]||0)+n));
+  const orden=Object.keys(tot).sort((a,b)=>tot[b]-tot[a]);const top=orden.slice(0,9),resto=orden.slice(9);
+  const ds=top.map((k,i)=>({label:k,data:fl.map(d=>d.por_estado[k]||0),borderColor:colorDe(k,i),backgroundColor:colorDe(k,i)+'99',fill:true,pointRadius:0,borderWidth:1.5,tension:.2}));
+  if(resto.length)ds.push({label:'Otros',data:fl.map(d=>resto.reduce((a,k)=>a+(d.por_estado[k]||0),0)),borderColor:'#94a3b8',backgroundColor:'#94a3b899',fill:true,pointRadius:0,borderWidth:1.5,tension:.2});
+  if(chA)chA.destroy();
+  chA=new Chart($('cA'),{type:'line',data:{labels:fl.map(d=>fmt(d.fecha)),datasets:ds},options:opts(true)});
+}
+
+function dibujarB(){
+  const fl=filas();let labels,altas,entr;
+  if(state.bucket==='dia'){labels=fl.map(d=>fmt(d.fecha));altas=fl.map(d=>d.creadas);entr=fl.map(d=>d.exitosas)}
+  else{const g={};fl.forEach(d=>{const k=lunes(d.fecha);g[k]=g[k]||{c:0,e:0};g[k].c+=d.creadas;g[k].e+=d.exitosas});const ks=Object.keys(g).sort();labels=ks.map(k=>'sem '+fmt(k));altas=ks.map(k=>g[k].c);entr=ks.map(k=>g[k].e)}
+  let acc=0;const acum=entr.map(v=>acc+=v);
+  if(chB)chB.destroy();
+  chB=new Chart($('cB'),{data:{labels,datasets:[
+    {type:'bar',label:'Altas (creadas)',data:altas,backgroundColor:'#1a9fd4cc',order:2},
+    {type:'bar',label:'Entregadas',data:entr,backgroundColor:'#1dbf8ecc',order:2},
+    {type:'line',label:'Entregadas acumuladas',data:acum,borderColor:'#f59e0b',backgroundColor:'#f59e0b',yAxisID:'y2',pointRadius:0,borderWidth:2,tension:.2,order:1}]},
+    options:{...opts(false),scales:{...opts(false).scales,y2:{position:'right',grid:{drawOnChartArea:false},ticks:{color:'#f59e0b'},beginAtZero:true}}}});
+}
+
+function dibujarC(){
+  const cs=ciclo();if(chC)chC.destroy();
+  chC=new Chart($('cC'),{type:'line',data:{labels:cs.map(x=>'sem '+fmt(x.semana)),datasets:[
+    {label:'Mediana (días)',data:cs.map(x=>x.mediana),borderColor:'#1dbf8e',backgroundColor:'#1dbf8e',tension:.25,pointRadius:3},
+    {label:'Promedio (días)',data:cs.map(x=>x.promedio),borderColor:'#f59e0b',backgroundColor:'#f59e0b',borderDash:[5,4],tension:.25,pointRadius:3}]},
+    options:{...opts(false),plugins:{...opts(false).plugins,tooltip:{callbacks:{afterBody:i=>'Entregas: '+cs[i[0].dataIndex].n}}}}});
+}
+
+function opts(stacked){return{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+  plugins:{legend:{labels:{color:'#cbd5e1',boxWidth:12,font:{size:11}}}},
+  scales:{x:{ticks:{color:'#8aa0b5',maxTicksLimit:14},grid:{color:'#1f3a5733'}},y:{stacked,beginAtZero:true,ticks:{color:'#8aa0b5'},grid:{color:'#1f3a5755'}}}}}
+
+async function sincronizar(mode){
+  if(mode==='full'&&!confirm('Esto trae TODO el historial de estados desde Salesforce (tarda un par de minutos). ¿Seguimos?'))return;
+  $('btnInc').disabled=$('btnFull').disabled=true;
+  const r=await api('/automations/wo-historial/sync',{method:'POST',body:JSON.stringify({mode})});
+  if(!r.ok){msg('⛔ '+r.j.error,true);$('btnInc').disabled=$('btnFull').disabled=false;return}
+  msg('⏳ Sincronizando el historial con Salesforce… no cierres la página.');
+  for(let i=0;i<120;i++){ // espera hasta 10 min
+    await new Promise(ok=>setTimeout(ok,5000));
+    const e=await api('/automations/wo-historial/estado');
+    if(e.ok&&!e.j.enCurso){
+      $('btnInc').disabled=$('btnFull').disabled=false;
+      const u=e.j.ultimoSync;
+      if(u&&u.ok===false){msg('⛔ '+u.error,true);return}
+      msg(u?`✅ Listo: ${u.guardadas.toLocaleString('es-AR')} cambios guardados en ${u.segundos}s.`:'✅ Listo.');
+      await cargar();return;
+    }
+  }
+  msg('Sigue trabajando en segundo plano; recargá en unos minutos.');$('btnInc').disabled=$('btnFull').disabled=false;
+}
+init();
+</script>
+</body>
+</html>
