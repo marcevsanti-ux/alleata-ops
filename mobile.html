@@ -165,7 +165,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
       <div class="login-logo">
         <img id="loginLogo" src="" alt="Alleata">
         <div class="login-sub">Portal de Operaciones</div>
-        <div class="login-version">v2.15.3 · mobile</div>
+        <div class="login-version">v2.15.4 · mobile</div>
       </div>
       <div class="field"><label class="label">Email</label><input class="input" id="lEmail" type="email" placeholder="usuario@alleata.com" autocomplete="email"></div>
       <div class="field"><label class="label">Contraseña</label><input class="input" id="lPass" type="password" placeholder="••••••••" autocomplete="current-password"></div>
@@ -182,7 +182,7 @@ textarea{width:100%;background:var(--navy-700);border:1px solid var(--border2);c
     <img id="appLogo" src="" alt="Alleata">
     <div class="topbar-title" id="topbarTitle">Operaciones</div>
     <button id="btnSyncRapido" onclick="syncRapido()" title="Actualizar estados desde Salesforce (sin esperar los 10min)" style="background:none;border:none;color:#fff;font-size:18px;cursor:pointer;padding:4px 6px;line-height:1">🔄</button>
-    <div class="topbar-version" onclick="_tocarVersion()">v2.15.3</div>
+    <div class="topbar-version" onclick="_tocarVersion()">v2.15.4</div>
     <div class="topbar-avatar" id="topbarAvatar" onclick="openDrawer()">?</div>
   </div>
 
@@ -660,6 +660,11 @@ const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSI
 //     control" que ya tenía el lado de Supabase.
 //   - Resultado de SIM ahora muestra la fuente: "Confirmado en vivo con
 //     Salesforce" vs "Caché local — no se pudo confirmar"
+// Cambios v2.15.4 (05/10):
+//   - Fix: una OT que salió en Cabify Flota y quedó en Reprogramar ya no se podía volver
+//     a cargar — ni escaneando el rótulo ni a mano por número — porque ambas búsquedas
+//     filtraban logistica='ALLEATA' y al "Salir a ruta" con Flota la OT pasa a
+//     'CABIFY FLOTA'. Ahora aceptan ALLEATA y CABIFY FLOTA (siempre Pre-Colecta/Reprogramar).
 // Cambios v2.15.3 (02/10):
 //   - Planilla de "Salir a ruta": el backend ahora responde enseguida y manda el
 //     Excel en segundo plano, esperando el límite de WaSender (1 msg / ~5s) —
@@ -2666,7 +2671,7 @@ async function mostrarOTScaneada(sfId){
   let ot=null, esSFWorkorder=false;
   const{data:sfOT,error:sfErr}=await sb.from('sf_workorders')
     .select('id,sf_id,workorder_number,record_type,status,logistica,cuenta,nombre_comercio,propietario_cuenta,direccion_formula,direccion,localidad,ciudad,provincia,codigo_postal,contacto_celular,horario,horario_entrega,responsable,perfil,rollout,n_terminal_nueva')
-    .eq('sf_id',sfId).eq('logistica','ALLEATA').maybeSingle();
+    .eq('sf_id',sfId).in('logistica',['ALLEATA','CABIFY FLOTA']).maybeSingle();
 
   if(sfErr) console.warn('[mostrarOTScaneada] sf_workorders error:', sfErr.message);
   if(sfOT && !sfErr){
@@ -2818,12 +2823,12 @@ async function buscarOTManual(){
 
   const{data:sfOT,error}=await sb.from('sf_workorders')
     .select('id,sf_id,workorder_number,record_type,status,logistica,cuenta,nombre_comercio,propietario_cuenta,direccion_formula,direccion,localidad,ciudad,provincia,codigo_postal,contacto_celular,horario,horario_entrega,responsable,perfil,rollout,n_terminal_nueva')
-    .eq('logistica','ALLEATA')
+    .in('logistica',['ALLEATA','CABIFY FLOTA'])
     .ilike('workorder_number','%'+numLimpio)
     .maybeSingle();
 
   if(error||!sfOT){
-    msgEl.textContent='❌ OT no encontrada (Logística Alleata)';
+    msgEl.textContent='❌ OT no encontrada (Logística Alleata / Cabify Flota)';
     msgEl.style.color='var(--red)';
     return;
   }
