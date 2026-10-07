@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.7.86</title>
+<title>Alleata · Operaciones v4.7.87</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -409,7 +409,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.86 · 30 sep 2026
+      v4.7.87 · 30 sep 2026
     </div>
   </div>
 </div>
@@ -524,7 +524,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.86 · 30 sep 2026
+      v4.7.87 · 30 sep 2026
     </div>
   </div>
 </nav>
@@ -579,7 +579,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.86</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.87</div>
   </div>
   <div class="content">
 
@@ -4089,7 +4089,7 @@ function dsTabSwitch(tab){
     // Vista simplificada para rol Customer (pedido 26/08): oculta la tira
     // de tabs, el buscador genérico de arriba y el header/descripción de
     // este panel — Rosario/Juan Ignacio no necesitan nada de eso.
-    if(window._isCustomerRole){
+    if(window._isCustomerRole && !window._customerVeTodoDesinst){
       const tabsRow=document.getElementById('ds-tabs-row');
       const buscadorRow=document.getElementById('ds-buscador-row');
       const headerRow=document.getElementById('ds-backlog-header-row');
@@ -5377,7 +5377,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.7.86] OK');
+console.log('[Alleata v4.7.87] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -6665,6 +6665,7 @@ function showApp(){
   // Angel pero sobre las OTs de antes del 1/4.
   const isCustomer=currentProfile.rol==='customer';
   window._isCustomerRole=isCustomer;
+  window._customerVeTodoDesinst = isCustomer && (currentProfile.modulos||[]).includes('desinst-completo');
   // Un customer sin modulos cargados conserva el comportamiento original (solo
   // Desinstalaciones), para no abrirle de golpe SIMs/Envios, que es el default
   // generico de los demas roles.
@@ -6779,7 +6780,7 @@ function showApp(){
     const destino=modulos.find(m=>document.getElementById('nav-'+m)) || 'desinstalaciones';
     goTo(destino);
     if(destino==='desinstalaciones'){
-      setTimeout(()=>{ if(typeof dsTabSwitch==='function') dsTabSwitch('backlog'); }, 300);
+      setTimeout(()=>{ if(typeof dsTabSwitch==='function') dsTabSwitch(window._customerVeTodoDesinst?'gestionops':'backlog'); }, 300);
     }
   }
 
@@ -6904,7 +6905,7 @@ function goTo(mod){
   // 1294 OTs). Para el rol customer tiene que ir siempre a 'backlog'.
   if(mod==='desinstalaciones'){
     if(window.cargarDesinstalaciones&&!(window.DesinModule?.cargado))window.cargarDesinstalaciones();
-    if(typeof dsTabSwitch==='function')dsTabSwitch(window._isCustomerRole?'backlog':'gestionops');
+    if(typeof dsTabSwitch==='function')dsTabSwitch((window._isCustomerRole&&!window._customerVeTodoDesinst)?'backlog':'gestionops');
   }
   if(mod==='churn-producto'){
     const f=document.getElementById('churnProductoFrame');
@@ -7158,6 +7159,10 @@ const ALL_MODS = [
   {id:'rollout-piloto', label:'🧪 Misión Rollout'},
   {id:'rollout-vip', label:'⭐ Rollout VIP'},
   {id:'desinstalaciones', label:'📦 Desinstalaciones'},
+  // Pedido 07/10 (marcelos): permiso para un usuario Customer (ej. Rosario) — en vez de la vista simplificada
+  // del backlog anterior al 1/4, ve Desinstalaciones completo (Listado OTs + Gestión OPS + Backlog). No es un
+  // módulo del menú: solo cambia cómo se ve Desinstalaciones. Requiere tener también 📦 Desinstalaciones.
+  {id:'desinst-completo', label:'🔓 Desinstalaciones completo (todas las OT)'},
   {id:'churn-producto', label:'🔬 Churn Producto'},
   {id:'hoja-ruta', label:'🗺️ Hoja de Ruta'},
   {id:'napse', label:'🔍 Napse'},
@@ -11909,7 +11914,7 @@ async function dsBacklogCargar(){
     // 26/08): "En Proceso" (cantidad) + buscador + cards por Responsable,
     // click en un responsable lista sus OTs. Para el resto de los roles
     // sigue el flujo de chips de siempre (resumenEl + dsBacklogToggleEstado).
-    if(window._isCustomerRole){
+    if(window._isCustomerRole && !window._customerVeTodoDesinst){
       if(resumenEl) resumenEl.style.display='none';
       const simpleEl=document.getElementById('ds-backlog-simple');
       if(simpleEl) simpleEl.style.display='block';
