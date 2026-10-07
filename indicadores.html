@@ -295,6 +295,11 @@
 //           setup_presupuesto_irreparables.sql) y que presupuesto.html esté
 //           en v1.14.6+ para que ese campo se guarde con las facturas
 //           nuevas. Facturas cargadas antes de ese fix muestran "*s/d".
+//  v2.10.0 — Tabla "OTs creadas por mes": CADA número (total, instalación, cambio+rollout,
+//           pre-colecta, y los de la fila TOTAL) es clickeable y muestra CANTIDAD Y COSTO POR
+//           LOGÍSTICA de esas OT (pedido 06/10). Costo: Alleata = $1 simbólico por OT (misma
+//           convención de toda la página), el resto su costo_envio de SF; también se informa
+//           cuántas OT todavía no tienen costo cargado (típico de las que siguen en Pre-Colecta).
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_ANON);
@@ -566,17 +571,68 @@ function indCerrarModal(){
   document.getElementById('indModalOverlay').style.display='none';
 }
 
+// ── Cantidad y costo por logística (pedido 06/10) ────────────────────────────
+// Recibe las OT (filas de _datosCrudosPrecolecta) y devuelve una tabla: por cada logística, cuántas
+// OT usaron y cuánto costaron. Costo = misma convención que el resto de la página: Alleata $1
+// simbólico por OT (COSTO_FIJO_ALLEATA), las demás su costo_envio. "Sin costo" cuenta las OT
+// no-Alleata sin costo cargado (las que siguen en Pre-Colecta, por ejemplo, todavía no lo tienen).
+function indFilasMes(mesKey){
+  return _datosCrudosPrecolecta.filter(r=>{
+    if(mesKey==='__todos')return true;
+    const d=new Date(r.sf_created_at);
+    return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')===mesKey;
+  });
+}
+function indTipoDe(r){ return r.record_type==='Instalación Equipo + Simcard'?'instalacion':(r.rollout===true?'rollout':'cambio'); }
+function indResumenLogistica(filas,conTipos){
+  const lab=Object.fromEntries(LOGISTICAS.map(l=>[l.key,l]));
+  const g={};
+  filas.forEach(r=>{
+    const k=(r.logistica||'').toUpperCase().trim()||'(SIN LOGÍSTICA)';
+    if(!g[k])g[k]={k,n:0,costo:0,sinCosto:0,instalacion:0,cambio:0,rollout:0};
+    const x=g[k]; x.n++; x[indTipoDe(r)]++;
+    const c=k==='ALLEATA'?COSTO_FIJO_ALLEATA:(Number(r.costo_envio)||0);
+    x.costo+=c; if(k!=='ALLEATA'&&!c)x.sinCosto++;
+  });
+  const lista=Object.values(g).sort((a,b)=>b.n-a.n);
+  const tot=lista.reduce((a,x)=>({n:a.n+x.n,costo:a.costo+x.costo,sinCosto:a.sinCosto+x.sinCosto,instalacion:a.instalacion+x.instalacion,cambio:a.cambio+x.cambio,rollout:a.rollout+x.rollout}),{n:0,costo:0,sinCosto:0,instalacion:0,cambio:0,rollout:0});
+  const nombre=k=>(lab[k]?.label)||(k==='(SIN LOGÍSTICA)'?'Sin logística':k.toLowerCase().replace(/(^|\s)\S/g,c=>c.toUpperCase()));
+  const punto=k=>`<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${lab[k]?.color||'#64748b'};margin-right:6px"></span>`;
+  const fila=x=>`<tr>
+    <td>${punto(x.k)}${nombre(x.k)}</td>
+    <td class="num">${x.n}</td><td class="num" style="color:var(--text-dim)">${tot.n?Math.round(x.n/tot.n*100):0}%</td>
+    ${conTipos?`<td class="num">${x.instalacion||'—'}</td><td class="num">${x.cambio||'—'}</td><td class="num">${x.rollout||'—'}</td>`:''}
+    <td class="num" style="font-weight:700">${fmt$(x.costo)}${x.k==='ALLEATA'?' <span style="color:var(--text-dim);font-weight:400" title="Costo simbólico: $1 por OT">*</span>':''}</td>
+    <td class="num" style="color:var(--text-dim)">${x.n?fmt$(x.costo/x.n):'—'}</td>
+    <td class="num" style="color:${x.sinCosto?'var(--amber)':'var(--text-dim)'}">${x.sinCosto||'—'}</td>
+  </tr>`;
+  const totFila=`<tr style="border-top:2px solid var(--border2);font-weight:800">
+    <td style="color:var(--teal)">TOTAL</td><td class="num">${tot.n}</td><td class="num">100%</td>
+    ${conTipos?`<td class="num">${tot.instalacion}</td><td class="num">${tot.cambio}</td><td class="num">${tot.rollout}</td>`:''}
+    <td class="num">${fmt$(tot.costo)}</td><td class="num" style="color:var(--text-dim)">${tot.n?fmt$(tot.costo/tot.n):'—'}</td>
+    <td class="num" style="color:${tot.sinCosto?'var(--amber)':'var(--text-dim)'}">${tot.sinCosto||'—'}</td></tr>`;
+  return `<div style="overflow-x:auto"><table>
+    <thead><tr><th>Logística</th><th style="text-align:right">OTs</th><th style="text-align:right">%</th>
+      ${conTipos?'<th style="text-align:right">Instalación</th><th style="text-align:right">Cambio</th><th style="text-align:right">Rollout</th>':''}
+      <th style="text-align:right">Costo total</th><th style="text-align:right">Costo prom./OT</th><th style="text-align:right" title="OT que no son de Alleata y todavía no tienen costo cargado">Sin costo</th></tr></thead>
+    <tbody>${lista.length?lista.map(fila).join('')+totFila:'<tr><td colspan="9" class="empty">Sin registros</td></tr>'}</tbody></table></div>
+    <div style="font-size:11px;color:var(--text-dim);margin-top:8px">* Alleata (logística propia): $1 simbólico por OT, igual que el resto de la página. "Sin costo" = OT de otra logística que todavía no tiene costo cargado en SF (ej. las que siguen en Pre-Colecta).</div>`;
+}
+// Click en "Total OTs creadas" o "Instalación": solo el desglose por logística.
+function indVerPorLogistica(mesKey,mesLabel,tipo){
+  let filas=indFilasMes(mesKey); let nombre='Total OTs creadas';
+  if(tipo==='instalacion'){ filas=filas.filter(r=>r.record_type==='Instalación Equipo + Simcard'); nombre='Instalación'; }
+  document.getElementById('indModalTitulo').textContent=`${nombre} por logística — ${mesLabel} (${filas.length} OT${filas.length===1?'':'s'})`;
+  document.getElementById('indModalBody').innerHTML=indResumenLogistica(filas,tipo==='total');
+  document.getElementById('indModalOverlay').style.display='flex';
+}
+
 // Modal de solo lectura: lista las OTs "Cambio de Terminal" (incluye Rollout,
 // comparten record_type) de un mes puntual de la tabla "OTs creadas" — pedido
 // 17/08 para poder detectar de un vistazo qué OTs específicas componen ese
 // número, sin tener que ir a buscarlas a mano.
 function indVerListadoCambio(mesKey,mesLabel){
-  const filas=_datosCrudosPrecolecta.filter(r=>{
-    if(r.record_type!=='Cambio de Terminal')return false;
-    const d=new Date(r.sf_created_at);
-    const key=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
-    return key===mesKey;
-  });
+  const filas=indFilasMes(mesKey).filter(r=>r.record_type==='Cambio de Terminal');
 
   const filasHtml=filas.length
     ? filas.map(r=>`<tr>
@@ -585,14 +641,18 @@ function indVerListadoCambio(mesKey,mesLabel){
         <td>${r.perfil||'—'}</td>
         <td>${r.status||'—'}</td>
         <td>${r.responsable||'—'}</td>
+        <td>${r.logistica||'—'}</td>
       </tr>`).join('')
-    : `<tr><td colspan="5" class="empty">Sin registros</td></tr>`;
+    : `<tr><td colspan="6" class="empty">Sin registros</td></tr>`;
 
   document.getElementById('indModalTitulo').textContent=`Cambio + Rollout — ${mesLabel} (${filas.length} OT${filas.length===1?'':'s'})`;
   document.getElementById('indModalBody').innerHTML=`
+    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--teal);margin-bottom:8px">Por logística</div>
+    ${indResumenLogistica(filas,false)}
+    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--teal);margin:18px 0 8px">Listado de OTs</div>
     <div style="overflow-x:auto"><table>
       <thead><tr>
-        <th>N° OT</th><th>Cuenta</th><th>Perfil</th><th>Status</th><th>Responsable</th>
+        <th>N° OT</th><th>Cuenta</th><th>Perfil</th><th>Status</th><th>Responsable</th><th>Logística</th>
       </tr></thead>
       <tbody>${filasHtml}</tbody>
     </table></div>`;
@@ -602,13 +662,7 @@ function indVerListadoCambio(mesKey,mesLabel){
 // Modal de solo lectura: lista las OTs que HOY siguen en Pre-Colecta, creadas
 // en un mes puntual — pedido 18/08, mismo patrón que indVerListadoCambio.
 function indVerListadoPrecolecta(mesKey,mesLabel){
-  const filas=_datosCrudosPrecolecta.filter(r=>{
-    if((r.status||'').trim()!=='Pre-Colecta')return false;
-    if(mesKey==='__todos')return true;
-    const d=new Date(r.sf_created_at);
-    const key=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
-    return key===mesKey;
-  });
+  const filas=indFilasMes(mesKey).filter(r=>(r.status||'').trim()==='Pre-Colecta');
 
   const filasHtml=filas.length
     ? filas.map(r=>{
@@ -626,6 +680,9 @@ function indVerListadoPrecolecta(mesKey,mesLabel){
 
   document.getElementById('indModalTitulo').textContent=`En Pre-Colecta hoy — ${mesLabel} (${filas.length} OT${filas.length===1?'':'s'})`;
   document.getElementById('indModalBody').innerHTML=`
+    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--teal);margin-bottom:8px">Por logística</div>
+    ${indResumenLogistica(filas,true)}
+    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--teal);margin:18px 0 8px">Listado de OTs</div>
     <div style="overflow-x:auto"><table>
       <thead><tr>
         <th>N° OT</th><th>Cuenta</th><th>Tipo</th><th>Perfil</th><th>Responsable</th>
@@ -808,7 +865,7 @@ async function cargarLogicalis(){
 async function cargarPrecolecta(){
   const tbody=document.getElementById('tablaPrecolecta');
   const{data:dataCruda,error}=await sb.from('sf_workorders')
-    .select('sf_id,sf_created_at,status,record_type,perfil,rollout,workorder_number,cuenta,responsable')
+    .select('sf_id,sf_created_at,status,record_type,perfil,rollout,workorder_number,cuenta,responsable,logistica,costo_envio')
     .in('record_type',['Instalación Equipo + Simcard','Cambio de Terminal'])
     .gte('sf_created_at',FECHA_CORTE)
     .not('sf_created_at','is',null)
@@ -874,8 +931,8 @@ async function cargarPrecolecta(){
     const pct=m.total?Math.round(m.precolecta/m.total*100):0;
     return `<tr>
       <td style="font-weight:700">${m.label}</td>
-      <td class="num">${m.total}</td>
-      <td class="num" style="color:var(--text-dim)">${m.instalacion}</td>
+      <td class="num" style="cursor:pointer;text-decoration:underline dotted" onclick="indVerPorLogistica('${m.key}','${m.label}','total')" title="Click para ver cantidad y costo por logística">${m.total}</td>
+      <td class="num" style="color:var(--text-dim);cursor:pointer;text-decoration:underline dotted" onclick="indVerPorLogistica('${m.key}','${m.label}','instalacion')" title="Click para ver cantidad y costo por logística">${m.instalacion}</td>
       <td class="num" style="color:var(--text-dim);cursor:pointer" onclick="indVerListadoCambio('${m.key}','${m.label}')" title="Cambio: ${m.cambio} · Rollout: ${m.rollout} — Click para ver el listado de OTs">${m.cambio} + ${m.rollout}</td>
       <td class="num" style="color:${m.precolecta?'var(--amber)':'var(--text-dim)'};cursor:pointer" onclick="indVerListadoPrecolecta('${m.key}','${m.label}')" title="Instalación: ${m.precolecta-m.precolectaCambio-m.precolectaRollout} · Cambio: ${m.precolectaCambio} · Rollout: ${m.precolectaRollout} — Click para ver el listado de OTs">${m.precolecta}<div style="font-size:9px;font-weight:400;opacity:.75">${m.precolectaCambio} + ${m.precolectaRollout}</div></td>
       <td class="num">${pct}%</td>
@@ -890,9 +947,9 @@ async function cargarPrecolecta(){
   const totPct=tot.total?Math.round(tot.precolecta/tot.total*100):0;
   tbody.innerHTML+=`<tr style="border-top:2px solid var(--border2)">
     <td style="font-weight:800;color:var(--teal)">TOTAL</td>
-    <td class="num" style="font-weight:800;color:var(--teal)">${tot.total}</td>
-    <td class="num" style="font-weight:700">${tot.instalacion}</td>
-    <td class="num" style="font-weight:700" title="Cambio: ${tot.cambio} · Rollout: ${tot.rollout}">${tot.cambio} + ${tot.rollout}</td>
+    <td class="num" style="font-weight:800;color:var(--teal);cursor:pointer;text-decoration:underline dotted" onclick="indVerPorLogistica('__todos','Todos los meses','total')" title="Click para ver cantidad y costo por logística">${tot.total}</td>
+    <td class="num" style="font-weight:700;cursor:pointer;text-decoration:underline dotted" onclick="indVerPorLogistica('__todos','Todos los meses','instalacion')" title="Click para ver cantidad y costo por logística">${tot.instalacion}</td>
+    <td class="num" style="font-weight:700;cursor:pointer;text-decoration:underline dotted" onclick="indVerListadoCambio('__todos','Todos los meses')" title="Cambio: ${tot.cambio} · Rollout: ${tot.rollout} — Click para ver el listado y el desglose por logística">${tot.cambio} + ${tot.rollout}</td>
     <td class="num" style="font-weight:700;color:var(--amber);cursor:pointer" onclick="indVerListadoPrecolecta('__todos','Todos los meses')" title="Instalación: ${tot.precolecta-tot.precolectaCambio-tot.precolectaRollout} · Cambio: ${tot.precolectaCambio} · Rollout: ${tot.precolectaRollout} — Click para ver el listado de OTs">${tot.precolecta}<div style="font-size:9px;font-weight:400;opacity:.75">${tot.precolectaCambio} + ${tot.precolectaRollout}</div></td>
     <td class="num" style="font-weight:700">${totPct}%</td>
   </tr>`;
