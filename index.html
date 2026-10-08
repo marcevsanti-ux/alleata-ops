@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.7.87</title>
+<title>Alleata · Operaciones v4.7.88</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -409,7 +409,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.87 · 30 sep 2026
+      v4.7.88 · 30 sep 2026
     </div>
   </div>
 </div>
@@ -524,7 +524,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.87 · 30 sep 2026
+      v4.7.88 · 30 sep 2026
     </div>
   </div>
 </nav>
@@ -579,7 +579,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.87</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.88</div>
   </div>
   <div class="content">
 
@@ -5377,7 +5377,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.7.87] OK');
+console.log('[Alleata v4.7.88] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -7163,6 +7163,10 @@ const ALL_MODS = [
   // del backlog anterior al 1/4, ve Desinstalaciones completo (Listado OTs + Gestión OPS + Backlog). No es un
   // módulo del menú: solo cambia cómo se ve Desinstalaciones. Requiere tener también 📦 Desinstalaciones.
   {id:'desinst-completo', label:'🔓 Desinstalaciones completo (todas las OT)'},
+  // Pedido 08/10 (marcelos): permiso para un usuario de rol Logística (ej. Angel) — en Envíos deja de estar
+  // limitado a las OT con logística ALLEATA: ve todas las logísticas (Cabify / Correo Arg. / EPSA) y le aparece
+  // el filtro "Filtrar por responsable" (Andrés, Gonza, etc.). No es un módulo del menú. Requiere 🚚 Envíos.
+  {id:'envios-completo', label:'🔓 Envíos completo (todas las logísticas y responsables)'},
   {id:'churn-producto', label:'🔬 Churn Producto'},
   {id:'hoja-ruta', label:'🗺️ Hoja de Ruta'},
   {id:'napse', label:'🔍 Napse'},
@@ -13646,8 +13650,8 @@ async function initEnvios(){
   // Cards de canal legacy
 
 
-  if(isAdmin){
-    // Admin además ve filtro de responsable
+  if(isAdmin || (isLogistica && (currentProfile?.modulos||[]).includes('envios-completo'))){
+    // Admin (y Logística con permiso "Envíos completo") además ve filtro de responsable
     const wrap=document.getElementById('envFiltroRespWrap');
     if(wrap) wrap.style.display='block';
     const lbl=document.getElementById('envFiltroRespLabel');
@@ -14117,7 +14121,7 @@ async function loadFiltroResponsables(){
   // Filtrar en cliente para asegurar combinaciones correctas
   const dataFilt=(data||[]).filter(e=>
     (e.status==='Pre-Colecta'||e.status==='Despachado') &&
-    (e.logistica==='ALLEATA'||e.logistica==='CORREO ARGENTINO')
+    ['ALLEATA','CORREO ARGENTINO','CABIFY','EPSA'].includes(e.logistica)   // 08/10: antes solo ALLEATA/CA → un responsable con OT solo de Cabify/EPSA no aparecía en el filtro
   );
   const uniq=[...new Set((dataFilt||[]).map(r=>r.responsable).filter(Boolean))];
   const sel=document.getElementById('envFiltroResp');
@@ -14403,9 +14407,13 @@ async function renderEnvios(){
   const LOGS_CONOCIDAS = ['ALLEATA','CORREO ARGENTINO','CABIFY','EPSA'];
   query=query.in('status', STATUSES_ACTIVOS);
 
-  if(isLogistica){
+  // Permiso "Envíos completo" (pedido 08/10): un usuario de rol Logística con este permiso se comporta como
+  // admin SOLO para la consulta de Envíos (todas las logísticas, filtro por responsable y por canal).
+  // Sin el permiso, sigue como siempre: únicamente OT con logística ALLEATA.
+  const veTodoEnvios = isLogistica && (currentProfile?.modulos||[]).includes('envios-completo');
+  if(isLogistica && !veTodoEnvios){
     query=query.eq('logistica','ALLEATA');
-  } else if(isAdmin){
+  } else if(isAdmin || veTodoEnvios){
     // OTROS y TODOS: no filtrar logística en query, filtrar en cliente
     if(_canalActivo !== 'TODOS' && _canalActivo !== 'OTROS') query=query.eq('logistica', LOG_MAP[_canalActivo]||_canalActivo);
     const filtroResp=document.getElementById('envFiltroResp')?.value||'';
