@@ -7560,6 +7560,84 @@ function _hrBtnExport(key){
   return `<button class="btn-sm" style="background:none;border:1px solid var(--teal);color:var(--teal);font-size:11px;margin-left:auto" onclick="exportarHojaRutaExcel('${key}',this)" title="Descargar la hoja de ruta de este chofer en Excel">📥 Excel</button>`;
 }
 
+// ── Reenviar el reporte de cierre de ruta de un chofer (pedido 09/10) ────────
+// Caso real: WaSender se cayó justo cuando Ignacio cerró la ruta y el reporte
+// no salió; desde la app mobile ya no se podía rehacer. Esto reconstruye el
+// mismo texto "Reporte Log. Alleata" que arma mobile.html (generarTextoResumen)
+// pero desde la base — sf_workorders (fecha_cierre = hoy, entregado_por =
+// chofer) + hoja_ruta_paradas_manuales — y lo manda al grupo "Ally + Ops" por
+// /automations/send-message. Muestra el texto antes y pide confirmación.
+// Limitaciones: los km salen de rutas_diarias.km_total (mobile los recalcula
+// con las paradas reales) y las desinstalaciones cerradas desde mobile no se
+// incluyen (viven en localStorage del celular).
+const HR_GRUPO_OPS='120363424299090366@g.us';
+function _hrBtnReenviarCierre(userId,choferJs){
+  return `<button class="btn-sm" style="background:none;border:1px solid var(--orange);color:var(--orange);font-size:11px" onclick="reenviarCierreChofer('${userId}','${choferJs}',this)" title="Regenera el reporte de cierre de hoy de este chofer y lo reenvía al grupo">📲 Reenviar cierre</button>`;
+}
+async function reenviarCierreChofer(userId,chofer,btn){
+  const orig=btn.textContent;
+  btn.disabled=true;btn.textContent='⏳ Armando...';
+  try{
+    const hoy=hoyArgentina();
+    const nombre=(chofer||'').trim();
+    const{data:ots,error:e1}=await sb.from('sf_workorders')
+      .select('workorder_number,status,cuenta,record_type,rollout,notas_cierre,fecha_exitoso,updated_at')
+      .eq('fecha_cierre',hoy).eq('entregado_por',nombre);
+    if(e1)throw new Error(e1.message);
+    const{data:paradas}=await sb.from('hoja_ruta_paradas_manuales')
+      .select('tipo,proveedor_nombre,ot_numero,que_retirar,completado,created_at')
+      .eq('fecha',hoy).eq('chofer_user_id',userId).order('created_at',{ascending:true});
+    const{data:ruta}=await sb.from('rutas_diarias').select('km_total').eq('fecha',hoy).eq('user_id',userId).maybeSingle();
+
+    const mapa={'Exitoso':'Entregado','Exitosa':'Entregado','Entregado':'Entregado','Reprogramar':'Reprogramar','Fallido':'Fallido'};
+    const lista=(ots||[]).slice().sort((a,b)=>String(a.fecha_exitoso||a.updated_at||'').localeCompare(String(b.fecha_exitoso||b.updated_at||'')))
+      .map(o=>({...o,res:mapa[o.status]||'Entregado'}));
+    const tag=o=>{
+      if(o.rollout===true)return ' 🔁 *ROLLOUT*';
+      const t=(o.record_type||'').toLowerCase();
+      if(t.includes('instal'))return ' 🟩 *INSTALACIÓN*';
+      if(t.includes('cambio'))return ' 🟦 *CAMBIO*';
+      if(t.includes('retir'))return ' 🟧 *RETIRO*';
+      if(t.includes('asist'))return ' 🟨 *ASISTENCIA*';
+      return '';
+    };
+    const ex=lista.filter(o=>o.res==='Entregado'),fa=lista.filter(o=>o.res==='Fallido'),re=lista.filter(o=>o.res==='Reprogramar');
+    const d=new Date();
+    const fechaLarga=d.toLocaleDateString('es-AR',{day:'numeric',month:'long',timeZone:'America/Argentina/Buenos_Aires'})+' — '+d.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit',timeZone:'America/Argentina/Buenos_Aires'});
+    let txt=`📦 *Reporte Log. Alleata*\n👷 ${nombre}\n🕐 ${fechaLarga}\n🛣️ Kmts Recorridos: ${ruta?.km_total?Math.round(ruta.km_total):0} km\n`;
+    if(ex.length){txt+=`\n*OT Exitosas (${ex.length}):*\n`;ex.forEach(o=>{txt+=`${o.workorder_number} ✅${tag(o)}\n`;});}
+    if(fa.length){txt+=`\n*OT Fallidas (${fa.length}):*\n`;fa.forEach(o=>{txt+=`${o.workorder_number} ❌${o.notas_cierre?` (${o.notas_cierre})`:''}${tag(o)}\n`;});}
+    if(re.length){txt+=`\n*OT Reprogramadas (${re.length}):*\n`;re.forEach(o=>{txt+=`${o.workorder_number} 🔄${o.notas_cierre?` (${o.notas_cierre})`:''}${tag(o)}\n`;});}
+    const linea=p=>{
+      const n=String(p.ot_numero||'').split(/[,;\s]+/).filter(Boolean);
+      return `${p.proveedor_nombre||'Proveedor'}${n.length?` — OT ${n.join(', ')}${n.length>1?` (${n.length} terminales)`:''}`:''}${p.que_retirar?' · '+p.que_retirar:''}`;
+    };
+    const marca=p=>p.completado?'✅':'⏳ _(no realizado)_';
+    const ret=(paradas||[]).filter(p=>p.tipo!=='entrega_proveedor'),ent=(paradas||[]).filter(p=>p.tipo==='entrega_proveedor');
+    if(ret.length){txt+=`\n*Retiros en proveedor (${ret.length}):*\n`;ret.forEach(p=>{txt+=`${marca(p)} 📦 ${linea(p)}\n`;});}
+    if(ent.length){txt+=`\n*Entregas en proveedor (${ent.length}):*\n`;ent.forEach(p=>{txt+=`${marca(p)} 📤 ${linea(p)}\n`;});}
+    const total=lista.length+(paradas||[]).filter(p=>p.completado).length;
+    if(!total&&!(paradas||[]).length){alert(`No hay cierres de hoy registrados para ${nombre} (fecha_cierre=${hoy}, entregado_por="${nombre}").`);return;}
+    txt+=`\n🚚 Total gestionado hoy: ${total}`;
+
+    if(!confirm(`Se va a enviar este reporte al grupo Ally + Ops:\n\n${txt}\n\n¿Enviar?`))return;
+    btn.textContent='⏳ Enviando...';
+    const resp=await fetch(`${ALLY_URL}/automations/send-message`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-automation-secret':'123456'},
+      body:JSON.stringify({group_id:HR_GRUPO_OPS,message:txt,context:'resumen_ruta_reenvio'})
+    });
+    const j=await resp.json().catch(()=>({}));
+    if(!resp.ok||j.error)throw new Error(j.error||('HTTP '+resp.status));
+    btn.textContent='✅ Enviado';
+    setTimeout(()=>{btn.textContent=orig;btn.disabled=false;},4000);
+    return;
+  }catch(e){
+    alert('No se pudo reenviar el cierre: '+e.message);
+  }
+  btn.textContent=orig;btn.disabled=false;
+}
+
 async function loadHojaRuta(){
   const cont=document.getElementById('hr-content');
   if(!cont)return;
@@ -7845,6 +7923,7 @@ async function loadHojaRuta(){
         ${rolloutCount?`<span style="font-size:10px;font-weight:700;color:#8b5cf6;background:rgba(139,92,246,.15);border:1px solid rgba(139,92,246,.35);border-radius:12px;padding:2px 8px">🔄 ${rolloutCount} rollout</span>`:''}
         ${enColaEste?`<span style="font-size:10px;font-weight:700;color:var(--orange);background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.3);border-radius:12px;padding:2px 8px">🕓 ${enColaEste} en cola</span>`:''}
         ${_hrBtnExport(_hrKey)}
+        ${_hrBtnReenviarCierre(r.user_id,choferJs)}
       </div>
       <div style="display:flex;flex-direction:column;gap:8px">${items}</div>
     </div>`;
