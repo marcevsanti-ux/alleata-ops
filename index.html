@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.7.89</title>
+<title>Alleata · Operaciones v4.7.90</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -409,7 +409,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.89 · 30 sep 2026
+      v4.7.90 · 13 oct 2026
     </div>
   </div>
 </div>
@@ -524,7 +524,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.89 · 30 sep 2026
+      v4.7.90 · 13 oct 2026
     </div>
   </div>
 </nav>
@@ -579,7 +579,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.89</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.90</div>
   </div>
   <div class="content">
 
@@ -5377,7 +5377,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.7.89] OK');
+console.log('[Alleata v4.7.90] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -5573,6 +5573,13 @@ const rvEsc = t => String(t ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').re
 const rvOtLink = (numero, sfId) => sfId
   ? `<a href="https://alleata.lightning.force.com/lightning/r/WorkOrder/${rvEsc(sfId)}/view" target="_blank" rel="noopener" class="mono" style="color:var(--teal);text-decoration:none;font-weight:600">${rvEsc(numero)} ↗</a>`
   : `<span class="mono" style="font-weight:600">${rvEsc(numero)}</span>`;
+// Estado de la OT en SF normalizado (sin tildes/espacios/guiones, minúscula): "Pre-Colecta" == "Precolecta".
+const rvStNorm = r => String(r.ot_status || '').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[\s_-]+/g,'');
+const RV_ST = {
+  configurar:  r => r.ot_numero && rvStNorm(r) === 'configurarterminal',
+  enGestion:   r => r.ot_numero && ['enproceso','precolecta'].includes(rvStNorm(r)),
+  gestionado:  r => r.ot_numero && ['despachado','retirarterminal','exitoso','exitosa'].includes(rvStNorm(r)),
+};
 const rvMillones = v => ((Number(v)||0)/1e6).toLocaleString('es-AR',{maximumFractionDigits:1}) + ' M';
 
 function rvEtapaEfectiva(r) {
@@ -5651,19 +5658,26 @@ function rvRenderKpis(rows) {
   const despachadoN = rows.filter(r => r.ot_numero && (r.ot_status || '').trim().toLowerCase() === 'despachado').length;
   const pctVol = volTot ? Math.round(100 * volInst / volTot) : 0;
   const box = (cls, num, label, sub, key) => `<div class="stat-box ${cls}" style="cursor:pointer" onclick="rvMostrarDetalle('${key}')" title="Ver el detalle"><div class="stat-num">${num}</div><div class="stat-label">${label}</div>${sub ? `<div style="font-size:10px;color:var(--text-muted);margin-top:2px">${sub}</div>` : ''}</div>`;
+  // Pedido 13/10: estados de la OT en SF → "Configurar terminal", "En gestión" (En proceso + Pre-Colecta)
+  // y, solo Interior, "Gestionado" (Despachado + Retirar terminal + Exitoso).
+  const cfgN = rows.filter(RV_ST.configurar).length;
+  const enGestOtN = rows.filter(RV_ST.enGestion).length;
+  const gestionadoN = rows.filter(RV_ST.gestionado).length;
   document.getElementById('rvKpis').innerHTML =
     box('s-purple', rows.length, 'Terminales en ranking', rvMillones(volTot) + ' de volumen', 'todas') +
-    // "Sin contactar": solo AMBA (pedido 05/10; en Interior se oculta y entra "Despachado").
-    (_rvZona === 'INTERIOR' ? '' : box('', cont['Sin contactar']||0, 'Sin contactar', '', 'Sin contactar')) +
+    // "Sin contactar": oculta en AMBA (pedido 13/10) e Interior (05/10). La etapa sigue en el desplegable de filtros.
     // "En gestión": oculta en AMBA e Interior (pedido 05/10). Las etapas Notificado/Confirmado
     // siguen existiendo y se pueden filtrar con el desplegable; solo se sacó la tarjeta.
     box('s-teal', conOT, 'OT creada', sinInstalar + ' sin instalar · ' + (cont['Instalado']||0) + ' instaladas', 'con_ot') +
+    box('s-blue', cfgN, 'Configurar terminal', 'OT en estado Configurar terminal', 'ot_configurar') +
+    box('s-teal', enGestOtN, 'En gestión', 'OT en proceso o pre-colecta', 'ot_en_gestion') +
     (_rvZona === 'INTERIOR' ? box('s-blue', despachadoN, 'Despachado', 'OT ya salió · sin instalar', 'despachado') : '') +
     box('s-green', cont['Instalado']||0, 'Instalado', pctVol + '% del volumen', 'Instalado') +
     // "Sin respuesta / Frenado" oculta (pedido 05/10). Las etapas siguen existiendo en los filtros.
     // Retirar terminal: solo en INTERIOR (pedido 05/10; en AMBA se oculta) — OT cuya terminal
     // nueva ya se entregó y falta retirar la vieja.
-    (_rvZona === 'INTERIOR' ? box('', retirarTerm, 'Retirar terminal', 'nueva entregada · falta retiro', 'retirar_terminal') : '');
+    (_rvZona === 'INTERIOR' ? box('', retirarTerm, 'Retirar terminal', 'nueva entregada · falta retiro', 'retirar_terminal') : '') +
+    (_rvZona === 'INTERIOR' ? box('s-green', gestionadoN, 'Gestionado', 'despachado + retirar terminal + exitoso', 'ot_gestionado') : '');
   const multi = new Set(); const vistos = new Set();
   rows.forEach(r => { if (r.cuit) { if (vistos.has(r.cuit)) multi.add(r.cuit); vistos.add(r.cuit); } });
   document.getElementById('rvKpiNota').textContent = multi.size
@@ -5676,6 +5690,9 @@ function rvMostrarDetalle(key) {
   let lista = _rvKpiRows, titulo = '';
   if (key === 'todas') titulo = 'Todas las terminales del ranking (esta zona)';
   else if (key === 'en_gestion') { lista = lista.filter(r => ['Notificado','Notificado 2da vez','Confirmado'].includes(rvEtapaEfectiva(r))); titulo = 'En gestión (notificado / confirmado)'; }
+  else if (key === 'ot_configurar') { lista = lista.filter(RV_ST.configurar); titulo = 'Configurar terminal'; }
+  else if (key === 'ot_en_gestion') { lista = lista.filter(RV_ST.enGestion); titulo = 'En gestión (OT en proceso / pre-colecta)'; }
+  else if (key === 'ot_gestionado') { lista = lista.filter(RV_ST.gestionado); titulo = 'Gestionado (despachado / retirar terminal / exitoso)'; }
   else if (key === 'con_ot') { lista = lista.filter(r => r.ot_numero); titulo = 'OT creada (incluye las ya instaladas)'; }
   else if (key === 'despachado') { lista = lista.filter(r => r.ot_numero && (r.ot_status || '').trim().toLowerCase() === 'despachado'); titulo = 'Despachado'; }
   else if (key === 'retirar_terminal') { lista = lista.filter(r => r.ot_numero && (r.ot_status || '').trim().toLowerCase() === 'retirar terminal'); titulo = 'Retirar terminal'; }
@@ -9626,6 +9643,24 @@ function _ultimosNMeses(n){
   return meses;
 }
 
+// Pedido 13/10: el general de ruta por chofer muestra solo las últimas 2 semanas
+// (semana anterior + semana en curso, lunes a domingo, hora Argentina).
+function _ultimasNSemanas(n){
+  const fmt = d => `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}`;
+  const iso = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  const hoy = new Date(); hoy.setHours(12,0,0,0);
+  const lunes = new Date(hoy); lunes.setDate(hoy.getDate() - ((hoy.getDay()+6)%7));
+  const out = [];
+  for(let i=n-1;i>=0;i--){
+    const ini = new Date(lunes); ini.setDate(lunes.getDate() - 7*i);
+    const fin = new Date(ini); fin.setDate(ini.getDate()+6);
+    out.push({ key: iso(ini), desde: iso(ini), hasta: iso(fin),
+      label: (i===0 ? 'ESTA SEMANA ' : i===1 ? 'SEMANA ANTERIOR ' : '') + fmt(ini)+'–'+fmt(fin) });
+  }
+  return out;
+}
+const _enSemana = (fecha, m) => { const f = String(fecha||'').slice(0,10); return f >= m.desde && f <= m.hasta; };
+
 let _hrMesBuckets = {};  // { 'Marce|2026-09': {todas:[],exitosas:[],reprogramar:[],otros:[]}, ... }
 
 async function cargarIndicadoresRutaMensual() {
@@ -9634,8 +9669,8 @@ async function cargarIndicadoresRutaMensual() {
   cont.innerHTML = '<div class="card" style="padding:16px;color:var(--text-muted);font-size:12px">Cargando resumen mensual de ruta...</div>';
 
   try {
-    const meses = _ultimosNMeses(3);
-    const desde = meses[0].key + '-01';
+    const meses = _ultimasNSemanas(2);
+    const desde = meses[0].desde;
 
     const { data: rutas, error: errRutas } = await sb.from('rutas_diarias')
       .select('user_id,fecha,ots_numeros').gte('fecha', desde);
@@ -9674,7 +9709,7 @@ async function cargarIndicadoresRutaMensual() {
       (ots || []).forEach(o => { otsInfo[o.workorder_number] = o; });
     }
 
-    const contarMes = (matchFn, mesKey) => {
+    const contarMes = (matchFn, mesObj) => {
       // FIX 12/09: dedup por ot_numero dentro del mes — cada OT cuenta una
       // sola vez, sin importar cuántos días haya estado en la ruta hasta
       // que se cerró (ver comentario original más abajo en el archivo si
@@ -9706,13 +9741,13 @@ async function cargarIndicadoresRutaMensual() {
         else buckets.otros.push(item);
       };
       (rutas || []).forEach(r => {
-        if (String(r.fecha).slice(0, 7) !== mesKey) return;
+        if (!_enSemana(r.fecha, mesObj)) return;
         const nombre = (porUser[r.user_id]?.nombre || porUser[r.user_id]?.email || '').trim();
         if (!matchFn(nombre)) return;
         (r.ots_numeros || []).forEach(agregar);
       });
       (cerradosRango || []).forEach(o => {
-        if (String(o.fecha_cierre).slice(0, 7) !== mesKey) return;
+        if (!_enSemana(o.fecha_cierre, mesObj)) return;
         if (!matchFn((o.entregado_por || '').trim())) return;
         agregar(o.workorder_number);
       });
@@ -9733,7 +9768,7 @@ async function cargarIndicadoresRutaMensual() {
       <div style="font-size:11px;font-weight:700;margin:8px 0 6px">👷 ${nombre}</div>
       <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:6px">
         ${meses.map(m => {
-          const d = contarMes(n => _normResponsable(n) === clave, m.key);
+          const d = contarMes(n => _normResponsable(n) === clave, m);
           const key = nombre + '|' + m.key;  // ej: "Marce|2026-09"
           const tituloSufijo = `${nombre} · ${m.label}`;
           _hrMesBuckets[key] = d.buckets;
@@ -9752,7 +9787,7 @@ async function cargarIndicadoresRutaMensual() {
     const choferesMes = _hrChoferes(rutas, porUser, cerradosRango);
     cont.innerHTML = `
       <div class="card">
-        <div style="font-size:13px;font-weight:700;margin-bottom:4px">🚚 Ruta por chofer, general por mes</div>
+        <div style="font-size:13px;font-weight:700;margin-bottom:4px">🚚 Ruta por chofer, últimas 2 semanas</div>
         ${choferesMes.length
           ? choferesMes.map(c => filaChofer(c.nombre, c.clave)).join('')
           : '<div style="font-size:12px;color:var(--text-muted);padding:6px 0">Sin rutas registradas en el período.</div>'}
