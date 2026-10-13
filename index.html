@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.7.91</title>
+<title>Alleata · Operaciones v4.7.92</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -411,7 +411,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.91 · 13 oct 2026
+      v4.7.92 · 13 oct 2026
     </div>
   </div>
 </div>
@@ -526,7 +526,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.91 · 13 oct 2026
+      v4.7.92 · 13 oct 2026
     </div>
   </div>
 </nav>
@@ -581,7 +581,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.91</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.92</div>
   </div>
   <div class="content">
 
@@ -5379,7 +5379,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.7.91] OK');
+console.log('[Alleata v4.7.92] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -5686,12 +5686,11 @@ function rvRenderKpis(rows) {
   // INTERIOR (pedido 13/10): solo estas 5 cards. Despachado / Instalado / Retirar terminal / Otros
   // ya no se muestran como card (Despachado, Retirar terminal y Exitoso van dentro de "Gestionado").
   // AMBA: Sin contactar oculta (13/10); se mantienen Instalado y Otros estados para que la suma cierre.
-  document.getElementById('rvKpis').innerHTML = _rvZona === 'INTERIOR'
-    ? cTerminales + cOtCreada + cConfigurar + cEnGestion + cGestionado
-    : cTerminales + cOtCreada + cConfigurar + cEnGestion +
-      box('s-teal', cont['Instalado']||0, 'Instalado', pctVol + '% del volumen', 'Instalado') +
-      cGestionado +
-      box('', otrosRows.length, 'Otros estados', otrosSub || 'OT en otro estado de SF', 'ot_otros');
+  // Pedido 13/10 (2): AMBA sin card "Instalado" (los exitosos ya están dentro de Gestionado) e Interior
+  // con "Otros estados" para que Configurar + En gestión + Gestionado + Otros = OT creada en las dos zonas.
+  const cOtros = box('', otrosRows.length, 'Otros estados', otrosSub || 'OT en otro estado de SF', 'ot_otros');
+  document.getElementById('rvKpis').innerHTML =
+    cTerminales + cOtCreada + cConfigurar + cEnGestion + cGestionado + cOtros;
   const multi = new Set(); const vistos = new Set();
   rows.forEach(r => { if (r.cuit) { if (vistos.has(r.cuit)) multi.add(r.cuit); vistos.add(r.cuit); } });
   document.getElementById('rvKpiNota').textContent = multi.size
