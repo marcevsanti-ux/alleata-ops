@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.7.90</title>
+<title>Alleata · Operaciones v4.7.91</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -228,6 +228,8 @@ tr:hover td{background:var(--surface2);}
 .stat-box.s-red .stat-num{color:var(--red);}
 .stat-box.s-blue .stat-num{color:var(--blue);}
 .stat-box.s-purple .stat-num{color:#8b5cf6;}
+.stat-box.s-white .stat-num{color:#ffffff;}
+.stat-box.s-yellow .stat-num{color:#facc15;}
 .stat-label{font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1.5px;margin-top:3px;font-weight:700;}
 .sim-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px;}
 .sim-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;transition:border-color .2s;}
@@ -409,7 +411,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.90 · 13 oct 2026
+      v4.7.91 · 13 oct 2026
     </div>
   </div>
 </div>
@@ -524,7 +526,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.90 · 13 oct 2026
+      v4.7.91 · 13 oct 2026
     </div>
   </div>
 </nav>
@@ -579,7 +581,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.90</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.91</div>
   </div>
   <div class="content">
 
@@ -5377,7 +5379,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.7.90] OK');
+console.log('[Alleata v4.7.91] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -5580,6 +5582,10 @@ const RV_ST = {
   enGestion:   r => r.ot_numero && ['enproceso','precolecta'].includes(rvStNorm(r)),
   gestionado:  r => r.ot_numero && ['despachado','retirarterminal','exitoso','exitosa'].includes(rvStNorm(r)),
 };
+// OT creadas que no caen en Configurar terminal / En gestión / Gestionado (Fallido, Reprogramar, Cancelado, sin estado, etc.).
+// Configurar + En gestión + Gestionado + Otros = OT creada (grupos excluyentes). Ojo: Gestionado ya INCLUYE
+// Despachado + Retirar terminal + Exitoso, así que esas tarjetas no se suman aparte.
+RV_ST.otros = r => r.ot_numero && !RV_ST.configurar(r) && !RV_ST.enGestion(r) && !RV_ST.gestionado(r);
 const rvMillones = v => ((Number(v)||0)/1e6).toLocaleString('es-AR',{maximumFractionDigits:1}) + ' M';
 
 function rvEtapaEfectiva(r) {
@@ -5663,21 +5669,29 @@ function rvRenderKpis(rows) {
   const cfgN = rows.filter(RV_ST.configurar).length;
   const enGestOtN = rows.filter(RV_ST.enGestion).length;
   const gestionadoN = rows.filter(RV_ST.gestionado).length;
-  document.getElementById('rvKpis').innerHTML =
-    box('s-purple', rows.length, 'Terminales en ranking', rvMillones(volTot) + ' de volumen', 'todas') +
-    // "Sin contactar": oculta en AMBA (pedido 13/10) e Interior (05/10). La etapa sigue en el desplegable de filtros.
-    // "En gestión": oculta en AMBA e Interior (pedido 05/10). Las etapas Notificado/Confirmado
-    // siguen existiendo y se pueden filtrar con el desplegable; solo se sacó la tarjeta.
-    box('s-teal', conOT, 'OT creada', sinInstalar + ' sin instalar · ' + (cont['Instalado']||0) + ' instaladas', 'con_ot') +
-    box('s-blue', cfgN, 'Configurar terminal', 'OT en estado Configurar terminal', 'ot_configurar') +
-    box('s-teal', enGestOtN, 'En gestión', 'OT en proceso o pre-colecta', 'ot_en_gestion') +
-    (_rvZona === 'INTERIOR' ? box('s-blue', despachadoN, 'Despachado', 'OT ya salió · sin instalar', 'despachado') : '') +
-    box('s-green', cont['Instalado']||0, 'Instalado', pctVol + '% del volumen', 'Instalado') +
-    // "Sin respuesta / Frenado" oculta (pedido 05/10). Las etapas siguen existiendo en los filtros.
-    // Retirar terminal: solo en INTERIOR (pedido 05/10; en AMBA se oculta) — OT cuya terminal
-    // nueva ya se entregó y falta retirar la vieja.
-    (_rvZona === 'INTERIOR' ? box('', retirarTerm, 'Retirar terminal', 'nueva entregada · falta retiro', 'retirar_terminal') : '') +
-    (_rvZona === 'INTERIOR' ? box('s-green', gestionadoN, 'Gestionado', 'despachado + retirar terminal + exitoso', 'ot_gestionado') : '');
+  const otrosRows = rows.filter(RV_ST.otros);
+  const otrosPorEstado = {};
+  otrosRows.forEach(r => { const k = (r.ot_status || '').trim() || 'Sin estado'; otrosPorEstado[k] = (otrosPorEstado[k]||0) + 1; });
+  const otrosTop = Object.entries(otrosPorEstado).sort((a,b) => b[1]-a[1]);
+  const otrosSub = otrosTop.slice(0,3).map(([k,n]) => rvEsc(k) + ' ' + n).join(' · ') + (otrosTop.length > 3 ? ' · +' + (otrosTop.length-3) : '');
+  // Desglose por estado de SF para las leyendas de las cards (pedido 13/10).
+  const nSt = (...ks) => rows.filter(r => r.ot_numero && ks.includes(rvStNorm(r))).length;
+  const subGest = 'En proceso ' + nSt('enproceso') + ' · Pre-colecta ' + nSt('precolecta');
+  const subGestionado = 'Despachado ' + nSt('despachado') + ' · Retirar terminal ' + nSt('retirarterminal') + ' · Exitoso ' + nSt('exitoso','exitosa');
+  const cTerminales = box('s-purple', rows.length, 'Terminales en ranking', rvMillones(volTot) + ' de volumen', 'todas');
+  const cOtCreada   = box('s-white',  conOT,   'OT creada',           sinInstalar + ' sin instalar · ' + (cont['Instalado']||0) + ' instaladas', 'con_ot');
+  const cConfigurar = box('s-red',    cfgN,    'Configurar terminal', 'OT en estado Configurar terminal', 'ot_configurar');
+  const cEnGestion  = box('s-yellow', enGestOtN, 'En gestión',        subGest, 'ot_en_gestion');
+  const cGestionado = box('s-green',  gestionadoN, 'Gestionado',      subGestionado, 'ot_gestionado');
+  // INTERIOR (pedido 13/10): solo estas 5 cards. Despachado / Instalado / Retirar terminal / Otros
+  // ya no se muestran como card (Despachado, Retirar terminal y Exitoso van dentro de "Gestionado").
+  // AMBA: Sin contactar oculta (13/10); se mantienen Instalado y Otros estados para que la suma cierre.
+  document.getElementById('rvKpis').innerHTML = _rvZona === 'INTERIOR'
+    ? cTerminales + cOtCreada + cConfigurar + cEnGestion + cGestionado
+    : cTerminales + cOtCreada + cConfigurar + cEnGestion +
+      box('s-teal', cont['Instalado']||0, 'Instalado', pctVol + '% del volumen', 'Instalado') +
+      cGestionado +
+      box('', otrosRows.length, 'Otros estados', otrosSub || 'OT en otro estado de SF', 'ot_otros');
   const multi = new Set(); const vistos = new Set();
   rows.forEach(r => { if (r.cuit) { if (vistos.has(r.cuit)) multi.add(r.cuit); vistos.add(r.cuit); } });
   document.getElementById('rvKpiNota').textContent = multi.size
@@ -5692,6 +5706,7 @@ function rvMostrarDetalle(key) {
   else if (key === 'en_gestion') { lista = lista.filter(r => ['Notificado','Notificado 2da vez','Confirmado'].includes(rvEtapaEfectiva(r))); titulo = 'En gestión (notificado / confirmado)'; }
   else if (key === 'ot_configurar') { lista = lista.filter(RV_ST.configurar); titulo = 'Configurar terminal'; }
   else if (key === 'ot_en_gestion') { lista = lista.filter(RV_ST.enGestion); titulo = 'En gestión (OT en proceso / pre-colecta)'; }
+  else if (key === 'ot_otros') { lista = lista.filter(RV_ST.otros); titulo = 'Otros estados (OT que no están en Configurar / En gestión / Gestionado)'; }
   else if (key === 'ot_gestionado') { lista = lista.filter(RV_ST.gestionado); titulo = 'Gestionado (despachado / retirar terminal / exitoso)'; }
   else if (key === 'con_ot') { lista = lista.filter(r => r.ot_numero); titulo = 'OT creada (incluye las ya instaladas)'; }
   else if (key === 'despachado') { lista = lista.filter(r => r.ot_numero && (r.ot_status || '').trim().toLowerCase() === 'despachado'); titulo = 'Despachado'; }
