@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Jornada — Configurar Terminal</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap');
+
+  :root {
+    --navy:   #0d1b2a; --navy-2: #112236; --navy-3: #162d45;
+    --teal:   #1dbf8e; --blue:   #1a9fd4;
+    --white:  #ffffff; --text:   #e2e8f0; --muted:  #7a91a8;
+    --gold:   #f5a623; --green:  #27ae60; --orange: #e67e22; --red: #e74c3c; --purple:#9b59b6;
+    --card-bg: #112236; --border: rgba(29,191,142,0.15);
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:var(--navy); font-family:'Inter',sans-serif; color:var(--text); min-height:100vh; }
+
+  /* ── LOGIN ── */
+  #login-screen { min-height:100vh; display:flex; align-items:center; justify-content:center;
+    background: radial-gradient(ellipse at 50% 0%, rgba(29,191,142,0.08) 0%, transparent 60%), var(--navy); padding:16px; }
+  .login-card { background:var(--navy-2); border:1px solid var(--border); border-radius:16px; padding:40px 36px; width:100%; max-width:400px; box-shadow:0 24px 64px rgba(0,0,0,0.4); }
+  .login-logo { background:linear-gradient(135deg,#1dbf8e,#1a9fd4); color:var(--navy); font-weight:800; font-size:13px; letter-spacing:1.5px; padding:5px 14px; border-radius:20px; text-transform:uppercase; display:inline-block; margin-bottom:24px; }
+  .login-title { font-size:22px; font-weight:800; color:var(--white); margin-bottom:4px; }
+  .login-sub   { font-size:13px; color:var(--muted); margin-bottom:32px; }
+  .field { margin-bottom:16px; }
+  .field label { display:block; font-size:10px; font-weight:700; color:var(--muted); letter-spacing:1.5px; text-transform:uppercase; margin-bottom:6px; }
+  .field input { width:100%; background:var(--navy-3); border:1px solid var(--border); color:var(--white); font-family:'Inter',sans-serif; font-size:14px; padding:11px 14px; border-radius:8px; outline:none; transition:border-color .2s; }
+  .field input:focus { border-color:var(--teal); }
+  .btn-login { width:100%; background:linear-gradient(135deg,#1dbf8e,#1a9fd4); color:var(--navy); border:none; padding:12px; border-radius:8px; font-family:'Inter',sans-serif; font-weight:800; font-size:14px; cursor:pointer; transition:opacity .2s, transform .1s; margin-top:4px; }
+  .btn-login:hover { opacity:.9; transform:translateY(-1px); }
+  .btn-login:disabled { opacity:.5; cursor:not-allowed; transform:none; }
+  .login-error { background:rgba(231,76,60,.12); border:1px solid rgba(231,76,60,.3); color:#ff6b6b; font-size:12px; padding:10px 14px; border-radius:8px; margin-top:14px; display:none; }
+  .login-error.show { display:block; }
+
+  #app { display:none; }
+
+  /* ── TOPBAR ── */
+  .topbar { background:var(--navy-2); border-bottom:1px solid var(--border); padding:0 32px; min-height:60px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:100; flex-wrap:wrap; gap:8px; }
+  .topbar-left { display:flex; align-items:center; gap:16px; }
+  .logo-pill { background:linear-gradient(135deg,#1dbf8e,#1a9fd4); color:var(--navy); font-weight:800; font-size:13px; letter-spacing:1.5px; padding:5px 14px; border-radius:20px; text-transform:uppercase; }
+  .topbar-title { font-size:15px; font-weight:600; color:var(--white); }
+  .topbar-right { display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+  #live-clock { font-family:'JetBrains Mono',monospace; font-size:13px; color:var(--teal); font-weight:600; }
+  .user-chip { display:flex; align-items:center; gap:8px; background:var(--navy-3); border:1px solid var(--border); border-radius:20px; padding:4px 12px 4px 8px; font-size:12px; color:var(--muted); }
+  .user-avatar { width:22px; height:22px; border-radius:50%; background:linear-gradient(135deg,#1dbf8e,#1a9fd4); display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:800; color:var(--navy); }
+  .sync-status { font-size:11px; color:var(--muted); display:flex; align-items:center; gap:6px; }
+  .sync-dot { width:7px; height:7px; border-radius:50%; background:var(--muted); flex-shrink:0; }
+  .sync-dot.ok { background:var(--green); } .sync-dot.loading { background:var(--gold); animation:pulse 1s infinite; } .sync-dot.error { background:var(--red); }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+  .btn { border:none; padding:8px 16px; border-radius:8px; font-family:'Inter',sans-serif; font-weight:700; font-size:12px; cursor:pointer; transition:opacity .2s, transform .1s; display:inline-flex; align-items:center; gap:6px; }
+  .btn:hover { opacity:.88; transform:translateY(-1px); }
+  .btn-teal  { background:linear-gradient(135deg,#1dbf8e,#1a9fd4); color:var(--navy); }
+  .btn-ghost { background:rgba(255,255,255,.07); color:var(--text); border:1px solid var(--border); }
+  .btn-logout { background:transparent; border:none; color:var(--muted); font-size:11px; cursor:pointer; padding:4px 8px; border-radius:6px; }
+  .btn-logout:hover { color:var(--red); }
+
+  .main { padding:24px 32px; max-width:1400px; margin:0 auto; }
+
+  /* ── FILTROS ── */
+  .filter-banner { background:var(--navy-3); border:1px solid var(--border); border-left:3px solid var(--teal); border-radius:8px; padding:9px 16px; margin-bottom:16px; display:flex; align-items:center; gap:8px; font-size:11px; color:var(--muted); flex-wrap:wrap; }
+  .filter-tag { background:rgba(29,191,142,.1); border:1px solid rgba(29,191,142,.25); color:var(--teal); padding:2px 9px; border-radius:20px; font-size:10px; font-weight:700; font-family:'JetBrains Mono',monospace; }
+  .controls { display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap; margin-bottom:20px; }
+  .ctl label { display:block; font-size:9px; font-weight:700; color:var(--muted); letter-spacing:1.2px; text-transform:uppercase; margin-bottom:5px; }
+  .ctl select, .ctl input { background:var(--navy-2); border:1px solid var(--border); color:var(--white); font-family:'JetBrains Mono',monospace; font-size:13px; padding:8px 10px; border-radius:8px; outline:none; min-width:150px; }
+  .ctl select:focus, .ctl input:focus { border-color:var(--teal); }
+  .ctl-spacer { flex:1; }
+
+  /* ── CABECERA DE FOTO ── */
+  .snapshot-header { display:flex; align-items:baseline; justify-content:space-between; margin-bottom:18px; flex-wrap:wrap; gap:10px; }
+  .snapshot-label { font-size:10px; font-weight:700; color:var(--muted); letter-spacing:2px; text-transform:uppercase; }
+  .snapshot-date  { font-size:20px; font-weight:800; color:var(--white); font-family:'JetBrains Mono',monospace; }
+  .turno-badge    { background:rgba(29,191,142,.12); border:1px solid var(--teal); color:var(--teal); padding:4px 14px; border-radius:20px; font-size:12px; font-weight:700; }
+
+  /* ── CARDS ── */
+  .cards-grid { display:grid; grid-template-columns:repeat(5,1fr); gap:12px; margin-bottom:20px; }
+  @media(max-width:1100px){ .cards-grid { grid-template-columns:repeat(3,1fr); } }
+  @media(max-width:700px) { .cards-grid { grid-template-columns:repeat(2,1fr); } .main { padding:16px; } .topbar { padding:8px 16px; } }
+  .stat-card { background:var(--card-bg); border:1px solid var(--border); border-radius:12px; padding:18px 16px 14px; position:relative; overflow:hidden; }
+  .stat-card::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; background:var(--accent); }
+  .card-label  { font-size:9px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; color:var(--accent); margin-bottom:8px; }
+  .card-number { font-family:'JetBrains Mono',monospace; font-size:44px; font-weight:700; color:var(--white); line-height:1; margin-bottom:6px; }
+  .card-sub    { font-size:11px; color:var(--muted); line-height:1.5; }
+  .card-sub b  { color:var(--text); font-weight:600; }
+
+  /* ── TOTAL ── */
+  .total-strip { background:linear-gradient(135deg,#1dbf8e,#1a9fd4); border-radius:10px; padding:12px 24px; display:flex; align-items:center; justify-content:space-between; margin-bottom:22px; gap:12px; flex-wrap:wrap; }
+  .total-strip .label  { font-size:11px; font-weight:800; color:var(--navy); opacity:.75; letter-spacing:.5px; text-transform:uppercase; }
+  .total-strip .number { font-family:'JetBrains Mono',monospace; font-size:32px; font-weight:800; color:var(--navy); }
+  .total-strip .sublabel { font-size:11px; color:var(--navy); opacity:.75; }
+
+  /* ── PANELES ── */
+  .bottom-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:22px; }
+  @media(max-width:900px){ .bottom-grid { grid-template-columns:1fr; } }
+  .panel { background:var(--card-bg); border:1px solid var(--border); border-radius:12px; padding:18px 20px; overflow-x:auto; }
+  .panel-title { font-size:10px; font-weight:700; letter-spacing:2px; text-transform:uppercase; color:var(--muted); margin-bottom:16px; display:flex; align-items:center; gap:8px; }
+  .panel-title::after { content:''; flex:1; height:1px; background:var(--border); }
+  .bar-row   { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
+  .bar-label { font-size:11px; color:var(--text); width:130px; flex-shrink:0; font-weight:500; }
+  .bar-track { flex:1; height:26px; background:rgba(255,255,255,.05); border-radius:4px; overflow:hidden; display:flex; }
+  .bar-seg   { height:100%; display:flex; align-items:center; justify-content:center; font-family:'JetBrains Mono',monospace; font-size:10px; font-weight:700; color:var(--navy); min-width:0; transition:width .8s cubic-bezier(.4,0,.2,1); }
+  .bar-total { font-family:'JetBrains Mono',monospace; font-size:13px; font-weight:700; color:var(--white); width:34px; text-align:right; }
+  .legend { display:flex; gap:14px; font-size:10px; color:var(--muted); margin-top:4px; flex-wrap:wrap; }
+  .legend i { display:inline-block; width:9px; height:9px; border-radius:2px; margin-right:5px; vertical-align:-1px; }
+
+  /* ── TABLAS ── */
+  .history-table { width:100%; border-collapse:collapse; font-size:11px; }
+  .history-table th { text-align:left; padding:5px 8px; color:var(--muted); font-weight:600; font-size:9px; letter-spacing:1px; text-transform:uppercase; border-bottom:1px solid var(--border); white-space:nowrap; }
+  .history-table td { padding:8px; border-bottom:1px solid rgba(255,255,255,.04); color:var(--text); font-family:'JetBrains Mono',monospace; font-size:11px; white-space:nowrap; }
+  .history-table tbody tr.click { cursor:pointer; }
+  .history-table tbody tr:hover td { background:rgba(255,255,255,.03); }
+  .history-table .num { text-align:right; }
+  .delta-pos { color:var(--green); } .delta-neg { color:var(--red); } .delta-neu { color:var(--muted); }
+  .slot-7 { color:var(--gold); } .slot-13 { color:var(--blue); } .slot-18 { color:var(--teal); }
+  .badge { border-radius:4px; padding:1px 6px; font-size:9px; font-weight:700; }
+  .badge-ok   { background:rgba(29,191,142,.15); color:var(--teal); }
+  .badge-warn { background:rgba(245,166,35,.15); color:var(--gold); }
+  .day-sep td { background:rgba(255,255,255,.025); color:var(--white); font-weight:700; font-size:10px; letter-spacing:1px; }
+
+  /* ── MODAL ── */
+  .modal-overlay { display:none; position:fixed; inset:0; background:rgba(6,12,20,.72); backdrop-filter:blur(2px); z-index:1000; align-items:center; justify-content:center; padding:20px; }
+  .modal-overlay.show { display:flex; }
+  .modal-box { background:var(--navy-2); border:1px solid var(--border); border-radius:14px; width:100%; max-width:760px; max-height:85vh; overflow-y:auto; padding:24px 26px; box-shadow:0 30px 80px rgba(0,0,0,.5); }
+  .modal-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; }
+  .modal-title { font-size:17px; font-weight:800; color:var(--white); }
+  .modal-close { background:rgba(255,255,255,.07); border:none; color:var(--muted); width:28px; height:28px; border-radius:8px; cursor:pointer; font-size:14px; }
+  .modal-sub { font-size:11px; color:var(--muted); margin-bottom:16px; line-height:1.5; }
+
+  .notes { font-size:11px; color:var(--muted); line-height:1.7; }
+  .notes b { color:var(--text); }
+  .footer { text-align:center; padding:20px; font-size:10px; color:var(--muted); border-top:1px solid var(--border); }
+  .footer span { color:var(--teal); font-weight:600; }
+  .empty-state { text-align:center; padding:32px; color:var(--muted); font-size:13px; }
+  #toast { position:fixed; bottom:24px; right:24px; padding:10px 18px; border-radius:8px; font-weight:700; font-size:13px; opacity:0; transform:translateY(8px); transition:all .25s; z-index:2000; pointer-events:none; }
+  #toast.ok { background:var(--teal); color:var(--navy); } #toast.error { background:var(--red); color:var(--white); } #toast.show { opacity:1; transform:translateY(0); }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">Alleata</div>
+    <div class="login-title">Jornada · Configurar Terminal</div>
+    <div class="login-sub">Ingresá con tu cuenta Alleata Ops</div>
+    <div class="field"><label>Email</label><input type="email" id="login-email" placeholder="usuario@alleata.com.ar" autocomplete="email"></div>
+    <div class="field"><label>Contraseña</label><input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password"></div>
+    <button class="btn-login" id="btn-login" onclick="doLogin()">Ingresar</button>
+    <div class="login-error" id="login-error"></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="logo-pill">Alleata</div>
+      <div class="topbar-title">Jornada · Configurar Terminal</div>
+    </div>
+    <div class="topbar-right">
+      <div class="sync-status"><div class="sync-dot" id="sync-dot"></div><span id="sync-text">—</span></div>
+      <div id="live-clock">--:--:--</div>
+      <button class="btn btn-ghost" onclick="cargar(true)">↻ Actualizar</button>
+      <button class="btn btn-teal" onclick="exportarCSV()">⬇ CSV</button>
+      <div class="user-chip"><div class="user-avatar" id="user-avatar">?</div><span id="user-name">—</span></div>
+      <button class="btn-logout" onclick="doLogout()">Salir</button>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="filter-banner">
+      <span>📸 Fotos automáticas</span><span class="filter-tag">07:00</span><span class="filter-tag">13:00</span><span class="filter-tag">18:00</span>
+      <span>· lunes a sábado · Operaciones: <b style="color:var(--text)">Andres, Gonzalo y Angel</b> · OT en estado <b style="color:var(--text)">Configurar Terminal</b></span>
+    </div>
+
+    <div class="controls">
+      <div class="ctl"><label>Día</label><select id="f-fecha" onchange="render()"></select></div>
+      <div class="ctl"><label>Equipo</label>
+        <select id="f-equipo" onchange="onEquipo()">
+          <option value="operaciones">Operaciones</option>
+          <option value="altas_otros">Altas / otros</option>
+          <option value="todos">Todos</option>
+        </select></div>
+      <div class="ctl"><label>Persona</label><select id="f-persona" onchange="render()"><option value="">Todas</option></select></div>
+    </div>
+
+    <div class="snapshot-header">
+      <div><div class="snapshot-label" id="snap-label">Última foto del día</div><div class="snapshot-date" id="snap-date">—</div></div>
+      <div class="turno-badge" id="snap-slot">—</div>
+    </div>
+
+    <div class="cards-grid" id="cards"></div>
+
+    <div class="total-strip">
+      <div><div class="label">OT configuradas en la jornada</div><div class="sublabel" id="total-sub">—</div></div>
+      <div class="number" id="total-num">—</div>
+    </div>
+
+    <div class="bottom-grid">
+      <div class="panel">
+        <div class="panel-title">Quién configuró</div>
+        <div id="por-persona"></div>
+        <div class="legend" id="legend-tipos"></div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">Evolución del día</div>
+        <table class="history-table">
+          <thead><tr><th>Foto</th><th class="num">Inicio</th><th class="num">Entraron</th><th class="num">Config.</th><th class="num">Reasig.</th><th class="num">Stock</th></tr></thead>
+          <tbody id="evo-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-bottom:22px">
+      <div class="panel-title">Historial de fotos</div>
+      <table class="history-table">
+        <thead><tr>
+          <th>Fecha</th><th>Hora</th><th class="num">Configurar terminal</th><th class="num">Instalación equipo + simcard</th><th class="num">Cambio terminal</th><th class="num">Otro tipo</th>
+          <th class="num">Entraron</th><th class="num">Config.</th><th class="num">Reasig.</th><th class="num">Δ stock</th><th>Base</th>
+        </tr></thead>
+        <tbody id="hist-body"></tbody>
+      </table>
+      <div class="notes" style="margin-top:12px">Tocá una fila para ver el detalle por persona y tipo de OT.</div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">Cómo leer esto</div>
+      <div class="notes">
+        <b>Inicio</b>: OT del equipo en Configurar Terminal a las 07:00 · <b>Entraron</b>: pasaron a ese estado desde las 07:00 · <b>Config.</b> (configuradas): dejaron Configurar Terminal desde las 07:00, es lo que el equipo trabajó · <b>Reasig.</b>: neto de OT que cambiaron de responsable estando en Configurar Terminal (ej. Altas la pasa a Operaciones) · <b>Stock</b>: OT en ese estado al momento de la foto.<br>
+        Cuenta de cada fila: <b>Stock = Inicio + Entraron − Config. + Reasig.</b><br>
+        Las fotos marcadas <span class="badge badge-warn">sin base</span> no tienen el detalle exacto de las 07:00 (ej. el 13/10, primer día): los movimientos se atribuyen al responsable actual de cada OT y Reasig. puede no estar separada. La foto de las 07:00 es la base y siempre figura sin base.
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">Alleata · <span>Jornada</span> · datos de <span>jornada_snapshots</span> (Supabase) · el cron toma la foto a las 07:00, 13:00 y 18:00 ART</div>
+</div>
+
+<div class="modal-overlay" id="modal" onclick="if(event.target===this)cerrarModal()">
+  <div class="modal-box">
+    <div class="modal-header"><div class="modal-title" id="m-title">—</div><button class="modal-close" onclick="cerrarModal()">✕</button></div>
+    <div class="modal-sub" id="m-sub">—</div>
+    <div id="m-body"></div>
+  </div>
+</div>
+<div id="toast"></div>
+
+<script>
+// SUPABASE — mismas credenciales que el portal principal
+const SUPA_URL = 'https://njkstpfmcfhqxdadqbdy.supabase.co';
+const SUPA_KEY = 'sb_publishable_W3fP-CCb0m-B0v5tdaHQCg_2L43Rx5J';
+const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
+
+const DIAS_ATRAS = 90;
+const SLOTS = ['07:00', '13:00', '18:00'];
+const TIPOS = [
+  { key: 'inst',  label: 'Instalación equipo + simcard', color: '#1a9fd4' },
+  { key: 'cambio', label: 'Cambio de terminal',          color: '#1dbf8e' },
+  { key: 'otro',  label: 'Otro tipo',                    color: '#f5a623' },
+];
+let rows = [];          // filas crudas de jornada_snapshots
+let currentUser = null;
+
+// ── helpers ──
+const esc = t => String(t ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+const sum = (arr, k) => arr.reduce((a, r) => a + (Number(r[k]) || 0), 0);
+const fmtFecha = f => { const [y,m,d] = String(f).slice(0,10).split('-'); return `${d}/${m}/${y}`; };
+const DOW = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+const diaSemana = f => { const [y,m,d] = f.split('-').map(Number); return DOW[new Date(Date.UTC(y, m-1, d)).getUTCDay()]; };
+const tipoDe = rt => { const s = String(rt||'').toLowerCase(); if (s.includes('instal')) return 'inst'; if (s.includes('cambio')) return 'cambio'; return 'otro'; };
+const slotClass = s => s === '07:00' ? 'slot-7' : s === '13:00' ? 'slot-13' : 'slot-18';
+const signed = n => n > 0 ? `+${n}` : n < 0 ? `−${Math.abs(n)}` : '0';
+const deltaHtml = n => n == null ? '<span class="delta-neu">—</span>' : `<span class="${n>0?'delta-pos':n<0?'delta-neg':'delta-neu'}">${signed(n)}</span>`;
+function toast(msg, type='ok') { const t = document.getElementById('toast'); t.textContent = msg; t.className = type + ' show'; setTimeout(() => t.classList.remove('show'), 2600); }
+function setSync(state, txt) { document.getElementById('sync-dot').className = 'sync-dot ' + state; document.getElementById('sync-text').textContent = txt; }
+(function reloj(){ const p=n=>String(n).padStart(2,'0'); const tick=()=>{ const n=new Date(); document.getElementById('live-clock').textContent=`${p(n.getHours())}:${p(n.getMinutes())}:${p(n.getSeconds())}`; }; setInterval(tick,1000); tick(); })();
+
+// ── AUTH ──
+async function doLogin() {
+  const email = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+  const btn = document.getElementById('btn-login');
+  if (!email || !password) { loginError('Completá email y contraseña.'); return; }
+  btn.disabled = true; btn.textContent = 'Ingresando…';
+  document.getElementById('login-error').classList.remove('show');
+  const { data, error } = await sb.auth.signInWithPassword({ email, password });
+  if (error) { btn.disabled = false; btn.textContent = 'Ingresar'; loginError(error.message === 'Invalid login credentials' ? 'Email o contraseña incorrectos.' : error.message); return; }
+  await onLogin(data.user);
+}
+function loginError(msg) { const el = document.getElementById('login-error'); el.textContent = msg; el.classList.add('show'); }
+async function onLogin(user) {
+  const { data: profile } = await sb.from('profiles').select('nombre, rol, modulos').eq('id', user.id).single();
+  if (!profile) { await sb.auth.signOut(); loginError('Tu usuario no tiene perfil configurado. Contactá al administrador.'); const b = document.getElementById('btn-login'); b.disabled = false; b.textContent = 'Ingresar'; return; }
+  currentUser = { ...user, ...profile };
+  const nombre = profile.nombre || user.email.split('@')[0];
+  document.getElementById('user-name').textContent = nombre;
+  document.getElementById('user-avatar').textContent = nombre.charAt(0).toUpperCase();
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  await cargar();
+}
+async function doLogout() {
+  await sb.auth.signOut(); currentUser = null; rows = [];
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('login-email').value = ''; document.getElementById('login-password').value = '';
+  const b = document.getElementById('btn-login'); b.disabled = false; b.textContent = 'Ingresar';
+}
+
+// ── DATOS ──
+async function cargar(manual) {
+  setSync('loading', 'Cargando…');
+  try {
+    const desde = new Date(Date.now() - DIAS_ATRAS * 86400000 - 3*3600000).toISOString().slice(0, 10);
+    let todo = [], from = 0; const PAG = 1000;
+    for (;;) {
+      const { data, error } = await sb.from('jornada_snapshots').select('*').gte('fecha', desde)
+        .order('fecha', { ascending: false }).order('slot', { ascending: true }).range(from, from + PAG - 1);
+      if (error) throw error;
+      todo = todo.concat(data || []);
+      if (!data || data.length < PAG) break;
+      from += PAG;
+    }
+    rows = todo;
+    poblarFiltros();
+    render();
+    const ult = rows.reduce((m, r) => r.tomado_at > m ? r.tomado_at : m, '');
+    setSync('ok', ult ? 'Última foto: ' + new Date(ult).toLocaleString('es-AR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit', timeZone:'America/Argentina/Buenos_Aires' }) : 'Sin fotos');
+    if (manual) toast('Datos actualizados');
+  } catch (e) {
+    console.error('[Jornada]', e);
+    setSync('error', 'Error');
+    const falta = /does not exist|schema cache|Could not find/i.test(e.message || '');
+    document.getElementById('cards').innerHTML = `<div class="empty-state" style="grid-column:1/-1">⛔ No se pudieron cargar las fotos: ${esc(e.message || e)}${falta ? '<br>Falta correr setup_jornada_snapshots.sql y setup_jornada_snapshots_v2.sql en Supabase.' : ''}</div>`;
+  }
+}
+
+function poblarFiltros() {
+  const fechas = [...new Set(rows.map(r => String(r.fecha).slice(0,10)))].sort().reverse();
+  const sel = document.getElementById('f-fecha'); const prev = sel.value;
+  sel.innerHTML = fechas.map(f => `<option value="${f}">${fmtFecha(f)} · ${diaSemana(f)}</option>`).join('') || '<option value="">Sin datos</option>';
+  if (prev && fechas.includes(prev)) sel.value = prev;
+  poblarPersonas();
+}
+function poblarPersonas() {
+  const eq = document.getElementById('f-equipo').value;
+  const sel = document.getElementById('f-persona'); const prev = sel.value;
+  const nombres = [...new Set(rows.filter(r => eq === 'todos' || r.equipo === eq).map(r => r.responsable))].sort((a,b) => a.localeCompare(b, 'es'));
+  sel.innerHTML = '<option value="">Todas</option>' + nombres.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
+  if (prev && nombres.includes(prev)) sel.value = prev;
+}
+function onEquipo() { poblarPersonas(); render(); }
+function filtradas() {
+  const eq = document.getElementById('f-equipo').value, per = document.getElementById('f-persona').value;
+  return rows.filter(r => (eq === 'todos' || r.equipo === eq) && (!per || r.responsable === per));
+}
+
+// ── RENDER ──
+function render() {
+  const base = filtradas();
+  const fecha = document.getElementById('f-fecha').value;
+  const delDia = base.filter(r => String(r.fecha).slice(0,10) === fecha);
+  const slotsDia = SLOTS.filter(s => delDia.some(r => r.slot === s));
+  const ultSlot = slotsDia[slotsDia.length - 1];
+  const ult = delDia.filter(r => r.slot === ultSlot);
+  const ini = delDia.filter(r => r.slot === '07:00');
+  const hora = s => ({ '07:00':'7:00', '13:00':'13:00', '18:00':'18:00' })[s];
+
+  document.getElementById('snap-date').textContent = fecha ? `${fmtFecha(fecha)} · ${diaSemana(fecha)}` : '—';
+  document.getElementById('snap-slot').textContent = ultSlot ? `Foto de las ${hora(ultSlot)}` : 'Sin fotos';
+  document.getElementById('snap-label').textContent = (fecha && ultSlot) ? `Último estado del día · ${slotsDia.length} de 3 fotos` : 'Sin datos para este día';
+
+  if (!ult.length) {
+    document.getElementById('cards').innerHTML = '<div class="empty-state" style="grid-column:1/-1">No hay fotos para este día y filtro.</div>';
+    document.getElementById('total-num').textContent = '—'; document.getElementById('total-sub').textContent = '—';
+    document.getElementById('por-persona').innerHTML = ''; document.getElementById('legend-tipos').innerHTML = '';
+    document.getElementById('evo-body').innerHTML = '<tr><td colspan="6" class="empty-state">—</td></tr>';
+    renderHistorial(base);
+    return;
+  }
+
+  // Inicio: stock de la foto de las 07:00 (si no hay, el campo inicio de la última)
+  const inicio = ini.length ? sum(ini, 'stock') : sum(ult, 'inicio');
+  const entraron = sum(ult, 'entraron'), salieron = sum(ult, 'salieron'), reas = sum(ult, 'reasignadas'), stock = sum(ult, 'stock');
+  const porTipo = (arr, k) => { const o = { inst:0, cambio:0, otro:0 }; arr.forEach(r => { o[tipoDe(r.record_type)] += Number(r[k]) || 0; }); return o; };
+  const sub = o => `Instalación <b>${o.inst}</b> · Cambio <b>${o.cambio}</b>${o.otro ? ` · Otro <b>${o.otro}</b>` : ''}`;
+  const card = (label, num, accent, subHtml) => `<div class="stat-card" style="--accent:${accent}"><div class="card-label">${label}</div><div class="card-number">${num}</div><div class="card-sub">${subHtml}</div></div>`;
+  document.getElementById('cards').innerHTML =
+    card('Al inicio · 7:00', inicio, '#f5a623', ini.length ? sub(porTipo(ini, 'stock')) : '<span style="opacity:.7">sin foto de las 7:00</span>') +
+    card('Entraron', entraron, '#1a9fd4', sub(porTipo(ult, 'entraron'))) +
+    card('Configuradas', salieron, '#27ae60', sub(porTipo(ult, 'salieron'))) +
+    card('Reasignadas (neto)', signed(reas), '#9b59b6', reas === 0 ? 'Sin cambios de responsable' : 'Cambios de responsable en Configurar Terminal') +
+    card(`Stock · ${hora(ultSlot)}`, stock, '#e67e22', sub(porTipo(ult, 'stock')));
+  document.getElementById('total-num').textContent = salieron;
+  document.getElementById('total-sub').textContent = `acumulado hasta la foto de las ${hora(ultSlot)} · ${entraron} entraron · stock ${inicio} → ${stock}`;
+
+  // Quién configuró (última foto del día)
+  const personas = {};
+  ult.forEach(r => { const p = personas[r.responsable] = personas[r.responsable] || { inst:0, cambio:0, otro:0 }; p[tipoDe(r.record_type)] += Number(r.salieron) || 0; });
+  const lista = Object.entries(personas).map(([n, o]) => ({ n, o, t: o.inst + o.cambio + o.otro })).sort((a, b) => b.t - a.t || a.n.localeCompare(b.n, 'es'));
+  const max = Math.max(1, ...lista.map(x => x.t));
+  document.getElementById('por-persona').innerHTML = lista.length ? lista.map(x => `
+    <div class="bar-row"><div class="bar-label">${esc(x.n)}</div>
+      <div class="bar-track">${TIPOS.map(t => x.o[t.key] ? `<div class="bar-seg" style="width:${(x.o[t.key] / max) * 100}%;background:${t.color}" title="${t.label}: ${x.o[t.key]}">${x.o[t.key]}</div>` : '').join('')}</div>
+      <div class="bar-total">${x.t}</div></div>`).join('') : '<div class="empty-state">Sin movimientos</div>';
+  document.getElementById('legend-tipos').innerHTML = TIPOS.map(t => `<span><i style="background:${t.color}"></i>${t.label}</span>`).join('');
+
+  // Evolución del día
+  document.getElementById('evo-body').innerHTML = slotsDia.map(s => {
+    const a = delDia.filter(r => r.slot === s);
+    return `<tr><td class="${slotClass(s)}">${hora(s)}</td><td class="num">${s === '07:00' ? sum(a, 'stock') : (ini.length ? sum(ini, 'stock') : sum(a, 'inicio'))}</td>
+      <td class="num">${sum(a, 'entraron')}</td><td class="num">${sum(a, 'salieron')}</td><td class="num">${signed(sum(a, 'reasignadas'))}</td><td class="num"><b style="color:var(--white)">${sum(a, 'stock')}</b></td></tr>`;
+  }).join('');
+
+  renderHistorial(base);
+}
+
+function agrupar(base) {   // una entrada por fecha+slot
+  const m = new Map();
+  base.forEach(r => { const k = String(r.fecha).slice(0,10) + '|' + r.slot; if (!m.has(k)) m.set(k, { fecha: String(r.fecha).slice(0,10), slot: r.slot, arr: [] }); m.get(k).arr.push(r); });
+  return [...m.values()].sort((a, b) => (a.fecha + a.slot).localeCompare(b.fecha + b.slot));
+}
+function renderHistorial(base) {
+  const fotos = agrupar(base);
+  const conDelta = fotos.map((f, i) => ({ ...f, delta: i ? sum(f.arr, 'stock') - sum(fotos[i-1].arr, 'stock') : null }));
+  const desc = conDelta.slice().reverse();
+  let ultimoDia = '';
+  const out = [];
+  desc.forEach(f => {
+    if (f.fecha !== ultimoDia) { ultimoDia = f.fecha; out.push(`<tr class="day-sep"><td colspan="11">${fmtFecha(f.fecha)} · ${diaSemana(f.fecha)}</td></tr>`); }
+    const st = porTipoStock(f.arr);
+    const sinBase = f.arr.some(r => r.baseline === false);
+    out.push(`<tr class="click" onclick="abrirDetalle('${f.fecha}','${f.slot}')">
+      <td>${fmtFecha(f.fecha)}</td><td class="${slotClass(f.slot)}">${f.slot}</td>
+      <td class="num"><b style="color:var(--white)">${sum(f.arr, 'stock')}</b></td><td class="num">${st.inst}</td><td class="num">${st.cambio}</td><td class="num">${st.otro}</td>
+      <td class="num">${sum(f.arr, 'entraron')}</td><td class="num">${sum(f.arr, 'salieron')}</td><td class="num">${signed(sum(f.arr, 'reasignadas'))}</td><td class="num">${deltaHtml(f.delta)}</td>
+      <td>${sinBase ? '<span class="badge badge-warn" title="Sin el detalle exacto de las 07:00 como base">sin base</span>' : '<span class="badge badge-ok">ok</span>'}</td></tr>`);
+  });
+  document.getElementById('hist-body').innerHTML = out.join('') || '<tr><td colspan="11" class="empty-state">Todavía no hay fotos.</td></tr>';
+}
+function porTipoStock(arr) { const o = { inst:0, cambio:0, otro:0 }; arr.forEach(r => { o[tipoDe(r.record_type)] += Number(r.stock) || 0; }); return o; }
+
+// ── DETALLE ──
+function abrirDetalle(fecha, slot) {
+  const arr = filtradas().filter(r => String(r.fecha).slice(0,10) === fecha && r.slot === slot)
+    .sort((a, b) => a.equipo.localeCompare(b.equipo) || a.responsable.localeCompare(b.responsable, 'es') || a.record_type.localeCompare(b.record_type));
+  document.getElementById('m-title').textContent = `${fmtFecha(fecha)} · foto de las ${slot}`;
+  const t = arr[0]?.tomado_at ? new Date(arr[0].tomado_at).toLocaleString('es-AR', { hour:'2-digit', minute:'2-digit', second:'2-digit', timeZone:'America/Argentina/Buenos_Aires' }) : '—';
+  document.getElementById('m-sub').innerHTML = `Tomada a las ${t} (hora Argentina). Stock = Inicio + Entraron − Config. + Reasig.`;
+  document.getElementById('m-body').innerHTML = `<table class="history-table"><thead><tr><th>Equipo</th><th>Responsable</th><th>Tipo de OT</th><th class="num">Inicio</th><th class="num">Entraron</th><th class="num">Config.</th><th class="num">Reasig.</th><th class="num">Stock</th></tr></thead><tbody>
+    ${arr.map(r => `<tr><td>${r.equipo === 'operaciones' ? 'Operaciones' : 'Altas / otros'}</td><td>${esc(r.responsable)}</td><td>${esc(r.record_type)}</td><td class="num">${r.inicio}</td><td class="num">${r.entraron}</td><td class="num">${r.salieron}</td><td class="num">${signed(r.reasignadas)}</td><td class="num"><b style="color:var(--white)">${r.stock}</b></td></tr>`).join('')}
+    <tr><td colspan="3"><b>Total</b></td><td class="num"><b>${sum(arr,'inicio')}</b></td><td class="num"><b>${sum(arr,'entraron')}</b></td><td class="num"><b>${sum(arr,'salieron')}</b></td><td class="num"><b>${signed(sum(arr,'reasignadas'))}</b></td><td class="num"><b style="color:var(--white)">${sum(arr,'stock')}</b></td></tr>
+    </tbody></table>`;
+  document.getElementById('modal').classList.add('show');
+}
+function cerrarModal() { document.getElementById('modal').classList.remove('show'); }
+document.addEventListener('keydown', e => { if (e.key === 'Escape') cerrarModal(); });
+
+// ── CSV (formato de la planilla + movimientos) ──
+function exportarCSV() {
+  const fotos = agrupar(filtradas());
+  if (!fotos.length) { toast('No hay datos para exportar', 'error'); return; }
+  const cab = ['fecha','hora_foto','configurar_terminal','instalacion_equipo_simcard','cambio_terminal','otro_tipo','entraron','configuradas','reasignadas'];
+  const lineas = fotos.map(f => { const st = porTipoStock(f.arr); return [f.fecha, f.slot, sum(f.arr,'stock'), st.inst, st.cambio, st.otro, sum(f.arr,'entraron'), sum(f.arr,'salieron'), sum(f.arr,'reasignadas')].join(','); });
+  const blob = new Blob(['﻿' + [cab.join(','), ...lineas].join('\n')], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = `jornada_${new Date().toISOString().slice(0,10)}.csv`; a.click(); URL.revokeObjectURL(a.href);
+  toast('CSV descargado');
+}
+
+// ── BOOT ──
+document.getElementById('login-password').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+(async () => {
+  const { data: { session } } = await sb.auth.getSession();
+  if (session?.user) await onLogin(session.user);
+})();
+</script>
+</body>
+</html>
