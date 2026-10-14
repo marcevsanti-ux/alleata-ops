@@ -198,6 +198,8 @@
       <div class="number" id="total-num">—</div>
     </div>
 
+    <div class="notes" id="formula" style="margin:-10px 0 20px 4px"></div>
+
     <div class="bottom-grid">
       <div class="panel">
         <div class="panel-title">Quién configuró</div>
@@ -230,7 +232,7 @@
       <div class="notes">
         <b>Inicio</b>: OT del equipo en Configurar Terminal a las 07:00 · <b>Entraron</b>: pasaron a ese estado desde las 07:00 · <b>Config.</b> (configuradas): dejaron Configurar Terminal desde las 07:00, es lo que el equipo trabajó · <b>Reasig.</b>: neto de OT que cambiaron de responsable estando en Configurar Terminal (ej. Altas la pasa a Operaciones) · <b>Stock</b>: OT en ese estado al momento de la foto.<br>
         Cuenta de cada fila: <b>Stock = Inicio + Entraron − Config. + Reasig.</b><br>
-        Las fotos marcadas <span class="badge badge-warn">sin base</span> no tienen el detalle exacto de las 07:00 (ej. el 13/10, primer día): los movimientos se atribuyen al responsable actual de cada OT y Reasig. puede no estar separada. La foto de las 07:00 es la base y siempre figura sin base.
+        Las fotos marcadas <span class="badge badge-warn">sin base</span> no tienen el detalle exacto de las 07:00 (ej. el 13/10, primer día): los movimientos se atribuyen al responsable actual de cada OT y <b>Reasig. se calcula por diferencia</b> para que la cuenta cierre. La foto de las 07:00 es la base y siempre figura sin base.
       </div>
     </div>
   </div>
@@ -374,7 +376,7 @@ function render() {
 
   if (!ult.length) {
     document.getElementById('cards').innerHTML = '<div class="empty-state" style="grid-column:1/-1">No hay fotos para este día y filtro.</div>';
-    document.getElementById('total-num').textContent = '—'; document.getElementById('total-sub').textContent = '—';
+    document.getElementById('total-num').textContent = '—'; document.getElementById('total-sub').textContent = '—'; document.getElementById('formula').innerHTML = '';
     document.getElementById('por-persona').innerHTML = ''; document.getElementById('legend-tipos').innerHTML = '';
     document.getElementById('evo-body').innerHTML = '<tr><td colspan="6" class="empty-state">—</td></tr>';
     renderHistorial(base);
@@ -383,7 +385,8 @@ function render() {
 
   // Inicio: stock de la foto de las 07:00 (si no hay, el campo inicio de la última)
   const inicio = ini.length ? sum(ini, 'stock') : sum(ult, 'inicio');
-  const entraron = sum(ult, 'entraron'), salieron = sum(ult, 'salieron'), reas = sum(ult, 'reasignadas'), stock = sum(ult, 'stock');
+  const entraron = sum(ult, 'entraron'), salieron = sum(ult, 'salieron'), stock = sum(ult, 'stock');
+  const ri = reasInfo(ult, ultSlot, ini), reas = ri.v;
   const porTipo = (arr, k) => { const o = { inst:0, cambio:0, otro:0 }; arr.forEach(r => { o[tipoDe(r.record_type)] += Number(r[k]) || 0; }); return o; };
   const sub = o => `Instalación <b>${o.inst}</b> · Cambio <b>${o.cambio}</b>${o.otro ? ` · Otro <b>${o.otro}</b>` : ''}`;
   const card = (label, num, accent, subHtml) => `<div class="stat-card" style="--accent:${accent}"><div class="card-label">${label}</div><div class="card-number">${num}</div><div class="card-sub">${subHtml}</div></div>`;
@@ -391,10 +394,11 @@ function render() {
     card('Al inicio · 7:00', inicio, '#f5a623', ini.length ? sub(porTipo(ini, 'stock')) : '<span style="opacity:.7">sin foto de las 7:00</span>') +
     card('Entraron', entraron, '#1a9fd4', sub(porTipo(ult, 'entraron'))) +
     card('Configuradas', salieron, '#27ae60', sub(porTipo(ult, 'salieron'))) +
-    card('Reasignadas (neto)', signed(reas), '#9b59b6', reas === 0 ? 'Sin cambios de responsable' : 'Cambios de responsable en Configurar Terminal') +
+    card('Reasignadas (neto)', signed(reas), '#9b59b6', reas === 0 ? 'Sin cambios de responsable' : (ri.calc ? 'OT que cambió de responsable · calculada por diferencia' : 'OT que cambiaron de responsable en Configurar Terminal')) +
     card(`Stock · ${hora(ultSlot)}`, stock, '#e67e22', sub(porTipo(ult, 'stock')));
   document.getElementById('total-num').textContent = salieron;
   document.getElementById('total-sub').textContent = `acumulado hasta la foto de las ${hora(ultSlot)} · ${entraron} entraron · stock ${inicio} → ${stock}`;
+  document.getElementById('formula').innerHTML = `Cuenta: <b>${inicio}</b> al inicio + <b>${entraron}</b> entraron ${reas < 0 ? '−' : '+'} <b>${Math.abs(reas)}</b> reasignadas − <b>${salieron}</b> configuradas = <b style="color:var(--white)">${inicio + entraron + reas - salieron}</b> de stock${(inicio + entraron + reas - salieron) === stock ? ' ✓' : ` (la foto dice ${stock})`}`;
 
   // Quién configuró (última foto del día)
   const personas = {};
@@ -411,7 +415,7 @@ function render() {
   document.getElementById('evo-body').innerHTML = slotsDia.map(s => {
     const a = delDia.filter(r => r.slot === s);
     return `<tr><td class="${slotClass(s)}">${hora(s)}</td><td class="num">${s === '07:00' ? sum(a, 'stock') : (ini.length ? sum(ini, 'stock') : sum(a, 'inicio'))}</td>
-      <td class="num">${sum(a, 'entraron')}</td><td class="num">${sum(a, 'salieron')}</td><td class="num">${signed(sum(a, 'reasignadas'))}</td><td class="num"><b style="color:var(--white)">${sum(a, 'stock')}</b></td></tr>`;
+      <td class="num">${sum(a, 'entraron')}</td><td class="num">${sum(a, 'salieron')}</td><td class="num">${signed(reasInfo(a, s, ini).v)}</td><td class="num"><b style="color:var(--white)">${sum(a, 'stock')}</b></td></tr>`;
   }).join('');
 
   renderHistorial(base);
@@ -426,6 +430,8 @@ function renderHistorial(base) {
   const fotos = agrupar(base);
   const conDelta = fotos.map((f, i) => ({ ...f, delta: i ? sum(f.arr, 'stock') - sum(fotos[i-1].arr, 'stock') : null }));
   const desc = conDelta.slice().reverse();
+  const base07 = {};
+  base.filter(r => r.slot === '07:00').forEach(r => { const f = String(r.fecha).slice(0,10); (base07[f] = base07[f] || []).push(r); });
   let ultimoDia = '';
   const out = [];
   desc.forEach(f => {
@@ -435,10 +441,18 @@ function renderHistorial(base) {
     out.push(`<tr class="click" onclick="abrirDetalle('${f.fecha}','${f.slot}')">
       <td>${fmtFecha(f.fecha)}</td><td class="${slotClass(f.slot)}">${f.slot}</td>
       <td class="num"><b style="color:var(--white)">${sum(f.arr, 'stock')}</b></td><td class="num">${st.inst}</td><td class="num">${st.cambio}</td><td class="num">${st.otro}</td>
-      <td class="num">${sum(f.arr, 'entraron')}</td><td class="num">${sum(f.arr, 'salieron')}</td><td class="num">${signed(sum(f.arr, 'reasignadas'))}</td><td class="num">${deltaHtml(f.delta)}</td>
+      <td class="num">${sum(f.arr, 'entraron')}</td><td class="num">${sum(f.arr, 'salieron')}</td><td class="num">${signed(reasInfo(f.arr, f.slot, base07[f.fecha]).v)}</td><td class="num">${deltaHtml(f.delta)}</td>
       <td>${sinBase ? '<span class="badge badge-warn" title="Sin el detalle exacto de las 07:00 como base">sin base</span>' : '<span class="badge badge-ok">ok</span>'}</td></tr>`);
   });
   document.getElementById('hist-body').innerHTML = out.join('') || '<tr><td colspan="11" class="empty-state">Todavía no hay fotos.</td></tr>';
+}
+// Reasignadas efectivas: si la foto tiene base exacta (baseline) se usa lo guardado; si no, se calcula por
+// diferencia con la cuenta  Stock = Inicio + Entraron − Config. + Reasig.  (así la suma siempre cierra a la vista).
+function inicioDia(arr07, arrSlot) { return arr07 && arr07.length ? sum(arr07, 'stock') : sum(arrSlot, 'inicio'); }
+function reasInfo(arrSlot, slot, arr07) {
+  if (slot === '07:00') return { v: 0, calc: false };
+  if (arrSlot.length && arrSlot.every(r => r.baseline === true)) return { v: sum(arrSlot, 'reasignadas'), calc: false };
+  return { v: sum(arrSlot, 'stock') - inicioDia(arr07, arrSlot) - sum(arrSlot, 'entraron') + sum(arrSlot, 'salieron'), calc: true };
 }
 function porTipoStock(arr) { const o = { inst:0, cambio:0, otro:0 }; arr.forEach(r => { o[tipoDe(r.record_type)] += Number(r.stock) || 0; }); return o; }
 
@@ -446,12 +460,21 @@ function porTipoStock(arr) { const o = { inst:0, cambio:0, otro:0 }; arr.forEach
 function abrirDetalle(fecha, slot) {
   const arr = filtradas().filter(r => String(r.fecha).slice(0,10) === fecha && r.slot === slot)
     .sort((a, b) => a.equipo.localeCompare(b.equipo) || a.responsable.localeCompare(b.responsable, 'es') || a.record_type.localeCompare(b.record_type));
+  const filas07 = {}; filtradas().filter(r => String(r.fecha).slice(0,10) === fecha && r.slot === '07:00').forEach(r => { filas07[r.responsable + '|' + r.record_type] = r; });
+  const conBase = arr.length && arr.every(r => r.baseline === true);
+  const filaCalc = r => {
+    if (slot === '07:00') return { ini: r.stock, reas: 0 };
+    if (conBase) return { ini: r.inicio, reas: r.reasignadas };
+    const i = filas07[r.responsable + '|' + r.record_type]; const ini = i ? i.stock : r.inicio;
+    return { ini, reas: r.stock - ini - r.entraron + r.salieron };
+  };
+  const calc = arr.map(filaCalc);
   document.getElementById('m-title').textContent = `${fmtFecha(fecha)} · foto de las ${slot}`;
   const t = arr[0]?.tomado_at ? new Date(arr[0].tomado_at).toLocaleString('es-AR', { hour:'2-digit', minute:'2-digit', second:'2-digit', timeZone:'America/Argentina/Buenos_Aires' }) : '—';
   document.getElementById('m-sub').innerHTML = `Tomada a las ${t} (hora Argentina). Stock = Inicio + Entraron − Config. + Reasig.`;
   document.getElementById('m-body').innerHTML = `<table class="history-table"><thead><tr><th>Equipo</th><th>Responsable</th><th>Tipo de OT</th><th class="num">Inicio</th><th class="num">Entraron</th><th class="num">Config.</th><th class="num">Reasig.</th><th class="num">Stock</th></tr></thead><tbody>
-    ${arr.map(r => `<tr><td>${r.equipo === 'operaciones' ? 'Operaciones' : 'Altas / otros'}</td><td>${esc(r.responsable)}</td><td>${esc(r.record_type)}</td><td class="num">${r.inicio}</td><td class="num">${r.entraron}</td><td class="num">${r.salieron}</td><td class="num">${signed(r.reasignadas)}</td><td class="num"><b style="color:var(--white)">${r.stock}</b></td></tr>`).join('')}
-    <tr><td colspan="3"><b>Total</b></td><td class="num"><b>${sum(arr,'inicio')}</b></td><td class="num"><b>${sum(arr,'entraron')}</b></td><td class="num"><b>${sum(arr,'salieron')}</b></td><td class="num"><b>${signed(sum(arr,'reasignadas'))}</b></td><td class="num"><b style="color:var(--white)">${sum(arr,'stock')}</b></td></tr>
+    ${arr.map((r, i) => `<tr><td>${r.equipo === 'operaciones' ? 'Operaciones' : 'Altas / otros'}</td><td>${esc(r.responsable)}</td><td>${esc(r.record_type)}</td><td class="num">${calc[i].ini}</td><td class="num">${r.entraron}</td><td class="num">${r.salieron}</td><td class="num">${signed(calc[i].reas)}</td><td class="num"><b style="color:var(--white)">${r.stock}</b></td></tr>`).join('')}
+    <tr><td colspan="3"><b>Total</b></td><td class="num"><b>${calc.reduce((a, c) => a + c.ini, 0)}</b></td><td class="num"><b>${sum(arr,'entraron')}</b></td><td class="num"><b>${sum(arr,'salieron')}</b></td><td class="num"><b>${signed(calc.reduce((a, c) => a + c.reas, 0))}</b></td><td class="num"><b style="color:var(--white)">${sum(arr,'stock')}</b></td></tr>
     </tbody></table>`;
   document.getElementById('modal').classList.add('show');
 }
@@ -463,7 +486,8 @@ function exportarCSV() {
   const fotos = agrupar(filtradas());
   if (!fotos.length) { toast('No hay datos para exportar', 'error'); return; }
   const cab = ['fecha','hora_foto','configurar_terminal','instalacion_equipo_simcard','cambio_terminal','otro_tipo','entraron','configuradas','reasignadas'];
-  const lineas = fotos.map(f => { const st = porTipoStock(f.arr); return [f.fecha, f.slot, sum(f.arr,'stock'), st.inst, st.cambio, st.otro, sum(f.arr,'entraron'), sum(f.arr,'salieron'), sum(f.arr,'reasignadas')].join(','); });
+  const b07 = {}; filtradas().filter(r => r.slot === '07:00').forEach(r => { const f = String(r.fecha).slice(0,10); (b07[f] = b07[f] || []).push(r); });
+  const lineas = fotos.map(f => { const st = porTipoStock(f.arr); return [f.fecha, f.slot, sum(f.arr,'stock'), st.inst, st.cambio, st.otro, sum(f.arr,'entraron'), sum(f.arr,'salieron'), reasInfo(f.arr, f.slot, b07[f.fecha]).v].join(','); });
   const blob = new Blob(['﻿' + [cab.join(','), ...lineas].join('\n')], { type: 'text/csv;charset=utf-8' });
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
   a.download = `jornada_${new Date().toISOString().slice(0,10)}.csv`; a.click(); URL.revokeObjectURL(a.href);
