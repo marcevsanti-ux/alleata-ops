@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.7.93</title>
+<title>Alleata · Operaciones v4.7.94</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -411,7 +411,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.93 · 14 oct 2026
+      v4.7.94 · 15 oct 2026
     </div>
   </div>
 </div>
@@ -530,7 +530,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.93 · 14 oct 2026
+      v4.7.94 · 15 oct 2026
     </div>
   </div>
 </nav>
@@ -585,7 +585,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.93</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.94</div>
   </div>
   <div class="content">
 
@@ -2506,6 +2506,11 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <span id="epenv-fname" style="font-size:12px;color:var(--text-muted)">Ningún archivo cargado</span>
       <span id="epenv-status" style="font-size:12px;font-weight:700"></span>
     </div>
+  </div>
+
+  <div id="epenv-buscar" style="display:none;margin-bottom:10px;align-items:center;gap:10px;flex-wrap:wrap">
+    <input id="epenv-q" class="input" placeholder="🔍 Buscar OT, guía, estado, tipo o quién recibió (busca en todas las filas)" style="flex:1;min-width:280px;max-width:560px" oninput="epsaEnvBuscar(this.value)" autocomplete="off">
+    <span id="epenv-qcount" style="font-size:12px;color:var(--text-muted)"></span>
   </div>
 
   <div id="epenv-resumen" style="display:none;margin-bottom:10px;display:none;gap:8px;flex-wrap:wrap;align-items:center"></div>
@@ -5432,7 +5437,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.7.93] OK');
+console.log('[Alleata v4.7.94] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -20396,7 +20401,7 @@ async function cargaConfirmar() {
 // las escrituras a alleata-agent: POST /automations/epsa/preview y /aplicar.
 const EPSA_SERVICIOS = ['RETIRO','PACK','ENTREGA Y RETIRO'];
 const EPSA_COLS_REQ  = ['Nro Guia','Estado','Remito','Servicio','Importe'];
-let _epsa = { guias: [], filas: [], ignoradas: 0, entorno: null, filtro: 'TODAS', ocupado: false };
+let _epsa = { guias: [], filas: [], ignoradas: 0, entorno: null, filtro: 'TODAS', q: '', sel: new Set(), ocupado: false };
 
 function _epEsc(v){return String(v??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');}
 function _epStatus(msg, color){const el=document.getElementById('epenv-status');if(el){el.textContent=msg||'';el.style.color=color||'var(--text-muted)';}}
@@ -20449,7 +20454,8 @@ async function epsaEnvPreview(){
     const res=await railwayFetch('/automations/epsa/preview',{method:'POST',body:JSON.stringify({guias:_epsa.guias})});
     const d=await res.json();
     if(!res.ok||!d.ok) throw new Error(d.error||('HTTP '+res.status));
-    _epsa.filas=d.filas; _epsa.entorno=d.entorno; _epsa.filtro='TODAS';
+    _epsa.filas=d.filas; _epsa.entorno=d.entorno; _epsa.filtro='TODAS'; _epsa.q=''; _epsa.sel=new Set();
+    { const qi=document.getElementById('epenv-q'); if(qi) qi.value=''; }
     _epStatus(`${d.filas.length} guías analizadas`+(_epsa.ignoradas?` · ${_epsa.ignoradas} de otros servicios ignoradas`:''),'var(--teal)');
     epsaEnvRender();
   }catch(err){ _epStatus('❌ '+err.message,'var(--red)'); }
@@ -20489,7 +20495,11 @@ function epsaEnvRender(){
   res.innerHTML=chip('TODAS','Todas',filas.length,'#1a9fd4')+Object.keys(EPSA_ACC_STYLE).filter(k=>cnt[k]).map(k=>chip(k,EPSA_ACC_STYLE[k][1],cnt[k],EPSA_ACC_STYLE[k][0])).join('');
   document.getElementById('epenv-acciones').style.display='flex';
   // Tabla
-  const vis=filas.filter(f=>_epsa.filtro==='TODAS'||f.accion===_epsa.filtro);
+  document.getElementById('epenv-buscar').style.display='flex';
+  const q=_epNorm(_epsa.q);
+  // Con texto de búsqueda se busca en TODAS las filas (ignora el chip activo); sin texto, rige el chip.
+  const vis=q?filas.filter(f=>_epCoincide(f,q)):filas.filter(f=>_epsa.filtro==='TODAS'||f.accion===_epsa.filtro);
+  document.getElementById('epenv-qcount').textContent=q?`${vis.length} resultado${vis.length===1?'':'s'} de ${filas.length}`:'';
   const tb=document.getElementById('epenv-tbody');
   if(!vis.length){tb.innerHTML='<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--text-muted)">Sin filas</td></tr>';epsaEnvActualizarBoton();return;}
   tb.innerHTML=vis.map(f=>{
@@ -20497,7 +20507,7 @@ function epsaEnvRender(){
     const puede=f.accion==='ACTUALIZAR';
     const rec=[f.recibio,f.documento].filter(x=>x!==null&&x!=='').map(_epEsc).join(' · ');
     return `<tr>
-      <td>${puede?`<input type="checkbox" class="epenv-chk" data-ot="${_epEsc(f.ot)}" checked onchange="epsaEnvActualizarBoton()">`:''}</td>
+      <td>${puede?`<input type="checkbox" class="epenv-chk" data-ot="${_epEsc(f.ot)}" ${_epsa.sel.has(f.ot)?'checked':''} onchange="epsaEnvToggle(this.dataset.ot,this.checked)">`:''}</td>
       <td style="font-family:'JetBrains Mono',monospace;font-weight:700">${_epEsc(f.ot||f.remito||'—')}<div><span class="badge" style="background:${color}22;color:${color}">${label}</span></div></td>
       <td style="font-family:'JetBrains Mono',monospace;font-size:12px">${_epEsc(f.nro_guia)}</td>
       <td style="font-size:12px">${_epEsc(f.servicio)}</td>
@@ -20509,13 +20519,25 @@ function epsaEnvRender(){
   epsaEnvActualizarBoton();
 }
 
-function epsaEnvFiltro(k){ _epsa.filtro=k; epsaEnvRender(); }
-function epsaEnvSelTodas(on){ document.querySelectorAll('.epenv-chk').forEach(c=>c.checked=on); epsaEnvActualizarBoton(); }
-function _epSeleccionadas(){ return [...document.querySelectorAll('.epenv-chk:checked')].map(c=>c.dataset.ot); }
+function epsaEnvFiltro(k){ _epsa.filtro=k; _epsa.q=''; const qi=document.getElementById('epenv-q'); if(qi) qi.value=''; epsaEnvRender(); }
+// Búsqueda: sin acentos/mayúsculas; los números de OT se comparan con y sin ceros a la izquierda (24974 = 00024974).
+function _epNorm(s){ return String(s??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim(); }
+function _epCoincide(f,q){
+  const txt=_epNorm([f.ot,f.remito,f.nro_guia,f.servicio,f.estado_epsa,f.tipo,f.estado_sf,f.accion,f.detalle,f.recibio,f.documento,f.cuenta_nombre].join(' | '));
+  if(txt.includes(q)) return true;
+  const dq=q.replace(/^0+/,''); // "00024974" → "24974"
+  return !!dq && /^\d+$/.test(dq) && String(f.ot||'').replace(/^0+/,'').includes(dq);
+}
+let _epQT=null;
+function epsaEnvBuscar(v){ _epsa.q=v; clearTimeout(_epQT); _epQT=setTimeout(epsaEnvRender,120); }
+// Selección persistente: no se pierde al buscar/filtrar. Por seguridad (PRODUCCIÓN) nada viene tildado de entrada.
+function epsaEnvToggle(ot,on){ if(on) _epsa.sel.add(ot); else _epsa.sel.delete(ot); epsaEnvActualizarBoton(); }
+function epsaEnvSelTodas(on){ document.querySelectorAll('.epenv-chk').forEach(c=>{c.checked=on; if(on)_epsa.sel.add(c.dataset.ot); else _epsa.sel.delete(c.dataset.ot);}); epsaEnvActualizarBoton(); }
+function _epSeleccionadas(){ const ok=new Set(_epsa.filas.filter(f=>f.accion==='ACTUALIZAR').map(f=>f.ot)); return [..._epsa.sel].filter(ot=>ok.has(ot)); }
 function epsaEnvActualizarBoton(){
   const b=document.getElementById('epenv-btn-aplicar'); if(!b) return;
   const n=_epSeleccionadas().length;
-  b.textContent=`✅ Aplicar seleccionadas (${n})`; b.disabled=!n||_epsa.ocupado; b.style.opacity=(!n||_epsa.ocupado)?'.5':'1';
+  b.textContent=`✅ Aplicar seleccionadas (${n})`; b.title='Cuenta todas las OT tildadas, aunque no estén visibles por el filtro o la búsqueda'; b.disabled=!n||_epsa.ocupado; b.style.opacity=(!n||_epsa.ocupado)?'.5':'1';
 }
 
 async function epsaEnvAplicar(){
