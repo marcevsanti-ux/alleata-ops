@@ -516,6 +516,10 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
   <div class="nav-item" data-mod="despacho-epsa" id="nav-despacho-epsa" onclick="goTo('despacho-epsa')" style="display:none">
     <div class="active-bar"></div><span class="nav-icon-wrap">📋</span> Despacho EPSA
   </div>
+  <!-- EPSA Envíos — conciliación del Excel de guías de EPSA contra las OT de SF (15/10) -->
+  <div class="nav-item" data-mod="epsa-envios" id="nav-epsa-envios" onclick="goTo('epsa-envios')" style="display:none">
+    <div class="active-bar"></div><span class="nav-icon-wrap">📦</span> EPSA Envíos
+  </div>
   <div class="sidebar-footer">
     <div class="user-chip">
       <div class="user-avatar" id="sideUserAvatar">?</div>
@@ -2481,6 +2485,56 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
   </div>
 </div>
 
+<!-- ══ MÓDULO EPSA ENVÍOS ══════════════════════════════════════════════════════
+     Concilia el Excel de guías de EPSA contra las OT de Salesforce (logistica=EPSA).
+     Flujo: subir Excel → Vista previa (solo lectura, /automations/epsa/preview) →
+     elegir OT → Aplicar (/automations/epsa/aplicar). Las reglas viven en el backend
+     (alleata-agent/automations/epsaLogic.js), acá solo se muestran y confirman.
+     También guarda Recibió/DNI en Supabase (entregas_recepcion). -->
+<div class="module" id="mod-epsa-envios">
+  <div style="margin-bottom:14px">
+    <div class="sec-title"><div class="sec-dot" style="background:#1a9fd4"></div>📦 EPSA Envíos — conciliación de guías</div>
+    <div style="font-size:12px;color:var(--text-muted);margin-top:4px">Subí el Excel de guías que baja de EPSA. Primero se muestra qué se haría con cada OT (no se escribe nada); después elegís cuáles aplicar. Solo se validan los servicios RETIRO, PACK y ENTREGA Y RETIRO.</div>
+  </div>
+
+  <div id="epenv-banner" style="display:none;margin-bottom:12px;padding:8px 14px;border-radius:8px;font-size:12px;font-weight:700"></div>
+
+  <div class="card" style="margin-bottom:14px;background:var(--surface2)">
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <input type="file" id="epenv-file" accept=".xlsx,.xls" style="display:none" onchange="epsaEnvArchivo(this)">
+      <button class="btn btn-sm" style="width:auto" onclick="document.getElementById('epenv-file').click()">📥 Subir Excel de EPSA</button>
+      <span id="epenv-fname" style="font-size:12px;color:var(--text-muted)">Ningún archivo cargado</span>
+      <span id="epenv-status" style="font-size:12px;font-weight:700"></span>
+    </div>
+  </div>
+
+  <div id="epenv-resumen" style="display:none;margin-bottom:10px;display:none;gap:8px;flex-wrap:wrap;align-items:center"></div>
+
+  <div id="epenv-acciones" style="display:none;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:10px">
+    <label style="font-size:12px;color:var(--text-muted);display:flex;align-items:center;gap:6px;cursor:pointer">
+      <input type="checkbox" id="epenv-dry"> Simular (no escribe en SF ni en Supabase)
+    </label>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn btn-sm" onclick="epsaEnvExportar()" style="width:auto;background:var(--surface2);color:var(--text);border:1px solid var(--border2)">⬇️ Descargar propuesta</button>
+      <button class="btn btn-sm" id="epenv-btn-aplicar" onclick="epsaEnvAplicar()" style="width:auto;background:#000;color:#fff;font-weight:900">✅ Aplicar seleccionadas (0)</button>
+    </div>
+  </div>
+
+  <div class="card" style="padding:0;overflow-x:auto">
+    <div class="table-wrap">
+    <table class="table">
+      <thead><tr>
+        <th><input type="checkbox" id="epenv-chk-all" onchange="epsaEnvSelTodas(this.checked)" title="Seleccionar todas las que se pueden aplicar"></th>
+        <th>OT</th><th>Guía</th><th>Servicio</th><th>Estado EPSA</th><th>Tipo / Estado SF</th><th>Qué se hará</th><th>Recibió</th>
+      </tr></thead>
+      <tbody id="epenv-tbody">
+        <tr><td colspan="8" style="text-align:center;padding:30px;color:var(--text-muted)">Subí el Excel de EPSA para ver la propuesta</td></tr>
+      </tbody>
+    </table>
+    </div>
+  </div>
+</div>
+
 <div class="module" id="mod-zonas-amba">
 
   <div style="margin-bottom:14px">
@@ -4032,7 +4086,7 @@ function toggleSidebar(){
   const sbW=sb.classList.contains('collapsed')?60:224;
   main.style.marginLeft=sbW+'px';
   // Actualizar módulos outside si hay uno activo
-  const outsideMods=new Set(['ally','retencion','distri','terminales','instalaciones','recuperadas','zonas-amba','despacho-epsa']);
+  const outsideMods=new Set(['ally','retencion','distri','terminales','instalaciones','recuperadas','zonas-amba','despacho-epsa','epsa-envios']);
   const activeOutside=document.querySelector('.module.active');
   if(activeOutside){
     const mod=activeOutside.id.replace('mod-','');
@@ -6757,7 +6811,7 @@ function showApp(){
     ['nav-sims','nav-envios','nav-rollout','nav-rollout-piloto','nav-rollout-vip','nav-terminal-trazabilidad','nav-store','nav-recuperadas',
      'nav-ally','nav-distri','nav-ajustes','nav-retencion','nav-terminales','nav-section-config',
      'nav-napse','nav-churn-producto','nav-hoja-ruta','nav-zonas-amba','nav-indicadores',
-     'nav-despacho-epsa','nav-presupuesto','nav-auditoria']
+     'nav-despacho-epsa','nav-epsa-envios','nav-presupuesto','nav-auditoria']
       .forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display='none'; });
     // FIX 22/09: antes el customer quedaba clavado en Desinstalaciones sin
     // importar que modulos se le asignaran en Ajustes — a Rosario se le
@@ -6789,6 +6843,8 @@ function showApp(){
   if(navIndicadores&&(isAdmin||isCeo||modulos.includes('indicadores')))navIndicadores.style.display='flex';
   const navDespachoEpsa=document.getElementById('nav-despacho-epsa');
   if(navDespachoEpsa&&!isCeo&&(isAdmin||modulos.includes('despacho-epsa')))navDespachoEpsa.style.display='flex';
+  const navEpsaEnvios=document.getElementById('nav-epsa-envios');
+  if(navEpsaEnvios&&!isCeo&&!isCustomer&&(isAdmin||modulos.includes('epsa-envios')))navEpsaEnvios.style.display='flex';
   ['sims','envios','desinstalaciones','churn-producto','hoja-ruta','napse','store','recuperadas','rollout','rollout-piloto','rollout-vip','retencion','terminales','terminal-trazabilidad','zonas-amba'].forEach(mod=>{
     const el=document.getElementById('nav-'+mod);
     if(el&&!modulos.includes(mod)&&!isAdmin&&!isCeo&&!isCustomer){el.classList.add('locked');el.onclick=null;}
@@ -6888,13 +6944,13 @@ function buildDashCards(modulos,isAdmin,isCeo){
   loadOpsPanel(isAdmin, modulos);
 }
 
-const MOD_INFO={home:'Dashboard',sims:'Verificador SIMs',envios:'Envíos',rollout:'Rollout','rollout-piloto':'Misión Rollout — Trazabilidad','rollout-vip':'Rollout VIP — seguimiento del ranking de Ventas',desinstalaciones:'Desinstalaciones','churn-producto':'Churn Producto — NAPSE / PRISMA / Sin Perfil','hoja-ruta':'Hoja de Ruta — por chofer',napse:'NAPSE — Logs VTOL',instalaciones:'Instalaciones SF',retencion:'Retención de Cuentas',ajustes:'Ajustes',ally:'Configuración Ally',distri:'Distribuidores',terminales:'Terminales — Logicalis','terminal-trazabilidad':'Trazabilidad Terminal — Logicalis + TEM',store:'Bancos — Terminales disponibles',presupuesto:'Presupuesto de Operaciones','zonas-amba':'Zonas AMBA — correcciones por CP',indicadores:'Indicadores Operaciones — Logística','despacho-epsa':'Despacho EPSA — colecta'};
+const MOD_INFO={home:'Dashboard',sims:'Verificador SIMs',envios:'Envíos',rollout:'Rollout','rollout-piloto':'Misión Rollout — Trazabilidad','rollout-vip':'Rollout VIP — seguimiento del ranking de Ventas',desinstalaciones:'Desinstalaciones','churn-producto':'Churn Producto — NAPSE / PRISMA / Sin Perfil','hoja-ruta':'Hoja de Ruta — por chofer',napse:'NAPSE — Logs VTOL',instalaciones:'Instalaciones SF',retencion:'Retención de Cuentas',ajustes:'Ajustes',ally:'Configuración Ally',distri:'Distribuidores',terminales:'Terminales — Logicalis','terminal-trazabilidad':'Trazabilidad Terminal — Logicalis + TEM',store:'Bancos — Terminales disponibles',presupuesto:'Presupuesto de Operaciones','zonas-amba':'Zonas AMBA — correcciones por CP',indicadores:'Indicadores Operaciones — Logística','despacho-epsa':'Despacho EPSA — colecta','epsa-envios':'EPSA Envíos — conciliación de guías'};
 
 function goTo(mod){
   const el=document.getElementById('nav-'+mod);
   if(el&&el.classList.contains('locked'))return;
   // Módulos que viven FUERA del .content div
-  const outsideMods=new Set(['ally','retencion','distri','terminales','instalaciones','recuperadas','zonas-amba','despacho-epsa']);
+  const outsideMods=new Set(['ally','retencion','distri','terminales','instalaciones','recuperadas','zonas-amba','despacho-epsa','epsa-envios']);
   const contentEl=document.querySelector('.content');
   if(contentEl) contentEl.style.display=outsideMods.has(mod)?'none':'';
   document.querySelectorAll('.module').forEach(m=>{
@@ -6965,6 +7021,7 @@ function goTo(mod){
     if(f&&f.getAttribute('src')==='about:blank') f.src=f.dataset.src;
   }
   if(mod==='despacho-epsa')cargarDespachoEpsa();
+  if(mod==='epsa-envios')epsaEnvInit();
 }
 
 function refreshCurrentModule(){
@@ -7207,6 +7264,7 @@ const ALL_MODS = [
   {id:'zonas-amba', label:'📍 Zonas AMBA'},
   {id:'indicadores', label:'📊 Indicadores'},
   {id:'despacho-epsa', label:'📋 Despacho EPSA'},
+  {id:'epsa-envios', label:'📦 EPSA Envíos'},
 ];
 
 async function loadUsers() {
@@ -20330,6 +20388,171 @@ async function cargaConfirmar() {
 }
 // ══ /STORE — CARGAR TERMINALES ═══════════════════════════════════════════════
 
+</script>
+
+<script>
+// ══ MÓDULO EPSA ENVÍOS ═══════════════════════════════════════════════════════
+// Parsea el Excel en el navegador (SheetJS, ya cargado) y delega TODA la lógica y
+// las escrituras a alleata-agent: POST /automations/epsa/preview y /aplicar.
+const EPSA_SERVICIOS = ['RETIRO','PACK','ENTREGA Y RETIRO'];
+const EPSA_COLS_REQ  = ['Nro Guia','Estado','Remito','Servicio','Importe'];
+let _epsa = { guias: [], filas: [], ignoradas: 0, entorno: null, filtro: 'TODAS', ocupado: false };
+
+function _epEsc(v){return String(v??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');}
+function _epStatus(msg, color){const el=document.getElementById('epenv-status');if(el){el.textContent=msg||'';el.style.color=color||'var(--text-muted)';}}
+
+function epsaEnvInit(){ /* nada que precargar: se trabaja sobre el archivo que suba el operador */ }
+
+// Fecha Entrega "2026-10-14 18:41:47" (hora Argentina) → ISO con offset, para no perder 3 hs en timestamptz.
+function _epFechaEntrega(v){
+  if(v===null||v===undefined||v==='') return null;
+  if(v instanceof Date && !isNaN(v)){
+    const p=n=>String(n).padStart(2,'0');
+    return `${v.getFullYear()}-${p(v.getMonth()+1)}-${p(v.getDate())}T${p(v.getHours())}:${p(v.getMinutes())}:${p(v.getSeconds())}-03:00`;
+  }
+  const s=String(v).trim();
+  return /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(s) ? s.replace(' ','T')+'-03:00' : s;
+}
+
+function epsaEnvArchivo(inp){
+  const f=inp.files&&inp.files[0]; if(!f) return;
+  document.getElementById('epenv-fname').textContent=f.name;
+  _epStatus('Leyendo archivo...');
+  const rd=new FileReader();
+  rd.onload=async e=>{
+    try{
+      const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array',cellDates:true});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const rows=XLSX.utils.sheet_to_json(ws,{defval:null,raw:true});
+      if(!rows.length) throw new Error('El archivo no tiene filas');
+      const faltan=EPSA_COLS_REQ.filter(c=>!(c in rows[0]));
+      if(faltan.length) throw new Error('No parece el Excel de EPSA. Faltan columnas: '+faltan.join(', '));
+      const validas=rows.filter(r=>EPSA_SERVICIOS.includes(String(r['Servicio']||'').trim().toUpperCase()));
+      _epsa.ignoradas=rows.length-validas.length;
+      _epsa.guias=validas.map(r=>({
+        nro_guia:String(r['Nro Guia']), remito:r['Remito']===null?null:String(r['Remito']),
+        estado:r['Estado'], servicio:String(r['Servicio']).trim().toUpperCase(), importe:Number(r['Importe']),
+        recibio:r['Recibio']??null, documento:r['Documento']??null, fecha_entrega:_epFechaEntrega(r['Fecha Entrega']),
+      }));
+      if(!_epsa.guias.length) throw new Error('No hay guías de RETIRO / PACK / ENTREGA Y RETIRO en el archivo');
+      await epsaEnvPreview();
+    }catch(err){ _epStatus('❌ '+err.message,'var(--red)'); }
+    inp.value='';
+  };
+  rd.readAsArrayBuffer(f);
+}
+
+async function epsaEnvPreview(){
+  _epStatus(`Consultando ${_epsa.guias.length} guías en Salesforce...`);
+  _epsa.ocupado=true;
+  try{
+    const res=await railwayFetch('/automations/epsa/preview',{method:'POST',body:JSON.stringify({guias:_epsa.guias})});
+    const d=await res.json();
+    if(!res.ok||!d.ok) throw new Error(d.error||('HTTP '+res.status));
+    _epsa.filas=d.filas; _epsa.entorno=d.entorno; _epsa.filtro='TODAS';
+    _epStatus(`${d.filas.length} guías analizadas`+(_epsa.ignoradas?` · ${_epsa.ignoradas} de otros servicios ignoradas`:''),'var(--teal)');
+    epsaEnvRender();
+  }catch(err){ _epStatus('❌ '+err.message,'var(--red)'); }
+  finally{ _epsa.ocupado=false; }
+}
+
+const EPSA_ACC_STYLE={
+  ACTUALIZAR:['#0e9f6e','Actualizar'], NADA:['#6b7280','Sin cambios'], REVISAR:['#d97706','Revisar'],
+  NO_ENCONTRADA:['#dc2626','OT no encontrada'], IGNORADA:['#6b7280','Ignorada'],
+};
+
+function _epPlanHtml(f){
+  if(f.accion!=='ACTUALIZAR'||!f.plan) return `<span style="color:var(--text-muted)">${_epEsc(f.detalle)}</span>`;
+  const o=f.plan.ot||{}, li=[];
+  if(o.N_de_seguimiento__c) li.push(`Guía → <b>${_epEsc(o.N_de_seguimiento__c)}</b>`);
+  if(o.Costo_de_envio__c!==undefined) li.push(`Costo → <b>$${Number(o.Costo_de_envio__c).toLocaleString('es-AR',{minimumFractionDigits:2})}</b>`);
+  if(o.Observaciones__c){ const l=String(o.Observaciones__c).split('\n').pop(); li.push(`Obs. + <i>${_epEsc(l)}</i>`); }
+  if(o.Datos_de_envio__c) li.push(`Datos de envío → ${_epEsc(o.Datos_de_envio__c)}`);
+  if((f.plan.transiciones||[]).length) li.push(`Estado: ${_epEsc(f.estado_sf)} → <b>${f.plan.transiciones.map(_epEsc).join(' → ')}</b>`);
+  if(f.plan.cuenta&&f.plan.cuenta.Fecha_de_Instalaci_n__c) li.push(`Cuenta: fecha de instalación = <b>${_epEsc(f.plan.cuenta.Fecha_de_Instalaci_n__c)}</b>`);
+  return `<div style="font-size:11px;line-height:1.6">${li.join('<br>')}</div><div style="font-size:10px;color:var(--text-muted);margin-top:2px">${_epEsc(f.detalle)}</div>`;
+}
+
+function epsaEnvRender(){
+  const filas=_epsa.filas, cnt={};
+  filas.forEach(f=>{cnt[f.accion]=(cnt[f.accion]||0)+1;});
+  // Banner de entorno
+  const ban=document.getElementById('epenv-banner');
+  const prod=(_epsa.entorno||'').toLowerCase()==='prod';
+  ban.style.display='block';
+  ban.style.background=prod?'rgba(220,38,38,.12)':'rgba(217,119,6,.12)';
+  ban.style.color=prod?'#dc2626':'#d97706';
+  ban.textContent=prod?'⚠️ Conectado a Salesforce PRODUCCIÓN — "Aplicar" modifica OT reales.':'🧪 Conectado a Salesforce UAT (pruebas).';
+  // Chips de resumen / filtro
+  const res=document.getElementById('epenv-resumen'); res.style.display='flex';
+  const chip=(k,label,n,color)=>`<button onclick="epsaEnvFiltro('${k}')" style="cursor:pointer;border:1px solid ${color};background:${_epsa.filtro===k?color:'transparent'};color:${_epsa.filtro===k?'#fff':color};border-radius:20px;padding:4px 12px;font-size:12px;font-weight:700">${label} ${n}</button>`;
+  res.innerHTML=chip('TODAS','Todas',filas.length,'#1a9fd4')+Object.keys(EPSA_ACC_STYLE).filter(k=>cnt[k]).map(k=>chip(k,EPSA_ACC_STYLE[k][1],cnt[k],EPSA_ACC_STYLE[k][0])).join('');
+  document.getElementById('epenv-acciones').style.display='flex';
+  // Tabla
+  const vis=filas.filter(f=>_epsa.filtro==='TODAS'||f.accion===_epsa.filtro);
+  const tb=document.getElementById('epenv-tbody');
+  if(!vis.length){tb.innerHTML='<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--text-muted)">Sin filas</td></tr>';epsaEnvActualizarBoton();return;}
+  tb.innerHTML=vis.map(f=>{
+    const [color,label]=EPSA_ACC_STYLE[f.accion]||['#6b7280',f.accion];
+    const puede=f.accion==='ACTUALIZAR';
+    const rec=[f.recibio,f.documento].filter(x=>x!==null&&x!=='').map(_epEsc).join(' · ');
+    return `<tr>
+      <td>${puede?`<input type="checkbox" class="epenv-chk" data-ot="${_epEsc(f.ot)}" checked onchange="epsaEnvActualizarBoton()">`:''}</td>
+      <td style="font-family:'JetBrains Mono',monospace;font-weight:700">${_epEsc(f.ot||f.remito||'—')}<div><span class="badge" style="background:${color}22;color:${color}">${label}</span></div></td>
+      <td style="font-family:'JetBrains Mono',monospace;font-size:12px">${_epEsc(f.nro_guia)}</td>
+      <td style="font-size:12px">${_epEsc(f.servicio)}</td>
+      <td style="font-size:12px">${_epEsc(f.estado_epsa)}</td>
+      <td style="font-size:12px">${_epEsc(f.tipo||'—')}<div style="color:var(--text-muted)">${_epEsc(f.estado_sf||'')}</div></td>
+      <td>${_epPlanHtml(f)}</td>
+      <td style="font-size:12px">${rec||'<span style="color:var(--text-muted)">—</span>'}</td></tr>`;
+  }).join('');
+  epsaEnvActualizarBoton();
+}
+
+function epsaEnvFiltro(k){ _epsa.filtro=k; epsaEnvRender(); }
+function epsaEnvSelTodas(on){ document.querySelectorAll('.epenv-chk').forEach(c=>c.checked=on); epsaEnvActualizarBoton(); }
+function _epSeleccionadas(){ return [...document.querySelectorAll('.epenv-chk:checked')].map(c=>c.dataset.ot); }
+function epsaEnvActualizarBoton(){
+  const b=document.getElementById('epenv-btn-aplicar'); if(!b) return;
+  const n=_epSeleccionadas().length;
+  b.textContent=`✅ Aplicar seleccionadas (${n})`; b.disabled=!n||_epsa.ocupado; b.style.opacity=(!n||_epsa.ocupado)?'.5':'1';
+}
+
+async function epsaEnvAplicar(){
+  if(_epsa.ocupado) return;
+  const sel=_epSeleccionadas(); if(!sel.length) return;
+  const dry=document.getElementById('epenv-dry').checked;
+  const prod=(_epsa.entorno||'').toLowerCase()==='prod';
+  const msg=dry?`Simular ${sel.length} OT (no se escribe nada)?`
+    :`Vas a modificar ${sel.length} OT en Salesforce ${prod?'PRODUCCIÓN':'UAT'}.\nSe cargan guía/costo/observaciones y se transicionan los estados según las reglas.\n\n¿Confirmás?`;
+  if(!confirm(msg)) return;
+  _epsa.ocupado=true; epsaEnvActualizarBoton(); _epStatus(dry?'Simulando...':'Aplicando en Salesforce...');
+  try{
+    const res=await railwayFetch('/automations/epsa/aplicar',{method:'POST',body:JSON.stringify({guias:_epsa.guias,confirmar:sel,dryRun:dry})});
+    const d=await res.json();
+    if(!res.ok||!d.ok) throw new Error(d.error||('HTTP '+res.status));
+    const errores=(d.resultados||[]).filter(r=>r.error);
+    let m=dry?`Simulación OK (${sel.length} OT)`:`✅ ${d.aplicadas} OT actualizadas`;
+    if(d.recepciones&&d.recepciones.guardadas) m+=` · ${d.recepciones.guardadas} recepciones guardadas`;
+    if(d.recepciones&&d.recepciones.error) m+=` · ⚠️ recepciones: ${d.recepciones.error}`;
+    if(errores.length) m+=` · ❌ ${errores.length} con error`;
+    _epStatus(m,errores.length?'var(--red)':'var(--teal)');
+    showToastPortal(m);
+    if(errores.length) alert('OT con error:\n\n'+errores.map(r=>`${r.ot}: ${r.error}`).join('\n'));
+    if(!dry) await epsaEnvPreview(); // refresca: lo aplicado pasa a "Sin cambios"
+  }catch(err){ _epStatus('❌ '+err.message,'var(--red)'); }
+  finally{ _epsa.ocupado=false; epsaEnvActualizarBoton(); }
+}
+
+function epsaEnvExportar(){
+  if(!_epsa.filas.length) return;
+  const data=_epsa.filas.map(f=>({OT:f.ot,'Nro Guia':f.nro_guia,Servicio:f.servicio,'Estado EPSA':f.estado_epsa,'Tipo SF':f.tipo,'Estado SF':f.estado_sf,
+    Accion:f.accion,Detalle:f.detalle,Importe:f.importe,Recibio:f.recibio,Documento:f.documento,
+    Cambios:f.plan?JSON.stringify(f.plan):''}));
+  const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(data),'Propuesta');
+  XLSX.writeFile(wb,`epsa_propuesta_${new Date().toISOString().slice(0,10)}.xlsx`);
+}
+// ══ /MÓDULO EPSA ENVÍOS ══════════════════════════════════════════════════════
 </script>
 
 <script src="desinstalaciones.js"></script>
