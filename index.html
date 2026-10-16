@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.7.97</title>
+<title>Alleata · Operaciones v4.7.98</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -411,7 +411,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.97 · 16 oct 2026
+      v4.7.98 · 16 oct 2026
     </div>
   </div>
 </div>
@@ -530,7 +530,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.97 · 16 oct 2026
+      v4.7.98 · 16 oct 2026
     </div>
   </div>
 </nav>
@@ -574,6 +574,11 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         onmouseover="this.style.background='rgba(139,92,246,.2)'" onmouseout="this.style.background='rgba(139,92,246,.1)'">
         ⚡ Forzar OT
       </button>
+      <button id="global-epsa-force-btn" onclick="forzarEpsaSeguimiento()" title="Fuerza ahora la corrida de EPSA Seguimiento (consulta las guías en epresis, guarda estados y registra entregas). Corre en segundo plano (unos 4 min) y al terminar Ally manda el resumen al grupo."
+        style="display:flex;align-items:center;gap:5px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);color:#f59e0b;border-radius:7px;padding:5px 10px;cursor:pointer;font-size:11px;font-weight:600;white-space:nowrap;transition:all .2s;margin-left:6px"
+        onmouseover="this.style.background='rgba(245,158,11,.2)'" onmouseout="this.style.background='rgba(245,158,11,.1)'">
+        🚚 Forzar EPSA
+      </button>
       <!-- Reparar Terminales (pedido 27/08, caso OT 23467) — SOLO admin, ver
            mostrarSFSyncSiAdmin(). Corre repararTerminalesReprogramar() a
            demanda; el mismo chequeo también corre solo cada 2h por cron. -->
@@ -594,7 +599,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.97</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.98</div>
   </div>
   <div class="content">
 
@@ -5446,7 +5451,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.7.97] OK');
+console.log('[Alleata v4.7.98] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -18044,6 +18049,39 @@ async function sfCargarUltimaCorridaCA() {
   }
 }
 
+// Forzar corrida de EPSA Seguimiento: el backend responde enseguida y corre en segundo plano;
+// acá se consulta /estado hasta que termina y se refresca la columna "Última" del panel.
+async function forzarEpsaSeguimiento() {
+  const btn = document.getElementById('global-epsa-force-btn');
+  if (!btn || btn.disabled) return;
+  if (!confirm('¿Forzar ahora la corrida de EPSA Seguimiento?\nTarda unos 4 min y al terminar Ally manda el resumen al grupo.')) return;
+  const orig = btn.innerHTML;
+  btn.disabled = true; btn.innerHTML = '⏳ Iniciando...';
+  try {
+    const r = await railwayFetch('/automations/epsa/seguimiento/sync', { method: 'POST', body: JSON.stringify({ background: true }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.ok) {
+      showToastPortal(j.error || ('Error ' + r.status), 'error');
+      btn.disabled = false; btn.innerHTML = orig; return;
+    }
+    showToastPortal('Corrida EPSA iniciada — Ally avisa al terminar', 'success');
+    btn.innerHTML = '⏳ Corriendo EPSA...';
+    const t0 = Date.now();
+    const poll = async () => {
+      let corriendo = true;
+      try { const e = await (await railwayFetch('/automations/epsa/seguimiento/estado')).json(); corriendo = e.corriendo !== false; } catch (_) {}
+      if (corriendo && Date.now() - t0 < 15 * 60000) { setTimeout(poll, 10000); return; }
+      btn.disabled = false; btn.innerHTML = orig;
+      sfCargarUltimaCorridaEpsa();
+      showToastPortal('Corrida EPSA terminada', 'success');
+    };
+    setTimeout(poll, 15000);
+  } catch (e) {
+    showToastPortal('Error: ' + e.message, 'error');
+    btn.disabled = false; btn.innerHTML = orig;
+  }
+}
+
 // Última corrida de EPSA Seguimiento (registrada por el backend en automation_runs).
 async function sfCargarUltimaCorridaEpsa() {
   const el = document.getElementById('epsa-last-seg');
@@ -18070,6 +18108,8 @@ function mostrarSFSyncSiAdmin() {
   wrap.style.display = puedeVerSync ? 'flex' : 'none';
   // Reparar Terminales (pedido 27/08) — SOLO admin, más restrictivo que el
   // resto de este bloque (que también lo ven los que tienen módulo Envíos).
+  const btnEpsa = document.getElementById('global-epsa-force-btn');
+  if (btnEpsa) btnEpsa.style.display = isAdmin ? 'flex' : 'none';
   const btnReparar = document.getElementById('global-reparar-terminales-btn');
   if (btnReparar) btnReparar.style.display = isAdmin ? 'flex' : 'none';
   // Arrancar el cron de próximo sync si puede ver el panel
