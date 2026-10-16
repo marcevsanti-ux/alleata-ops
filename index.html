@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.7.95</title>
+<title>Alleata · Operaciones v4.7.96</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -411,7 +411,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.95 · 16 oct 2026
+      v4.7.96 · 16 oct 2026
     </div>
   </div>
 </div>
@@ -530,7 +530,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.95 · 16 oct 2026
+      v4.7.96 · 16 oct 2026
     </div>
   </div>
 </nav>
@@ -585,7 +585,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.95</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.96</div>
   </div>
   <div class="content">
 
@@ -5437,7 +5437,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.7.95] OK');
+console.log('[Alleata v4.7.96] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -12571,6 +12571,32 @@ async function dsEnProcesoRenderTracking(lista, el){
   dsEnProcesoRenderFiltrado('todas', el);
 }
 
+// Exporta a Excel exactamente lo que está filtrado (grupo + fase de guías CA).
+function dsEnProcesoExportarExcel(elId){
+  const el=document.getElementById(elId); if(!el)return;
+  const grupo=el.dataset.grupo||'todas', filtro=el.dataset.filtroCa||'todas';
+  const ca=window._dsEnProcesoCaList||[], sg=window._dsEnProcesoCaSinGuia||[], al=window._dsEnProcesoAlleataList||[], ot=window._dsEnProcesoOtrosList||[];
+  const gu=window._dsEnProcesoGuias||{};
+  const faseDe=o=>(gu[o.tracking]||{}).fase||'preimposicion';
+  const caF=ca.filter(o=>filtro==='todas'||faseDe(o)===filtro);
+  const filas=[];
+  const add=(grp,l)=>l.forEach(o=>{const g=gu[o.tracking]||{};filas.push({
+    'Grupo':grp,'OT':o.ot,'Link SF':o.sf_id?`https://alleata.lightning.force.com/lightning/r/WorkOrder/${o.sf_id}/view`:'',
+    'Cuenta':o.comercio||o.cuenta||'','Contacto':o.contacto||'','Logística':o.logistica||'','Guía':o.tracking||'',
+    'Fase CA':grp==='Con guía CA'?(FASE_CA_LABEL[faseDe(o)]||faseDe(o)):'','Días':grp==='Con guía CA'?(g.sla_dias??''):'',
+    'Responsable':o.responsable||'','Provincia':o.provincia||'','Ciudad':o.ciudad||''});});
+  if(grupo==='todas'||grupo==='ca')add('Con guía CA',caF);
+  if(grupo==='todas'||grupo==='casg')add('CA sin guía',sg);
+  if(grupo==='todas'||grupo==='alleata')add('Alleata',al);
+  if(grupo==='todas'||grupo==='otros')add('Otros',ot);
+  if(!filas.length){if(typeof showToastPortal==='function')showToastPortal('No hay OTs para exportar','warn');return;}
+  const ws=XLSX.utils.json_to_sheet(filas);
+  filas.forEach((f,i)=>{if(f['Link SF']){const c=ws[XLSX.utils.encode_cell({r:i+1,c:2})];if(c)c.l={Target:f['Link SF']};}});
+  ws['!cols']=Object.keys(filas[0]).map(k=>({wch:k==='Link SF'?14:k==='Cuenta'?30:16}));
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'En Proceso');
+  XLSX.writeFile(wb,`Desinst_EnProceso_${grupo}_${new Date().toISOString().slice(0,10)}.xlsx`);
+}
+
 function dsEnProcesoRenderFiltrado(filtro, el){
   const caList=window._dsEnProcesoCaList||[];
   const caSinGuia=window._dsEnProcesoCaSinGuia||[];
@@ -12581,6 +12607,7 @@ function dsEnProcesoRenderFiltrado(filtro, el){
   const grupo=el.dataset.grupo||'todas';
 
   const celda=v=>v?`<span>${v}</span>`:`<span style="color:var(--text-muted)">—</span>`;
+  const otLink=o=>o.sf_id?`<a href="https://alleata.lightning.force.com/lightning/r/WorkOrder/${o.sf_id}/view" target="_blank" rel="noopener" style="color:var(--teal);text-decoration:none" title="Abrir OT en Salesforce">${o.ot} ↗</a>`:o.ot;
 
   const items=caList.map(o=>{
     const g=guiasPorTracking[o.tracking]||{};
@@ -12680,7 +12707,7 @@ function dsEnProcesoRenderFiltrado(filtro, el){
         <th style="padding:4px 8px 4px 0">OT</th><th style="padding:4px 8px">Cuenta</th><th style="padding:4px 8px">Contacto</th><th style="padding:4px 8px">Provincia</th><th style="padding:4px 0">Ciudad</th>
       </tr></thead>
       <tbody>${alleataList.map(o=>`<tr style="border-top:1px solid var(--border)">
-        <td style="padding:5px 8px 5px 0;font-family:'JetBrains Mono',monospace;font-weight:700">${o.ot}</td>
+        <td style="padding:5px 8px 5px 0;font-family:'JetBrains Mono',monospace;font-weight:700">${otLink(o)}</td>
         <td style="padding:5px 8px">${celda(o.comercio||o.cuenta)}</td>
         <td style="padding:5px 8px">${celda(o.contacto)}</td>
         <td style="padding:5px 8px">${celda(o.provincia)}</td>
@@ -12696,7 +12723,7 @@ function dsEnProcesoRenderFiltrado(filtro, el){
         <th style="padding:4px 8px 4px 0">OT</th><th style="padding:4px 8px">Cuenta</th><th style="padding:4px 8px">Contacto</th><th style="padding:4px 8px">Provincia</th><th style="padding:4px 0">Ciudad</th>
       </tr></thead>
       <tbody>${caSinGuia.map(o=>`<tr style="border-top:1px solid var(--border)">
-        <td style="padding:5px 8px 5px 0;font-family:'JetBrains Mono',monospace;font-weight:700">${o.ot}</td>
+        <td style="padding:5px 8px 5px 0;font-family:'JetBrains Mono',monospace;font-weight:700">${otLink(o)}</td>
         <td style="padding:5px 8px">${celda(o.comercio||o.cuenta)}</td>
         <td style="padding:5px 8px">${celda(o.contacto)}</td>
         <td style="padding:5px 8px">${celda(o.provincia)}</td>
@@ -12712,7 +12739,7 @@ function dsEnProcesoRenderFiltrado(filtro, el){
         <th style="padding:4px 8px 4px 0">OT</th><th style="padding:4px 8px">Cuenta</th><th style="padding:4px 8px">Logística</th><th style="padding:4px 8px">Provincia</th><th style="padding:4px 0">Ciudad</th>
       </tr></thead>
       <tbody>${otrosList.map(o=>`<tr style="border-top:1px solid var(--border)">
-        <td style="padding:5px 8px 5px 0;font-family:'JetBrains Mono',monospace;font-weight:700">${o.ot}</td>
+        <td style="padding:5px 8px 5px 0;font-family:'JetBrains Mono',monospace;font-weight:700">${otLink(o)}</td>
         <td style="padding:5px 8px">${celda(o.comercio||o.cuenta)}</td>
         <td style="padding:5px 8px">${celda(o.logistica)}</td>
         <td style="padding:5px 8px">${celda(o.provincia)}</td>
@@ -12730,6 +12757,7 @@ function dsEnProcesoRenderFiltrado(filtro, el){
     ${btnG('casg','CA sin guía',caSinGuia.length,'#d97706')}
     ${btnG('alleata','Alleata',alleataList.length)}
     ${btnG('otros','Otros',otrosList.length)}
+    <button type="button" onclick="dsEnProcesoExportarExcel('${el.id}')" style="cursor:pointer;font-family:inherit;font-size:11px;margin-left:auto;color:#fff;background:#1dbf8e;border:1px solid #1dbf8e;border-radius:8px;padding:6px 12px;font-weight:700">⬇ Exportar Excel</button>
   </div>`;
 
   el.innerHTML=`<div style="margin-top:12px">
