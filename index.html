@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.7.100</title>
+<title>Alleata · Operaciones v4.7.101</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -411,7 +411,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.100 · 19 oct 2026
+      v4.7.101 · 19 oct 2026
     </div>
   </div>
 </div>
@@ -530,7 +530,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.100 · 19 oct 2026
+      v4.7.101 · 19 oct 2026
     </div>
   </div>
 </nav>
@@ -599,7 +599,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.100</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.101</div>
   </div>
   <div class="content">
 
@@ -5452,7 +5452,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.7.100] OK');
+console.log('[Alleata v4.7.101] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -5823,7 +5823,7 @@ function rvMostrarDetalle(key) {
 }
 
 // Exporta a Excel lo que se ve en la tabla (zona + filtros actuales).
-function rvExportarExcel() {
+async function rvExportarExcel() {
   const rows = _rvRows[_rvZona] || [];
   const q = (document.getElementById('rvBuscar')?.value || '').trim().toLowerCase();
   const fEtapa = document.getElementById('rvFiltroEtapa')?.value || '';
@@ -5836,8 +5836,28 @@ function rvExportarExcel() {
     (!q || `${r.razon_social||''} ${r.cuit||''} ${r.terminal_id||''}`.toLowerCase().includes(q))
   );
   if (!lista.length) { alert('No hay terminales para exportar con los filtros actuales.'); return; }
+  // Domicilio / localidad / contacto / horarios: salen de Salesforce (sf_workorders).
+  // Con OT → la de esa OT; sin OT → la más reciente de ese CUIT (si existe).
+  const btn = document.querySelector('button[onclick="rvExportarExcel()"]');
+  const btnTxt = btn?.textContent; if (btn) { btn.disabled = true; btn.textContent = '⏳ Armando Excel...'; }
+  const porOt = {}, porCuit = {};
+  try {
+    const cols = 'workorder_number,cuit,direccion,direccion_formula,ciudad,provincia,codigo_postal,entre_calles,contacto_celular,telefono_secundario,email_destino,horario,horario_entrega,sf_last_modified';
+    const trozos = (arr, n) => { const o = []; for (let i = 0; i < arr.length; i += n) o.push(arr.slice(i, i + n)); return o; };
+    const ots = [...new Set(lista.map(r => r.ot_numero).filter(Boolean))];
+    const cuits = [...new Set(lista.filter(r => !r.ot_numero && r.cuit).map(r => String(r.cuit)))];
+    for (const t of trozos(ots, 150)) {
+      const { data } = await sb.from('sf_workorders').select(cols).in('workorder_number', t);
+      (data || []).forEach(x => { porOt[x.workorder_number] = x; });
+    }
+    for (const t of trozos(cuits, 150)) {
+      const { data } = await sb.from('sf_workorders').select(cols).in('cuit', t).order('sf_last_modified', { ascending: false });
+      (data || []).forEach(x => { if (!porCuit[x.cuit]) porCuit[x.cuit] = x; });
+    }
+  } catch (e) { console.warn('[rvExportarExcel] no se pudo traer domicilio/contacto', e); }
+  if (btn) { btn.disabled = false; btn.textContent = btnTxt; }
   const fmt = d => d ? new Date(d).toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' }) : '';
-  const data = lista.map(r => ({
+  const data = lista.map(r => { const d = (r.ot_numero ? porOt[r.ot_numero] : porCuit[String(r.cuit)]) || {}; return ({
     'Ranking': r.ranking ?? '',
     'Zona': _rvZona === 'INTERIOR' ? 'Interior' : 'AMBA',
     'Razón social': r.razon_social || '',
@@ -5851,13 +5871,23 @@ function rvExportarExcel() {
     'Logística': r.ot_logistica || '',
     'Fecha OT': fmt(r.ot_creada),
     'Fecha exitoso': fmt(r.ot_fecha_exitoso),
+    'Domicilio': d.direccion || d.direccion_formula || '',
+    'Entre calles': d.entre_calles || '',
+    'Localidad': d.ciudad || '',
+    'Provincia': d.provincia || '',
+    'CP domicilio': d.codigo_postal || '',
+    'Contacto (celular)': d.contacto_celular || '',
+    'Teléfono secundario': d.telefono_secundario || '',
+    'Email': d.email_destino || '',
+    'Horario de entrega': d.horario_entrega || '',
+    'Horario': d.horario || '',
     'Vía': r.via || '',
     'Etapa': rvEtapaEfectiva(r),
     'Responsable': r.responsable || '',
     'Próximo paso': r.proximo_paso || '',
     'Fecha próximo paso': r.proximo_paso_fecha || '',
     'Notas': r.notas || '',
-  }));
+  }); });
   const ws = XLSX.utils.json_to_sheet(data);
   ws['!cols'] = Object.keys(data[0]).map(k => ({ wch: Math.min(40, Math.max(k.length + 2, ...data.map(d => String(d[k]).length + 2))) }));
   const wb = XLSX.utils.book_new();
