@@ -10,7 +10,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.7.101</title>
+<title>Alleata · Operaciones v4.7.102</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -411,7 +411,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.101 · 19 oct 2026
+      v4.7.102 · 19 oct 2026
     </div>
   </div>
 </div>
@@ -530,7 +530,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.101 · 19 oct 2026
+      v4.7.102 · 19 oct 2026
     </div>
   </div>
 </nav>
@@ -599,7 +599,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.101</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.102</div>
   </div>
   <div class="content">
 
@@ -5452,7 +5452,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.7.101] OK');
+console.log('[Alleata v4.7.102] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -18173,8 +18173,52 @@ async function sfCargarUltimaCorridaEpsa() {
     const horaStr = new Date(data.finished_at).toLocaleString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
     const origen = data.rule_code === 'epsa_seguimiento_cron' ? 'auto' : 'manual';
     const m = data.metadata || {};
-    el.textContent = `${data.status === 'error' ? '⚠️' : '✅'} ${horaStr} (${origen}) · ${data.processed_count ?? 0} cons. · ${m.cambios ?? 0} cambios`;
+    window._epsaUltimaCorrida = { hora: horaStr, origen, status: data.status, consultadas: data.processed_count ?? 0, m };
+    const nSf = (m.sf_detalle || []).length;
+    const sfTxt = m.sf ? (m.sf.modo === 'dry' ? ` · SF prueba: ${m.sf.actualizar ?? 0}` : m.sf.modo === 'on' ? ` · SF: ${m.sf.aplicadas ?? 0} act.` : '') : '';
+    el.textContent = `${data.status === 'error' ? '⚠️' : '✅'} ${horaStr} (${origen}) · ${data.processed_count ?? 0} cons. · ${m.cambios ?? 0} cambios${sfTxt}`;
+    // Clickeable: abre la lista de OTs que cambiaron y lo que se hizo (o haría) en Salesforce.
+    const hayDetalle = (m.cambios_detalle || []).length || nSf;
+    el.style.cursor = hayDetalle ? 'pointer' : 'help';
+    el.style.textDecoration = hayDetalle ? 'underline dotted' : 'none';
+    el.onclick = hayDetalle ? epsaVerDetalleCorrida : null;
+    if (hayDetalle) el.title = 'Click para ver las OTs que cambiaron en esta corrida y qué se hizo en Salesforce';
   } catch (e) { el.textContent = 'sin registro'; }
+}
+
+// Detalle de la última corrida de EPSA Seguimiento: OTs que cambiaron de estado en EPSA + acción en Salesforce.
+function epsaVerDetalleCorrida() {
+  const c = window._epsaUltimaCorrida; if (!c) return;
+  const m = c.m || {};
+  const e = (t) => String(t ?? '').replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+  const sfPorOt = new Map((m.sf_detalle || []).map((d) => [d.ot, d]));
+  const colorAcc = { ACTUALIZAR: '#22c55e', REVISAR: '#f59e0b', NO_ENCONTRADA: '#ef4444' };
+  const modo = m.sf?.modo || 'off';
+  const modoTxt = modo === 'on' ? 'Escribe en Salesforce' : modo === 'dry' ? 'PRUEBA: no escribe en Salesforce' : 'Salesforce desactivado';
+  const celda = 'padding:5px 8px;border-bottom:1px solid var(--border,#334155);vertical-align:top';
+  const filasCamb = (m.cambios_detalle || []).map((d) => {
+    const sf = sfPorOt.get(d.ot);
+    const accion = sf ? `<span style="color:${colorAcc[sf.accion] || '#94a3b8'};font-weight:700">${e(sf.accion)}${sf.aplicado ? ' ✔' : ''}${sf.error ? ' ✖' : ''}</span><br><span style="opacity:.8">${e(sf.detalle)}</span>${sf.error ? `<br><span style="color:#ef4444">${e(sf.error)}</span>` : ''}` : '<span style="opacity:.5">sin acción en SF</span>';
+    return `<tr><td style="${celda};white-space:nowrap"><b>${e(d.ot)}</b>${d.nueva ? ' <span style="color:#38bdf8">nueva</span>' : ''}<br><span style="opacity:.6">guía ${e(d.guia)}</span></td><td style="${celda}">${d.estado_antes ? e(d.estado_antes) + ' → ' : ''}<b>${e(d.estado_ahora)}</b></td><td style="${celda}">${accion}</td></tr>`;
+  });
+  // OTs con acción en SF que no cambiaron de estado en EPSA (p. ej. guía ya cargada que todavía no se aplicó en SF)
+  const idsCamb = new Set((m.cambios_detalle || []).map((d) => d.ot));
+  const filasSolo = (m.sf_detalle || []).filter((d) => !idsCamb.has(d.ot)).map((sf) =>
+    `<tr><td style="${celda};white-space:nowrap"><b>${e(sf.ot)}</b><br><span style="opacity:.6">guía ${e(sf.guia)}</span></td><td style="${celda}">${e(sf.estado_epsa)}<br><span style="opacity:.6">SF: ${e(sf.estado_sf)}</span></td><td style="${celda}"><span style="color:${colorAcc[sf.accion] || '#94a3b8'};font-weight:700">${e(sf.accion)}${sf.aplicado ? ' ✔' : ''}${sf.error ? ' ✖' : ''}</span><br><span style="opacity:.8">${e(sf.detalle)}</span>${sf.error ? `<br><span style="color:#ef4444">${e(sf.error)}</span>` : ''}</td></tr>`);
+  const tabla = (titulo, filas) => filas.length ? `<h4 style="margin:14px 0 6px;font-size:12px">${titulo} (${filas.length})</h4><table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr style="text-align:left;opacity:.6"><th style="padding:4px 8px">OT</th><th style="padding:4px 8px">Estado EPSA</th><th style="padding:4px 8px">Salesforce</th></tr></thead><tbody>${filas.join('')}</tbody></table>` : '';
+  document.getElementById('epsa-detalle-modal')?.remove();
+  const ov = document.createElement('div');
+  ov.id = 'epsa-detalle-modal';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px';
+  ov.onclick = (ev) => { if (ev.target === ov) ov.remove(); };
+  ov.innerHTML = `<div style="background:var(--bg-card,#0f172a);color:var(--text,#e2e8f0);border:1px solid var(--border,#334155);border-radius:10px;max-width:880px;width:100%;max-height:85vh;overflow:auto;padding:16px 18px;font-family:inherit">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px"><b style="font-size:14px">🚚 EPSA Seguimiento · ${e(c.hora)} (${e(c.origen)})</b><button onclick="document.getElementById('epsa-detalle-modal').remove()" style="background:none;border:0;color:inherit;font-size:18px;cursor:pointer">✕</button></div>
+    <div style="font-size:11px;opacity:.75;margin-top:4px">${c.consultadas} consultadas · ${m.cambios ?? 0} cambios · ${e(modoTxt)}${m.sf ? ` · a actualizar ${m.sf.actualizar ?? 0} · aplicadas ${m.sf.aplicadas ?? 0} · a revisar ${m.sf.revisar ?? 0}${m.sf.con_error ? ` · con error ${m.sf.con_error}` : ''}` : ''}</div>
+    ${tabla('OTs que cambiaron de estado en EPSA', filasCamb)}
+    ${tabla('Otras OTs con acción pendiente en Salesforce', filasSolo)}
+    ${(filasCamb.length || filasSolo.length) ? '' : '<p style="opacity:.7;font-size:12px">Sin detalle registrado para esta corrida.</p>'}
+  </div>`;
+  document.body.appendChild(ov);
 }
 
 function mostrarSFSyncSiAdmin() {
