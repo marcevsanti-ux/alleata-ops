@@ -13,11 +13,11 @@
 - **NOTA:** Las keys `sb_publishable_*` y `sb_secret_*` son inválidas — usar siempre el JWT anon key
 
 ### Gemini API
-- **Key mobile (portal-alleata-3):** AIzaSyAGmyGdkujeZelE96tIaUOXClFmZ3ayq8o — llamada directa sin proxy
-- **Key desktop (portal-alleata-mobile):** AIzaSyA8A-fiQnmI59MuHr6tg7PKXpS2XsJOfqs — via proxy Supabase
+- **Key mobile (portal-alleata-3):** <GOOGLE_API_KEY — rotada, ver Supabase/Railway> — llamada directa sin proxy
+- **Key desktop (portal-alleata-mobile):** <GOOGLE_API_KEY — rotada, ver Supabase/Railway> — via proxy Supabase
 - **Modelo:** gemini-2.5-flash
 - **Proxy URL:** https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy
-- **Secret Supabase:** `GEMINI_KEY=AIzaSyA8A-fiQnmI59MuHr6tg7PKXpS2XsJOfqs`
+- **Secret Supabase:** `GEMINI_KEY=<GOOGLE_API_KEY — rotada, ver Supabase/Railway>`
 - **IMPORTANTE mobile:** llama directo a la API de Google (proxy daba 403 por sesión)
 
 ### Supabase CLI

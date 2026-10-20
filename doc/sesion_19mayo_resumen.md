@@ -261,7 +261,7 @@ MICORREO_API_BASE=https://api.correoargentino.com.ar/micorreo/v1
 
 - URL: `https://alleata--u4t.sandbox.my.salesforce.com`
 - Token URL: `https://alleata--u4t.sandbox.my.salesforce.com/services/oauth2/token`
-- Key: `3MVG9O_Hkc8TP1aFKfStBooWqwnzaPBZu_7Dex8oxEny0nYlSif0K5R0Fkm0l9mPBn9SH3e.wjlwruQ.LlLXK`
+- Key: `<SF_CONSUMER_KEY>`
 
 ---
 
