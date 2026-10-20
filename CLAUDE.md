@@ -21,7 +21,6 @@ Si la tarea es **datos, crons, Salesforce, Cabify, WhatsApp** → código está 
 |---|---|---|
 | `index.html` | **Portal principal desktop** (~700KB, todos los módulos operativos) | v4.4.33 |
 | `mobile.html` | App mobile (SIMs + módulos) | v2.14.0 |
-| `distri.html` | Portal Distribuidor | v1.4.6 |
 | `napse.html` | Parseo de logs NAPSE | v1.21.0 |
 | `napse-gestion.html` | Dashboard NAPSE | v2.7.0 |
 | `napse_dashboard.html` | Idem (⚠️ duplicado, verificar cuál es el vivo) | v2.0.0 |
