@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
+<script src="agent-auth.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Alleata · Mobile</title>
@@ -1332,7 +1333,7 @@ async function railwayFetch(path, options = {}) {
     headers: {
       'Content-Type': 'application/json',
       'Authorization': 'Bearer ' + (session ? session.access_token : ''),
-      'x-automation-secret': '123456',
+      'x-automation-secret': '',
       ...(options.headers || {}),
     },
   });
@@ -1739,7 +1740,7 @@ async function enviarResumenAOps(){
   try{
     const res=await fetch(ALLY_URL+'/automations/send-message',{
       method:'POST',
-      headers:{'Content-Type':'application/json','x-automation-secret':'123456'},
+      headers:{'Content-Type':'application/json','x-automation-secret':''},
       body:JSON.stringify({group_id:ALLY_GROUP_TEST,message:txt,context:'resumen_ruta'})
     });
     const data=await res.json();
@@ -1768,7 +1769,7 @@ async function syncRapido(){
   try{
     const resp=await fetch('https://alleata-agent-production.up.railway.app/automations/run/sf_incremental',{
       method:'POST',
-      headers:{'x-automation-secret':'123456'}
+      headers:{'x-automation-secret':''}
     });
     const json=await resp.json();
     if(!json.ok){
@@ -2209,7 +2210,7 @@ async function allyRuta_enviarMensaje(mensaje,contexto){
       try{
         const res=await fetch(ALLY_URL+'/automations/send-message',{
           method:'POST',
-          headers:{'Content-Type':'application/json','x-automation-secret':'123456'},
+          headers:{'Content-Type':'application/json','x-automation-secret':''},
           body:JSON.stringify({group_id:g.group_id,message:mensaje,context:contexto})
         });
         if(res.ok){ okCount++; _ultimosGruposRutaOk.push(g.group_id); }
@@ -3958,7 +3959,7 @@ function fileToB64(file){
 async function callVision(b64,mime){
   const resp=await fetch(ALLY_URL+'/automations/vision-ocr',{
     method:'POST',
-    headers:{'Content-Type':'application/json','x-automation-secret':'123456'},
+    headers:{'Content-Type':'application/json','x-automation-secret':''},
     body:JSON.stringify({image_base64:b64,mime_type:mime})
   });
   const data=await resp.json();
@@ -4468,7 +4469,7 @@ async function allyDesinst_enviarMensaje(mensaje, contexto) {
     if (!groupId) return false;
     await fetch('https://alleata-agent-production.up.railway.app/automations/send-message', {
       method: 'POST',
-      headers: { 'Content-Type':'application/json','x-automation-secret':'123456' },
+      headers: { 'Content-Type':'application/json','x-automation-secret':'' },
       body: JSON.stringify({ group_id: groupId, message: mensaje, context: contexto })
     });
     return true;
