@@ -1269,7 +1269,7 @@ function logiReprocesarRTO(numero){
         showToast(`✅ RTO actualizado: ${terminales} óptimas + ${irreparables} irreparables`);
       }
       if(currentUser) await saveFacturaDB(fac, logiMesActual);
-      if(currentUser) await irrSyncDesdeRTO(irreparablesDetalle, fac.numero, logiMesActual);
+      if(currentUser) await irrSyncDesdeRTO(irreparablesDetalle, fac.numero, logiMesActual, fac.fecha);
       logiRenderFacturas(); logiRenderSeries(); logiRenderAcum(); logiRenderKPIs();
     }catch(e){ showToast('⛔ Error leyendo el Excel: '+e.message); }
   };
@@ -4536,12 +4536,36 @@ async function saveFacturaDB(fac, mesKey) {
 // "Personalización" del RTO quedan registradas para armar cajas/pallets hacia SPP.
 // Solo INSERTA las que no existen (ignoreDuplicates): si ya hay una con caja o con
 // info del operador, no se toca. Nunca bloquea la carga de la factura.
-async function irrSyncDesdeRTO(detalle, numero, mes){
+// Fecha del reporte de Logicalis (v4.7.106): 1) columna "Fecha…" de la fila del RTO, 2) fecha de la factura,
+// 3) el día de la carga. Devuelve 'YYYY-MM-DD'.
+function irrParseFecha(v){
+  if(v==null||v===''||v==='—') return null;
+  const pad=n=>String(n).padStart(2,'0');
+  const ok=(y,m,d)=>{ if(y<100) y+=2000; if(y<2000||y>2100||m<1||m>12||d<1||d>31) return null;
+    const dt=new Date(Date.UTC(y,m-1,d)); return dt.getUTCMonth()===m-1?y+'-'+pad(m)+'-'+pad(d):null; };
+  if(v instanceof Date) return isNaN(v)?null:ok(v.getFullYear(),v.getMonth()+1,v.getDate());
+  if(typeof v==='number'){ if(v<30000||v>80000) return null; const dt=new Date(Math.round((v-25569)*86400000)); return ok(dt.getUTCFullYear(),dt.getUTCMonth()+1,dt.getUTCDate()); }
+  const t=String(v).trim(); let m=t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/); if(m) return ok(+m[1],+m[2],+m[3]);
+  m=t.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})/); if(m) return ok(+m[3],+m[2],+m[1]);
+  if(/^\d{5}(\.\d+)?$/.test(t)) return irrParseFecha(parseFloat(t));
+  return null;
+}
+function irrFechaDeFila(fila){
+  if(!fila) return null;
+  const pr=k=>/report|inform|entrega|egreso|devol|repar|env[ií]|despach|recib/i.test(k)?0:1;
+  const keys=Object.keys(fila).filter(k=>/fecha/i.test(k)).sort((a,b)=>pr(a)-pr(b));
+  for(const k of keys){ const f=irrParseFecha(fila[k]); if(f) return f; }
+  return null;
+}
+async function irrSyncDesdeRTO(detalle, numero, mes, facFecha){
   if(!detalle || !detalle.length) return;
   try{
     const quien=(currentUser&&currentUser.email)||'presupuesto';
+    const hoy=new Date(); const hoyISO=hoy.getFullYear()+'-'+String(hoy.getMonth()+1).padStart(2,'0')+'-'+String(hoy.getDate()).padStart(2,'0');
+    const fechaBase=irrParseFecha(facFecha)||hoyISO;
     const rows=detalle.map(d=>({
       serie:d.serie, modelo:d.modelo||null, origen:'rto', falla_logicalis:d.solucion,
+      fecha_reporte:irrFechaDeFila(d.fila)||fechaBase,
       rto_ref:numero, mes_rto:mes, detalle_rto:d.fila||null, created_by:quien
     }));
     let nuevas=0;
@@ -4822,7 +4846,7 @@ logiAgregar = async function() {
   logiSyncReal(); render();
   showToast(msg);
   if(currentUser) await saveFacturaDB(fac, logiMesActual);
-  if(currentUser) await irrSyncDesdeRTO(irrDetalle, fac.numero, logiMesActual);
+  if(currentUser) await irrSyncDesdeRTO(irrDetalle, fac.numero, logiMesActual, fac.fecha);
 };
 
 // Check session al cargar
