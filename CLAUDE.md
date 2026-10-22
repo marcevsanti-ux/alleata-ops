@@ -28,6 +28,7 @@ Si la tarea es **datos, crons, Salesforce, Cabify, WhatsApp** → código está 
 | `conciliador.html` | Conciliación (status: confirmar si en prod o beta) | v1.1.0 |
 | `presupuesto.html` | Presupuesto Operaciones | v1.9.0 |
 | `desinstalaciones.js` | JS compartido para Desinstalaciones (ref directo SF Report + Railway) | — |
+| `irreparables.js` | Módulo Irreparables (terminal → caja → pallet → SPP). SQL en `doc/setup_irreparables.sql` | — |
 
 ## Módulos en index.html (sidebar)
 
@@ -39,6 +40,7 @@ Localizalos con comentarios `<!-- ══ MÓDULO X ══ -->`:
 - `desinstalaciones` — Import/gestión
 - `napse` — Integración NAPSE
 - `terminales` — CRUD terminales (endpoints `/terminales/*` de alleata-agent)
+- `irreparables` — trazabilidad de terminales irreparables (cajas de 30, pallets, packing list, rótulos SATO). Usa `/terminales/preview-sf` y `/terminales/update-sf` (⚠ este último PISA Ubicación/Estado/Batería/Perfil con defaults si no se los reenvía: el módulo los reenvía idénticos). Las irreparables se dan de alta solas al cargar el RTO en `presupuesto.html`
 - `recuperadas` — Terminales recuperadas (módulo de alleata-agent)
 - `rollout`, `retencion` — otros módulos
 - `store` — **oculto** (`display:none`) — disponibilidad de terminales

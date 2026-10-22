@@ -1110,7 +1110,7 @@ function logiParseNum(s){
 // (logiReprocesarRTO, pedido 01/10).
 async function logiParsearRTOExcel(buf){
   const wb=XLSX.read(buf,{type:'array'});
-  let terminales=0,series=[],irreparables=0;
+  let terminales=0,series=[],irreparables=0,irreparablesDetalle=[];
 
   const nameInf=wb.SheetNames.find(n=>n.toLowerCase().includes('informe')||n.toLowerCase().includes('final'))||wb.SheetNames[0];
   if(nameInf){
@@ -1178,13 +1178,24 @@ async function logiParsearRTOExcel(buf){
     const header=data[0]||[];
     const col=Math.max(0,header.findIndex(h=>String(h).toLowerCase().includes('serie')));
     const colSolucion=header.findIndex(h=>String(h).toLowerCase().includes('soluci'));
+    const colModelo=header.findIndex(h=>/modelo|model/i.test(String(h)));
     for(let i=1;i<data.length;i++){
       // Solo contar terminales con Solución = Personalización — "Sin
       // reparación" se factura a USD 0 y no debe sumar a la lista de
       // series ni al conteo de terminales de esta factura.
       if(colSolucion>=0){
-        const solucion=String(data[i][colSolucion]||'').trim().toLowerCase();
-        if(!solucion.startsWith('personalizaci')) continue;
+        const solRaw=String(data[i][colSolucion]||'').trim();
+        const solucion=solRaw.toLowerCase();
+        if(!solucion.startsWith('personalizaci')){
+          // Módulo Irreparables (22/10): estas filas NO suman a la factura, pero se
+          // guardan aparte para la trazabilidad terminal → caja → pallet → SPP.
+          const sv=String(data[i][col]||'').trim();
+          if(solRaw && sv.length>8 && /^\d+$/.test(sv)){
+            const fila={}; header.forEach((h,ci)=>{ const k=String(h).trim(); if(k) fila[k]=data[i][ci]; });
+            irreparablesDetalle.push({serie:sv, modelo:colModelo>=0?String(data[i][colModelo]||'').trim():'', solucion:solRaw, fila});
+          }
+          continue;
+        }
       }
       const v=String(data[i][col]||'').trim();
       if(v&&v.length>8&&/^\d+$/.test(v)) series.push(v);
@@ -1205,7 +1216,7 @@ async function logiParsearRTOExcel(buf){
       }
     }
   }
-  return {terminales:terminales||series.length, irreparables, series, totalUSD:rtoTotalUSD};
+  return {terminales:terminales||series.length, irreparables, series, totalUSD:rtoTotalUSD, irreparablesDetalle};
 }
 
 async function logiHandleXLS(input){
@@ -1215,12 +1226,13 @@ async function logiHandleXLS(input){
   logiShowMsg('msgXls','Leyendo Excel...','ok');
   try{
     const buf=await file.arrayBuffer();
-    const {terminales,irreparables,series,totalUSD:rtoTotalUSD}=await logiParsearRTOExcel(buf);
-    logiPendingRTO={terminales, irreparables, series, totalUSD:rtoTotalUSD, _fileXls:file};
+    const {terminales,irreparables,series,totalUSD:rtoTotalUSD,irreparablesDetalle}=await logiParsearRTOExcel(buf);
+    logiPendingRTO={terminales, irreparables, series, totalUSD:rtoTotalUSD, irreparablesDetalle, _fileXls:file};
     document.getElementById('upZoneXls').classList.add('loaded');
     logiShowPreview('prevXls',[
       ['Terminales facturables (Personalización)',terminales.toString()],
       ...(irreparables?[['Irreparables (USD 0, no facturan)',irreparables.toString()]]:[]),
+      ...(irreparablesDetalle&&irreparablesDetalle.length?[['Irreparables con serie (van al módulo Irreparables)',irreparablesDetalle.length.toString()]]:[]),
       ['Total físico recibido',(terminales+irreparables).toString()],
       ['Series registradas',series.length.toString()],
       ...(rtoTotalUSD?[['Total RTO (sin IVA)','USD '+rtoTotalUSD.toLocaleString('en-US',{minimumFractionDigits:2})]]:[]),
@@ -1244,7 +1256,7 @@ function logiReprocesarRTO(numero){
     showToast('Leyendo Excel...');
     try{
       const buf=await file.arrayBuffer();
-      const {terminales,irreparables,series,totalUSD}=await logiParsearRTOExcel(buf);
+      const {terminales,irreparables,series,totalUSD,irreparablesDetalle}=await logiParsearRTOExcel(buf);
       fac.terminales=terminales; fac.irreparables=irreparables; fac.series=series;
       // Chequeo de consistencia: si el Excel que soltaron no es el de esta
       // factura (otro número/monto), el total USD del RTO no va a coincidir
@@ -1257,6 +1269,7 @@ function logiReprocesarRTO(numero){
         showToast(`✅ RTO actualizado: ${terminales} óptimas + ${irreparables} irreparables`);
       }
       if(currentUser) await saveFacturaDB(fac, logiMesActual);
+      if(currentUser) await irrSyncDesdeRTO(irreparablesDetalle, fac.numero, logiMesActual);
       logiRenderFacturas(); logiRenderSeries(); logiRenderAcum(); logiRenderKPIs();
     }catch(e){ showToast('⛔ Error leyendo el Excel: '+e.message); }
   };
@@ -4519,6 +4532,34 @@ async function saveFacturaDB(fac, mesKey) {
   else showToast('✅ Guardado en base de datos');
 }
 
+// Módulo Irreparables (22/10/2026): las terminales con Solución distinta de
+// "Personalización" del RTO quedan registradas para armar cajas/pallets hacia SPP.
+// Solo INSERTA las que no existen (ignoreDuplicates): si ya hay una con caja o con
+// info del operador, no se toca. Nunca bloquea la carga de la factura.
+async function irrSyncDesdeRTO(detalle, numero, mes){
+  if(!detalle || !detalle.length) return;
+  try{
+    const quien=(currentUser&&currentUser.email)||'presupuesto';
+    const rows=detalle.map(d=>({
+      serie:d.serie, modelo:d.modelo||null, origen:'rto', falla_logicalis:d.solucion,
+      rto_ref:numero, mes_rto:mes, detalle_rto:d.fila||null, created_by:quien
+    }));
+    let nuevas=0;
+    for(let i=0;i<rows.length;i+=200){
+      const {data,error}=await sb.from('irreparables_items')
+        .upsert(rows.slice(i,i+200),{onConflict:'serie',ignoreDuplicates:true}).select('serie');
+      if(error) throw error;
+      nuevas+=(data||[]).length;
+    }
+    showToast('🧰 Irreparables: '+nuevas+' nueva(s) registrada(s)'+(nuevas<rows.length?' ('+(rows.length-nuevas)+' ya estaban)':''));
+  }catch(e){
+    console.error('irrSyncDesdeRTO',e);
+    showToast(/does not exist|schema cache|Could not find/i.test(e.message||'')
+      ? '⚠️ Factura OK, pero falta correr setup_irreparables.sql: las irreparables no se registraron'
+      : '⚠️ Factura OK, pero no se pudieron registrar las irreparables: '+(e.message||e));
+  }
+}
+
 async function loadFacturasFromDB() {
   // Cargar facturas Logicalis — IMPORTANTE: filtrar por proveedor, ya que esta
   // misma tabla también guarda facturas de Napse y Correo Argentino (CA).
@@ -4764,6 +4805,7 @@ logiAgregar = async function() {
   if(!logiFacturas[logiMesActual]) logiFacturas[logiMesActual]=[];
   const yaExiste=logiFacturas[logiMesActual].find(f=>f.numero===fac.numero&&fac.numero!=='RTO s/factura');
   if(yaExiste){ showToast('⚠️ Boludo, ya cargaste la '+fac.numero); return; }
+  const irrDetalle=(logiPendingRTO&&logiPendingRTO.irreparablesDetalle)||[];
   fac.adjuntos=await presupSubirAdjuntos([
     {file:logiPendingFac._filePdf, etiqueta:'pdf'},
     {file:logiPendingRTO._fileXls, etiqueta:'xls'},
@@ -4780,6 +4822,7 @@ logiAgregar = async function() {
   logiSyncReal(); render();
   showToast(msg);
   if(currentUser) await saveFacturaDB(fac, logiMesActual);
+  if(currentUser) await irrSyncDesdeRTO(irrDetalle, fac.numero, logiMesActual);
 };
 
 // Check session al cargar
