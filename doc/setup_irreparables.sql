@@ -61,6 +61,9 @@ create table if not exists irreparables_items (
 );
 create index if not exists irreparables_items_caja_idx on irreparables_items(caja_id);
 
+-- Fecha del reporte de Logicalis (agregada 22/10, v4.7.106). Seguro repetir.
+alter table irreparables_items add column if not exists fecha_reporte date;
+
 -- Vista de trazabilidad (terminal, caja, pallet)
 create or replace view v_irreparables_trazabilidad with (security_invoker = true) as
 select
@@ -76,7 +79,8 @@ select
     when p.id is not null then 'en_pallet'
     else 'en_caja'
   end as estado_trazabilidad,
-  i.created_at
+  i.created_at,
+  i.fecha_reporte
 from irreparables_items i
 left join irreparables_cajas c on c.id = i.caja_id
 left join irreparables_pallets p on p.id = c.pallet_id;

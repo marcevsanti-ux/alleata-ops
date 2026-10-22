@@ -83,6 +83,47 @@
     });
   };
 
+  // Fechas: devuelve 'YYYY-MM-DD' o null. Acepta Date, serial de Excel, 'd/m/aaaa', 'd-m-aa' y 'aaaa-mm-dd'.
+  L.parseFecha = function (v) {
+    if (v == null || v === '' || v === '—') return null;
+    const pad = function (n) { return String(n).padStart(2, '0'); };
+    const ok = function (y, m, d) {
+      if (y < 100) y += 2000;
+      if (y < 2000 || y > 2100 || m < 1 || m > 12 || d < 1 || d > 31) return null;
+      const dt = new Date(Date.UTC(y, m - 1, d));
+      return dt.getUTCMonth() === m - 1 ? y + '-' + pad(m) + '-' + pad(d) : null;
+    };
+    if (v instanceof Date) return isNaN(v) ? null : ok(v.getFullYear(), v.getMonth() + 1, v.getDate());
+    if (typeof v === 'number') {
+      if (v < 30000 || v > 80000) return null;
+      const dt = new Date(Math.round((v - 25569) * 86400000));        // serial de Excel → UTC
+      return ok(dt.getUTCFullYear(), dt.getUTCMonth() + 1, dt.getUTCDate());
+    }
+    const t = String(v).trim();
+    let m = t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+    if (m) return ok(+m[1], +m[2], +m[3]);
+    m = t.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})/);
+    if (m) return ok(+m[3], +m[2], +m[1]);
+    if (/^\d{5}(\.\d+)?$/.test(t)) return L.parseFecha(parseFloat(t));
+    return null;
+  };
+  L.fmtDia = function (iso) {                                          // 'YYYY-MM-DD' → 'd/m/aaaa'
+    const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+    return m ? (+m[3]) + '/' + (+m[2]) + '/' + m[1] : '—';
+  };
+  // Fecha del reporte de Logicalis dentro de una fila del detalle del RTO: columnas con "fecha"
+  // en el encabezado; se prefieren las que hablan del informe/entrega/reparación.
+  L.fechaDeFila = function (fila) {
+    if (!fila) return null;
+    const keys = Object.keys(fila).filter(function (k) { return /fecha/i.test(k); });
+    keys.sort(function (a, b) {
+      const pr = function (k) { return /report|inform|entrega|egreso|devol|repar|env[ií]|despach|recib/i.test(k) ? 0 : 1; };
+      return pr(a) - pr(b);
+    });
+    for (const k of keys) { const f = L.parseFecha(fila[k]); if (f) return f; }
+    return null;
+  };
+
   L.esRota = function (estado) { return /rota/i.test(String(estado || '')); };
 
   // Detección de una terminal irreparable en una fila del detalle del RTO de Logicalis
@@ -445,11 +486,11 @@
       return log('err', serie + ': en SF figura como ' + cur.Tipo_de_producto__c + ', no es una terminal.');
     const pl = L.parseLote(cur.Lote__c);
     if (L.esRota(cur.Estado__c) && pl.falla) {
-      item = await crearItem({ serie: serie, origen: 'sf', falla_logicalis: pl.falla, sf_id: sf.sfId, sf_estado_ingreso: cur.Estado__c });
+      item = await crearItem({ serie: serie, origen: 'sf', falla_logicalis: pl.falla, fecha_reporte: L.parseFecha(pl.fecha), sf_id: sf.sfId, sf_estado_ingreso: cur.Estado__c });
       return asignar(item);
     }
     // Operativa (ej. pantalla rayada) o sin falla informada → decide el operador
-    S.alta = { serie: serie, sfId: sf.sfId, estadoSF: cur.Estado__c, perfil: cur.Perfil__c, loteSF: cur.Lote__c, fallaSug: pl.falla || pl.base || '' };
+    S.alta = { serie: serie, sfId: sf.sfId, estadoSF: cur.Estado__c, perfil: cur.Perfil__c, loteSF: cur.Lote__c, fallaSug: pl.falla || pl.base || '', fechaRep: L.parseFecha(pl.fecha) };
     log('warn', serie + ': en SF está ' + (cur.Estado__c || '—') + ' / ' + (cur.Perfil__c || '—') + '. Cargá la falla para sumarla.');
     renderAlta();
   }
@@ -479,7 +520,7 @@
     if (!falla) return toast('Indicá la falla (es lo que se asienta en SF).');
     try {
       const item = await crearItem({
-        serie: a.serie, origen: L.esRota(a.estadoSF) ? 'sf' : 'manual', falla_logicalis: falla,
+        serie: a.serie, origen: L.esRota(a.estadoSF) ? 'sf' : 'manual', falla_logicalis: falla, fecha_reporte: a.fechaRep || null,
         info_operador: info || null, operativa: operativa, sf_id: a.sfId, sf_estado_ingreso: a.estadoSF,
       });
       S.alta = null; renderAlta();
@@ -655,14 +696,14 @@
       const rows = items.map(function (i) {
         return {
           'Pallet': i.pallet, 'Caja': i.caja, 'Serie': i.serie, 'Modelo': i.modelo || '',
-          'Falla Logicalis': i.falla_logicalis || '', 'Info operador': i.info_operador || '',
+          'Falla Logicalis': i.falla_logicalis || '', 'Fecha reporte': i.fecha_reporte ? L.fmtDia(i.fecha_reporte) : '', 'Info operador': i.info_operador || '',
           'Operativa': i.operativa ? 'SÍ' : '', 'Origen': i.origen, 'RTO / Factura': i.rto_ref || '',
           'Asentado en SF': i.sf_sync_ok ? 'SÍ' : '', 'Lote SF': i.sf_lote_grabado || '',
         };
       });
       const wb = XLSX.utils.book_new();
       const ws = XLSX.utils.json_to_sheet(rows);
-      ws['!cols'] = [10, 10, 28, 12, 40, 40, 9, 8, 14, 12, 50].map(function (w) { return { wch: w }; });
+      ws['!cols'] = [10, 10, 28, 12, 40, 14, 40, 9, 8, 14, 12, 50].map(function (w) { return { wch: w }; });
       XLSX.utils.book_append_sheet(wb, ws, 'Packing list');
       const resumen = [['Pallet', p.codigo], ['Estado', p.estado], ['Destino', p.destino], ['Remito', p.remito || ''],
         ['Cajas', p.cant_cajas], ['Terminales', p.cant_terminales], ['Enviado', p.enviado_at ? fmtFecha(p.enviado_at) : ''],
@@ -861,11 +902,12 @@
       '<button class="btn btn-sm" onclick="Irr.asentarSeleccion()" title="Agrega caja/pallet al Lote de las terminales tildadas, directo en Salesforce producción">📤 Asentar tildadas en SF</button>' +
       '<button class="btn btn-sm" style="background:transparent;border:1px solid var(--border);color:var(--text-muted)" onclick="Irr.selTodas(true)">Tildar todas</button>' +
       '<button class="btn btn-sm" style="background:transparent;border:1px solid var(--border);color:var(--text-muted)" onclick="Irr.selTodas(false)">Destildar</button></div>' +
-      '<div style="overflow-x:auto"><table class="irr-tbl"><thead><tr><th></th><th>#</th><th>Serie</th><th>Falla (Logicalis)</th><th style="min-width:200px">Info del operador</th><th>Operativa</th><th>SF</th><th></th></tr></thead><tbody>' +
+      '<div style="overflow-x:auto"><table class="irr-tbl"><thead><tr><th></th><th>#</th><th>Serie</th><th>Falla (Logicalis)</th><th>Fecha reporte</th><th style="min-width:200px">Info del operador</th><th>Operativa</th><th>SF</th><th></th></tr></thead><tbody>' +
       S.items.map(function (i, n) {
         const sf = i.sf_sync_ok === true ? badge('✓ ' + fmtFecha(i.sf_sync_at), '#1dbf8e') : i.sf_sync_ok === false ? '<span title="' + esc(i.sf_sync_msg) + '">' + (/^Re-asentar/i.test(i.sf_sync_msg || '') ? badge('↻ re-asentar', '#f59e0b') : badge('⚠ error', '#ef4444')) + '</span>' : '<span style="color:var(--text-muted)">—</span>';
         return '<tr><td><input type="checkbox" ' + (S.sel[i.serie] ? 'checked' : '') + ' onchange="Irr.sel(\'' + esc(i.serie) + '\',this.checked)"></td><td style="color:var(--text-muted)">' + (n + 1) + '</td>' +
           '<td class="irr-mono">' + esc(i.serie) + '</td><td>' + esc(i.falla_logicalis || '—') + ' ' + (i.origen === 'manual' ? badge('manual', '#f59e0b') : '') + '</td>' +
+          '<td style="white-space:nowrap">' + esc(L.fmtDia(i.fecha_reporte)) + '</td>' +
           '<td><input class="irr-in" value="' + esc(i.info_operador || '') + '" placeholder="ej. pantalla rayada" onchange="Irr.guardar(\'' + i.id + '\',\'info_operador\',this.value)"></td>' +
           '<td><input type="checkbox" ' + (i.operativa ? 'checked' : '') + ' onchange="Irr.guardar(\'' + i.id + '\',\'operativa\',this.checked)"></td><td>' + sf + '</td>' +
           '<td style="white-space:nowrap">' +
@@ -951,7 +993,7 @@
         if (!r) { out.innerHTML = '<div class="card" style="color:var(--text-muted)">' + esc(t.serie) + ' no está registrada como irreparable en el módulo.</div>'; return; }
         out.innerHTML = '<div class="card"><div class="irr-mono" style="font-size:15px;font-weight:700;margin-bottom:8px">' + esc(r.serie) + ' ' + badge(ESTADO_TXT[r.estado_trazabilidad], ESTADO_COLOR[r.estado_trazabilidad]) + '</div>' +
           '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px;font-size:12px">' +
-          fila('Falla (Logicalis)', r.falla_logicalis) + fila('Info del operador', r.info_operador) + fila('Operativa', r.operativa ? 'Sí' : 'No') +
+          fila('Falla (Logicalis)', r.falla_logicalis) + fila('Fecha del reporte', L.fmtDia(r.fecha_reporte)) + fila('Info del operador', r.info_operador) + fila('Operativa', r.operativa ? 'Sí' : 'No') +
           fila('Caja', r.caja) + fila('Pallet', r.pallet) + fila('Destino', r.destino) + fila('Remito', r.remito) + fila('RTO / Factura', r.rto_ref) +
           fila('Origen del alta', r.origen) + fila('Asentado en SF', r.sf_sync_ok ? fmtFecha(r.sf_sync_at) : (r.sf_sync_ok === false ? '⚠ ' + (r.sf_sync_msg || 'error') : 'No')) + fila('Lote en SF', r.sf_lote_grabado) + '</div></div>';
       } else if (t.tipo === 'caja') {
@@ -970,8 +1012,8 @@
   }
   function fila(k, v) { return '<div><div style="font-size:9px;color:var(--text-muted);text-transform:uppercase">' + esc(k) + '</div><div style="font-weight:700">' + esc(v == null || v === '' ? '—' : v) + '</div></div>'; }
   function tablaItems(items) {
-    return '<div style="overflow-x:auto"><table class="irr-tbl"><thead><tr><th>Serie</th><th>Falla</th><th>Info operador</th><th>SF</th></tr></thead><tbody>' +
-      items.map(function (i) { return '<tr><td class="irr-mono">' + esc(i.serie) + '</td><td>' + esc(i.falla_logicalis || '—') + '</td><td>' + esc(i.info_operador || '') + '</td><td>' + (i.sf_sync_ok ? '✓' : '—') + '</td></tr>'; }).join('') + '</tbody></table></div>';
+    return '<div style="overflow-x:auto"><table class="irr-tbl"><thead><tr><th>Serie</th><th>Falla</th><th>Fecha reporte</th><th>Info operador</th><th>SF</th></tr></thead><tbody>' +
+      items.map(function (i) { return '<tr><td class="irr-mono">' + esc(i.serie) + '</td><td>' + esc(i.falla_logicalis || '—') + '</td><td>' + esc(L.fmtDia(i.fecha_reporte)) + '</td><td>' + esc(i.info_operador || '') + '</td><td>' + (i.sf_sync_ok ? '✓' : '—') + '</td></tr>'; }).join('') + '</tbody></table></div>';
   }
 
   /* ═════════ Init ═════════ */
