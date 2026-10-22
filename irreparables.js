@@ -474,6 +474,7 @@
         const c = await dbq(sb.from(T_CAJAS).select('codigo').eq('id', item.caja_id).maybeSingle());
         return log('err', serie + ' ya está en la caja ' + (c ? c.codigo : '?') + '.');
       }
+      await completarFecha(item);
       return asignar(item);
     }
 
@@ -495,6 +496,18 @@
     renderAlta();
   }
 
+  // Terminales registradas antes de existir la columna (o sin fecha): se completa con la fecha del Lote en SF.
+  // Nunca bloquea el escaneo.
+  async function completarFecha(item) {
+    if (item.fecha_reporte) return;
+    try {
+      const sf = (await sfPreview([item.serie]))[0];
+      const f = sf && sf.found && sf.current ? L.parseFecha(L.parseLote(sf.current.Lote__c).fecha) : null;
+      if (!f) return;
+      await dbq(sb.from(T_ITEMS).update({ fecha_reporte: f }).eq('id', item.id).is('fecha_reporte', null));
+      item.fecha_reporte = f;
+    } catch (e) { /* sin fecha por ahora */ }
+  }
   async function crearItem(o) {
     o.created_by = quien();
     try { return await dbq(sb.from(T_ITEMS).insert(o).select('*').single()); }
