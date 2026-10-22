@@ -40,7 +40,7 @@ Localizalos con comentarios `<!-- ══ MÓDULO X ══ -->`:
 - `desinstalaciones` — Import/gestión
 - `napse` — Integración NAPSE
 - `terminales` — CRUD terminales (endpoints `/terminales/*` de alleata-agent)
-- `irreparables` — trazabilidad de terminales irreparables (cajas de 30, pallets, packing list, rótulos SATO). Usa `/terminales/preview-sf` y `/terminales/update-sf` (⚠ este último PISA Ubicación/Estado/Batería/Perfil con defaults si no se los reenvía: el módulo los reenvía idénticos). Las irreparables se dan de alta solas al cargar el RTO en `presupuesto.html`
+- `irreparables` — trazabilidad de terminales irreparables (cajas de 30, pallets, packing list, rótulos SATO).  Editar/mover/reabrir cajas: cualquier usuario del módulo; ELIMINAR (caja/terminal/pallet): solo `profiles.rol=admin` (policies RLS `*_del` en el SQL). Usa `/terminales/preview-sf` y `/terminales/update-sf` (⚠ este último PISA Ubicación/Estado/Batería/Perfil con defaults si no se los reenvía: el módulo los reenvía idénticos). Las irreparables se dan de alta solas al cargar el RTO en `presupuesto.html`
 - `recuperadas` — Terminales recuperadas (módulo de alleata-agent)
 - `rollout`, `retencion` — otros módulos
 - `store` — **oculto** (`display:none`) — disponibilidad de terminales
