@@ -96,19 +96,43 @@ left join irreparables_cajas c on c.pallet_id = p.id
 left join irreparables_items i on i.caja_id = c.id
 group by p.id;
 
--- Seguridad: solo usuarios logueados (el portal es publico con clave anon)
+-- Seguridad: los usuarios logueados leen, crean y modifican. SOLO los administradores borran
+-- (profiles.rol = admin). El portal es publico con clave anon, por eso se controla en la base.
 alter table irreparables_items enable row level security;
 alter table irreparables_cajas enable row level security;
 alter table irreparables_pallets enable row level security;
 
+-- Limpieza de la politica anterior, que permitia borrar a cualquier usuario logueado
 drop policy if exists irreparables_items_auth_all on irreparables_items;
-create policy irreparables_items_auth_all on irreparables_items for all to authenticated using (true) with check (true);
-
 drop policy if exists irreparables_cajas_auth_all on irreparables_cajas;
-create policy irreparables_cajas_auth_all on irreparables_cajas for all to authenticated using (true) with check (true);
-
 drop policy if exists irreparables_pallets_auth_all on irreparables_pallets;
-create policy irreparables_pallets_auth_all on irreparables_pallets for all to authenticated using (true) with check (true);
+
+drop policy if exists irreparables_items_sel on irreparables_items;
+create policy irreparables_items_sel on irreparables_items for select to authenticated using (true);
+drop policy if exists irreparables_items_ins on irreparables_items;
+create policy irreparables_items_ins on irreparables_items for insert to authenticated with check (true);
+drop policy if exists irreparables_items_upd on irreparables_items;
+create policy irreparables_items_upd on irreparables_items for update to authenticated using (true) with check (true);
+drop policy if exists irreparables_items_del on irreparables_items;
+create policy irreparables_items_del on irreparables_items for delete to authenticated using (exists (select 1 from profiles p where p.id = auth.uid() and p.rol = 'admin'));
+
+drop policy if exists irreparables_cajas_sel on irreparables_cajas;
+create policy irreparables_cajas_sel on irreparables_cajas for select to authenticated using (true);
+drop policy if exists irreparables_cajas_ins on irreparables_cajas;
+create policy irreparables_cajas_ins on irreparables_cajas for insert to authenticated with check (true);
+drop policy if exists irreparables_cajas_upd on irreparables_cajas;
+create policy irreparables_cajas_upd on irreparables_cajas for update to authenticated using (true) with check (true);
+drop policy if exists irreparables_cajas_del on irreparables_cajas;
+create policy irreparables_cajas_del on irreparables_cajas for delete to authenticated using (exists (select 1 from profiles p where p.id = auth.uid() and p.rol = 'admin'));
+
+drop policy if exists irreparables_pallets_sel on irreparables_pallets;
+create policy irreparables_pallets_sel on irreparables_pallets for select to authenticated using (true);
+drop policy if exists irreparables_pallets_ins on irreparables_pallets;
+create policy irreparables_pallets_ins on irreparables_pallets for insert to authenticated with check (true);
+drop policy if exists irreparables_pallets_upd on irreparables_pallets;
+create policy irreparables_pallets_upd on irreparables_pallets for update to authenticated using (true) with check (true);
+drop policy if exists irreparables_pallets_del on irreparables_pallets;
+create policy irreparables_pallets_del on irreparables_pallets for delete to authenticated using (exists (select 1 from profiles p where p.id = auth.uid() and p.rol = 'admin'));
 
 -- Los codigos se generan con nextval: el rol authenticated necesita usar las secuencias
 grant usage, select on sequence irreparables_caja_seq to authenticated;

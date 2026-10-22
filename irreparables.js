@@ -111,7 +111,9 @@
     alta: null,                       // terminal nueva esperando datos del operador
     log: [], cola: [], drenando: false,
     sel: {},                          // serie → true (selección para SF)
+    abiertas: [],                     // otras cajas abiertas (destino de "Mover a…")
   };
+  function esAdmin() { try { return typeof currentProfile !== 'undefined' && !!currentProfile && currentProfile.rol === 'admin'; } catch (e) { return false; } }
 
   /* ── helpers ── */
   function $(id) { return document.getElementById(id); }
@@ -162,12 +164,13 @@
 
   /* ═════════ Carga de datos ═════════ */
   async function cargarCaja(id) {
-    if (!id) { S.caja = null; S.items = []; return; }
+    if (!id) { S.caja = null; S.items = []; S.abiertas = []; return; }
     const c = await dbq(sb.from(V_CAJAS).select('*').eq('id', id).maybeSingle());
     S.caja = c || null;
     S.items = c ? await fetchAll(function (a, b) {
       return sb.from(V_TRAZ).select('*').eq('caja_id', id).order('serie').range(a, b);
     }) : [];
+    S.abiertas = c ? await dbq(sb.from(V_CAJAS).select('id,codigo,cant,capacidad').eq('estado', 'abierta').neq('id', id).order('codigo').limit(50)) : [];
     guardarActiva();
   }
   async function refreshCaja() { await cargarCaja(S.caja && S.caja.id); renderCajaBar(); renderCajaItems(); }
@@ -213,17 +216,175 @@
   async function reabrirCaja() {
     const c = S.caja;
     if (!c || c.estado !== 'cerrada') return;
-    if (c.pallet_id) return toast('La caja ya está en el pallet ' + c.pallet_codigo + '. Sacala del pallet primero.');
+    if (c.pallet_estado === 'enviado') return toast('La caja está en el pallet ' + c.pallet_codigo + ', que ya fue enviado: no se puede modificar.');
+    if (c.pallet_id && !confirm('La caja está en el pallet ' + c.pallet_codigo + '. Si la modificás, tenés que volver a cerrarla y reimprimir su rótulo y el del pallet. ¿Reabrirla?')) return;
     try {
       await dbq(sb.from(T_CAJAS).update({ estado: 'abierta', closed_at: null }).eq('id', c.id));
       await refreshCaja();
     } catch (e) { errorGeneral(e); }
   }
+  // Las terminales ya asentadas en SF con su caja anterior quedan marcadas para re-asentar
+  async function marcarReasentar(ids) {
+    if (!ids || !ids.length) return;
+    await dbq(sb.from(T_ITEMS).update({ sf_sync_ok: false, sf_sync_msg: 'Re-asentar: cambió la caja' }).in('id', ids).eq('sf_sync_ok', true));
+  }
   async function quitarItem(itemId) {
     if (!S.caja || S.caja.estado !== 'abierta') return;
     try {
       await dbq(sb.from(T_ITEMS).update({ caja_id: null, caja_at: null, caja_by: null }).eq('id', itemId));
+      await marcarReasentar([itemId]);
       await refreshCaja();
+    } catch (e) { errorGeneral(e); }
+  }
+  // Mueve una terminal a otra caja abierta con lugar
+  async function moverItem(itemId, destinoId) {
+    if (!destinoId) return;
+    const c = S.caja; if (!c || c.estado !== 'abierta') return;
+    const dest = S.abiertas.find(function (x) { return x.id === destinoId; });
+    if (!dest) return toast('La caja de destino ya no está abierta.');
+    if (dest.cant >= dest.capacidad) { await refreshCaja(); return toast(dest.codigo + ' está llena.'); }
+    try {
+      const upd = await dbq(sb.from(T_ITEMS).update({ caja_id: dest.id, caja_at: new Date().toISOString(), caja_by: quien() })
+        .eq('id', itemId).eq('caja_id', c.id).select('id'));
+      if (!upd || !upd.length) { await refreshCaja(); return toast('La terminal ya no está en esta caja.'); }
+      await marcarReasentar([itemId]);
+      log('ok', 'Terminal movida a ' + dest.codigo);
+      await refreshCaja();
+    } catch (e) { errorGeneral(e); }
+  }
+  // Modifica notas y capacidad de la caja activa
+  async function editarCaja() {
+    const c = S.caja; if (!c) return;
+    if (c.pallet_estado === 'enviado') return toast('La caja está en un pallet enviado: no se puede modificar.');
+    const notas = prompt('Notas de la caja ' + c.codigo + ' (vacío = sin notas):', c.notas || '');
+    if (notas === null) return;
+    const capTxt = prompt('Capacidad de la caja (mínimo ' + Math.max(1, c.cant) + ', máximo 60):', String(c.capacidad));
+    if (capTxt === null) return;
+    const cap = parseInt(capTxt, 10);
+    if (!(cap >= Math.max(1, c.cant) && cap <= 60)) return toast('Capacidad inválida: tiene que estar entre ' + Math.max(1, c.cant) + ' y 60.');
+    try {
+      await dbq(sb.from(T_CAJAS).update({ notas: notas.trim() || null, capacidad: cap }).eq('id', c.id));
+      await refreshCaja();
+      log('ok', 'Caja ' + c.codigo + ' actualizada.');
+    } catch (e) { errorGeneral(e); }
+  }
+
+  /* ═════════ Eliminar (solo administradores; la base también lo exige por RLS) ═════════ */
+  // Quita " | CJ | PL" del Lote__c en SF (deja la falla de Logicalis). Devuelve { ok, fallo[] }
+  async function limpiarSF(filas) {
+    const res = { ok: 0, fallo: [] };
+    const prev = await sfPreview(filas.map(function (f) { return f.serie; }));
+    const porSerie = {}; prev.forEach(function (r) { porSerie[r.serie] = r; });
+    const records = [], esperado = {}, antes = {};
+    filas.forEach(function (f) {
+      const p = porSerie[f.serie];
+      if (!p || !p.found) return res.fallo.push({ serie: f.serie, motivo: 'No existe en Salesforce' });
+      const vac = L.camposVacios(p.current);
+      if (vac.length) return res.fallo.push({ serie: f.serie, motivo: 'Campos vacíos en SF (' + vac.join(', ') + ')' });
+      const lote = L.quitarSufijo(p.current.Lote__c);
+      if (lote === String(p.current.Lote__c || '').trim()) return res.ok++;
+      if (!lote) return res.fallo.push({ serie: f.serie, motivo: 'El Lote quedaría vacío: revisalo en SF' });
+      const fields = { Lote__c: lote };
+      L.CAMPOS_PROTEGIDOS.forEach(function (k) { fields[k] = p.current[k]; });
+      records.push({ serie: f.serie, fields: fields }); esperado[f.serie] = lote; antes[f.serie] = p.current;
+    });
+    const upd = {};
+    for (let i = 0; i < records.length; i += 25) {
+      const j = await sfFetch('/terminales/update-sf', { records: records.slice(i, i + 25) });
+      (j.results || []).forEach(function (r) { upd[r.serie] = r; });
+    }
+    const grabadas = Object.keys(upd).filter(function (s) { return upd[s].ok; });
+    const post = grabadas.length ? await sfPreview(grabadas) : [];
+    const postMap = {}; post.forEach(function (r) { postMap[r.serie] = r; });
+    records.forEach(function (rec) {
+      const s = rec.serie, u = upd[s], c = postMap[s] && postMap[s].current;
+      if (!u || !u.ok) return res.fallo.push({ serie: s, motivo: (u && u.error) || 'Sin respuesta del agente' });
+      if (!c || c.Lote__c !== esperado[s]) return res.fallo.push({ serie: s, motivo: 'Grabó pero la verificación no coincide — revisar en SF' });
+      if (L.CAMPOS_PROTEGIDOS.some(function (k) { return c[k] !== antes[s][k]; })) return res.fallo.push({ serie: s, motivo: 'Cambió otro campo — revisar en SF' });
+      res.ok++;
+    });
+    return res;
+  }
+  // Pregunta si también se limpia SF. Devuelve false si el usuario cancela todo.
+  async function limpiezaSFOpcional(filas) {
+    const asentadas = filas.filter(function (f) { return f.sf_sync_ok === true || f.sf_lote_grabado; });
+    if (!asentadas.length) return true;
+    if (!confirm(asentadas.length + ' terminal(es) ya tienen la caja grabada en Salesforce (Lote__c).\n\n' +
+      'Aceptar = quitar también " | caja | pallet" del Lote en SF (producción).\nCancelar = elegir si seguir sin tocar SF.')) {
+      return confirm('¿Eliminar igual, SIN tocar Salesforce? En SF quedará el código de caja en el Lote.');
+    }
+    toast('⏳ Limpiando Salesforce…');
+    const r = await limpiarSF(asentadas);
+    if (r.fallo.length) {
+      return confirm('No se pudo limpiar SF en ' + r.fallo.length + ' terminal(es):\n' +
+        r.fallo.slice(0, 5).map(function (x) { return x.serie + ' — ' + x.motivo; }).join('\n') + '\n\n¿Eliminar igual?');
+    }
+    return true;
+  }
+  // La FK (on delete set null) ya les saca la caja; acá se limpia el resto de su rastro
+  async function soltarItems(itemIds) {
+    for (let i = 0; i < itemIds.length; i += 100) {
+      await dbq(sb.from(T_ITEMS).update({ caja_id: null, caja_at: null, caja_by: null, sf_sync_ok: null, sf_sync_msg: null, sf_lote_grabado: null, sf_sync_at: null }).in('id', itemIds.slice(i, i + 100)));
+    }
+  }
+  async function eliminarCaja(id) {
+    if (!esAdmin()) return toast('Solo un administrador puede eliminar cajas.');
+    id = id || (S.caja && S.caja.id);
+    try {
+      const c = await dbq(sb.from(V_CAJAS).select('*').eq('id', id).maybeSingle());
+      if (!c) return toast('La caja ya no existe.');
+      if (c.pallet_estado === 'enviado') return toast(c.codigo + ' está en un pallet ya enviado: no se puede eliminar.');
+      const items = await fetchAll(function (a, b) { return sb.from(V_TRAZ).select('*').eq('caja_id', id).order('serie').range(a, b); });
+      if (!confirm('¿ELIMINAR la caja ' + c.codigo + '?\n\n' + items.length + ' terminal(es) quedan sin caja (siguen registradas como irreparables, no se borran).' +
+        (c.pallet_codigo ? '\nLa caja sale del pallet ' + c.pallet_codigo + '.' : '') + '\n\nEsto no se puede deshacer.')) return;
+      if (!(await limpiezaSFOpcional(items))) return;
+      const del = await dbq(sb.from(T_CAJAS).delete().eq('id', id).select('id')).catch(function (e) { return e; });
+      if (!del || del instanceof Error || !del.length) {
+        await marcarReasentar(items.map(function (x) { return x.id; })).catch(function () { /* noop */ });   // SF pudo quedar sin la caja
+        throw (del instanceof Error ? del : new Error('La base no permitió eliminar (solo administradores).'));
+      }
+      await soltarItems(items.map(function (x) { return x.id; }));
+      Object.keys(S.sel).forEach(function (s) { delete S.sel[s]; });
+      if (S.caja && S.caja.id === id) { S.caja = null; S.items = []; S.abiertas = []; guardarActiva(); }
+      toast('Caja ' + c.codigo + ' eliminada');
+      await setTab(S.tab);
+    } catch (e) { errorGeneral(e); }
+  }
+  async function eliminarItem(itemId) {
+    if (!esAdmin()) return toast('Solo un administrador puede eliminar terminales.');
+    const it = S.items.find(function (x) { return x.id === itemId; });
+    if (!it) return;
+    if (it.pallet_estado === 'enviado') return toast('La terminal está en un pallet ya enviado: no se puede eliminar.');
+    try {
+      if (!confirm('¿ELIMINAR del módulo la terminal ' + it.serie + '?\n\nSe borra su registro (falla, info del operador, caja). Si está en un reporte RTO, se vuelve a dar de alta al recargarlo. No se puede deshacer.')) return;
+      if (!(await limpiezaSFOpcional([it]))) return;
+      const del = await dbq(sb.from(T_ITEMS).delete().eq('id', itemId).select('id')).catch(function (e) { return e; });
+      if (!del || del instanceof Error || !del.length) {
+        await marcarReasentar([itemId]).catch(function () { /* noop */ });
+        throw (del instanceof Error ? del : new Error('La base no permitió eliminar (solo administradores).'));
+      }
+      delete S.sel[it.serie];
+      toast('Terminal eliminada');
+      await refreshCaja();
+    } catch (e) { errorGeneral(e); }
+  }
+  async function eliminarPallet() {
+    if (!esAdmin()) return toast('Solo un administrador puede eliminar pallets.');
+    const p = S.pallet; if (!p) return;
+    if (p.estado === 'enviado') return toast(p.codigo + ' ya fue enviado: no se puede eliminar.');
+    try {
+      if (!confirm('¿ELIMINAR el pallet ' + p.codigo + '?\n\nSus ' + p.cant_cajas + ' caja(s) quedan sin pallet (no se borran ni se abren). ' +
+        'Si ya asentaste el pallet en SF, el Lote seguirá mostrando "' + p.codigo + '" hasta que vuelvas a asentar cada caja.\n\nNo se puede deshacer.')) return;
+      const ids = S.cajasPallet.map(function (c) { return c.id; });
+      if (ids.length) {
+        const its = await dbq(sb.from(T_ITEMS).select('id').in('caja_id', ids).eq('sf_sync_ok', true));
+        await marcarReasentar((its || []).map(function (x) { return x.id; }));
+      }
+      const del = await dbq(sb.from(T_PALLETS).delete().eq('id', p.id).select('id'));
+      if (!del || !del.length) throw new Error('La base no permitió eliminar (solo administradores).');
+      S.pallet = null; S.cajasPallet = [];
+      toast('Pallet eliminado');
+      await renderPalletTab();
     } catch (e) { errorGeneral(e); }
   }
   async function guardarInfo(itemId, campo, valor) {
@@ -655,8 +816,11 @@
       '<div><div style="font-size:10px;color:var(--text-muted);text-transform:uppercase">Terminales</div><div class="irr-big" style="color:' + (llena ? '#f59e0b' : 'var(--text)') + '">' + c.cant + '<span style="font-size:18px;color:var(--text-muted)"> / ' + c.capacidad + '</span></div></div>' +
       '<div>' + badge(c.estado === 'abierta' ? 'ABIERTA' : 'CERRADA', c.estado === 'abierta' ? '#1dbf8e' : '#94a3b8') + (c.pallet_codigo ? ' ' + badge(c.pallet_codigo, '#1a9fd4') : '') + '</div>' +
       '<div style="flex:1"></div><div style="display:flex;gap:6px;flex-wrap:wrap">' +
-      (c.estado === 'abierta' ? '<button class="btn btn-sm" onclick="Irr.cerrarCaja()">✅ Cerrar e imprimir rótulo</button>' : '<button class="btn btn-sm" onclick="Irr.reimprimirCaja(\'' + c.id + '\')">🖨️ Reimprimir</button>' + (!c.pallet_id ? '<button class="btn btn-sm" onclick="Irr.reabrirCaja()">↩ Reabrir</button>' : '')) +
+      (c.estado === 'abierta' ? '<button class="btn btn-sm" onclick="Irr.cerrarCaja()">✅ Cerrar e imprimir rótulo</button>' : '<button class="btn btn-sm" onclick="Irr.reimprimirCaja(\'' + c.id + '\')">🖨️ Reimprimir</button>' + (c.pallet_estado !== 'enviado' ? '<button class="btn btn-sm" onclick="Irr.reabrirCaja()">↩ Reabrir para modificar</button>' : '')) +
+      (c.pallet_estado !== 'enviado' ? '<button class="btn btn-sm" onclick="Irr.editarCaja()">✏️ Editar caja</button>' : '') +
+      (esAdmin() && c.pallet_estado !== 'enviado' ? '<button class="btn btn-sm" style="background:transparent;border:1px solid #ef4444;color:#ef4444" onclick="Irr.eliminarCaja()">🗑 Eliminar caja</button>' : '') +
       '<button class="btn btn-sm" onclick="Irr.nuevaCaja()">➕ Nueva caja</button></div></div>' +
+      (c.notas ? '<div style="font-size:11px;color:var(--text-muted);margin-top:8px">📝 ' + esc(c.notas) + '</div>' : '') +
       '<div style="height:6px;background:var(--navy-700);border-radius:4px;margin-top:10px;overflow:hidden"><div style="height:100%;width:' + pct + '%;background:' + (llena ? '#f59e0b' : 'var(--teal)') + '"></div></div></div>';
   }
   async function cargarSelectCajas() {
@@ -699,12 +863,16 @@
       '<button class="btn btn-sm" style="background:transparent;border:1px solid var(--border);color:var(--text-muted)" onclick="Irr.selTodas(false)">Destildar</button></div>' +
       '<div style="overflow-x:auto"><table class="irr-tbl"><thead><tr><th></th><th>#</th><th>Serie</th><th>Falla (Logicalis)</th><th style="min-width:200px">Info del operador</th><th>Operativa</th><th>SF</th><th></th></tr></thead><tbody>' +
       S.items.map(function (i, n) {
-        const sf = i.sf_sync_ok === true ? badge('✓ ' + fmtFecha(i.sf_sync_at), '#1dbf8e') : i.sf_sync_ok === false ? '<span title="' + esc(i.sf_sync_msg) + '">' + badge('⚠ error', '#ef4444') + '</span>' : '<span style="color:var(--text-muted)">—</span>';
+        const sf = i.sf_sync_ok === true ? badge('✓ ' + fmtFecha(i.sf_sync_at), '#1dbf8e') : i.sf_sync_ok === false ? '<span title="' + esc(i.sf_sync_msg) + '">' + (/^Re-asentar/i.test(i.sf_sync_msg || '') ? badge('↻ re-asentar', '#f59e0b') : badge('⚠ error', '#ef4444')) + '</span>' : '<span style="color:var(--text-muted)">—</span>';
         return '<tr><td><input type="checkbox" ' + (S.sel[i.serie] ? 'checked' : '') + ' onchange="Irr.sel(\'' + esc(i.serie) + '\',this.checked)"></td><td style="color:var(--text-muted)">' + (n + 1) + '</td>' +
           '<td class="irr-mono">' + esc(i.serie) + '</td><td>' + esc(i.falla_logicalis || '—') + ' ' + (i.origen === 'manual' ? badge('manual', '#f59e0b') : '') + '</td>' +
           '<td><input class="irr-in" value="' + esc(i.info_operador || '') + '" placeholder="ej. pantalla rayada" onchange="Irr.guardar(\'' + i.id + '\',\'info_operador\',this.value)"></td>' +
           '<td><input type="checkbox" ' + (i.operativa ? 'checked' : '') + ' onchange="Irr.guardar(\'' + i.id + '\',\'operativa\',this.checked)"></td><td>' + sf + '</td>' +
-          '<td>' + (abierta ? '<button title="Sacar de la caja" style="background:none;border:none;color:#ef4444;cursor:pointer;font-size:14px" onclick="Irr.quitar(\'' + i.id + '\')">✕</button>' : '') + '</td></tr>';
+          '<td style="white-space:nowrap">' +
+          (abierta && S.abiertas.length ? '<select class="irr-in" style="width:auto;margin-right:4px" title="Mover a otra caja abierta" onchange="Irr.mover(\'' + i.id + '\',this.value)"><option value="">Mover a…</option>' +
+            S.abiertas.filter(function (x) { return x.cant < x.capacidad; }).map(function (x) { return '<option value="' + x.id + '">' + esc(x.codigo) + ' (' + x.cant + '/' + x.capacidad + ')</option>'; }).join('') + '</select>' : '') +
+          (abierta ? '<button title="Sacar de la caja" style="background:none;border:none;color:#ef4444;cursor:pointer;font-size:14px" onclick="Irr.quitar(\'' + i.id + '\')">✕</button>' : '') +
+          (esAdmin() && i.pallet_estado !== 'enviado' ? '<button title="Eliminar terminal (admin)" style="background:none;border:none;cursor:pointer;font-size:13px" onclick="Irr.eliminarItem(\'' + i.id + '\')">🗑</button>' : '') + '</td></tr>';
       }).join('') + '</tbody></table></div></div>';
   }
 
@@ -717,7 +885,8 @@
         cajas.map(function (c) {
           return '<tr><td class="irr-mono"><b>' + esc(c.codigo) + '</b></td><td>' + badge(c.estado, c.estado === 'abierta' ? '#1dbf8e' : '#94a3b8') + '</td><td>' + c.cant + ' / ' + c.capacidad + '</td>' +
             '<td>' + (c.pallet_codigo ? badge(c.pallet_codigo, '#1a9fd4') : '—') + '</td><td>' + esc(fmtFecha(c.created_at)) + '</td><td>' + esc(c.created_by || '') + '</td>' +
-            '<td style="white-space:nowrap"><button class="btn btn-sm" onclick="Irr.verCaja(\'' + c.id + '\')">Abrir</button> <button class="btn btn-sm" onclick="Irr.reimprimirCaja(\'' + c.id + '\')">🖨️</button></td></tr>';
+            '<td style="white-space:nowrap"><button class="btn btn-sm" onclick="Irr.verCaja(\'' + c.id + '\')">Abrir</button> <button class="btn btn-sm" onclick="Irr.reimprimirCaja(\'' + c.id + '\')">🖨️</button>' +
+              (esAdmin() && c.pallet_estado !== 'enviado' ? ' <button class="btn btn-sm" title="Eliminar caja (admin)" style="background:transparent;border:1px solid #ef4444;color:#ef4444" onclick="Irr.eliminarCaja(\'' + c.id + '\')">🗑</button>' : '') + '</td></tr>';
         }).join('') + '</tbody></table></div>' : '<div style="color:var(--text-muted);font-size:12px">Todavía no hay cajas.</div>') + '</div>';
   }
   async function verCaja(id) { await cargarCaja(id); await setTab('escaneo'); }
@@ -743,7 +912,8 @@
         '<div style="display:flex;gap:6px;flex-wrap:wrap">' +
         (ab ? '<button class="btn btn-sm" onclick="Irr.cerrarPallet()">✅ Cerrar e imprimir etiqueta</button>' : '<button class="btn btn-sm" onclick="Irr.reimprimirPallet(\'' + p.id + '\')">🖨️ Etiqueta</button>') +
         (p.estado === 'cerrado' ? '<button class="btn btn-sm" onclick="Irr.enviarPallet()">🚚 Marcar enviado a ' + esc(p.destino) + '</button><button class="btn btn-sm" onclick="Irr.reabrirPallet()">↩ Reabrir</button>' : '') +
-        '<button class="btn btn-sm" onclick="Irr.exportar()">📊 Packing list (Excel)</button><button class="btn btn-sm" onclick="Irr.asentarPallet()">📤 Asentar pallet en SF</button></div></div></div>';
+        '<button class="btn btn-sm" onclick="Irr.exportar()">📊 Packing list (Excel)</button><button class="btn btn-sm" onclick="Irr.asentarPallet()">📤 Asentar pallet en SF</button>' +
+        (esAdmin() && p.estado !== 'enviado' ? '<button class="btn btn-sm" style="background:transparent;border:1px solid #ef4444;color:#ef4444" onclick="Irr.eliminarPallet()">🗑 Eliminar pallet</button>' : '') + '</div></div></div>';
       if (ab) {
         html += '<div class="card" style="margin-bottom:10px"><input id="irrScanPallet" class="irr-scan" autocomplete="off" placeholder="Escaneá el rótulo de una caja (CJ-xxxx) para ponerla en ' + esc(p.codigo) + '" onkeydown="if(event.key===\'Enter\'){Irr.cajaAPallet(this.value);this.value=\'\'}">' +
           (sinPallet.length ? '<div style="margin-top:8px;font-size:11px;color:var(--text-muted)">Cerradas sin pallet: ' + sinPallet.map(function (c) { return '<a href="#" class="irr-mono" onclick="Irr.cajaAPallet(\'' + c.codigo + '\');return false" style="color:var(--teal)">' + esc(c.codigo) + ' (' + c.cant + ')</a>'; }).join(' · ') + '</div>' : '') + '</div>';
@@ -817,6 +987,7 @@
 
   window.Irr = {
     init: init, tab: setTab, scan: scan, nuevaCaja: nuevaCaja, elegirCaja: elegirCaja, cerrarCaja: cerrarCaja, reabrirCaja: reabrirCaja,
+    editarCaja: editarCaja, mover: moverItem, eliminarCaja: eliminarCaja, eliminarItem: eliminarItem, eliminarPallet: eliminarPallet,
     quitar: quitarItem, guardar: guardarInfo, confirmarAlta: confirmarAlta, cancelarAlta: cancelarAlta,
     sel: function (s, v) { S.sel[s] = v; }, selTodas: selTodas, asentarSeleccion: asentarSeleccion,
     reimprimirCaja: reimprimirCaja, reimprimirPallet: reimprimirPallet, verCaja: verCaja,
