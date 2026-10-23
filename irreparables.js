@@ -59,7 +59,8 @@
   L.parseLote = function (lote) {
     const base = L.quitarSufijo(lote);
     const m = base.match(/^(\d{1,2}\/\d{1,2}\/\d{4})\s*-\s*(.+)$/);
-    return { base: base, fecha: m ? m[1] : '', falla: m ? m[2].trim() : '' };
+    // Sin "fecha - ": si la terminal esta ROTA, el texto completo del Lote es la descripcion de la falla
+    return { base: base, fecha: m ? m[1] : '', falla: m ? m[2].trim() : base };
   };
 
   // Valor final de Lote__c. Conserva lo que ya había (la falla de Logicalis) y reemplaza
