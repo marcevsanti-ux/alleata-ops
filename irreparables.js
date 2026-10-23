@@ -40,6 +40,10 @@
   L.tipoEscaneo = function (raw) {
     const s = String(raw == null ? '' : raw).trim();
     if (!s) return null;
+    // QR del rótulo = link al portal (...?irr=CJ-0002). Si la pistola lo lee, vale el código del final
+    // (tolera que el lector cambie símbolos como ? = : /).
+    const u = s.length > 8 && /irr/i.test(s) ? s.match(/(CJ|PL)\D{0,3}(\d{1,6})\s*$/i) : null;
+    if (u) { const pre = u[1].toUpperCase(); return { tipo: pre === 'CJ' ? 'caja' : 'pallet', codigo: pre + '-' + L.pad4(parseInt(u[2], 10)) }; }
     const m = s.match(/^(CJ|PL)\D{0,3}(\d{1,6})$/i);
     if (m) {
       const pre = m[1].toUpperCase();
@@ -157,6 +161,7 @@
     log: [], cola: [], drenando: false,
     sel: {},                          // serie → true (selección para SF)
     abiertas: [],                     // otras cajas abiertas (destino de "Mover a…")
+    pendOpts: null,
     comp: {}, faltan: [], pendSF: null, // Perfil / Batería elegidos por el operador (serie → {campo: valor})
   };
   function esAdmin() { try { return typeof currentProfile !== 'undefined' && !!currentProfile && currentProfile.rol === 'admin'; } catch (e) { return false; } }
@@ -567,11 +572,15 @@
   // Graba caja/pallet en Product2.Lote__c. filas = filas de v_irreparables_trazabilidad.
   async function asentarSF(filas, opts) {
     opts = opts || {};
+    const ub = opts.ubicacion || null;               // modo "enviado a SPP": cambia SOLO la Ubicación
     const validas = filas.filter(function (f) { return f.caja; });
     if (!validas.length) return toast('No hay terminales con caja para asentar.');
-    if (!opts.sinConfirmar && !confirm('Vas a grabar en SALESFORCE (producción) ' + validas.length + ' terminal(es).\n\n' +
+    if (!opts.sinConfirmar && !confirm(ub
+      ? 'Vas a cambiar en SALESFORCE (producción) la Ubicación a ' + ub + ' de ' + validas.length + ' terminal(es).\n\nEstado, Perfil, Batería y Lote no se tocan.\n\n¿Continuar?'
+      : 'Vas a grabar en SALESFORCE (producción) ' + validas.length + ' terminal(es).\n\n' +
       'Se modifica SOLO Product2.Lote__c: se agrega " | caja | pallet" al final (la falla de Logicalis se conserva). ' +
       'Ubicación, Estado, Perfil y Batería se reenvían sin cambios.\n\n¿Continuar?')) return;
+    S.pendOpts = { ubicacion: ub };
     const msg = $('irrSfMsg'); if (msg) msg.innerHTML = '<span style="color:var(--text-muted)">⏳ Consultando Salesforce…</span>';
     const hoy = new Date().toLocaleDateString('es-AR');
     const res = { ok: 0, igual: 0, fallo: [] };
@@ -592,6 +601,15 @@
         const cur = Object.assign({}, p.current), pend = [];
         vac.forEach(function (k) { const v = (S.comp[f.serie] || {})[k]; if (v) cur[k] = v; else pend.push(k); });
         if (pend.length) { f._pend = true; return faltan.push({ serie: f.serie, campos: pend }); }
+        if (ub) {
+          if (cur.Ubicacion__c === ub && !vac.length) { res.igual++; f._ok = { sfId: p.sfId, lote: p.current.Lote__c, igual: true }; return; }
+          const fu = {};
+          L.CAMPOS_PROTEGIDOS.forEach(function (k) { fu[k] = cur[k]; });
+          fu.Ubicacion__c = ub;                                                  // sin Lote__c: el agente no lo toca
+          records.push({ serie: f.serie, fields: fu });
+          esperado[f.serie] = p.current.Lote__c; antes[f.serie] = Object.assign({}, cur, { Ubicacion__c: ub }); f._sfId = p.sfId;
+          return;
+        }
         const lote = L.armarLote({ loteActual: p.current.Lote__c, falla: f.falla_logicalis, info: f.info_operador, caja: f.caja, pallet: f.pallet, hoy: hoy });
         if (lote === p.current.Lote__c && !vac.length) { res.igual++; f._ok = { sfId: p.sfId, lote: lote, igual: true }; return; }
         const fields = { Lote__c: lote };
@@ -626,6 +644,7 @@
       const fallos = {}; res.fallo.forEach(function (x) { fallos[x.serie] = x.motivo; });
       for (const f of validas) {
         if (f._pend) continue;                       // espera que el operador elija Perfil / Batería
+        if (ub) { if (f._ok) delete S.comp[f.serie]; continue; }   // en modo ubicación no se toca el estado del Lote
         const patch = { sf_sync_at: ahora };
         if (f._ok) { delete S.comp[f.serie]; patch.sf_sync_ok = true; patch.sf_sync_msg = f._ok.igual ? 'Ya estaba asentado' : 'OK'; patch.sf_lote_grabado = f._ok.lote; if (f._ok.sfId) patch.sf_id = f._ok.sfId; }
         else { patch.sf_sync_ok = false; patch.sf_sync_msg = (fallos[f.serie] || 'Error').slice(0, 300); }
@@ -635,8 +654,8 @@
       if (msg) msg.innerHTML = '<span style="color:var(--red,#ef4444)">⛔ ' + esc(e.message) + '</span>';
       return;
     }
-    const lineas = ['✅ ' + res.ok + ' grabada(s) y verificada(s)'];
-    if (res.igual) lineas.push('= ' + res.igual + ' ya estaban asentadas');
+    const lineas = [ub ? '✅ ' + res.ok + ' con Ubicación ' + ub + ' en SF (verificado)' : '✅ ' + res.ok + ' grabada(s) y verificada(s)'];
+    if (res.igual) lineas.push('= ' + res.igual + (ub ? ' ya estaban en ' + ub : ' ya estaban asentadas'));
     const resumenHtml = '<div style="color:var(--teal)">' + lineas.join(' · ') + '</div>' +
       (res.fallo.length ? '<div style="color:var(--red,#ef4444);margin-top:4px">⛔ ' + res.fallo.length + ' con problema:<br>' +
         res.fallo.map(function (x) { return '<span class="irr-mono">' + esc(x.serie) + '</span> — ' + esc(x.motivo); }).join('<br>') + '</div>' : '');
@@ -686,7 +705,7 @@
     const sin = (S.faltan || []).filter(function (f) { return f.campos.some(function (k) { return !(S.comp[f.serie] || {})[k]; }); });
     if (sin.length) return toast('Falta elegir Perfil / Batería en ' + sin.length + ' terminal(es).');
     const filas = S.pendSF || [];
-    asentarSF(filas, { sinConfirmar: true });
+    asentarSF(filas, { sinConfirmar: true, ubicacion: (S.pendOpts || {}).ubicacion || null });
   }
   function compCancelar() { S.faltan = []; S.pendSF = null; const el = $('irrSfMsg'); if (el) el.innerHTML = ''; }
   function asentarSeleccion() {
@@ -728,12 +747,14 @@
   async function cerrarPallet() {
     const p = S.pallet; if (!p || p.estado !== 'abierto') return;
     if (!p.cant_cajas) return toast('El pallet no tiene cajas.');
-    if (!confirm('¿Cerrar el pallet ' + p.codigo + ' con ' + p.cant_cajas + ' cajas / ' + p.cant_terminales + ' terminales?')) return;
+    if (!confirm('¿Cerrar el pallet ' + p.codigo + ' con ' + p.cant_cajas + ' cajas / ' + p.cant_terminales + ' terminales?\n\n' +
+      'Al cerrarlo se graba también en SALESFORCE (producción) el nº de pallet en el Lote de las ' + p.cant_terminales + ' terminales (" | caja | ' + p.codigo + '"). Ubicación, Estado, Perfil y Batería no cambian.')) return;
     const w = abrirVentana();
     try {
       await dbq(sb.from(T_PALLETS).update({ estado: 'cerrado', closed_at: new Date().toISOString() }).eq('id', p.id));
       await cargarPallet(p.id); await renderPalletTab();
       await imprimirPallet(p.id, w);
+      await asentarSF(await itemsDePallet(p.id), { sinConfirmar: true });     // pallet → Lote de todas las terminales
     } catch (e) { if (w) w.close(); errorGeneral(e); }
   }
   async function reabrirPallet() {
@@ -741,13 +762,40 @@
     try { await dbq(sb.from(T_PALLETS).update({ estado: 'abierto', closed_at: null }).eq('id', p.id)); await cargarPallet(p.id); await renderPalletTab(); }
     catch (e) { errorGeneral(e); }
   }
+  // Valor real de Ubicacion__c para SPP: se busca en la lista de SF (no se escribe un valor que no exista)
+  async function resolverUbicacionSPP() {
+    try {
+      const h = {}; if (typeof SF_SYNC_SECRET !== 'undefined') h['x-automation-secret'] = SF_SYNC_SECRET;
+      const r = await fetch(AGENT + '/automations/sims/filtros', { headers: h });
+      const j = await r.json().catch(function () { return {}; });
+      const lista = (j && j.ubicaciones) || [];
+      if (r.ok && lista.length) {
+        const v = lista.find(function (x) { return /^\s*spp\s*$/i.test(x); }) || lista.find(function (x) { return /\bspp\b/i.test(x); });
+        return { valor: v || null, lista: lista };
+      }
+    } catch (e) { /* sin lista: se intenta con "SPP" y SF valida */ }
+    return { valor: 'SPP', lista: [] };
+  }
   async function enviarPallet() {
     const p = S.pallet; if (!p || p.estado !== 'cerrado') return toast('Cerrá el pallet antes de marcarlo como enviado.');
-    const remito = prompt('N° de remito / referencia del envío a ' + p.destino + ' (opcional):', p.remito || '');
-    if (remito === null) return;
     try {
+      const u = await resolverUbicacionSPP();
+      if (!u.valor) return alert('En Salesforce no existe una Ubicación "SPP". Valores disponibles:\n\n' + u.lista.join('\n') + '\n\nAgregala en SF o avisame cómo se llama.');
+      const remito = prompt('N° de remito / referencia del envío a ' + p.destino + ' (opcional):', p.remito || '');
+      if (remito === null) return;
+      if (!confirm('¿Marcar ' + p.codigo + ' como ENVIADO A SPP?\n\n• Se cambia en SALESFORCE (producción) la Ubicación de ' + p.cant_terminales + ' terminales a ' + u.valor + '.\n• Estado, Perfil, Batería y Lote no se tocan.\n• El pallet queda cerrado a cambios.')) return;
       await dbq(sb.from(T_PALLETS).update({ estado: 'enviado', remito: remito.trim() || null, enviado_at: new Date().toISOString() }).eq('id', p.id));
       await cargarPallet(p.id); await renderPalletTab();
+      await asentarSF(await itemsDePallet(p.id), { sinConfirmar: true, ubicacion: u.valor });
+    } catch (e) { errorGeneral(e); }
+  }
+  // Si algo falló al cambiar la Ubicación (o quedaron terminales por completar), se repite solo lo pendiente
+  async function reintentarUbicacion() {
+    const p = S.pallet; if (!p || p.estado !== 'enviado') return;
+    try {
+      const u = await resolverUbicacionSPP();
+      if (!u.valor) return alert('En Salesforce no existe una Ubicación "SPP". Valores disponibles:\n\n' + u.lista.join('\n'));
+      await asentarSF(await itemsDePallet(p.id), { ubicacion: u.valor });
     } catch (e) { errorGeneral(e); }
   }
   async function itemsDePallet(palletId) {
@@ -797,7 +845,7 @@
     '.logo{font-size:18px;font-weight:900;letter-spacing:-1px;color:#1dbf8e!important}.hdr small{font-size:7px;color:#444;text-align:right;line-height:1.4}',
     '.tag{background:#000!important;color:#fff!important;text-align:center;font-weight:900;font-size:12px;letter-spacing:1.5px;padding:1.6mm;margin-bottom:2mm}',
     '.code{font-size:40px;font-weight:900;text-align:center;letter-spacing:-1px;line-height:1.05;border:2.5px solid #000;padding:1.5mm;margin-bottom:2mm}',
-    '.codes{display:flex;gap:3mm;align-items:center;margin-bottom:2mm;padding-right:7mm}.codes img.bc{flex:1;min-width:0;height:17mm;object-fit:contain}.codes img.qr{width:20mm;height:20mm;flex:none}',
+    '.codes{display:flex;gap:3mm;align-items:center;margin-bottom:2mm;padding-right:7mm}.codes img.bc{flex:1;min-width:0;height:17mm;object-fit:contain}.codes img.qr{width:24mm;height:24mm;flex:none}',
     '.info{display:grid;grid-template-columns:1fr 1fr;gap:1.2mm 3mm;margin-bottom:2mm}',
     '.k{font-size:7px;font-weight:700;color:#555;text-transform:uppercase}.v{font-size:12px;font-weight:900}',
     '.lst-h{font-size:8px;font-weight:700;text-transform:uppercase;color:#555;border-top:1.5px solid #000;padding-top:1.2mm;margin-bottom:1mm}',
@@ -808,7 +856,9 @@
     '@media print{.btn{display:none!important}}',
   ].join('');
   function urlBarcode(t) { return 'https://barcode.tec-it.com/barcode.ashx?data=' + encodeURIComponent(t) + '&code=Code128&dpi=200&imagetype=Png'; }
-  function urlQR(t) { return 'https://api.qrserver.com/v1/create-qr-code/?size=160x160&margin=1&data=' + encodeURIComponent(t); }
+  // El QR abre el portal en la consulta de la caja/pallet (hay que estar logueado). La pistola también lo entiende.
+  function linkPortal(cod) { try { return location.origin + location.pathname + '?irr=' + encodeURIComponent(cod); } catch (e) { return cod; } }
+  function urlQR(t) { return 'https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=1&data=' + encodeURIComponent(t); }
   function escribir(w, titulo, cuerpo) {
     const html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>' + esc(titulo) + '</title><style>' + CSS_ROTULO + '</style></head><body>' +
       cuerpo + '<button class="btn" onclick="window.print()">🖨️ Imprimir</button></body></html>';
@@ -824,7 +874,7 @@
       escribir(w, 'Rótulo ' + c.codigo,
         '<div class="rotulo"><div class="hdr"><span class="logo">alleata</span><small>Andrés Moretti e Hijos S.A.<br>California 2082, CABA</small></div>' +
         '<div class="tag">TERMINALES IRREPARABLES</div><div class="code">' + esc(c.codigo) + '</div>' +
-        '<div class="codes"><img class="bc" src="' + urlBarcode(c.codigo) + '"><img class="qr" src="' + urlQR(c.codigo) + '"></div>' +
+        '<div class="codes"><img class="bc" src="' + urlBarcode(c.codigo) + '"><img class="qr" src="' + urlQR(linkPortal(c.codigo)) + '"></div>' +
         '<div class="info"><div><div class="k">Cantidad</div><div class="v">' + c.cant + ' terminales</div></div>' +
         '<div><div class="k">Cerrada</div><div class="v">' + esc(c.closed_at ? fmtFecha(c.closed_at) : '—') + '</div></div>' +
         '<div><div class="k">Destino</div><div class="v">SPP</div></div>' +
@@ -842,7 +892,7 @@
       escribir(w, 'Etiqueta ' + p.codigo,
         '<div class="rotulo"><div class="hdr"><span class="logo">alleata</span><small>Andrés Moretti e Hijos S.A.<br>California 2082, CABA</small></div>' +
         '<div class="tag">PALLET · TERMINALES IRREPARABLES</div><div class="code">' + esc(p.codigo) + '</div>' +
-        '<div class="codes"><img class="bc" src="' + urlBarcode(p.codigo) + '"><img class="qr" src="' + urlQR(p.codigo) + '"></div>' +
+        '<div class="codes"><img class="bc" src="' + urlBarcode(p.codigo) + '"><img class="qr" src="' + urlQR(linkPortal(p.codigo)) + '"></div>' +
         '<div class="info"><div><div class="k">Cajas</div><div class="v">' + p.cant_cajas + '</div></div>' +
         '<div><div class="k">Terminales</div><div class="v">' + p.cant_terminales + '</div></div>' +
         '<div><div class="k">Destino</div><div class="v">' + esc(p.destino) + '</div></div>' +
@@ -1023,7 +1073,8 @@
         '<div>' + badge(p.estado.toUpperCase(), ab ? '#1dbf8e' : p.estado === 'enviado' ? '#1a9fd4' : '#94a3b8') + (p.remito ? ' ' + badge('Remito ' + p.remito, '#94a3b8') : '') + '</div><div style="flex:1"></div>' +
         '<div style="display:flex;gap:6px;flex-wrap:wrap">' +
         (ab ? '<button class="btn btn-sm" onclick="Irr.cerrarPallet()">✅ Cerrar e imprimir etiqueta</button>' : '<button class="btn btn-sm" onclick="Irr.reimprimirPallet(\'' + p.id + '\')">🖨️ Etiqueta</button>') +
-        (p.estado === 'cerrado' ? '<button class="btn btn-sm" onclick="Irr.enviarPallet()">🚚 Marcar enviado a ' + esc(p.destino) + '</button><button class="btn btn-sm" onclick="Irr.reabrirPallet()">↩ Reabrir</button>' : '') +
+        (p.estado === 'cerrado' ? '<button class="btn btn-sm" style="background:#1a9fd4;color:#fff" onclick="Irr.enviarPallet()">🚚 ENVIADO A ' + esc(p.destino) + '</button><button class="btn btn-sm" onclick="Irr.reabrirPallet()">↩ Reabrir</button>' : '') +
+        (p.estado === 'enviado' ? '<button class="btn btn-sm" title="Vuelve a cambiar la Ubicación en SF de las terminales que no quedaron en ' + esc(p.destino) + '" onclick="Irr.reintentarUbicacion()">🔁 Revisar ubicación en SF</button>' : '') +
         '<button class="btn btn-sm" onclick="Irr.exportar()">📊 Packing list (Excel)</button><button class="btn btn-sm" onclick="Irr.asentarPallet()">📤 Asentar pallet en SF</button>' +
         (esAdmin() && p.estado !== 'enviado' ? '<button class="btn btn-sm" style="background:transparent;border:1px solid #ef4444;color:#ef4444" onclick="Irr.eliminarPallet()">🗑 Eliminar pallet</button>' : '') + '</div></div></div>';
       if (ab) {
@@ -1076,7 +1127,7 @@
         if (!p) { out.innerHTML = '<div class="card" style="color:var(--text-muted)">No existe ' + t.codigo + '.</div>'; return; }
         const cajas = await dbq(sb.from(V_CAJAS).select('*').eq('pallet_id', p.id).order('codigo'));
         out.innerHTML = '<div class="card"><div style="font-weight:700;margin-bottom:8px">' + esc(p.codigo) + ' · ' + p.cant_cajas + ' cajas · ' + p.cant_terminales + ' terminales · ' + badge(p.estado, '#94a3b8') + '</div>' +
-          cajas.map(function (c) { return '<span class="irr-mono" style="margin-right:10px">' + esc(c.codigo) + ' (' + c.cant + ')</span>'; }).join('') + '</div>';
+          cajas.map(function (c) { return '<a href="#" class="irr-mono" style="margin-right:10px;color:var(--teal)" onclick="Irr.buscar(\'' + esc(c.codigo) + '\');return false">' + esc(c.codigo) + ' (' + c.cant + ')</a>'; }).join('') + '</div>';
       }
     } catch (e) { errorGeneral(e); }
   }
@@ -1097,14 +1148,22 @@
     } catch (e) { errorGeneral(e); }
   }
 
+  // Entrada desde el QR del rótulo: abre Consulta con la caja / pallet
+  async function abrir(codigo) {
+    const t = L.tipoEscaneo(codigo); if (!t || t.tipo === 'serie') return;
+    await init(); S.tab = 'consulta'; await setTab('consulta');
+    const inp = $('irrBuscar'); if (inp) inp.value = t.codigo;
+    await buscar(t.codigo);
+  }
   window.Irr = {
+    abrir: abrir,
     init: init, tab: setTab, scan: scan, nuevaCaja: nuevaCaja, elegirCaja: elegirCaja, cerrarCaja: cerrarCaja, reabrirCaja: reabrirCaja,
     editarCaja: editarCaja, mover: moverItem, eliminarCaja: eliminarCaja, eliminarItem: eliminarItem, eliminarPallet: eliminarPallet,
     quitar: quitarItem, guardar: guardarInfo, confirmarAlta: confirmarAlta, cancelarAlta: cancelarAlta,
     sel: function (s, v) { S.sel[s] = v; }, selTodas: selTodas, asentarSeleccion: asentarSeleccion,
     reimprimirCaja: reimprimirCaja, reimprimirPallet: reimprimirPallet, verCaja: verCaja,
     nuevoPallet: nuevoPallet, elegirPallet: elegirPallet, cajaAPallet: agregarCajaAPallet, sacarCaja: quitarCajaDePallet,
-    cerrarPallet: cerrarPallet, reabrirPallet: reabrirPallet, enviarPallet: enviarPallet, asentarPallet: asentarPallet,
+    cerrarPallet: cerrarPallet, reabrirPallet: reabrirPallet, enviarPallet: enviarPallet, reintentarUbicacion: reintentarUbicacion, asentarPallet: asentarPallet,
     exportar: function () { exportarPacking(); }, buscar: buscar,
     comp: compSet, compTodas: compTodas, compAplicar: compAplicar, compCancelar: compCancelar,
     _logic: L,
