@@ -1151,7 +1151,7 @@
   async function mostrarPlanilla(t) {
     cerrarPlanilla();
     const o = document.createElement('div'); o.id = 'irrSheet';
-    o.style.cssText = 'position:fixed;inset:0;z-index:2147483000;background:#fff;color:#1f2937;overflow:auto;font-family:Arial,sans-serif;-webkit-overflow-scrolling:touch';
+    o.style.cssText = 'position:fixed;inset:0;z-index:2147483000;background:#fff;color:#111827;color-scheme:light;overflow:auto;font-family:Arial,sans-serif;-webkit-overflow-scrolling:touch';
     o.innerHTML = '<div style="padding:30px 16px;color:#6b7280;font-size:14px">⏳ Cargando…</div>';
     document.body.appendChild(o); document.body.style.overflow = 'hidden';
     const hdr = function (titulo, sub, extra) {
@@ -1159,19 +1159,19 @@
         '<div style="flex:1;min-width:180px"><div style="font-size:17px;font-weight:700">' + titulo + '</div><div style="font-size:12px;opacity:.9">' + sub + '</div></div>' + extra +
         '<button onclick="Irr.cerrarPlanilla()" style="background:#fff;color:#107c41;border:none;border-radius:6px;padding:8px 12px;font-weight:700;font-size:13px">✕ Cerrar</button></div>';
     };
-    const th = 'position:sticky;top:0;background:#e5e7eb;border:1px solid #cbd5e1;padding:6px 8px;font-size:11px;text-align:left;color:#374151;white-space:nowrap';
-    const td = 'border:1px solid #e5e7eb;padding:6px 8px;font-size:13px;vertical-align:top';
+    const th = 'position:sticky;top:0;background:#e5e7eb;border:1px solid #cbd5e1;padding:6px 8px;font-size:11px;text-align:left;color:#374151!important;white-space:nowrap';
+    const td = 'border:1px solid #e5e7eb;padding:5px 6px;font-size:13px;vertical-align:top;color:#111827!important;background:#fff';
     const fila = function (i, n) {
       return '<tr data-s="' + esc((i.serie + ' ' + (i.falla_logicalis || '') + ' ' + (i.info_operador || '')).toLowerCase()) + '">' +
-        '<td style="' + td + ';background:#f3f4f6;color:#6b7280;text-align:center;width:34px">' + n + '</td>' +
-        '<td style="' + td + ';font-family:\'Courier New\',monospace;font-weight:700;white-space:nowrap">' + esc(i.serie) + '</td>' +
-        '<td style="' + td + '">' + esc(i.falla_logicalis || '—') + (i.operativa ? ' <span style="color:#b45309;font-size:11px">(operativa)</span>' : '') + '</td>' +
-        '<td style="' + td + ';white-space:nowrap">' + esc(L.fmtDia(i.fecha_reporte)) + '</td>' +
+        '<td style="' + td + ';background:#f3f4f6;color:#6b7280!important;text-align:center;width:26px;padding:5px 3px">' + n + '</td>' +
+        '<td style="' + td + ';font-family:\'Courier New\',monospace;font-weight:700;white-space:nowrap;font-size:12px;letter-spacing:-.3px">' + esc(i.serie) + '</td>' +
+        '<td style="' + td + '">' + esc(i.falla_logicalis || '—') + (i.operativa ? ' <span style="color:#b45309!important;font-size:11px">(operativa)</span>' : '') + '</td>' +
+        '<td style="' + td + ';white-space:nowrap;font-size:12px">' + esc(L.fmtDia(i.fecha_reporte)) + '</td>' +
         '<td style="' + td + '">' + esc(i.info_operador || '') + '</td></tr>';
     };
     const cab = '<thead><tr><th style="' + th + ';width:34px"></th><th style="' + th + '">Serie</th><th style="' + th + '">Falla (Logicalis)</th><th style="' + th + '">Fecha reporte</th><th style="' + th + '">Info operador</th></tr></thead>';
     const buscador = '<div style="padding:8px 12px;background:#f9fafb;border-bottom:1px solid #e5e7eb;display:flex;gap:10px;align-items:center">' +
-      '<input type="search" placeholder="Buscar serie o falla…" oninput="Irr.filtrarPlanilla(this.value)" style="flex:1;font-size:16px;padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px"><span id="irrSheetCnt" style="font-size:12px;color:#6b7280;white-space:nowrap"></span></div>';
+      '<input type="search" placeholder="Buscar serie o falla…" oninput="Irr.filtrarPlanilla(this.value)" style="flex:1;font-size:16px;padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;background:#fff;color:#111827"><span id="irrSheetCnt" style="font-size:12px;color:#6b7280;white-space:nowrap"></span></div>';
     try {
       if (t.tipo === 'caja') {
         const c = await dbq(sb.from(V_CAJAS).select('*').eq('codigo', t.codigo).maybeSingle());
@@ -1189,7 +1189,7 @@
         S._planilla = { tipo: 'pallet', p: p, items: items };
         let n = 0, ult = null, body = '';
         items.forEach(function (i) {
-          if (i.caja !== ult) { ult = i.caja; body += '<tr><td colspan="5" style="' + td + ';background:#dcfce7;font-weight:700;color:#14532d">📦 ' + esc(i.caja) + '</td></tr>'; }
+          if (i.caja !== ult) { ult = i.caja; body += '<tr><td colspan="5" style="' + td + ';background:#dcfce7;font-weight:700;color:#14532d!important">📦 ' + esc(i.caja) + '</td></tr>'; }
           body += fila(i, ++n);
         });
         o.innerHTML = hdr(esc(p.codigo), esc(p.estado) + ' · ' + p.cant_cajas + ' cajas' + (p.remito ? ' · remito ' + esc(p.remito) : ''),
