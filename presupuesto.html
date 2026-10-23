@@ -4,7 +4,7 @@
 <script src="agent-auth.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Alleata · Presupuesto Operaciones v1.14.7</title>
+<title>Alleata · Presupuesto Operaciones v1.14.8</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -201,7 +201,7 @@
   <div class="login-box">
     <h2>💰 Presupuesto</h2>
     <p class="login-sub">Alleata · Acceso restringido</p>
-    <div style="position:absolute;bottom:12px;right:16px;font-size:10px;font-family:'JetBrains Mono',monospace;color:rgba(232,237,243,.2)">v1.14.7</div>
+    <div style="position:absolute;bottom:12px;right:16px;font-size:10px;font-family:'JetBrains Mono',monospace;color:rgba(232,237,243,.2)">v1.14.8</div>
     <div class="login-field">
       <label>Email</label>
       <input type="email" id="loginEmail" placeholder="tu@email.com" onkeydown="if(event.key==='Enter')doLogin()">
@@ -217,7 +217,7 @@
 
 <div id="appContent" style="display:none">
 <h1>💰 Presupuesto Operaciones</h1>
-<p class="sub">Alleata · 2026 <span style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 8px;border-radius:4px;border:1px solid var(--border2);font-size:10px;margin-left:6px">v1.14.7</span></p>
+<p class="sub">Alleata · 2026 <span style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 8px;border-radius:4px;border:1px solid var(--border2);font-size:10px;margin-left:6px">v1.14.8</span></p>
 
 <div class="toolbar">
   <div class="mes-bar" id="mesBar"></div>
@@ -409,7 +409,7 @@ function logiGetFacturas(m) {
 // Busca en qué factura/RTO de Logicalis viene una terminal puntual, en
 // TODOS los meses cargados en memoria (logiFacturas ya trae todo desde
 // loadFacturasFromDB() al iniciar, no hace falta ir mes por mes).
-function logiBuscarPorSerie() {
+async function logiBuscarPorSerie() {
   const input = document.getElementById('logiSerieBuscar');
   const out = document.getElementById('logiSerieResultado');
   const serie = (input.value || '').trim();
@@ -417,20 +417,41 @@ function logiBuscarPorSerie() {
   if (!serie) { out.innerHTML = ''; return; }
 
   const encontradas = [];
+  const conIrreparables = [];   // facturas con irreparables (se cuentan, pero su lista de series puede no estar guardada)
   for (const mes of Object.keys(logiFacturas)) {
     for (const f of (logiFacturas[mes] || [])) {
       if ((f.series || []).some(s => String(s).trim() === serie)) {
         encontradas.push({ mes, ...f });
       }
+      if ((f.irreparables || 0) > 0) conIrreparables.push({ mes, ...f });
     }
   }
 
-  if (!encontradas.length) {
-    out.innerHTML = `<div style="font-size:12px;color:var(--red);padding:6px 0">❌ No aparece en ninguna factura/RTO cargada. O no la subimos todavía, o la serie no coincide exacto (revisá que no tenga espacios de más).</div>`;
-    return;
+  // Irreparables registradas en el módulo (RTO de Logicalis con Solución distinta de Personalización)
+  let irr = null, irrError = '';
+  try {
+    const { data, error } = await sb.from('irreparables_items')
+      .select('serie,falla_logicalis,rto_ref,mes_rto,fecha_reporte,origen').eq('serie', serie).maybeSingle();
+    if (error) irrError = error.message || String(error); else irr = data;
+  } catch (e) { irrError = e.message || String(e); }
+
+  const fmtD = iso => { const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? (+m[3]) + '/' + (+m[2]) + '/' + m[1] : '—'; };
+  let html = '';
+
+  if (irr) {
+    html += `
+    <div style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.35);border-radius:8px;padding:10px 12px;margin-top:6px">
+      <div style="font-size:12px;font-weight:700;color:#f59e0b">🧰 Encontrada como IRREPARABLE${irr.mes_rto && MESES_LABEL && MESES_LABEL[irr.mes_rto] ? ' — ' + MESES_LABEL[irr.mes_rto] : ''}</div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:4px">
+        Falla informada: <span style="color:var(--text)">${irr.falla_logicalis || '—'}</span>
+        · RTO / Factura: <span style="color:var(--text);font-family:'JetBrains Mono',monospace">${irr.rto_ref || '—'}</span>
+        · Fecha del reporte: ${fmtD(irr.fecha_reporte)}
+        · Trazabilidad (caja / pallet): módulo Irreparables → Consulta
+      </div>
+    </div>`;
   }
 
-  out.innerHTML = encontradas.map(f => `
+  html += encontradas.map(f => `
     <div style="background:rgba(29,191,142,.08);border:1px solid rgba(29,191,142,.25);border-radius:8px;padding:10px 12px;margin-top:6px">
       <div style="font-size:12px;font-weight:700;color:var(--teal)">✓ Encontrada — ${MESES_LABEL ? MESES_LABEL[f.mes] : f.mes} 2026</div>
       <div style="font-size:11px;color:var(--text-muted);margin-top:4px">
@@ -441,6 +462,16 @@ function logiBuscarPorSerie() {
       </div>
     </div>
   `).join('');
+
+  if (!irr && !encontradas.length) {
+    html = `<div style="font-size:12px;color:var(--red);padding:6px 0">❌ No aparece en ninguna factura/RTO cargada ni en Irreparables. O no la subimos todavía, o la serie no coincide exacto (revisá que no tenga espacios de más).</div>`;
+    if (conIrreparables.length) {
+      html += `<div style="font-size:11px;color:var(--text-muted);padding:4px 0 2px">⚠️ Ojo: estas facturas tienen irreparables, pero la lista de series de las irreparables solo se guarda desde el 22/10. Si cargaste el RTO antes, apretá <b>🔄 RTO</b> en la factura para registrarlas y volvé a buscar:<br>` +
+        conIrreparables.map(f => `<span style="font-family:'JetBrains Mono',monospace;color:var(--text)">${f.numero || '—'}</span> (${MESES_LABEL ? MESES_LABEL[f.mes] : f.mes}, ${f.irreparables} irreparables)`).join(' · ') + `</div>`;
+    }
+    if (irrError) html += `<div style="font-size:10px;color:var(--text-muted)">No se pudo consultar Irreparables: ${irrError}</div>`;
+  }
+  out.innerHTML = html;
 }
 function logiRealPesos(m) {
   return logiGetFacturas(m).reduce((s,f) => s + f.totalUSD * logiCurrentTC, 0);
