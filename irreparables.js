@@ -67,7 +67,7 @@
   // el sufijo de caja/pallet, así que se puede repetir sin duplicar.
   L.armarLote = function (o) {
     let base = L.quitarSufijo(o.loteActual);
-    if (!base) base = (o.hoy || '') + ' - ' + (o.falla || 'Irreparable');
+    if (!base) base = String(o.falla || '').trim() || 'Irreparable';   // Lote vacio en SF: lo cargado en Falla / motivo
     const info = String(o.info || '').trim();
     if (info && base.toLowerCase().indexOf(info.toLowerCase()) === -1) base += ' - ' + info;
     const suf = ' | ' + o.caja + (o.pallet ? ' | ' + o.pallet : '');
