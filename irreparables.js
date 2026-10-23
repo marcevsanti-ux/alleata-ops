@@ -24,6 +24,9 @@
   L.CAP_PALLET_CAJAS = 17;       // ~500 terminales por pallet (17 × 30 = 510) — aviso, no bloqueo
   L.LOTE_MAX = 255;              // largo estándar de un campo de texto de SF
   L.CAMPOS_PROTEGIDOS = ['Ubicacion__c', 'Estado__c', 'CAMBIO_DE_BATERIA__c', 'Perfil__c'];
+  L.COMPLETABLES = ['Perfil__c', 'CAMBIO_DE_BATERIA__c'];      // si vienen vacíos de SF, los elige el operador
+  L.OPC_PERFIL = ['NAPSE', 'PRISMA'];
+  L.OPC_BATERIA = ['SÍ', 'NO'];
 
   L.esc = function (s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
@@ -67,7 +70,7 @@
   // el sufijo de caja/pallet, así que se puede repetir sin duplicar.
   L.armarLote = function (o) {
     let base = L.quitarSufijo(o.loteActual);
-    if (!base) base = (o.hoy || '') + ' - ' + (o.falla || 'Irreparable');
+    if (!base) base = String(o.falla || '').trim() || 'Irreparable';   // Lote vacio en SF: lo cargado en Falla / motivo
     const info = String(o.info || '').trim();
     if (info && base.toLowerCase().indexOf(info.toLowerCase()) === -1) base += ' - ' + info;
     const suf = ' | ' + o.caja + (o.pallet ? ' | ' + o.pallet : '');
@@ -154,6 +157,7 @@
     log: [], cola: [], drenando: false,
     sel: {},                          // serie → true (selección para SF)
     abiertas: [],                     // otras cajas abiertas (destino de "Mover a…")
+    comp: {}, faltan: [], pendSF: null, // Perfil / Batería elegidos por el operador (serie → {campo: valor})
   };
   function esAdmin() { try { return typeof currentProfile !== 'undefined' && !!currentProfile && currentProfile.rol === 'admin'; } catch (e) { return false; } }
 
@@ -561,30 +565,39 @@
   }
 
   // Graba caja/pallet en Product2.Lote__c. filas = filas de v_irreparables_trazabilidad.
-  async function asentarSF(filas) {
+  async function asentarSF(filas, opts) {
+    opts = opts || {};
     const validas = filas.filter(function (f) { return f.caja; });
     if (!validas.length) return toast('No hay terminales con caja para asentar.');
-    if (!confirm('Vas a grabar en SALESFORCE (producción) ' + validas.length + ' terminal(es).\n\n' +
+    if (!opts.sinConfirmar && !confirm('Vas a grabar en SALESFORCE (producción) ' + validas.length + ' terminal(es).\n\n' +
       'Se modifica SOLO Product2.Lote__c: se agrega " | caja | pallet" al final (la falla de Logicalis se conserva). ' +
       'Ubicación, Estado, Perfil y Batería se reenvían sin cambios.\n\n¿Continuar?')) return;
     const msg = $('irrSfMsg'); if (msg) msg.innerHTML = '<span style="color:var(--text-muted)">⏳ Consultando Salesforce…</span>';
     const hoy = new Date().toLocaleDateString('es-AR');
     const res = { ok: 0, igual: 0, fallo: [] };
+    let faltanFinal = [];
     try {
       const prev = await sfPreview(validas.map(function (f) { return f.serie; }));
       const porSerie = {}; prev.forEach(function (r) { porSerie[r.serie] = r; });
-      const records = [], esperado = {}, antes = {};
+      const records = [], esperado = {}, antes = {}, faltan = [];
+      faltanFinal = faltan;
       validas.forEach(function (f) {
+        f._pend = false;
         const p = porSerie[f.serie];
         if (!p || !p.found) return res.fallo.push({ serie: f.serie, motivo: 'No existe en Salesforce' });
         const vac = L.camposVacios(p.current);
-        if (vac.length) return res.fallo.push({ serie: f.serie, motivo: 'Campos vacíos en SF (' + vac.join(', ') + '): completalos en SF y reintentá' });
+        const noCompletables = vac.filter(function (k) { return L.COMPLETABLES.indexOf(k) < 0; });
+        if (noCompletables.length) return res.fallo.push({ serie: f.serie, motivo: 'Campos vacíos en SF (' + noCompletables.join(', ') + '): completalos en SF y reintentá' });
+        // Perfil / Batería vacíos: los elige el operador (se graban en SF junto con el Lote)
+        const cur = Object.assign({}, p.current), pend = [];
+        vac.forEach(function (k) { const v = (S.comp[f.serie] || {})[k]; if (v) cur[k] = v; else pend.push(k); });
+        if (pend.length) { f._pend = true; return faltan.push({ serie: f.serie, campos: pend }); }
         const lote = L.armarLote({ loteActual: p.current.Lote__c, falla: f.falla_logicalis, info: f.info_operador, caja: f.caja, pallet: f.pallet, hoy: hoy });
-        if (lote === p.current.Lote__c) { res.igual++; f._ok = { sfId: p.sfId, lote: lote, igual: true }; return; }
+        if (lote === p.current.Lote__c && !vac.length) { res.igual++; f._ok = { sfId: p.sfId, lote: lote, igual: true }; return; }
         const fields = { Lote__c: lote };
-        L.CAMPOS_PROTEGIDOS.forEach(function (k) { fields[k] = p.current[k]; });
+        L.CAMPOS_PROTEGIDOS.forEach(function (k) { fields[k] = cur[k]; });
         records.push({ serie: f.serie, fields: fields });
-        esperado[f.serie] = lote; antes[f.serie] = p.current; f._sfId = p.sfId;
+        esperado[f.serie] = lote; antes[f.serie] = cur; f._sfId = p.sfId;
       });
 
       const upd = {};
@@ -612,8 +625,9 @@
       const ahora = new Date().toISOString();
       const fallos = {}; res.fallo.forEach(function (x) { fallos[x.serie] = x.motivo; });
       for (const f of validas) {
+        if (f._pend) continue;                       // espera que el operador elija Perfil / Batería
         const patch = { sf_sync_at: ahora };
-        if (f._ok) { patch.sf_sync_ok = true; patch.sf_sync_msg = f._ok.igual ? 'Ya estaba asentado' : 'OK'; patch.sf_lote_grabado = f._ok.lote; if (f._ok.sfId) patch.sf_id = f._ok.sfId; }
+        if (f._ok) { delete S.comp[f.serie]; patch.sf_sync_ok = true; patch.sf_sync_msg = f._ok.igual ? 'Ya estaba asentado' : 'OK'; patch.sf_lote_grabado = f._ok.lote; if (f._ok.sfId) patch.sf_id = f._ok.sfId; }
         else { patch.sf_sync_ok = false; patch.sf_sync_msg = (fallos[f.serie] || 'Error').slice(0, 300); }
         await dbq(sb.from(T_ITEMS).update(patch).eq('id', f.id));
       }
@@ -632,7 +646,49 @@
       if (S.tab === 'pallets') await renderPalletTab();
     } catch (e) { /* el resumen se muestra igual */ }
     const m2 = $('irrSfMsg'); if (m2) m2.innerHTML = resumenHtml;
+    // Las terminales con Perfil / Batería vacíos en SF quedaron sin grabar: se pregunta con qué completarlas
+    if (faltanFinal.length) { S.pendSF = validas.filter(function (f) { return f._pend; }); renderComplemento(faltanFinal, true); }
   }
+  /* ── Perfil / Batería vacíos en SF: el operador los elige con un click ── */
+  function renderComplemento(faltan, agregar) {
+    const el = $('irrSfMsg'); if (!el) return;
+    S.faltan = faltan;
+    const selP = function (serie) { return '<select class="irr-in" style="width:auto" onchange="Irr.comp(\'' + esc(serie) + '\',\'Perfil__c\',this.value)"><option value="">Perfil…</option>' + L.OPC_PERFIL.map(function (v) { return '<option>' + esc(v) + '</option>'; }).join('') + '</select>'; };
+    const selB = function (serie) { return '<select class="irr-in" style="width:auto" onchange="Irr.comp(\'' + esc(serie) + '\',\'CAMBIO_DE_BATERIA__c\',this.value)"><option value="">Batería…</option>' + L.OPC_BATERIA.map(function (v) { return '<option>' + esc(v) + '</option>'; }).join('') + '</select>'; };
+    const hayP = faltan.some(function (f) { return f.campos.indexOf('Perfil__c') >= 0; });
+    const hayB = faltan.some(function (f) { return f.campos.indexOf('CAMBIO_DE_BATERIA__c') >= 0; });
+    const html = '<div class="card" style="border:1.5px solid #f59e0b;margin:8px 0">' +
+      '<div style="font-size:12px;font-weight:700;color:#f59e0b;margin-bottom:4px">⚠ ' + faltan.length + ' terminal(es) con datos vacíos en Salesforce — elegí con qué completarlos</div>' +
+      '<div style="font-size:11px;color:var(--text-muted);margin-bottom:8px">Salesforce exige Perfil y Cambio de batería al grabar. Lo que elijas se graba en SF junto con el Lote. Todavía no se escribió nada.</div>' +
+      '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px"><span style="font-size:11px;font-weight:700">Para todas:</span>' +
+      (hayP ? '<select class="irr-in" style="width:auto" onchange="Irr.compTodas(\'Perfil__c\',this.value)"><option value="">Perfil…</option>' + L.OPC_PERFIL.map(function (v) { return '<option>' + esc(v) + '</option>'; }).join('') + '</select>' : '') +
+      (hayB ? '<select class="irr-in" style="width:auto" onchange="Irr.compTodas(\'CAMBIO_DE_BATERIA__c\',this.value)"><option value="">Batería…</option>' + L.OPC_BATERIA.map(function (v) { return '<option>' + esc(v) + '</option>'; }).join('') + '</select>' : '') + '</div>' +
+      '<div style="max-height:260px;overflow:auto"><table class="irr-tbl"><tbody>' + faltan.map(function (f) {
+        return '<tr data-serie="' + esc(f.serie) + '"><td class="irr-mono">' + esc(f.serie) + '</td><td>' +
+          (f.campos.indexOf('Perfil__c') >= 0 ? selP(f.serie) : '') + '</td><td>' + (f.campos.indexOf('CAMBIO_DE_BATERIA__c') >= 0 ? selB(f.serie) : '') + '</td></tr>';
+      }).join('') + '</tbody></table></div>' +
+      '<div style="margin-top:10px;display:flex;gap:8px"><button class="btn btn-sm" onclick="Irr.compAplicar()">📤 Asentar en SF con estos datos</button>' +
+      '<button class="btn btn-sm" style="background:transparent;border:1px solid var(--border);color:var(--text-muted)" onclick="Irr.compCancelar()">Cancelar</button></div></div>';
+    if (agregar) el.insertAdjacentHTML('beforeend', html); else el.innerHTML = html;
+  }
+  function compSet(serie, campo, valor) { S.comp[serie] = S.comp[serie] || {}; if (valor) S.comp[serie][campo] = valor; else delete S.comp[serie][campo]; }
+  function compTodas(campo, valor) {
+    (S.faltan || []).forEach(function (f) { if (f.campos.indexOf(campo) >= 0) compSet(f.serie, campo, valor); });
+    document.querySelectorAll('#irrSfMsg tr[data-serie]').forEach(function (tr) {
+      const s = tr.getAttribute('data-serie');
+      tr.querySelectorAll('select').forEach(function (sel) {
+        const oc = sel.getAttribute('onchange') || '';
+        if (oc.indexOf("'" + campo + "'") >= 0) sel.value = (S.comp[s] || {})[campo] || '';
+      });
+    });
+  }
+  function compAplicar() {
+    const sin = (S.faltan || []).filter(function (f) { return f.campos.some(function (k) { return !(S.comp[f.serie] || {})[k]; }); });
+    if (sin.length) return toast('Falta elegir Perfil / Batería en ' + sin.length + ' terminal(es).');
+    const filas = S.pendSF || [];
+    asentarSF(filas, { sinConfirmar: true });
+  }
+  function compCancelar() { S.faltan = []; S.pendSF = null; const el = $('irrSfMsg'); if (el) el.innerHTML = ''; }
   function asentarSeleccion() {
     const filas = S.items.filter(function (i) { return S.sel[i.serie]; });
     if (!filas.length) return toast('Marcá al menos una terminal (o usá "Seleccionar todas").');
@@ -1050,6 +1106,7 @@
     nuevoPallet: nuevoPallet, elegirPallet: elegirPallet, cajaAPallet: agregarCajaAPallet, sacarCaja: quitarCajaDePallet,
     cerrarPallet: cerrarPallet, reabrirPallet: reabrirPallet, enviarPallet: enviarPallet, asentarPallet: asentarPallet,
     exportar: function () { exportarPacking(); }, buscar: buscar,
+    comp: compSet, compTodas: compTodas, compAplicar: compAplicar, compCancelar: compCancelar,
     _logic: L,
   };
 })();
