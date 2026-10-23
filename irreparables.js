@@ -246,7 +246,7 @@
     const c = await dbq(sb.from(V_CAJAS).select('*').eq('codigo', codigo).maybeSingle());
     if (!c) return log('err', 'No existe la caja ' + codigo + '.');
     await cargarCaja(c.id);
-    log('ok', 'Caja activa: ' + c.codigo + ' (' + c.cant + '/' + c.capacidad + ', ' + c.estado + ')');
+    log('ok', 'Caja activa: ' + c.codigo + ' (' + c.cant + ' terminales, ' + c.estado + ')');
     renderCajaBar(); renderCajaItems();
   }
   async function elegirCaja(id) { if (!id) return; try { await cargarCaja(id); renderCajaBar(); renderCajaItems(); focoScan(); } catch (e) { errorGeneral(e); } }
@@ -255,7 +255,6 @@
     const c = S.caja;
     if (!c || c.estado !== 'abierta') return;
     if (c.cant === 0) return toast('La caja está vacía.');
-    if (c.cant < c.capacidad && !confirm('La caja tiene ' + c.cant + ' de ' + c.capacidad + ' terminales. ¿Cerrarla igual?')) return;
     const w = abrirVentana();
     try {
       await dbq(sb.from(T_CAJAS).update({ estado: 'cerrada', closed_at: new Date().toISOString() }).eq('id', c.id));
@@ -293,7 +292,6 @@
     const c = S.caja; if (!c || c.estado !== 'abierta') return;
     const dest = S.abiertas.find(function (x) { return x.id === destinoId; });
     if (!dest) return toast('La caja de destino ya no está abierta.');
-    if (dest.cant >= dest.capacidad) { await refreshCaja(); return toast(dest.codigo + ' está llena.'); }
     try {
       const upd = await dbq(sb.from(T_ITEMS).update({ caja_id: dest.id, caja_at: new Date().toISOString(), caja_by: quien() })
         .eq('id', itemId).eq('caja_id', c.id).select('id'));
@@ -303,18 +301,14 @@
       await refreshCaja();
     } catch (e) { errorGeneral(e); }
   }
-  // Modifica notas y capacidad de la caja activa
+  // Modifica las notas de la caja activa (la caja no tiene tope de terminales)
   async function editarCaja() {
     const c = S.caja; if (!c) return;
     if (c.pallet_estado === 'enviado') return toast('La caja está en un pallet enviado: no se puede modificar.');
     const notas = prompt('Notas de la caja ' + c.codigo + ' (vacío = sin notas):', c.notas || '');
     if (notas === null) return;
-    const capTxt = prompt('Capacidad de la caja (mínimo ' + Math.max(1, c.cant) + ', máximo 60):', String(c.capacidad));
-    if (capTxt === null) return;
-    const cap = parseInt(capTxt, 10);
-    if (!(cap >= Math.max(1, c.cant) && cap <= 60)) return toast('Capacidad inválida: tiene que estar entre ' + Math.max(1, c.cant) + ' y 60.');
     try {
-      await dbq(sb.from(T_CAJAS).update({ notas: notas.trim() || null, capacidad: cap }).eq('id', c.id));
+      await dbq(sb.from(T_CAJAS).update({ notas: notas.trim() || null }).eq('id', c.id));
       await refreshCaja();
       log('ok', 'Caja ' + c.codigo + ' actualizada.');
     } catch (e) { errorGeneral(e); }
@@ -474,7 +468,6 @@
     const caja = S.caja;
     if (!caja) return log('err', 'Primero abrí una caja (➕ Nueva caja) o escaneá el código de una caja abierta.');
     if (caja.estado !== 'abierta') return log('err', 'La caja ' + caja.codigo + ' está cerrada. Reabrila o abrí otra.');
-    if (caja.cant >= caja.capacidad) return log('err', 'La caja ' + caja.codigo + ' está llena (' + caja.capacidad + '). Cerrala e imprimí el rótulo.');
     if (S.alta) return log('err', 'Terminá de cargar los datos de ' + S.alta.serie + ' antes de seguir.');
 
     let item = await dbq(sb.from(T_ITEMS).select('*').eq('serie', serie).maybeSingle());
@@ -533,7 +526,7 @@
     if (!upd || !upd.length) return log('err', item.serie + ': otro operador la acaba de asignar a una caja.');
     log('ok', item.serie + ' → ' + caja.codigo + (item.falla_logicalis ? '  ·  ' + item.falla_logicalis : ''));
     await refreshCaja();
-    if (S.caja.cant >= S.caja.capacidad) log('warn', '✅ ' + S.caja.codigo + ' completa (' + S.caja.capacidad + '). Cerrala e imprimí el rótulo.');
+    if (S.caja.capacidad && S.caja.cant === S.caja.capacidad) log('warn', S.caja.codigo + ' llegó a ' + S.caja.capacidad + ' terminales (referencia). Podés seguir o cerrarla e imprimir el rótulo.');
   }
   async function confirmarAlta() {
     const a = S.alta; if (!a) return;
@@ -971,10 +964,9 @@
         '<button class="btn btn-sm" onclick="Irr.nuevaCaja()">➕ Nueva caja</button>' + sel + '</div>';
       cargarSelectCajas(); return;
     }
-    const llena = c.cant >= c.capacidad, pct = Math.min(100, Math.round(c.cant / c.capacidad * 100));
     el.innerHTML = '<div class="card" style="margin-bottom:10px"><div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">' +
       '<div><div style="font-size:10px;color:var(--text-muted);text-transform:uppercase">Caja activa</div><div class="irr-big" style="color:var(--teal)">' + esc(c.codigo) + '</div></div>' +
-      '<div><div style="font-size:10px;color:var(--text-muted);text-transform:uppercase">Terminales</div><div class="irr-big" style="color:' + (llena ? '#f59e0b' : 'var(--text)') + '">' + c.cant + '<span style="font-size:18px;color:var(--text-muted)"> / ' + c.capacidad + '</span></div></div>' +
+      '<div><div style="font-size:10px;color:var(--text-muted);text-transform:uppercase">Terminales</div><div class="irr-big" style="color:var(--text)">' + c.cant + '</div></div>' +
       '<div>' + badge(c.estado === 'abierta' ? 'ABIERTA' : 'CERRADA', c.estado === 'abierta' ? '#1dbf8e' : '#94a3b8') + (c.pallet_codigo ? ' ' + badge(c.pallet_codigo, '#1a9fd4') : '') + '</div>' +
       '<div style="flex:1"></div><div style="display:flex;gap:6px;flex-wrap:wrap">' +
       (c.estado === 'abierta' ? '<button class="btn btn-sm" onclick="Irr.cerrarCaja()">✅ Cerrar e imprimir rótulo</button>' : '<button class="btn btn-sm" onclick="Irr.reimprimirCaja(\'' + c.id + '\')">🖨️ Reimprimir</button>' + (c.pallet_estado !== 'enviado' ? '<button class="btn btn-sm" onclick="Irr.reabrirCaja()">↩ Reabrir para modificar</button>' : '')) +
@@ -982,13 +974,13 @@
       (esAdmin() && c.pallet_estado !== 'enviado' ? '<button class="btn btn-sm" style="background:transparent;border:1px solid #ef4444;color:#ef4444" onclick="Irr.eliminarCaja()">🗑 Eliminar caja</button>' : '') +
       '<button class="btn btn-sm" onclick="Irr.nuevaCaja()">➕ Nueva caja</button></div></div>' +
       (c.notas ? '<div style="font-size:11px;color:var(--text-muted);margin-top:8px">📝 ' + esc(c.notas) + '</div>' : '') +
-      '<div style="height:6px;background:var(--navy-700);border-radius:4px;margin-top:10px;overflow:hidden"><div style="height:100%;width:' + pct + '%;background:' + (llena ? '#f59e0b' : 'var(--teal)') + '"></div></div></div>';
+      '</div>';
   }
   async function cargarSelectCajas() {
     try {
       const abiertas = await dbq(sb.from(V_CAJAS).select('id,codigo,cant,capacidad').eq('estado', 'abierta').order('created_at', { ascending: false }).limit(50));
       const s = document.querySelector('#irrCajaBar select'); if (!s) return;
-      s.innerHTML = '<option value="">Elegir caja abierta…</option>' + abiertas.map(function (c) { return '<option value="' + c.id + '">' + esc(c.codigo) + ' (' + c.cant + '/' + c.capacidad + ')</option>'; }).join('');
+      s.innerHTML = '<option value="">Elegir caja abierta…</option>' + abiertas.map(function (c) { return '<option value="' + c.id + '">' + esc(c.codigo) + ' (' + c.cant + ')</option>'; }).join('');
     } catch (e) { errorGeneral(e); }
   }
   function renderLog() {
@@ -1032,7 +1024,7 @@
           '<td><input type="checkbox" ' + (i.operativa ? 'checked' : '') + ' onchange="Irr.guardar(\'' + i.id + '\',\'operativa\',this.checked)"></td><td>' + sf + '</td>' +
           '<td style="white-space:nowrap">' +
           (abierta && S.abiertas.length ? '<select class="irr-in" style="width:auto;margin-right:4px" title="Mover a otra caja abierta" onchange="Irr.mover(\'' + i.id + '\',this.value)"><option value="">Mover a…</option>' +
-            S.abiertas.filter(function (x) { return x.cant < x.capacidad; }).map(function (x) { return '<option value="' + x.id + '">' + esc(x.codigo) + ' (' + x.cant + '/' + x.capacidad + ')</option>'; }).join('') + '</select>' : '') +
+            S.abiertas.map(function (x) { return '<option value="' + x.id + '">' + esc(x.codigo) + ' (' + x.cant + ')</option>'; }).join('') + '</select>' : '') +
           (abierta ? '<button title="Sacar de la caja" style="background:none;border:none;color:#ef4444;cursor:pointer;font-size:14px" onclick="Irr.quitar(\'' + i.id + '\')">✕</button>' : '') +
           (esAdmin() && i.pallet_estado !== 'enviado' ? '<button title="Eliminar terminal (admin)" style="background:none;border:none;cursor:pointer;font-size:13px" onclick="Irr.eliminarItem(\'' + i.id + '\')">🗑</button>' : '') + '</td></tr>';
       }).join('') + '</tbody></table></div></div>';
@@ -1045,7 +1037,7 @@
     $('irrBody').innerHTML = '<div class="card"><div style="font-size:13px;font-weight:700;margin-bottom:8px">📦 Cajas (' + cajas.length + ')</div>' +
       (cajas.length ? '<div style="overflow-x:auto"><table class="irr-tbl"><thead><tr><th>Caja</th><th>Estado</th><th>Terminales</th><th>Pallet</th><th>Creada</th><th>Por</th><th></th></tr></thead><tbody>' +
         cajas.map(function (c) {
-          return '<tr><td class="irr-mono"><b>' + esc(c.codigo) + '</b></td><td>' + badge(c.estado, c.estado === 'abierta' ? '#1dbf8e' : '#94a3b8') + '</td><td>' + c.cant + ' / ' + c.capacidad + '</td>' +
+          return '<tr><td class="irr-mono"><b>' + esc(c.codigo) + '</b></td><td>' + badge(c.estado, c.estado === 'abierta' ? '#1dbf8e' : '#94a3b8') + '</td><td>' + c.cant + '</td>' +
             '<td>' + (c.pallet_codigo ? badge(c.pallet_codigo, '#1a9fd4') : '—') + '</td><td>' + esc(fmtFecha(c.created_at)) + '</td><td>' + esc(c.created_by || '') + '</td>' +
             '<td style="white-space:nowrap"><button class="btn btn-sm" onclick="Irr.verCaja(\'' + c.id + '\')">Abrir</button> <button class="btn btn-sm" onclick="Irr.reimprimirCaja(\'' + c.id + '\')">🖨️</button>' +
               (esAdmin() && c.pallet_estado !== 'enviado' ? ' <button class="btn btn-sm" title="Eliminar caja (admin)" style="background:transparent;border:1px solid #ef4444;color:#ef4444" onclick="Irr.eliminarCaja(\'' + c.id + '\')">🗑</button>' : '') + '</td></tr>';
