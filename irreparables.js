@@ -1148,15 +1148,85 @@
     } catch (e) { errorGeneral(e); }
   }
 
-  // Entrada desde el QR del rótulo: abre Consulta con la caja / pallet
+  /* ═════════ Vista tipo planilla (al escanear el QR del rótulo con el celular) ═════════ */
+  function cerrarPlanilla() { const o = $('irrSheet'); if (o) o.remove(); try { document.body.style.overflow = ''; } catch (e) { /* noop */ } }
+  function filtrarPlanilla(q) {
+    q = String(q || '').trim().toLowerCase();
+    const rows = document.querySelectorAll('#irrSheet tr[data-s]'); let n = 0;
+    rows.forEach(function (tr) { const ok = !q || tr.getAttribute('data-s').indexOf(q) >= 0; tr.style.display = ok ? '' : 'none'; if (ok) n++; });
+    const c = $('irrSheetCnt'); if (c) c.textContent = q ? n + ' de ' + rows.length : rows.length + ' terminales';
+  }
+  async function mostrarPlanilla(t) {
+    cerrarPlanilla();
+    const o = document.createElement('div'); o.id = 'irrSheet';
+    o.style.cssText = 'position:fixed;inset:0;z-index:2147483000;background:#fff;color:#1f2937;overflow:auto;font-family:Arial,sans-serif;-webkit-overflow-scrolling:touch';
+    o.innerHTML = '<div style="padding:30px 16px;color:#6b7280;font-size:14px">⏳ Cargando…</div>';
+    document.body.appendChild(o); document.body.style.overflow = 'hidden';
+    const hdr = function (titulo, sub, extra) {
+      return '<div style="position:sticky;top:0;z-index:2;background:#107c41;color:#fff;padding:10px 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">' +
+        '<div style="flex:1;min-width:180px"><div style="font-size:17px;font-weight:700">' + titulo + '</div><div style="font-size:12px;opacity:.9">' + sub + '</div></div>' + extra +
+        '<button onclick="Irr.cerrarPlanilla()" style="background:#fff;color:#107c41;border:none;border-radius:6px;padding:8px 12px;font-weight:700;font-size:13px">✕ Cerrar</button></div>';
+    };
+    const th = 'position:sticky;top:0;background:#e5e7eb;border:1px solid #cbd5e1;padding:6px 8px;font-size:11px;text-align:left;color:#374151;white-space:nowrap';
+    const td = 'border:1px solid #e5e7eb;padding:6px 8px;font-size:13px;vertical-align:top';
+    const fila = function (i, n) {
+      return '<tr data-s="' + esc((i.serie + ' ' + (i.falla_logicalis || '') + ' ' + (i.info_operador || '')).toLowerCase()) + '">' +
+        '<td style="' + td + ';background:#f3f4f6;color:#6b7280;text-align:center;width:34px">' + n + '</td>' +
+        '<td style="' + td + ';font-family:\'Courier New\',monospace;font-weight:700;white-space:nowrap">' + esc(i.serie) + '</td>' +
+        '<td style="' + td + '">' + esc(i.falla_logicalis || '—') + (i.operativa ? ' <span style="color:#b45309;font-size:11px">(operativa)</span>' : '') + '</td>' +
+        '<td style="' + td + ';white-space:nowrap">' + esc(L.fmtDia(i.fecha_reporte)) + '</td>' +
+        '<td style="' + td + '">' + esc(i.info_operador || '') + '</td></tr>';
+    };
+    const cab = '<thead><tr><th style="' + th + ';width:34px"></th><th style="' + th + '">Serie</th><th style="' + th + '">Falla (Logicalis)</th><th style="' + th + '">Fecha reporte</th><th style="' + th + '">Info operador</th></tr></thead>';
+    const buscador = '<div style="padding:8px 12px;background:#f9fafb;border-bottom:1px solid #e5e7eb;display:flex;gap:10px;align-items:center">' +
+      '<input type="search" placeholder="Buscar serie o falla…" oninput="Irr.filtrarPlanilla(this.value)" style="flex:1;font-size:16px;padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px"><span id="irrSheetCnt" style="font-size:12px;color:#6b7280;white-space:nowrap"></span></div>';
+    try {
+      if (t.tipo === 'caja') {
+        const c = await dbq(sb.from(V_CAJAS).select('*').eq('codigo', t.codigo).maybeSingle());
+        if (!c) { o.innerHTML = hdr(esc(t.codigo), 'No existe', '') + '<div style="padding:20px">No existe la caja ' + esc(t.codigo) + '.</div>'; return; }
+        const items = await fetchAll(function (a, b) { return sb.from(V_TRAZ).select('*').eq('caja_id', c.id).order('serie').range(a, b); });
+        S._planilla = { tipo: 'caja', c: c, items: items };
+        o.innerHTML = hdr(esc(c.codigo), esc(c.estado) + (c.pallet_codigo ? ' · ' + esc(c.pallet_codigo) : '') + (c.notas ? ' · ' + esc(c.notas) : ''),
+          '<button onclick="Irr.excelPlanilla()" style="background:#0e6b39;color:#fff;border:1px solid #fff;border-radius:6px;padding:8px 12px;font-size:13px">📊 Excel</button>') +
+          buscador + '<div style="overflow-x:auto"><table style="border-collapse:collapse;width:100%">' + cab + '<tbody>' +
+          (items.length ? items.map(function (i, n) { return fila(i, n + 1); }).join('') : '<tr><td colspan="5" style="' + td + '">Caja vacía.</td></tr>') + '</tbody></table></div>';
+      } else {
+        const p = await dbq(sb.from(V_PALLETS).select('*').eq('codigo', t.codigo).maybeSingle());
+        if (!p) { o.innerHTML = hdr(esc(t.codigo), 'No existe', '') + '<div style="padding:20px">No existe el pallet ' + esc(t.codigo) + '.</div>'; return; }
+        const items = await itemsDePallet(p.id);
+        S._planilla = { tipo: 'pallet', p: p, items: items };
+        let n = 0, ult = null, body = '';
+        items.forEach(function (i) {
+          if (i.caja !== ult) { ult = i.caja; body += '<tr><td colspan="5" style="' + td + ';background:#dcfce7;font-weight:700;color:#14532d">📦 ' + esc(i.caja) + '</td></tr>'; }
+          body += fila(i, ++n);
+        });
+        o.innerHTML = hdr(esc(p.codigo), esc(p.estado) + ' · ' + p.cant_cajas + ' cajas' + (p.remito ? ' · remito ' + esc(p.remito) : ''),
+          '<button onclick="Irr.excelPlanilla()" style="background:#0e6b39;color:#fff;border:1px solid #fff;border-radius:6px;padding:8px 12px;font-size:13px">📊 Excel</button>') +
+          buscador + '<div style="overflow-x:auto"><table style="border-collapse:collapse;width:100%">' + cab + '<tbody>' + (body || '<tr><td colspan="5" style="' + td + '">Pallet sin terminales.</td></tr>') + '</tbody></table></div>';
+      }
+      filtrarPlanilla('');
+    } catch (e) {
+      o.innerHTML = hdr('Error', '', '') + '<div style="padding:20px;color:#b91c1c">' + esc(e.message || e) + '</div>';
+      console.error('[Irreparables] planilla', e);
+    }
+  }
+  function excelPlanilla() {
+    const d = S._planilla; if (!d) return;
+    if (d.tipo === 'pallet') return exportarPacking(d.p.id);
+    if (typeof XLSX === 'undefined') return toast('La librería Excel no cargó.');
+    const rows = d.items.map(function (i) { return { 'Caja': d.c.codigo, 'Serie': i.serie, 'Falla Logicalis': i.falla_logicalis || '', 'Fecha reporte': i.fecha_reporte ? L.fmtDia(i.fecha_reporte) : '', 'Info operador': i.info_operador || '', 'Operativa': i.operativa ? 'SÍ' : '' }; });
+    const wb = XLSX.utils.book_new(), ws = XLSX.utils.json_to_sheet(rows);
+    ws['!cols'] = [10, 28, 40, 14, 40, 9].map(function (w) { return { wch: w }; });
+    XLSX.utils.book_append_sheet(wb, ws, d.c.codigo);
+    XLSX.writeFile(wb, 'Caja_' + d.c.codigo + '.xlsx');
+  }
+  // Entrada desde el QR del rótulo: vista de planilla con los seriales de la caja / pallet
   async function abrir(codigo) {
     const t = L.tipoEscaneo(codigo); if (!t || t.tipo === 'serie') return;
-    await init(); S.tab = 'consulta'; await setTab('consulta');
-    const inp = $('irrBuscar'); if (inp) inp.value = t.codigo;
-    await buscar(t.codigo);
+    await mostrarPlanilla(t);
   }
   window.Irr = {
-    abrir: abrir,
+    abrir: abrir, cerrarPlanilla: cerrarPlanilla, filtrarPlanilla: filtrarPlanilla, excelPlanilla: excelPlanilla,
     init: init, tab: setTab, scan: scan, nuevaCaja: nuevaCaja, elegirCaja: elegirCaja, cerrarCaja: cerrarCaja, reabrirCaja: reabrirCaja,
     editarCaja: editarCaja, mover: moverItem, eliminarCaja: eliminarCaja, eliminarItem: eliminarItem, eliminarPallet: eliminarPallet,
     quitar: quitarItem, guardar: guardarInfo, confirmarAlta: confirmarAlta, cancelarAlta: cancelarAlta,
