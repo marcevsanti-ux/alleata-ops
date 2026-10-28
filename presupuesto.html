@@ -4,7 +4,7 @@
 <script src="agent-auth.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Alleata · Presupuesto Operaciones v1.14.8</title>
+<title>Alleata · Presupuesto Operaciones v1.14.9</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -149,6 +149,17 @@
   .tag-ok{font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;background:rgba(29,191,142,.15);color:var(--teal)}
   .fac-empty{text-align:center;padding:20px;font-size:12px;color:var(--text-muted)}
 
+  /* Desglose flotante al pasar el mouse sobre el N° de factura EPSA (un solo div en <body>, ver epsaTipShow) */
+  #epsaTip{position:fixed;z-index:9999;display:none;width:min(580px,94vw);background:var(--navy-900);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;box-shadow:0 12px 36px rgba(0,0,0,.55);pointer-events:none;text-align:left}
+  #epsaTip .tip-head{font-size:11px;color:var(--text-muted);margin-bottom:6px}
+  #epsaTip .tip-head b{font-family:'JetBrains Mono',monospace;color:var(--text);font-size:12px}
+  #epsaTip .tip-tot{margin-top:10px;border-top:1px solid var(--border2);padding-top:8px;display:grid;gap:3px}
+  #epsaTip .tip-tot div{display:flex;justify-content:space-between;gap:12px;font-size:11px;color:var(--text-muted)}
+  #epsaTip .tip-tot div b{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text);font-weight:600}
+  #epsaTip .tip-tot div.t{font-weight:700;color:var(--text)}
+  #epsaTip .tip-tot div.t b{color:var(--teal);font-weight:800;font-size:12px}
+  #epsaTip .tip-warn{margin-top:8px;font-size:10px;color:#f59e0b}
+
   /* Series */
   .series-wrap{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:4px;max-height:160px;overflow-y:auto;margin-top:10px}
   .serie-chip{font-size:10px;font-family:'JetBrains Mono',monospace;background:var(--navy-900);border:1px solid var(--border2);border-radius:5px;padding:3px 8px;color:var(--text-muted)}
@@ -201,7 +212,7 @@
   <div class="login-box">
     <h2>💰 Presupuesto</h2>
     <p class="login-sub">Alleata · Acceso restringido</p>
-    <div style="position:absolute;bottom:12px;right:16px;font-size:10px;font-family:'JetBrains Mono',monospace;color:rgba(232,237,243,.2)">v1.14.8</div>
+    <div style="position:absolute;bottom:12px;right:16px;font-size:10px;font-family:'JetBrains Mono',monospace;color:rgba(232,237,243,.2)">v1.14.9</div>
     <div class="login-field">
       <label>Email</label>
       <input type="email" id="loginEmail" placeholder="tu@email.com" onkeydown="if(event.key==='Enter')doLogin()">
@@ -217,7 +228,7 @@
 
 <div id="appContent" style="display:none">
 <h1>💰 Presupuesto Operaciones</h1>
-<p class="sub">Alleata · 2026 <span style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 8px;border-radius:4px;border:1px solid var(--border2);font-size:10px;margin-left:6px">v1.14.8</span></p>
+<p class="sub">Alleata · 2026 <span style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 8px;border-radius:4px;border:1px solid var(--border2);font-size:10px;margin-left:6px">v1.14.9</span></p>
 
 <div class="toolbar">
   <div class="mes-bar" id="mesBar"></div>
@@ -628,7 +639,9 @@ function renderTabla(items, filtro) {
           </div>`).join('');
       else if(isEpsa && epsaFacsRow.length)
         nroFacCell = epsaFacsRow.map(f=>`
-          <div style="display:inline-block;margin:2px;vertical-align:top;text-align:center">
+          <div style="display:inline-block;margin:2px;vertical-align:top;text-align:center;cursor:help" tabindex="0"
+               onmouseenter="epsaTipShow(this,'${mes}','${f.numero}')" onmouseleave="epsaTipHide()"
+               onfocus="epsaTipShow(this,'${mes}','${f.numero}')" onblur="epsaTipHide()">
             <span style="font-family:'JetBrains Mono',monospace;font-size:10px;background:rgba(29,191,142,.08);color:var(--teal);padding:1px 6px;border-radius:4px;border:1px solid rgba(29,191,142,.2);display:block">${f.numero}</span>
             ${f.cantidadTotal?`<span style="font-size:9px;color:var(--text-muted);margin-top:2px;display:block">${f.cantidadTotal} envíos</span>`:''}
           </div>`).join('');
@@ -2595,7 +2608,9 @@ function epsaRenderFacturas(){
     const chequeo = (f.desglose&&f.desglose.length)
       ? (Math.abs(f.totalPlanilla-f.subtotal)<=1
           ? `<div style="font-size:10px;color:var(--teal);margin-top:6px">✓ La planilla cuadra con el subtotal de la factura</div>`
-          : `<div style="font-size:10px;color:#f59e0b;margin-top:6px">⚠️ La planilla (${fmt(f.totalPlanilla)}) no coincide exactamente con el subtotal de la factura (${fmt(f.subtotal)}) — diferencia ${fmt(f.totalPlanilla-f.subtotal)}</div>`)
+          : (!f.iva && !f.otrosImp && f.totalFactura>f.totalPlanilla+1)
+            ? `<div style="font-size:10px;color:#f59e0b;margin-top:6px">⚠️ No se leyeron el IVA ni las percepciones de este PDF, por eso el subtotal figura igual al total (${fmt(f.totalFactura)}) y la planilla (${fmt(f.totalPlanilla)}) parece no coincidir. Tocá <b>🔄 PDF</b> y soltá de nuevo el PDF de la factura para releerlo.</div>`
+            : `<div style="font-size:10px;color:#f59e0b;margin-top:6px">⚠️ La planilla (${fmt(f.totalPlanilla)}) no coincide exactamente con el subtotal de la factura (${fmt(f.subtotal)}) — diferencia ${fmt(f.totalPlanilla-f.subtotal)}</div>`)
       : '';
     return `<div style="background:var(--navy-900);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;margin-bottom:10px">
       <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px">
@@ -2608,6 +2623,7 @@ function epsaRenderFacturas(){
             <div style="font-size:9px;color:var(--text-muted)">Subtotal ${fmt(f.subtotal)} · IVA ${fmt(f.iva)} · Perc. ${fmt(f.otrosImp)}</div>
             <div style="font-family:'JetBrains Mono',monospace;font-weight:800;color:var(--teal)">${fmt(f.totalFactura)}</div>
           </div>
+          <button onclick="epsaReprocesarPDF('${f.numero}')" title="Volver a leer el PDF de esta factura (subtotal, IVA y percepciones), sin tocar la planilla ni los adjuntos" style="background:rgba(29,191,142,.12);border:1px solid var(--teal);color:var(--teal);border-radius:6px;padding:4px 9px;font-size:11px;cursor:pointer;white-space:nowrap">🔄 PDF</button>
           <button onclick="epsaEliminarFactura('${f.numero}')" title="Eliminar factura" class="btn-del-fac" style="background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.25);color:#f87171;border-radius:6px;padding:5px 9px;cursor:pointer;font-size:12px">🗑️</button>
         </div>
       </div>
@@ -2710,14 +2726,7 @@ async function epsaHandlePDF(input){
   document.getElementById('epsaPdfName').style.display='block';
   epsaShowMsg('Leyendo PDF...','ok');
   try{
-    const buf=await file.arrayBuffer();
-    const pdf=await pdfjsLib.getDocument({data:buf}).promise;
-    let text='';
-    for(let i=1;i<=pdf.numPages;i++){
-      const pg=await pdf.getPage(i);
-      const ct=await pg.getTextContent();
-      text+=ct.items.map(it=>it.str).join(' ')+'\n';
-    }
+    const text=await epsaPdfATexto(await file.arrayBuffer());
     const fac=epsaParsePDF(text);
     if(!fac){ epsaShowMsg('No se pudo leer la factura de EPSA. Verificá el PDF.','err'); return; }
 
@@ -2748,7 +2757,8 @@ async function epsaHandlePDF(input){
       ['CAE', fac.cae],
     ]);
 
-    epsaShowMsg('✓ '+fac.numero+' leída · Emitida '+fac.fecha+' (servicio '+(fac.periodoTexto||'?')+') · Total: '+fmt(fac.totalFactura),'ok');
+    if(fac.completo) epsaShowMsg('✓ '+fac.numero+' leída · Emitida '+fac.fecha+' (servicio '+(fac.periodoTexto||'?')+') · Total: '+fmt(fac.totalFactura),'ok');
+    else epsaShowMsg('⚠️ '+fac.numero+' leída, pero no se pudieron separar el subtotal, el IVA y las percepciones: se tomó el total ('+fmt(fac.totalFactura)+') como subtotal. Revisá los importes antes de confirmar.','err');
     epsaRenderKPIs();
     document.getElementById('epsaBtnConfirm').style.display='block';
     fac._filePdf=file; // se sube a Storage recién al confirmar, no ahora
@@ -2756,6 +2766,40 @@ async function epsaHandlePDF(input){
     if(epsaPendingDesglose) Object.assign(fac, epsaPendingDesglose);
     epsaPendingFac=fac;
   }catch(e){ epsaShowMsg('Error: '+e.message,'err'); }
+}
+
+// Texto del PDF tal como lo ve el parser (pdf.js, ítems unidos con espacio).
+async function epsaPdfATexto(buf){
+  const pdf=await pdfjsLib.getDocument({data:buf}).promise;
+  let text='';
+  for(let i=1;i<=pdf.numPages;i++){
+    const pg=await pdf.getPage(i);
+    const ct=await pg.getTextContent();
+    text+=ct.items.map(it=>it.str).join(' ')+'\n';
+  }
+  return text;
+}
+
+// Subtotal / IVA / percepciones / total sin depender de etiquetas ni del orden del texto (la plantilla
+// de EPSA los imprime como valores sueltos y entre ellos puede haber texto como "AT.: PROVEEDORES").
+// Se buscan los importes del texto y se elige el juego que cierra: IVA = subtotal × alícuota (±$1) y
+// subtotal + IVA + percepciones = total (percepciones = lo que falta, 0 si no hay).
+function epsaLeerImportes(text){
+  const pctM=text.match(/(\d{1,2}(?:[.,]\d{1,2})?)\s*%/);
+  const ivaPct=pctM?(parseFloat(pctM[1].replace(',','.'))||21):21;
+  const nums=[...new Set([...text.matchAll(/(?:^|[^\d.,])(\d{1,3}(?:[.,]\d{3})*[.,]\d{2})(?!\d)/g)]
+    .map(m=>logiParseNum(m[1])).filter(n=>n>0))].sort((a,b)=>b-a);
+  for(const t of nums){
+    for(const s of nums){
+      if(s>=t) continue;
+      for(const i of nums){
+        if(i>=s || Math.abs(i-s*ivaPct/100)>1) continue;
+        const p=Math.round((t-s-i)*100)/100;
+        if(p>=-0.05 && p<=s*0.25) return {subtotal:s, ivaPct, iva:i, otrosImp:Math.max(0,p), totalFactura:t};
+      }
+    }
+  }
+  return null;
 }
 
 function epsaParsePDF(text){
@@ -2780,7 +2824,9 @@ function epsaParsePDF(text){
     // Período facturado (informativo — el mes del servicio prestado, que
     // puede diferir del mes de emisión; se muestra en la ficha pero ya
     // NO se usa para imputar el gasto)
-    const perM=text.match(/PERIODO:?\s*([A-ZÁÉÍÓÚÑ]+)\s+(\d{4})/i);
+    // Algunas facturas traen "PERIODO: JULIO 2026" y otras solo "SEPTIEMBRE 2026" (sin etiqueta).
+    const perM=text.match(/PERIODO:?\s*([A-ZÁÉÍÓÚÑ]+)\s+(\d{4})/i)
+      || text.match(/\b(ENERO|FEBRERO|MARZO|ABRIL|MAYO|JUNIO|JULIO|AGOSTO|SEPTIEMBRE|SETIEMBRE|OCTUBRE|NOVIEMBRE|DICIEMBRE)\s+(\d{4})\b/i);
     const periodoTexto=perM?(perM[1].toUpperCase()+' '+perM[2]):null;
 
     // Bloque Subtotal → IVA → CAE → Venc.CAE → Percepción → Total, en ese orden
@@ -2788,8 +2834,13 @@ function epsaParsePDF(text){
     // los imprime como imágenes fijas y solo el valor queda como texto real).
     const bloqueM=text.match(/PERIODO:?\s*[A-ZÁÉÍÓÚÑ]+\s+\d{4}\s+([\d.,]+)\s+([\d.]+)%\s+([\d.,]+)\s+CAE:\s*(\d+)\s+VENC:\s*(\d{2}\/\d{2}\/\d{4})\s+([A-Z0-9]+)\s+([\d.,]+)\s+([\d.,]+)/i);
 
-    let subtotal=0, ivaPct=21, iva=0, cae='—', vencCae='—', otrosImp=0, totalFactura=0;
-    if(bloqueM){
+    let subtotal=0, ivaPct=21, iva=0, cae='—', vencCae='—', otrosImp=0, totalFactura=0, completo=true;
+    const caeM=text.match(/CAE:?\s*(\d{8,})/i); if(caeM) cae=caeM[1];
+    const vencCaeM=text.match(/VENC:\s*(\d{2}\/\d{2}\/\d{4})/); if(vencCaeM) vencCae=vencCaeM[1]; // "VENC:" (CAE); el vto de pago es "Venc.:"
+    const imp=epsaLeerImportes(text);
+    if(imp){
+      ({subtotal,ivaPct,iva,otrosImp,totalFactura}=imp);
+    } else if(bloqueM){
       subtotal=logiParseNum(bloqueM[1]);
       ivaPct=parseFloat(bloqueM[2])||21;
       iva=logiParseNum(bloqueM[3]);
@@ -2801,13 +2852,87 @@ function epsaParsePDF(text){
       // Fallback: tomar el último número grande del texto como total
       const nums=[...text.matchAll(/\b([\d]{1,3}(?:[.,]\d{3})*[.,]\d{2})\b/g)].map(m=>logiParseNum(m[1]));
       if(nums.length){ totalFactura=nums[nums.length-1]; subtotal=totalFactura; }
-      const caeM=text.match(/CAE:\s*(\d+)/i); if(caeM) cae=caeM[1];
+      completo=false; // no se pudo separar subtotal / IVA / percepciones
     }
 
     if(!totalFactura) return null;
-    return {numero, fecha, vto, mesFac, periodoTexto, subtotal, ivaPct, iva, otrosImp, totalFactura, cae, vencCae};
+    return {numero, fecha, vto, mesFac, periodoTexto, subtotal, ivaPct, iva, otrosImp, totalFactura, cae, vencCae, completo};
   }catch(e){ return null; }
 }
+
+// Vuelve a leer el PDF de una factura YA guardada (subtotal, IVA, percepciones, período, CAE) sin tocar
+// la planilla de detalle ni los adjuntos. Mismo patrón que "🔄 RTO" de Logicalis.
+function epsaReprocesarPDF(numero){
+  if(isReadonlyBlocked()) return;
+  const fac=(epsaFacturas[epsaMesActual]||[]).find(f=>f.numero===numero);
+  if(!fac) return;
+  const inp=document.createElement('input');
+  inp.type='file'; inp.accept='.pdf';
+  inp.onchange=async ()=>{
+    const file=inp.files[0]; if(!file) return;
+    showToast('Leyendo PDF...');
+    try{
+      const nuevo=epsaParsePDF(await epsaPdfATexto(await file.arrayBuffer()));
+      if(!nuevo){ showToast('⛔ No se pudo leer la factura de EPSA. Verificá el PDF.'); return; }
+      if(nuevo.numero!==fac.numero){ showToast('⛔ Ese PDF es de la factura '+nuevo.numero+', no de '+fac.numero+'.'); return; }
+      if(!nuevo.completo){ showToast('⚠️ No se pudieron separar subtotal, IVA y percepciones en este PDF. No se modificó nada.'); return; }
+      Object.assign(fac,{
+        vto:nuevo.vto!=='—'?nuevo.vto:fac.vto,
+        periodoTexto:nuevo.periodoTexto||fac.periodoTexto,
+        subtotal:nuevo.subtotal, ivaPct:nuevo.ivaPct, iva:nuevo.iva, otrosImp:nuevo.otrosImp,
+        totalFactura:nuevo.totalFactura, cae:nuevo.cae!=='—'?nuevo.cae:fac.cae
+      });
+      if(currentUser){
+        const ok=await epsaSaveDB(fac);
+        if(!ok){ showToast('⛔ Se leyó el PDF pero hubo un error al guardar. Probá de nuevo.'); return; }
+      }
+      epsaRenderFacturas(); epsaRenderKPIs(); epsaSyncReal(); render();
+      showToast('✅ Factura releída · Subtotal '+fmt(fac.subtotal)+' · IVA '+fmt(fac.iva)+' · Perc. '+fmt(fac.otrosImp));
+    }catch(e){ showToast('⛔ Error leyendo el PDF: '+e.message); }
+  };
+  inp.click();
+}
+
+// ── Desglose al pasar el mouse sobre el N° de factura EPSA (columna "Nro factura" del presupuesto) ──
+const epsaEsc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function epsaTipHtml(f){
+  const des=(f.desglose&&f.desglose.length)
+    ? `<table class="fac-tbl">
+        <thead><tr><th>Servicio</th><th>Concepto</th><th style="text-align:right">Cant.</th><th style="text-align:right">Total</th><th style="text-align:right">Promedio</th></tr></thead>
+        <tbody>${f.desglose.map(d=>`<tr>
+          <td style="font-size:11px">${epsaEsc(d.servicio)}</td>
+          <td style="font-size:11px;color:var(--text-muted)">${epsaEsc(d.concepto)}</td>
+          <td class="nr">${d.cantidad}</td><td class="nr">${fmt(d.total)}</td><td class="nr" style="color:var(--text-muted)">${fmt(d.promedio)}</td>
+        </tr>`).join('')}
+        <tr><td colspan="2" style="font-weight:700;font-size:11px">Total planilla</td><td class="nr hi">${f.cantidadTotal}</td><td class="nr hi">${fmt(f.totalPlanilla)}</td><td class="nr" style="color:var(--text-muted)">${fmt(f.totalPlanilla/(f.cantidadTotal||1))}</td></tr>
+        </tbody></table>`
+    : `<div style="font-size:11px;color:var(--text-muted)">Todavía no se cargó la planilla de detalle para esta factura.</div>`;
+  const hayImp=!!(f.iva||f.otrosImp);
+  const tot=hayImp?`<div class="tip-tot">
+      <div><span>Neto (sin IVA)</span><b>${fmt(f.subtotal)}</b></div>
+      <div><span>IVA ${f.ivaPct||21}%</span><b>${fmt(f.iva)}</b></div>
+      <div><span>Percepciones</span><b>${fmt(f.otrosImp)}</b></div>
+      <div class="t"><span>Total factura (REAL, con IVA)</span><b>${fmt(f.totalFactura)}</b></div>
+    </div>`
+    : `<div class="tip-tot"><div class="t"><span>Total factura (REAL)</span><b>${fmt(f.totalFactura)}</b></div></div>`;
+  const warn=(f.desglose&&f.desglose.length&&hayImp&&Math.abs(f.totalPlanilla-f.subtotal)>1)
+    ? `<div class="tip-warn">⚠️ La planilla (${fmt(f.totalPlanilla)}) difiere del neto de la factura (${fmt(f.subtotal)}) en ${fmt(f.totalPlanilla-f.subtotal)}.</div>`
+    : (!hayImp?`<div class="tip-warn">⚠️ No se leyeron el IVA ni las percepciones de esta factura. Abrí la factura (📎) y tocá 🔄 PDF.</div>`:'');
+  return `<div class="tip-head"><b>${epsaEsc(f.numero)}</b> · Emitida ${epsaEsc(f.fecha)}${f.periodoTexto?' · Período '+epsaEsc(f.periodoTexto):''}</div>${des}${tot}${warn}`;
+}
+function epsaTipShow(el,mes,numero){
+  const f=(epsaFacturas[mes]||[]).find(x=>x.numero===numero); if(!f) return;
+  let tip=document.getElementById('epsaTip');
+  if(!tip){ tip=document.createElement('div'); tip.id='epsaTip'; document.body.appendChild(tip); }
+  tip.innerHTML=epsaTipHtml(f);
+  tip.style.display='block';
+  const r=el.getBoundingClientRect(), tw=tip.offsetWidth, th=tip.offsetHeight, gap=8;
+  let left=Math.min(Math.max(8,r.left+r.width/2-tw/2), window.innerWidth-tw-8);
+  let top=r.bottom+gap;
+  if(top+th>window.innerHeight-8) top=Math.max(8,r.top-th-gap); // si no entra abajo, va arriba
+  tip.style.left=left+'px'; tip.style.top=top+'px';
+}
+function epsaTipHide(){ const t=document.getElementById('epsaTip'); if(t) t.style.display='none'; }
 
 async function epsaAdjuntarArchivo(numero, tipo){
   const fac=(epsaFacturas[epsaMesActual]||[]).find(f=>f.numero===numero);
