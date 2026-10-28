@@ -4152,7 +4152,9 @@ function telecomAnalizar(items){
   an.impuestos=an.cab.impuestos!==undefined?an.cab.impuestos:sum(an.impuestosLineas);
   an.total=an.totalAPagar!==undefined?an.totalAPagar:an.cargosMes;
   an.lineas.filter(l=>l.tipo==='descuento').forEach(d=>{
-    const p=an.lineas.find(l=>l.tipo==='plan'&&l.clave===d.clave);
+    // Una factura puede traer el mismo plan en 2 renglones (p. ej. 1GB a $32.985 y 1GB a $115): la bonificación va con el de su misma cantidad.
+    const mismos=an.lineas.filter(l=>l.tipo==='plan'&&l.clave===d.clave);
+    const p=mismos.find(l=>l.cantidad===d.cantidad&&l.pct===undefined)||mismos.find(l=>l.cantidad===d.cantidad)||mismos[0];
     if(p&&p.unitario){ d.pct=Math.round(Math.abs(d.unitario)/p.unitario*1000)/10; p.pct=d.pct; p.netoUnit=telR2(p.unitario+d.unitario); }
   });
 
@@ -4219,8 +4221,8 @@ function telecomRenderAnalisis(v){
   const el=document.getElementById('telecomDetail'); if(!el) return;
   const prevMes=MESES[MESES.indexOf(v.mes)-1];
   const prevDet=(prevMes&&telecomData[prevMes]&&telecomData[prevMes].detalle)||[];
-  const prevPlan=c=>prevDet.find(d=>d.tipo==='plan'&&d.linea===c);
-  const prevDesc=c=>prevDet.find(d=>d.tipo==='descuento'&&d.linea==='Descuento '+c);
+  const prevPlan=c=>prevDet.filter(d=>d.tipo==='plan'&&d.linea===c).sort((a,b)=>b.cantidad-a.cantidad)[0];   // el renglón principal (más líneas)
+  const prevDesc=c=>prevDet.filter(d=>d.tipo==='descuento'&&d.linea==='Descuento '+c).sort((a,b)=>b.cantidad-a.cantidad)[0];
   const planes=v.lineas.filter(l=>l.tipo==='plan'), descs=v.lineas.filter(l=>l.tipo==='descuento');
   const hayPrev=planes.some(p=>prevPlan(p.linea)&&prevPlan(p.linea).unitario);
   const td='style="padding:6px 8px;font-size:11px"', nr='class="nr"';
