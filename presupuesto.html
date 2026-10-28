@@ -4,7 +4,7 @@
 <script src="agent-auth.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Alleata · Presupuesto Operaciones v1.14.9</title>
+<title>Alleata · Presupuesto Operaciones v1.15.0</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -212,7 +212,7 @@
   <div class="login-box">
     <h2>💰 Presupuesto</h2>
     <p class="login-sub">Alleata · Acceso restringido</p>
-    <div style="position:absolute;bottom:12px;right:16px;font-size:10px;font-family:'JetBrains Mono',monospace;color:rgba(232,237,243,.2)">v1.14.9</div>
+    <div style="position:absolute;bottom:12px;right:16px;font-size:10px;font-family:'JetBrains Mono',monospace;color:rgba(232,237,243,.2)">v1.15.0</div>
     <div class="login-field">
       <label>Email</label>
       <input type="email" id="loginEmail" placeholder="tu@email.com" onkeydown="if(event.key==='Enter')doLogin()">
@@ -228,7 +228,7 @@
 
 <div id="appContent" style="display:none">
 <h1>💰 Presupuesto Operaciones</h1>
-<p class="sub">Alleata · 2026 <span style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 8px;border-radius:4px;border:1px solid var(--border2);font-size:10px;margin-left:6px">v1.14.9</span></p>
+<p class="sub">Alleata · 2026 <span style="font-family:'JetBrains Mono',monospace;background:var(--surface2);padding:1px 8px;border-radius:4px;border:1px solid var(--border2);font-size:10px;margin-left:6px">v1.15.0</span></p>
 
 <div class="toolbar">
   <div class="mes-bar" id="mesBar"></div>
@@ -1380,7 +1380,6 @@ let claroPendingXLS   = null;
 let claroPendingPDF   = null;
 let napseMesActual    = 'jun';
 let telecomMesActual  = 'jun';
-let telecomPendingXLS = null;
 let telecomPendingPDF = null;
 
 // ── Correo Argentino state ──────────────────────────────────────────────────
@@ -4054,35 +4053,149 @@ function spbShowMsg(txt,type){ const e=document.getElementById('spbMsgFile');if(
 // ── Fin Cabify + CALOG ────────────────────────────────────────────────────────
 
 // ── Telecom Personal state ───────────────────────────────────────────────────
-// (telecomData, telecomMesActual, telecomPendingXLS/PDF declarados arriba)
+// (telecomData, telecomMesActual, telecomPendingPDF declarados arriba)
+//
+// Solo se sube el PDF de la factura de Telecom Argentina (Personal). El "análisis" que armaba Axel en un Excel
+// (planes × precio, bonificaciones, subtotal, impuestos, total) sale de la primera hoja de la factura
+// ("CARGOS DEL MES"), así que se reproduce acá y ya no hace falta la planilla.
+//  · El mes se imputa por el FIN DEL PERÍODO FACTURADO (igual que la planilla de Axel: la columna "VTO 13-07", período al 20/06, estaba rotulada JUNIO;
+//    la factura "Agosto" es la del período 21/07→20/08, que vence en septiembre).
+//  · REAL = SUBTOTAL de los planes de chips (Plan Control / Libre Empresas, ya con sus bonificaciones), sin
+//    "otros cargos" (M2M, packs, tráfico excedente) ni impuestos — el mismo criterio que venía usando el módulo.
+//  · Lo leído se valida contra los totales de la propia factura; si no cierra, no se deja guardar.
 
-// Mapeo VTO → mes: TELECOM usa misma lógica que CLARO
-const TELECOM_MES_MAP = {
-  'DIC':'ene','ENE':'feb','FEB':'mar','MAR':'abr','ABR':'may','MAY':'jun',
-  'JUN':'jul','JUL':'ago','AGO':'sep','SEP':'oct','OCT':'nov','NOV':'dic'
-};
-const TELECOM_MES_ORDER = ['ene','feb','mar','abr','may','jun','jul','ago'];
+const TEL_AMT=/^\$?\s*-?\$?\s*\d{1,3}(?:\.\d{3})*,\d{2}$/;   // 21.939.860,00 · -17.551.888,00 · $ 4.511.974,40
+const telNum=s=>{ const t=String(s).replace(/[$\s]/g,''); const v=parseFloat(t.replace('-','').replace(/\./g,'').replace(',','.')); return t.includes('-')?-v:v; };
+const telR2=n=>Math.round(n*100)/100;
+const telFmt=n=>(n<0?'-':'')+'$'+Math.abs(n).toLocaleString('es-AR',{maximumFractionDigits:2});
+const telEsc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const telPct=n=>(n>=0?'+':'')+n.toFixed(1).replace('.',',')+'%';
+
+// Textos del PDF con su posición (pdf.js). Alcanza con las 3 primeras hojas (la 3ª sigue con los impuestos): el resto de las ~700 es el detalle por línea.
+async function telecomPdfAItems(buf){
+  const pdf=await pdfjsLib.getDocument({data:buf}).promise;
+  const items=[];
+  for(let p=1;p<=Math.min(pdf.numPages,3);p++){
+    const pg=await pdf.getPage(p);
+    const ct=await pg.getTextContent();
+    ct.items.forEach(it=>items.push({str:it.str, x:it.transform[4], y:it.transform[5]-(p-1)*10000})); // 2ª hoja debajo de la 1ª
+  }
+  return items;
+}
+
+// Agrupa los textos en filas por coordenada Y (tolerancia 3,5: el importe de las cabeceras de sección queda ~2,3 pt más arriba que su rótulo) y los ordena de izquierda a derecha.
+function telecomFilas(items){
+  const filas=[];
+  items.forEach(it=>{
+    const s=String(it.str||'').trim(); if(!s) return;
+    let f=filas.find(r=>Math.abs(r.y-it.y)<=3.5);
+    if(!f){ f={y:it.y,cols:[]}; filas.push(f); }
+    f.cols.push({x:it.x,s});
+  });
+  filas.sort((a,b)=>b.y-a.y);
+  filas.forEach(f=>f.cols.sort((a,b)=>a.x-b.x));
+  return filas;
+}
+
+// Reproduce el análisis de la factura. Función pura (recibe los textos con posición).
+function telecomAnalizar(items){
+  const filas=telecomFilas(items);
+  const an={lineas:[],otrosLineas:[],consumosLineas:[],impuestosLineas:[],avisos:[],chequeos:[],cab:{}};
+  const textoTodo=filas.map(f=>f.cols.map(c=>c.s).join(' ')).join('\n');
+  if(!/TELECOM ARGENTINA/i.test(textoTodo)) an.avisos.push('Este PDF no parece una factura de Telecom Argentina (Personal).');
+  const SEC={'PLANES Y SERVICIOS':'planes','CONSUMOS VARIABLES EXCEDENTES':'consumos','IMPUESTOS':'impuestos'};
+  let seccion=null;
+  for(const f of filas){
+    const label=f.cols.filter(c=>c.x<300).map(c=>c.s).join(' ').replace(/\s+/g,' ').trim();
+    const rest=f.cols.filter(c=>c.x>=300).map(c=>c.s);
+    const amts=rest.filter(s=>TEL_AMT.test(s)).map(telNum);
+    const lu=label.toUpperCase();
+    if(SEC[lu]&&amts.length){ seccion=SEC[lu]; an.cab[seccion]=amts[0]; continue; }
+    if(lu==='CARGOS DEL MES'&&amts.length){ an.cargosMes=amts[0]; continue; }
+    if(lu==='TOTAL A PAGAR'&&amts.length){ an.totalAPagar=amts[0]; continue; }
+    if(lu==='SALDO ANTERIOR'&&amts.length){ an.saldoAnterior=amts[0]; continue; }
+    if(/^TOTAL\b/.test(lu)){ seccion=null; continue; }          // "TOTAL CARGOS DEL MES" cierra el bloque (la hoja 3 sigue con más datos debajo)
+    if(!label||!seccion||!amts.length) continue;
+    if(seccion==='planes'){
+      const cant=rest.find(s=>/^\d+$/.test(s));
+      if(cant===undefined||amts.length<2) continue;
+      const nombre=label.replace(/\s*\(\s*[^)]*\)\s*¹?\s*$/,'').replace(/¹/g,'').trim();
+      const l={linea:nombre,cantidad:Number(cant),unitario:amts[0],total:amts[amts.length-1],tipo:'otros'};
+      const m=nombre.match(/^(Descuento\s+)?Plan\s+(Control|Libre)\s+Empresas\s+(\d+)\s*GB$/i);
+      if(m){ l.tipo=m[1]?'descuento':'plan'; l.clave='Plan '+m[2]+' Empresas '+m[3]+'GB'; }
+      else if(!/M2M|Gastos Administrativos|^(Descuento\s+)?Pack\b/i.test(nombre)) an.avisos.push('Renglón no reconocido (se suma a "otros cargos"): '+nombre+' '+telFmt(l.total));
+      an.lineas.push(l);
+    } else if(seccion==='consumos') an.consumosLineas.push({linea:label,total:amts[amts.length-1]});
+    else if(seccion==='impuestos') an.impuestosLineas.push({linea:label,total:amts[amts.length-1]});
+  }
+  // Datos de cabecera
+  const todos=filas.flatMap(f=>f.cols.map(c=>c.s));
+  const nro=todos.find(s=>/^[A-Z]\d{4}-\d{8}$/.test(s));
+  an.nroFacCompleto=nro||null; an.nroFac=nro?nro.slice(1):'—';   // "6364-09448822": mismo formato que ya venía guardado
+  const fechaEn=re=>{ const f=filas.find(r=>r.cols.some(c=>re.test(c.s))); return f?((f.cols.map(c=>c.s).join(' ').match(/\d{2}\/\d{2}\/\d{4}/)||[])[0]||null):null; };
+  an.emision=fechaEn(/^Fecha de Emisi[oó]n$/i);
+  an.vto=fechaEn(/^VENCIMIENTO$/);
+  const perF=filas.find(r=>r.cols.some(c=>/^PERIODO FACTURADO$/i.test(c.s)));
+  const perM=perF&&perF.cols.map(c=>c.s).join(' ').match(/(\d{2}\/\d{2}\/\d{4})\s*al\s*(\d{2}\/\d{2}\/\d{4})/i);
+  an.periodo=perM?perM[1]+' → '+perM[2]:null;
+  an.periodoHasta=perM?perM[2]:null;
+  an.mes=an.periodoHasta?CA_MES_MAP[an.periodoHasta.slice(3,5)]:null;     // mes de la factura = mes en que termina el período
+  an.anio=an.periodoHasta?Number(an.periodoHasta.slice(6,10)):null;
+
+  // Análisis: lo que antes resumía la planilla
+  const sum=a=>telR2(a.reduce((s,x)=>s+x.total,0));
+  const planes=an.lineas.filter(l=>l.tipo==='plan'||l.tipo==='descuento');
+  an.subtotal=sum(planes);                                  // chips con sus bonificaciones = REAL
+  an.otrosPlanes=telR2(sum(an.lineas)-an.subtotal);          // M2M, paquetes, gastos administrativos
+  an.consumos=sum(an.consumosLineas);                        // tráfico excedente
+  an.otros=telR2(an.otrosPlanes+an.consumos);                // "consumo variable excedente" de la planilla de Axel
+  an.impuestos=an.cab.impuestos!==undefined?an.cab.impuestos:sum(an.impuestosLineas);
+  an.total=an.totalAPagar!==undefined?an.totalAPagar:an.cargosMes;
+  an.lineas.filter(l=>l.tipo==='descuento').forEach(d=>{
+    const p=an.lineas.find(l=>l.tipo==='plan'&&l.clave===d.clave);
+    if(p&&p.unitario){ d.pct=Math.round(Math.abs(d.unitario)/p.unitario*1000)/10; p.pct=d.pct; p.netoUnit=telR2(p.unitario+d.unitario); }
+  });
+
+  // Chequeos contra los totales que trae la propia factura
+  const ck=(ok,txt)=>an.chequeos.push({ok,txt});
+  const cerca=(a,b)=>Math.abs(a-b)<=1;
+  ck(planes.length>0,'Se encontraron los planes de chips (Plan Control / Libre Empresas)');
+  if(an.cab.planes!==undefined) ck(cerca(sum(an.lineas),an.cab.planes),'Los renglones de planes suman lo que dice "Planes y servicios" ('+telFmt(an.cab.planes)+')'+(cerca(sum(an.lineas),an.cab.planes)?'':' — leí '+telFmt(sum(an.lineas))));
+  else ck(false,'No se encontró el total de "Planes y servicios"');
+  if(an.cab.consumos!==undefined) ck(cerca(an.consumos,an.cab.consumos),'Los consumos variables suman '+telFmt(an.cab.consumos));
+  if(an.cab.impuestos!==undefined) ck(cerca(sum(an.impuestosLineas),an.cab.impuestos),'Los impuestos suman '+telFmt(an.cab.impuestos)+(cerca(sum(an.impuestosLineas),an.cab.impuestos)?'':' — leí '+telFmt(sum(an.impuestosLineas))));
+  if(an.total!==undefined&&an.cab.planes!==undefined){
+    const calc=telR2(an.cab.planes+(an.cab.consumos||0)+(an.cab.impuestos||0));
+    ck(cerca(calc,an.total),'Planes + consumos + impuestos = total de la factura ('+telFmt(an.total)+')'+(cerca(calc,an.total)?'':' — da '+telFmt(calc)));
+  } else ck(false,'No se encontró el total de la factura');
+  ck(!!an.nroFacCompleto,'Se leyó el N° de factura'+(an.nroFacCompleto?' ('+an.nroFacCompleto+')':''));
+  ck(!!an.periodoHasta,'Se leyó el período facturado'+(an.periodo?' ('+an.periodo+')':''));
+  ck(!!an.vto,'Se leyó el vencimiento'+(an.vto?' ('+an.vto+')':''));
+  an.ok=an.chequeos.every(c=>c.ok);
+  return an;
+}
 
 function openTelecomModal(m){
   telecomMesActual=m;
   document.getElementById('telecomBg').classList.add('open');
   document.getElementById('telecomSub').textContent=MESES_LABEL[m]+' 2026 · Servicios telefonía';
-  telecomPendingXLS=null; telecomPendingPDF=null;
+  telecomPendingPDF=null;
   resetTelecomForm();
   telecomRenderKPIs();
+  telecomRenderGuardado(m);
 }
 function closeTelecomModal(){
   document.getElementById('telecomBg').classList.remove('open');
   render();
 }
 function resetTelecomForm(){
-  ['telecomPrevPdf','telecomPrevXls'].forEach(id=>{const e=document.getElementById(id);if(e){e.style.display='none';e.innerHTML='';}});
-  ['telecomMsgPdf','telecomMsgXls'].forEach(id=>{const e=document.getElementById(id);if(e){e.className='up-msg';e.textContent='';}});
-  ['telecomPdfInp','telecomXlsInp'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
-  ['telecomZonePdf','telecomZoneXls'].forEach(id=>{document.getElementById(id)?.classList.remove('loaded');});
-  ['telecomPdfName','telecomXlsName'].forEach(id=>{const e=document.getElementById(id);if(e){e.style.display='none';e.textContent='';}});
-  const btn=document.getElementById('telecomBtnConfirm');if(btn)btn.style.display='none';
-  const det=document.getElementById('telecomDetail');if(det)det.style.display='none';
+  const pv=document.getElementById('telecomPrevPdf'); if(pv){pv.style.display='none';pv.innerHTML='';}
+  const mg=document.getElementById('telecomMsgPdf'); if(mg){mg.className='up-msg';mg.textContent='';}
+  const inp=document.getElementById('telecomPdfInp'); if(inp) inp.value='';
+  document.getElementById('telecomZonePdf')?.classList.remove('loaded');
+  const fn=document.getElementById('telecomPdfName'); if(fn){fn.style.display='none';fn.textContent='';}
+  const btn=document.getElementById('telecomBtnConfirm'); if(btn) btn.style.display='none';
+  const det=document.getElementById('telecomDetail'); if(det){det.style.display='none';det.innerHTML='';}
 }
 
 function telecomRenderKPIs(){
@@ -4098,116 +4211,98 @@ function telecomRenderKPIs(){
     {label:'DESVÍO',val:real>0?fmtPct(desvPct):'—',sub:desvPct<=0?'por debajo':'por encima',cls:real>0?(Math.abs(desvPct)>20?'warn':'ok'):''},
   ].map(k=>`<div class="lk"><div class="lk-label">${k.label}</div><div class="lk-val ${k.cls}">${k.val}</div><div class="lk-sub">${k.sub}</div></div>`).join('');
   const aw=document.getElementById('telecomAdjuntosWrap');
-  if(aw) aw.innerHTML=presupRenderAdjuntosConBoton(saved?.adjuntos, ['pdf','xls'], 'telecomAdjuntarArchivo', m);
+  if(aw) aw.innerHTML=presupRenderAdjuntosConBoton(saved?.adjuntos, ['pdf'], 'telecomAdjuntarArchivo', m);
 }
 
-async function telecomHandleXLS(input){
-  const file=input.files[0]; if(!file) return;
-  document.getElementById('telecomXlsName').textContent=file.name;
-  document.getElementById('telecomXlsName').style.display='block';
-  telecomShowMsg('telecomMsgXls','Leyendo planilla...','ok');
-  try{
-    const buf=await file.arrayBuffer();
-    const wb=XLSX.read(buf,{type:'array'});
-    const sheetName=wb.SheetNames.find(n=>n.toUpperCase()==='TELECOM')||wb.SheetNames[0];
-    const ws=wb.Sheets[sheetName];
-    const data=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+// Tabla del análisis (la misma información que la planilla de Axel). v = vista normalizada, ver telecomHandlePDF / telecomRenderGuardado.
+function telecomRenderAnalisis(v){
+  const el=document.getElementById('telecomDetail'); if(!el) return;
+  const prevMes=MESES[MESES.indexOf(v.mes)-1];
+  const prevDet=(prevMes&&telecomData[prevMes]&&telecomData[prevMes].detalle)||[];
+  const prevPlan=c=>prevDet.find(d=>d.tipo==='plan'&&d.linea===c);
+  const prevDesc=c=>prevDet.find(d=>d.tipo==='descuento'&&d.linea==='Descuento '+c);
+  const planes=v.lineas.filter(l=>l.tipo==='plan'), descs=v.lineas.filter(l=>l.tipo==='descuento');
+  const hayPrev=planes.some(p=>prevPlan(p.linea)&&prevPlan(p.linea).unitario);
+  const td='style="padding:6px 8px;font-size:11px"', nr='class="nr"';
+  const fila=(a,b,c,d,e,estilo='')=>`<tr style="${estilo}"><td ${td}>${a}</td><td ${nr}>${b}</td><td ${nr}>${c}</td><td ${nr}>${d}</td>${hayPrev?`<td ${nr}>${e}</td>`:''}</tr>`;
+  const gb=l=>telEsc(l.linea.replace(/^(Descuento\s+)?Plan\s+/i,''));
+  let filas='';
+  planes.forEach(p=>{
+    const pv=prevPlan(p.linea);
+    const dlt=(pv&&pv.unitario)?telPct((p.unitario/pv.unitario-1)*100):'—';
+    filas+=fila(telEsc(p.linea),p.cantidad,telFmt(p.unitario),telFmt(p.total),dlt);
+  });
+  descs.forEach(d=>filas+=fila('Bonificación '+gb(d)+(d.pct!=null?' <span style="color:var(--text-muted)">· '+String(d.pct).replace('.',',')+'%</span>':''),d.cantidad,telFmt(d.unitario),telFmt(d.total),'—','color:var(--text-muted)'));
+  filas+=`<tr style="background:rgba(29,191,142,.07)"><td ${td}><b>SUBTOTAL planes (REAL)</b></td><td ${nr}></td><td ${nr}></td><td ${nr} style="color:var(--teal);font-weight:800">${telFmt(v.subtotal)}</td>${hayPrev?`<td ${nr}></td>`:''}</tr>`;
+  filas+=fila('Otros cargos <span style="color:var(--text-muted)">(M2M, packs, tráfico excedente)</span>','','',telFmt(v.otros),'','color:var(--text-muted)');
+  const impDet=(v.impuestosItems||[]).map(i=>telEsc(i.linea)+' '+telFmt(i.total)).join(' · ');
+  filas+=fila('Impuestos'+(impDet?'<div style="font-size:9px;color:var(--text-muted);margin-top:2px">'+impDet+'</div>':''),'','',telFmt(v.impuestos),'','color:var(--text-muted)');
+  filas+=`<tr style="border-top:1px solid var(--border2)"><td ${td}><b>TOTAL FACTURA</b></td><td ${nr}></td><td ${nr}></td><td ${nr} style="font-weight:800">${telFmt(v.total)}</td>${hayPrev?`<td ${nr}></td>`:''}</tr>`;
+  const neto=planes.filter(p=>p.netoUnit!=null).map(p=>{
+    const pv=prevPlan(p.linea), pd=prevDesc(p.linea);
+    const netoPrev=(pv&&pd&&pv.unitario!=null&&pd.unitario!=null)?telR2(pv.unitario+pd.unitario):null;
+    return '<div>'+telEsc(p.linea.replace(/^Plan\s+/i,''))+': neto por línea <b>'+telFmt(p.netoUnit)+'</b> (bonificación '+String(p.pct).replace('.',',')+'%)'
+      +(netoPrev?' · mes anterior '+telFmt(netoPrev)+' ('+telPct((p.netoUnit/netoPrev-1)*100)+')':'')+'</div>';
+  }).join('');
+  const chk=v.chequeos?v.chequeos.map(c=>`<div style="font-size:10px;color:${c.ok?'var(--teal)':'#f87171'}">${c.ok?'✓':'⛔'} ${telEsc(c.txt)}</div>`).join(''):'';
+  const avisos=(v.avisos||[]).map(a=>`<div style="font-size:10px;color:#f59e0b">⚠️ ${telEsc(a)}</div>`).join('');
+  el.innerHTML=`
+    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:4px">${v.guardada?'Factura cargada':'Análisis de la factura'} · <span style="font-family:'JetBrains Mono',monospace;color:var(--text)">${telEsc(v.nroFac)}</span></div>
+    <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px">${v.emision?'Emitida '+telEsc(v.emision)+' · ':''}${v.vto?'vence '+telEsc(v.vto)+' · ':''}período ${telEsc(v.periodo||'—')}</div>
+    <div class="fac-wrap"><table class="fac-tbl">
+      <thead><tr><th>Concepto</th><th style="text-align:right">Cant.</th><th style="text-align:right">Unitario</th><th style="text-align:right">Total</th>${hayPrev?'<th style="text-align:right" title="Variación del precio unitario respecto de la factura del mes anterior">Δ unit.</th>':''}</tr></thead>
+      <tbody>${filas}</tbody></table></div>
+    ${neto?`<div style="margin-top:8px;font-size:11px;color:var(--text-muted);display:grid;gap:2px">${neto}</div>`:''}
+    <div style="margin-top:8px;font-size:10px;color:var(--text-muted)">El REAL del presupuesto es el subtotal de los planes de chips (ya con sus bonificaciones): no incluye otros cargos ni impuestos.</div>
+    ${chk||avisos?`<div style="margin-top:8px;display:grid;gap:2px">${chk}${avisos}</div>`:''}`;
+  el.style.display='block';
+}
 
-    // Encontrar columna del mes actual
-    const m=telecomMesActual;
-    const colIdx=TELECOM_MES_ORDER.indexOf(m);
-    const colOffset=colIdx*3; // cada bloque ocupa 3 columnas (Cantidad, Unitario, Total)
-
-    let subtotal=0, impuestos=0, total=0;
-    let detalle=[];
-
-    for(const row of data){
-      const col0=String(row[0]||'').trim();
-      const totalCol=parseFloat(String(row[colOffset+3]||'').replace(/[^0-9.-]/g,''));
-
-      if(/^SUBTOTAL$/i.test(col0) && !isNaN(totalCol) && totalCol>0) subtotal=totalCol;
-      if(/^IMPUESTOS$/i.test(col0) && !isNaN(totalCol) && totalCol>0) impuestos=totalCol;
-      if(/^TOTAL$/i.test(col0) && !isNaN(totalCol) && totalCol>0) total=totalCol;
-
-      // Detalle líneas (positivas)
-      if(/Chips/i.test(col0) && !isNaN(totalCol) && totalCol>0){
-        detalle.push({linea:col0.replace(/Chips /i,''), monto:totalCol});
-      }
-    }
-
-    if(!subtotal && !total){ telecomShowMsg('telecomMsgXls','No se encontró SUBTOTAL para '+MESES_LABEL[m]+'. Verificá que la planilla tenga la solapa TELECOM.','err'); return; }
-
-    telecomPendingXLS={subtotal, impuestos, total, detalle, mes:m, _fileXls:file};
-    document.getElementById('telecomZoneXls').classList.add('loaded');
-
-    // Preview
-    telecomShowPreview('telecomPrevXls',[
-      ...detalle.map(d=>[d.linea, fmt(d.monto)]),
-      ['Impuestos', fmt(impuestos)],
-      ['━━ SUBTOTAL', fmt(subtotal)],
-      ['TOTAL', fmt(total)],
-    ]);
-
-    // Detalle card
-    const dc=document.getElementById('telecomDetailRows');
-    if(dc){
-      dc.innerHTML=[
-        ...detalle.map(d=>[d.linea, fmt(d.monto)]),
-        ['Impuestos', fmt(impuestos)],
-        ['SUBTOTAL ▶', fmt(subtotal)],
-        ['TOTAL', fmt(total)],
-      ].map(r=>`<div class="claro-detail-row"><span class="dk">${r[0]}</span><span class="dv${r[0].includes('▶')||r[0].includes('TOTAL')?' hi':''}">${r[1]}</span></div>`).join('');
-      document.getElementById('telecomDetail').style.display='block';
-    }
-
-    telecomShowMsg('telecomMsgXls','✓ Planilla leída · '+MESES_LABEL[m]+' → SUBTOTAL: '+fmt(subtotal),'ok');
-    telecomCheckBtn();
-  }catch(e){ telecomShowMsg('telecomMsgXls','Error: '+e.message,'err'); }
+// Reabre la factura ya guardada de ese mes (si se guardó con el análisis nuevo).
+function telecomRenderGuardado(m){
+  const d=telecomData[m]; const det=(d&&d.detalle)||[];
+  const lineas=det.filter(x=>x.tipo==='plan'||x.tipo==='descuento'); if(!lineas.length) return;
+  const meta=det.find(x=>x.tipo==='meta')||{}, imp=det.find(x=>x.tipo==='impuestos')||{}, otr=det.find(x=>x.tipo==='otros')||{};
+  telecomRenderAnalisis({mes:m,guardada:true,nroFac:d.nroFac,emision:meta.emision,vto:meta.vto,periodo:d.periodo,
+    lineas:lineas.map(x=>({tipo:x.tipo,linea:x.linea,cantidad:x.cantidad,unitario:x.unitario,total:x.monto,pct:x.pct,netoUnit:x.netoUnit})),
+    subtotal:d.subtotal,otros:otr.monto||0,impuestos:imp.monto||0,impuestosItems:(imp.items||[]).map(i=>({linea:i.linea,total:i.monto})),total:d.total,chequeos:null,avisos:[]});
 }
 
 async function telecomHandlePDF(input){
   const file=input.files[0]; if(!file) return;
   document.getElementById('telecomPdfName').textContent=file.name;
   document.getElementById('telecomPdfName').style.display='block';
-  telecomShowMsg('telecomMsgPdf','Leyendo PDF...','ok');
+  telecomPendingPDF=null; telecomCheckBtn();
+  telecomShowMsg('telecomMsgPdf','Leyendo la factura...','ok');
   try{
-    const buf=await file.arrayBuffer();
-    const pdf=await pdfjsLib.getDocument({data:buf}).promise;
-    let text='';
-    for(let i=1;i<=Math.min(pdf.numPages,2);i++){
-      const pg=await pdf.getPage(i);
-      const ct=await pg.getTextContent();
-      text+=ct.items.map(it=>it.str).join(' ')+'\n';
+    const an=telecomAnalizar(await telecomPdfAItems(await file.arrayBuffer()));
+    if(!an.cab.planes&&!an.lineas.length){ telecomShowMsg('telecomMsgPdf','No se pudo leer la factura de Telecom. Verificá que sea el PDF de Personal (la primera hoja con "Cargos del mes").','err'); return; }
+    if(!an.mes||!MESES.includes(an.mes)||an.anio!==2026){
+      telecomShowMsg('telecomMsgPdf','El período de la factura ('+(an.periodo||'?')+') queda fuera de los meses del presupuesto (Mar–Oct 2026).','err'); return;
     }
-    // Parse Telecom PDF — similar a Claro
-    const nroM=text.match(/(?:Comprobante|Factura|N[°o])[^\d]*(\d{4}-\d{8})/i)||text.match(/(\d{4}-\d{8})/);
-    const nroFac=nroM?nroM[1]:'—';
-    const fechaM=text.match(/Fecha[:\s]*(\d{1,2}[/.-]\d{1,2}[/.-]\d{4})/i);
-    const fecha=fechaM?fechaM[1].replace(/[.-]/g,'/'):'—';
-    const totalM=text.match(/Total\s*(?:a\s*Pagar)?[:\s\$]*(\d[\d.,]+)/i);
-    const totalFac=totalM?logiParseNum(totalM[1]):0;
-    const periodoM=text.match(/[Pp]er[ií]odo[^\d]*(\d{1,2}[/.]\d{1,2}[/.]\d{4})[^\d]*(\d{1,2}[/.]\d{1,2}[/.]\d{4})/);
-    const periodo=periodoM?periodoM[1]+' → '+periodoM[2]:'—';
-
-    // Detectar mes del PDF
-    const MES_MAP_T={'01':'ene','02':'feb','03':'mar','04':'abr','05':'may','06':'jun','07':'jul','08':'ago'};
-    let mesFac=telecomMesActual;
-    if(fecha!=='—'){ const p=fecha.split('/'); if(p.length>=2) mesFac=MES_MAP_T[p[1].padStart(2,'0')]||telecomMesActual; }
-    if(mesFac!==telecomMesActual){
-      telecomMesActual=mesFac;
-      document.getElementById('telecomSub').textContent=MESES_LABEL[mesFac]+' 2026 · Servicios telefonía · (mes detectado del PDF)';
+    // El mes sale del período facturado (criterio de la planilla de Axel); si no es el del modal, se cambia.
+    if(an.mes!==telecomMesActual){
+      telecomMesActual=an.mes;
+      document.getElementById('telecomSub').textContent=MESES_LABEL[an.mes]+' 2026 · Servicios telefonía · (mes detectado del período facturado)';
     }
-
-    telecomPendingPDF={nroFac, fecha, periodo, totalFac, mesFac, _filePdf:file};
+    const ya=telecomData[an.mes];
+    if(ya&&ya.nroFac&&ya.nroFac!=='—') an.avisos.push(ya.nroFac===an.nroFac?'Esta factura ya estaba cargada: al confirmar se actualiza.':'Ya hay otra factura cargada en '+MESES_LABEL[an.mes]+' ('+ya.nroFac+'): al confirmar se reemplaza.');
+    telecomPendingPDF={an, mes:an.mes, _filePdf:file};
     document.getElementById('telecomZonePdf').classList.add('loaded');
     telecomShowPreview('telecomPrevPdf',[
-      ['N° Factura', nroFac],
-      ['Fecha', fecha],
-      ['Mes imputado', MESES_LABEL[mesFac]+' 2026'],
-      ['Período', periodo],
-      ['Total a Pagar', fmt(totalFac)||'—'],
+      ['N° Factura', an.nroFacCompleto||'—'],
+      ['Emitida / vence', (an.emision||'—')+' / '+(an.vto||'—')],
+      ['Mes imputado', MESES_LABEL[an.mes]+' 2026 (fin del período)'],
+      ['Período', an.periodo||'—'],
+      ['▶ SUBTOTAL planes (REAL)', fmt(an.subtotal)],
+      ['Otros cargos', fmt(an.otros)],
+      ['Impuestos', fmt(an.impuestos)],
+      ['Total factura', fmt(an.total)],
     ]);
-    telecomShowMsg('telecomMsgPdf','✓ Factura leída · imputada en '+MESES_LABEL[mesFac],'ok');
+    telecomRenderAnalisis({mes:an.mes,nroFac:an.nroFacCompleto||an.nroFac,emision:an.emision,vto:an.vto,periodo:an.periodo,lineas:an.lineas.filter(l=>l.tipo==='plan'||l.tipo==='descuento'),
+      subtotal:an.subtotal,otros:an.otros,impuestos:an.impuestos,impuestosItems:an.impuestosLineas,total:an.total,chequeos:an.chequeos,avisos:an.avisos});
+    if(an.ok) telecomShowMsg('telecomMsgPdf','✓ Factura leída · se imputa en '+MESES_LABEL[an.mes]+' · SUBTOTAL '+fmt(an.subtotal),'ok');
+    else telecomShowMsg('telecomMsgPdf','⛔ Los importes leídos no cierran con los totales de la factura: no se puede guardar. Revisá los chequeos de abajo.','err');
     telecomRenderKPIs();
     telecomCheckBtn();
   }catch(e){ telecomShowMsg('telecomMsgPdf','Error: '+e.message,'err'); }
@@ -4216,17 +4311,13 @@ async function telecomHandlePDF(input){
 function telecomCheckBtn(){
   const btn=document.getElementById('telecomBtnConfirm');
   const msg=document.getElementById('telecomMsgConfirm');
+  if(msg) msg.style.display='none';
   if(!btn) return;
-  if(telecomPendingXLS){
-    btn.style.display='block'; btn.disabled=false; btn.style.opacity='1'; btn.style.cursor='pointer';
-    btn.textContent='✓ Confirmar y guardar REAL';
-    if(msg){ msg.style.display=telecomPendingPDF?'none':'block';
-      if(!telecomPendingPDF){ msg.style.color='#f59e0b';msg.style.background='rgba(245,158,11,.1)';msg.style.border='1px solid rgba(245,158,11,.2)';
-        msg.textContent='💡 Podés confirmar sin el PDF, pero se recomienda subirlo.'; }
-    }
-  } else if(telecomPendingPDF){
-    btn.style.display='block'; btn.disabled=true; btn.style.opacity='.5'; btn.textContent='⚠️ Falta la planilla de Axel (Excel)';
-  } else { btn.style.display='none'; }
+  const p=telecomPendingPDF;
+  if(!p){ btn.style.display='none'; return; }
+  btn.style.display='block';
+  if(p.an.ok){ btn.disabled=false; btn.style.opacity='1'; btn.style.cursor='pointer'; btn.textContent='✓ Confirmar y guardar REAL'; }
+  else { btn.disabled=true; btn.style.opacity='.5'; btn.style.cursor='not-allowed'; btn.textContent='⛔ Los importes no cierran — no se puede guardar'; }
 }
 
 async function telecomAdjuntarArchivo(mes, tipo){
@@ -4240,33 +4331,34 @@ async function telecomAdjuntarArchivo(mes, tipo){
 
 async function telecomGuardar(){
   if(isReadonlyBlocked()) return;
-  if(!telecomPendingXLS) return;
-  const m=telecomPendingPDF?.mesFac||telecomMesActual;
+  const p=telecomPendingPDF;
+  if(!p||!p.an.ok) return;
+  const an=p.an, m=p.mes;
+  // Todo el análisis va en "detalle" (jsonb): líneas de planes/bonificaciones, otros cargos, impuestos y datos de la factura.
+  const detalle=[
+    ...an.lineas.filter(l=>l.tipo==='plan'||l.tipo==='descuento').map(l=>({tipo:l.tipo,linea:l.linea,cantidad:l.cantidad,unitario:l.unitario,monto:l.total,
+      ...(l.pct!=null?{pct:l.pct}:{}),...(l.netoUnit!=null?{netoUnit:l.netoUnit}:{})})),
+    {tipo:'otros',linea:'Otros cargos (M2M, packs, tráfico excedente)',monto:an.otros},
+    {tipo:'impuestos',linea:'Impuestos',monto:an.impuestos,items:an.impuestosLineas.map(i=>({linea:i.linea,monto:i.total}))},
+    {tipo:'meta',factura:an.nroFacCompleto,emision:an.emision,vto:an.vto,total:an.total},
+  ];
   telecomData[m]={
-    subtotal:    telecomPendingXLS.subtotal,
-    total:       telecomPendingXLS.total,
-    impuestos:   telecomPendingXLS.impuestos,
-    detalle:     telecomPendingXLS.detalle,
-    nroFac:      telecomPendingPDF?.nroFac||'—',
-    fecha:       telecomPendingPDF?.fecha||'—',
-    periodo:     telecomPendingPDF?.periodo||'—',
-    adjuntos: await presupSubirAdjuntos([
-      {file:telecomPendingPDF?._filePdf, etiqueta:'pdf'},
-      {file:telecomPendingXLS?._fileXls, etiqueta:'xls'},
-    ], 'telecom', m),
+    subtotal:an.subtotal, total:an.total, impuestos:an.impuestos, otros:an.otros, detalle,
+    nroFac:an.nroFac, fecha:an.emision||'—', periodo:an.periodo||'—',
+    adjuntos: await presupSubirAdjuntos([{file:p._filePdf, etiqueta:'pdf'}], 'telecom', m),
   };
-  reales['telecom_'+m]=telecomPendingXLS.subtotal;
+  reales['telecom_'+m]=an.subtotal;
   if(!currentUser){
-    telecomShowMsg('telecomMsgXls','⚠️ No hay sesión activa: se guardó solo en este navegador, NO en la base.','err');
+    telecomShowMsg('telecomMsgPdf','⚠️ No hay sesión activa: se guardó solo en este navegador, NO en la base.','err');
   } else {
     const ok=await telecomSaveDB(m);
     if(!ok){
-      telecomShowMsg('telecomMsgXls','⛔ Error al guardar en la base de datos. Revisá la consola (F12).','err');
+      telecomShowMsg('telecomMsgPdf','⛔ Error al guardar en la base de datos. Revisá la consola (F12).','err');
       return;
     }
   }
-  showToast('✅ Telecom '+MESES_LABEL[m]+' guardado · '+fmt(telecomPendingXLS.subtotal));
-  telecomPendingXLS=null; telecomPendingPDF=null;
+  showToast('✅ Telecom '+MESES_LABEL[m]+' guardado · '+fmt(an.subtotal));
+  telecomPendingPDF=null;
   resetTelecomForm(); telecomRenderKPIs();
   closeTelecomModal();
 }
@@ -5385,32 +5477,14 @@ logiAgregar = async function() {
           <input type="file" id="telecomPdfInp" accept=".pdf" onchange="telecomHandlePDF(this)">
           <div class="uz-icon">📑</div>
           <div class="uz-lbl">Soltá o seleccioná el PDF</div>
-          <div class="uz-sub">FAAT-PERSONAL_*.pdf</div>
+          <div class="uz-sub">Factura de Personal · el análisis se arma solo</div>
           <div class="uz-fn" id="telecomPdfName"></div>
         </div>
         <div class="up-preview" id="telecomPrevPdf"></div>
         <div class="up-msg" id="telecomMsgPdf"></div>
       </div>
-      <div>
-        <div class="up-title">📊 Planilla Axel — solapa TELECOM (Excel)</div>
-        <div class="up-zone" id="telecomZoneXls"
-          ondragover="event.preventDefault();this.classList.add('drag')"
-          ondragleave="this.classList.remove('drag')"
-          ondrop="this.classList.remove('drag');telecomHandleXLS({files:event.dataTransfer.files});event.preventDefault()">
-          <input type="file" id="telecomXlsInp" accept=".xlsx,.xls" onchange="telecomHandleXLS(this)">
-          <div class="uz-icon">📋</div>
-          <div class="uz-lbl">Soltá o seleccioná el Excel</div>
-          <div class="uz-sub">Telecom-Claro_Alleata_*.xlsx</div>
-          <div class="uz-fn" id="telecomXlsName"></div>
-        </div>
-        <div class="up-preview" id="telecomPrevXls"></div>
-        <div class="up-msg" id="telecomMsgXls"></div>
-      </div>
     </div>
-    <div class="claro-detail" id="telecomDetail">
-      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:8px">Detalle Telecom — mes seleccionado</div>
-      <div id="telecomDetailRows"></div>
-    </div>
+    <div class="claro-detail" id="telecomDetail" style="display:none"></div>
     <button class="btn-confirm" id="telecomBtnConfirm" onclick="telecomGuardar()" style="display:none;margin-top:14px">
       ✓ Confirmar y guardar REAL
     </button>
