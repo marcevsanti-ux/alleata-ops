@@ -4147,10 +4147,13 @@ function oriParseInvoiceText(text){
       return s.includes(',') ? (parseFloat(s.replace(/\./g,'').replace(',','.'))||0) : (parseFloat(s)||0); };
     const MESES_NUM=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
 
-    const nroM=j.match(/Punto\s+de\s+Venta:?\s*(\d{4,5})\s+Comp\.?\s*Nro:?\s*(\d{6,8})/i);
-    const numero=nroM?`${nroM[1]}-${nroM[2]}`:'—';
+    // N° de factura = "Comp. Nro" (8 dígitos, ej. 00001469), sin punto de venta.
+    // Si el lector de PDF separó la etiqueta del valor, se busca el número
+    // de 8 dígitos que empieza con 0000 (el CAE y el CUIT son más largos).
+    const nroM=j.match(/Comp\.?\s*Nro:?\s*(\d{6,8})/i)||j.match(/\b(0000\d{4})\b/);
+    const numero=nroM?nroM[1]:'—';
 
-    const emM=j.match(/Fecha\s+de\s+Emisi[oó]n:?\s*(\d{2})\/(\d{2})\/(\d{4})/i);
+    const emM=j.match(/Fecha\s+de\s+Emisi[oó]n:?\s*(\d{2})\/(\d{2})\/(\d{4})/i)||j.match(/(\d{2})\/(\d{2})\/(\d{4})/);
     const fecha=emM?`${emM[1]}-${emM[2]}-${emM[3]}`:'—';
     const perM=j.match(/Per[ií]odo\s+Facturado\s+Desde:?\s*(\d{2})\/(\d{2})\/(\d{4})/i);
     const mesRef=perM||emM;
