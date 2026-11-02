@@ -601,6 +601,7 @@ function renderTabla(items, filtro) {
       const isCoto=it.id==='coto';
       const isML=it.id==='mercadolibre';
       const isSpb=it.id==='superbol';
+      const isOri=it.id==='oriontech';
       // Nro facturas para columna
       const logiFacs = isLogi ? logiGetFacturas(mes) : [];
       const napseFacsRow = isNapse ? (napseFacturas[mes]||[]) : [];
@@ -610,6 +611,7 @@ function renderTabla(items, filtro) {
       const cotoFacsRow = isCoto ? (cotoFacturas[mes]||[]) : [];
       const mlFacsRow = isML ? (mlFacturas[mes]||[]) : [];
       const spbFacsRow = isSpb ? (spbFacturas[mes]||[]) : [];
+      const oriFacsRow = isOri ? (oriFacturas[mes]||[]) : [];
       // Envíos del mes (solo paquetería, no viajes de personas de Cabify "varios")
       if(isEpsa) totalEnvios += epsaFacsRow.reduce((s,f)=>s+(f.cantidadTotal||0),0);
       if(isCA) totalEnvios += caFacsRow.reduce((s,f)=>s+(f.cantidadAlleata||0),0);
@@ -665,6 +667,12 @@ function renderTabla(items, filtro) {
             <span style="font-family:'JetBrains Mono',monospace;font-size:10px;background:rgba(29,191,142,.08);color:var(--teal);padding:1px 6px;border-radius:4px;border:1px solid rgba(29,191,142,.2);display:block">${f.numero}</span>
             ${f.cantidad?`<span style="font-size:9px;color:var(--text-muted);margin-top:2px;display:block">${f.cantidad} unid.</span>`:''}
           </div>`).join('');
+      else if(isOri && oriFacsRow.length)
+        nroFacCell = oriFacsRow.map(f=>`
+          <div style="display:inline-block;margin:2px;vertical-align:top;text-align:center">
+            <span style="font-family:'JetBrains Mono',monospace;font-size:10px;background:rgba(29,191,142,.08);color:var(--teal);padding:1px 6px;border-radius:4px;border:1px solid rgba(29,191,142,.2);display:block">${f.numero}</span>
+            <span style="font-size:9px;color:var(--text-muted);margin-top:2px;display:block">${fmtUSD(f.totalUSD)}</span>
+          </div>`).join('');
       else if(isClaro && claroData[mes])
         nroFacCell = getChip(claroData[mes].nroFac||'—', claroData[mes].nroFac&&claroData[mes].nroFac!=='—'?'Claro':'');
       else if(isTelecom && telecomData[mes])
@@ -689,7 +697,7 @@ function renderTabla(items, filtro) {
           <td class="mono" style="color:${dc}">${(prev||real)?fmtDesv(desv,prev):'—'}</td>
           <td style="text-align:center">${pctBadge}</td>
           <td style="text-align:center">
-            <button class="btn-edit${(isLogi||isClaro)?' logi':''}" onclick="${isLogi?`openLogiModal('${mes}')`:isClaro?`openClaroModal('${mes}')`:isNapse?`openNapseModal('${mes}')`:isTelecom?`openTelecomModal('${mes}')`:isAmazon?`openAmazonModal('${mes}')`:isCA?`openCaModal('${mes}')`:isCabify?`openCabifyModal('${mes}')`:isEpsa?`openEpsaModal('${mes}')`:isCoto?`openCotoModal('${mes}')`:isML?`openMlModal('${mes}')`:isSpb?`openSpbModal('${mes}')`:`openModal('${it.id}','${it.p}','${it.d}')`}">${(isLogi||isClaro||isNapse||isTelecom||isAmazon||isCA||isCabify||isEpsa||isCoto||isML||isSpb)?'📎':'✏️'}</button>
+            <button class="btn-edit${(isLogi||isClaro)?' logi':''}" onclick="${isLogi?`openLogiModal('${mes}')`:isClaro?`openClaroModal('${mes}')`:isNapse?`openNapseModal('${mes}')`:isTelecom?`openTelecomModal('${mes}')`:isAmazon?`openAmazonModal('${mes}')`:isCA?`openCaModal('${mes}')`:isCabify?`openCabifyModal('${mes}')`:isEpsa?`openEpsaModal('${mes}')`:isCoto?`openCotoModal('${mes}')`:isML?`openMlModal('${mes}')`:isSpb?`openSpbModal('${mes}')`:isOri?`openOriModal('${mes}')`:`openModal('${it.id}','${it.p}','${it.d}')`}">${(isLogi||isClaro||isNapse||isTelecom||isAmazon||isCA||isCabify||isEpsa||isCoto||isML||isSpb||isOri)?'📎':'✏️'}</button>
           </td>
         </tr>`;
     });
@@ -1457,6 +1465,9 @@ let mlPendingFactura = null;
 const spbFacturas = {};
 let spbMesActual = 'jun';
 let spbPendingFactura = null;
+const oriFacturas = {};
+let oriMesActual = 'jun';
+let oriPendingFactura = null;
 
 let logiCurrentTC     = 1428;
 // (logiPendingFac declarado arriba)
@@ -4052,6 +4063,273 @@ async function spbEliminarFactura(numero){
 
 function spbShowMsg(txt,type){ const e=document.getElementById('spbMsgFile');if(e){e.className='up-msg '+type;e.textContent=txt;} }
 
+// ═══════════════════════════════════════
+// ORIONTECH SA / Honorarios Alleata — factura A en USD (horas de desarrollo +
+// tickets). El PDF trae el total en USD, el tipo de cambio consignado y el
+// total en pesos ("asciende a: $ ..."). REAL = total en pesos de la factura
+// (USD total c/IVA × TC). Se imputa por el mes del PERÍODO FACTURADO (Desde).
+// Guarda en presupuesto_facturas: tc, subtotal_usd, iva_usd, total_usd.
+// ═══════════════════════════════════════
+
+function openOriModal(m){
+  oriMesActual=m;
+  document.getElementById('oriBg').classList.add('open');
+  document.getElementById('oriSub').textContent=MESES_LABEL[m]+' 2026 · Honorarios Alleata (Oriontech SA)';
+  oriResetForm();
+  oriRenderKPIs();
+  oriRenderFacturas();
+}
+function closeOriModal(){
+  document.getElementById('oriBg').classList.remove('open');
+  oriSyncReal(); render();
+}
+function oriResetForm(){
+  const inp=document.getElementById('oriFileInp'); if(inp) inp.value='';
+  document.getElementById('oriZoneFile')?.classList.remove('loaded');
+  const fn=document.getElementById('oriFileName'); if(fn){fn.style.display='none';fn.textContent='';}
+  const msg=document.getElementById('oriMsgFile'); if(msg){msg.className='up-msg';msg.textContent='';}
+  const prev=document.getElementById('oriPendingWrap'); if(prev){prev.style.display='none';prev.innerHTML='';}
+  oriPendingFactura=null;
+}
+function oriSyncReal(){
+  MESES.forEach(m=>{
+    const real=(oriFacturas[m]||[]).reduce((s,f)=>s+f.total,0);
+    if(real>0) reales['oriontech_'+m]=real;
+  });
+}
+function oriRenderKPIs(){
+  const m=oriMesActual;
+  const prev=DATA.find(i=>i.id==='oriontech').prev[m]||0;
+  const facs=oriFacturas[m]||[];
+  const real=facs.reduce((s,f)=>s+f.total,0);
+  const usd=facs.reduce((s,f)=>s+(f.totalUSD||0),0);
+  const desvPct=prev>0?((real-prev)/prev)*100:0;
+  const el=document.getElementById('oriKpis'); if(!el) return;
+  el.innerHTML=[
+    {label:'PREV '+MESES_LABEL[m].substring(0,3).toUpperCase()+' 26', val:fmt(prev)||'—', sub:'presupuestado', cls:''},
+    {label:'REAL', val:real>0?fmt(real):'—', sub:facs.length+' factura(s)'+(usd?' · '+fmtUSD(usd):''), cls:real>0?'green':''},
+    {label:'DESVÍO', val:real>0&&prev>0?fmtPct(desvPct):'—', sub:desvPct<=0?'por debajo':'por encima', cls:real>0&&prev>0?(Math.abs(desvPct)>20?'warn':'ok'):''},
+  ].map(k=>`<div class="lk"><div class="lk-label">${k.label}</div><div class="lk-val ${k.cls}">${k.val}</div><div class="lk-sub">${k.sub}</div></div>`).join('');
+}
+function oriRenderFacturas(){
+  const m=oriMesActual;
+  const facs=oriFacturas[m]||[];
+  const wrap=document.getElementById('oriFacWrap');
+  const sec=document.getElementById('oriFacSecLbl');
+  const badge=document.getElementById('oriFacBadge');
+  if(!wrap) return;
+  if(!facs.length){ wrap.innerHTML=''; if(sec) sec.style.display='none'; return; }
+  if(sec) sec.style.display='flex';
+  if(badge) badge.textContent=facs.length+' factura'+(facs.length!==1?'s':'');
+  wrap.innerHTML=facs.map(f=>`
+    <div style="background:var(--navy-900);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px">
+        <div>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700">${f.numero}</span>
+          <span style="font-size:11px;color:var(--text-muted);margin-left:8px">${f.fecha} · ${fmtUSD(f.totalUSD)} × TC ${f.tc}</span>
+        </div>
+        <div style="text-align:right;display:flex;align-items:center;gap:10px">
+          <div style="font-family:'JetBrains Mono',monospace;font-weight:800;color:var(--teal)">${fmt(f.total)}</div>
+          <button onclick="oriEliminarFactura('${f.numero}')" title="Eliminar factura" class="btn-del-fac" style="background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.25);color:#f87171;border-radius:6px;padding:5px 9px;cursor:pointer;font-size:12px">🗑️</button>
+        </div>
+      </div>
+      ${presupRenderAdjuntosConBoton(f.adjuntos, ['img','pdf'], 'oriAdjuntarArchivo', f.numero)}
+    </div>`).join('');
+}
+
+// Factura A de Oriontech (AFIP, en USD). El PDF trae el mismo comprobante 3
+// veces (original/duplicado/triplicado): se toma la primera coincidencia.
+function oriParseInvoiceText(text){
+  try{
+    const j=text.replace(/\r/g,' ').replace(/\s+/g,' ');
+    // "2662,00" · "1.234,50" (formato argentino) · "1534.000000" (TC con punto decimal)
+    const num=s=>{ s=String(s||'').trim(); if(!s) return 0;
+      return s.includes(',') ? (parseFloat(s.replace(/\./g,'').replace(',','.'))||0) : (parseFloat(s)||0); };
+    const MESES_NUM=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+
+    const nroM=j.match(/Punto\s+de\s+Venta:?\s*(\d{4,5})\s+Comp\.?\s*Nro:?\s*(\d{6,8})/i);
+    const numero=nroM?`${nroM[1]}-${nroM[2]}`:'—';
+
+    const emM=j.match(/Fecha\s+de\s+Emisi[oó]n:?\s*(\d{2})\/(\d{2})\/(\d{4})/i);
+    const fecha=emM?`${emM[1]}-${emM[2]}-${emM[3]}`:'—';
+    const perM=j.match(/Per[ií]odo\s+Facturado\s+Desde:?\s*(\d{2})\/(\d{2})\/(\d{4})/i);
+    const mesRef=perM||emM;
+    const mesFactura=mesRef?(MESES_NUM[parseInt(mesRef[2],10)-1]||null):null;
+
+    const enUSD=/Moneda:?\s*USD/i.test(j);
+    const tcM=j.match(/tipo\s+de\s+cambio\s+consignado\s+de\s*([\d.,]+)/i);
+    const tc=enUSD&&tcM?num(tcM[1]):1;
+    const netoM=j.match(/Importe\s+Neto\s+Gravado:?\s*(?:USD|\$)?\s*([\d.,]+)/i);
+    const ivaM=j.match(/IVA\s+21%:?\s*(?:USD|\$)?\s*([\d.,]+)/i);
+    const totM=j.match(/Importe\s+Total:?\s*(?:USD|\$)?\s*([\d.,]+)/i);
+    const pesosM=j.match(/asciende\s+a:?\s*\$\s*([\d.,]+)/i);
+
+    // Según cómo el lector de PDF ordene el texto, los importes pueden quedar
+    // separados de su etiqueta: si falta neto/IVA se derivan del total (IVA 21%).
+    const totalUSD=totM?num(totM[1]):0;
+    let subtotalUSD=netoM?num(netoM[1]):0, ivaUSD=ivaM?num(ivaM[1]):0;
+    if(totalUSD&&(!subtotalUSD||!ivaUSD)){ subtotalUSD=Math.round(totalUSD/1.21*100)/100; ivaUSD=Math.round((totalUSD-subtotalUSD)*100)/100; }
+    return {numero, fecha, mesFactura, tc, enUSD, subtotalUSD, ivaUSD, totalUSD,
+      totalPesosFactura:pesosM?num(pesosM[1]):0};
+  }catch(e){ return null; }
+}
+const oriTotalPesos=t=>Math.round((Number(t.totalUSD)||0)*(Number(t.tc)||1)*100)/100;
+
+async function oriHandleFile(input){
+  const file=input.files[0]; if(!file) return;
+  document.getElementById('oriFileName').textContent=file.name;
+  document.getElementById('oriFileName').style.display='block';
+  document.getElementById('oriZoneFile').classList.add('loaded');
+  const esPdf=file.type==='application/pdf'||/\.pdf$/i.test(file.name);
+  oriShowMsg(esPdf?'📄 Leyendo el PDF...':'🤖 Leyendo la imagen (OCR)...','ok');
+  try{
+    let rawText='';
+    if(esPdf){
+      const buf=await file.arrayBuffer();
+      const pdf=await pdfjsLib.getDocument({data:buf}).promise;
+      for(let i=1;i<=pdf.numPages;i++){
+        const pg=await pdf.getPage(i);
+        const ct=await pg.getTextContent();
+        rawText+=ct.items.map(it=>it.str).join(' ')+'\n';
+      }
+    } else {
+      const base64=await fileToBase64(file);
+      rawText=await cotoCallVisionOCR(base64, file.type||'image/jpeg');
+    }
+    const p=oriParseInvoiceText(rawText);
+    if(!p){ oriShowMsg('No se pudo leer el archivo. Completá los datos a mano.','err'); }
+    oriPendingFactura={
+      numero:p?.numero||'—', fecha:p?.fecha||'—', mes:p?.mesFactura||oriMesActual,
+      tc:p?.tc||1, subtotalUSD:p?.subtotalUSD||0, ivaUSD:p?.ivaUSD||0, totalUSD:p?.totalUSD||0,
+      rawText, _file:file,
+    };
+    oriRenderPending();
+    const pesos=oriTotalPesos(oriPendingFactura);
+    const difiere=p?.totalPesosFactura && Math.abs(p.totalPesosFactura-pesos)>1;
+    if(oriPendingFactura.mes!==oriMesActual){
+      oriShowMsg('⛔ Esta factura parece ser de '+MESES_LABEL[oriPendingFactura.mes]+' pero estás cargando '+MESES_LABEL[oriMesActual]+'. Se va a imputar a '+MESES_LABEL[oriPendingFactura.mes]+' (podés cambiar el mes abajo).','err');
+    } else if(p?.totalUSD){
+      oriShowMsg('✓ Factura leída · '+fmtUSD(p.totalUSD)+' × TC '+p.tc+' = '+fmt(pesos)+(difiere?' · ⚠️ la factura indica '+fmt(p.totalPesosFactura)+', revisá el TC':'')+' · revisá los datos antes de confirmar','ok');
+    } else {
+      oriShowMsg('⚠️ No se detectó el total automáticamente. Completalo a mano.','err');
+    }
+  }catch(e){
+    oriShowMsg('Error leyendo el archivo: '+e.message+' — completá los datos a mano.','err');
+    oriPendingFactura={numero:'—',fecha:'—',mes:oriMesActual,tc:1,subtotalUSD:0,ivaUSD:0,totalUSD:0,rawText:'',_file:file};
+    oriRenderPending();
+  }
+}
+
+function oriRenderPending(){
+  const t=oriPendingFactura;
+  const wrap=document.getElementById('oriPendingWrap');
+  if(!wrap) return;
+  if(!t){ wrap.style.display='none'; wrap.innerHTML=''; return; }
+  wrap.style.display='block';
+  const esc=v=>String(v??'').replace(/"/g,'&quot;');
+  const st="width:100%;background:var(--navy-800);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:12px;padding:6px 8px;box-sizing:border-box";
+  const lb="font-size:10px;color:var(--text-muted);display:block;margin-bottom:3px";
+  wrap.innerHTML=`
+    <div style="background:var(--navy-900);border:1px solid var(--border2);border-radius:10px;padding:14px;margin-top:10px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+        <div><label style="${lb}">N° de factura</label><input type="text" value="${esc(t.numero)}" oninput="oriPendingFactura.numero=this.value" style="${st}"></div>
+        <div><label style="${lb}">Fecha emisión (DD-MM-YYYY)</label><input type="text" value="${esc(t.fecha)}" oninput="oriPendingFactura.fecha=this.value" style="${st}"></div>
+        <div><label style="${lb}">Mes a imputar (período facturado)</label>
+          <select onchange="oriPendingFactura.mes=this.value" style="${st}">${MESES.map(m=>`<option value="${m}"${m===t.mes?' selected':''}>${MESES_LABEL[m]}</option>`).join('')}</select></div>
+        <div><label style="${lb}">Tipo de cambio</label><input type="number" step="0.01" value="${t.tc}" oninput="oriPendingFactura.tc=parseFloat(this.value)||1;oriActualizarPesos()" style="${st};text-align:right"></div>
+        <div><label style="${lb}">Neto gravado (USD)</label><input type="number" step="0.01" value="${t.subtotalUSD}" oninput="oriPendingFactura.subtotalUSD=parseFloat(this.value)||0" style="${st};text-align:right"></div>
+        <div><label style="${lb}">IVA 21% (USD)</label><input type="number" step="0.01" value="${t.ivaUSD}" oninput="oriPendingFactura.ivaUSD=parseFloat(this.value)||0" style="${st};text-align:right"></div>
+        <div><label style="${lb}">Total c/IVA (USD)</label><input type="number" step="0.01" value="${t.totalUSD}" oninput="oriPendingFactura.totalUSD=parseFloat(this.value)||0;oriActualizarPesos()" style="${st};text-align:right"></div>
+        <div><label style="${lb}">Total en pesos (REAL)</label><div id="oriPesosCalc" style="${st};text-align:right;color:var(--teal);font-weight:800">${fmt(oriTotalPesos(t))}</div></div>
+      </div>
+      ${t.rawText?`<details style="margin-bottom:10px"><summary style="cursor:pointer;font-size:10px;color:var(--text-muted)">Ver texto crudo leído (por si algún dato quedó mal)</summary><pre style="white-space:pre-wrap;font-size:10px;color:var(--text-muted);max-height:160px;overflow:auto">${t.rawText.replace(/</g,'&lt;')}</pre></details>`:''}
+      <button class="btn-confirm" onclick="oriGuardar()" style="display:block">✓ Confirmar y guardar REAL</button>
+    </div>`;
+}
+function oriActualizarPesos(){
+  const e=document.getElementById('oriPesosCalc');
+  if(e&&oriPendingFactura) e.textContent=fmt(oriTotalPesos(oriPendingFactura));
+}
+
+async function oriGuardar(){
+  if(isReadonlyBlocked()) return;
+  const t=oriPendingFactura; if(!t) return;
+  if(!t.totalUSD){ oriShowMsg('El total no puede ser 0 — completalo antes de guardar.','err'); return; }
+  const mes=t.mes||oriMesActual;
+  if((oriFacturas[mes]||[]).find(f=>f.numero===t.numero && t.numero!=='—')){
+    oriShowMsg('⚠️ Ya cargaste la factura '+t.numero+' en '+MESES_LABEL[mes]+'.','err');
+    return;
+  }
+  if(mes!==oriMesActual){
+    oriMesActual=mes;
+    document.getElementById('oriSub').textContent=MESES_LABEL[mes]+' 2026 · Honorarios Alleata (Oriontech SA) · (mes del período facturado)';
+  }
+  const factura={
+    numero:t.numero, fecha:t.fecha, tc:t.tc, subtotalUSD:t.subtotalUSD, ivaUSD:t.ivaUSD, totalUSD:t.totalUSD,
+    total:oriTotalPesos(t),
+    adjuntos:await presupSubirAdjuntos([{file:t._file, etiqueta:/\.pdf$/i.test(t._file?.name||'')?'pdf':'img'}], 'oriontech', mes),
+  };
+  if(!oriFacturas[mes]) oriFacturas[mes]=[];
+  oriFacturas[mes].push(factura);
+  reales['oriontech_'+mes]=oriFacturas[mes].reduce((s,f)=>s+f.total,0);
+
+  if(!currentUser){
+    oriShowMsg('⚠️ No hay sesión activa: se guardó solo en este navegador, NO en la base.','err');
+  } else {
+    const ok=await oriSaveDB(factura);
+    if(!ok){ oriShowMsg('⛔ Error al guardar en la base de datos. Revisá la consola (F12).','err'); return; }
+  }
+  showToast('✅ Oriontech '+factura.numero+' guardado · '+fmt(factura.total));
+  oriResetForm();
+  oriRenderKPIs();
+  oriRenderFacturas();
+  render();
+}
+
+async function oriSaveDB(factura){
+  const row={
+    user_id:currentUser.id, mes:oriMesActual, proveedor:'oriontech',
+    numero:factura.numero, fecha:factura.fecha, vto:factura.fecha,
+    descripcion:'Oriontech SA · Honorarios Alleata',
+    tc:factura.tc, subtotal_usd:factura.subtotalUSD, iva_usd:factura.ivaUSD, otros_imp:0, total_usd:factura.totalUSD,
+    adjuntos:factura.adjuntos||[]
+  };
+  const {error}=await sb.from('presupuesto_facturas').upsert(row,{onConflict:'numero,mes'});
+  if(error){ console.error('Oriontech DB error:',error); return false; }
+  return true;
+}
+
+async function oriAdjuntarArchivo(numero, tipo){
+  const t=(oriFacturas[oriMesActual]||[]).find(f=>f.numero===numero);
+  if(!t) return;
+  presupAdjuntarArchivo(t, 'oriontech', oriMesActual, tipo, async ()=>{
+    if(currentUser) await oriSaveDB(t);
+    oriRenderFacturas();
+  });
+}
+
+async function oriEliminarFactura(numero){
+  if(isReadonlyBlocked()) return;
+  const m=oriMesActual;
+  const facs=oriFacturas[m]||[];
+  const f=facs.find(x=>x.numero===numero);
+  if(!f) return;
+  if(!confirm('¿Eliminar la factura '+numero+' ('+fmt(f.total)+') de '+MESES_LABEL[m]+'? Esta acción no se puede deshacer.')) return;
+  if(currentUser){
+    const {error}=await sb.from('presupuesto_facturas').delete().eq('numero',numero).eq('mes',m).eq('proveedor','oriontech');
+    if(error){ showToast('⛔ Error al eliminar en la base de datos. Revisá la consola (F12).'); console.error('Oriontech delete error:',error); return; }
+  }
+  oriFacturas[m]=facs.filter(x=>x.numero!==numero);
+  const real=oriFacturas[m].reduce((s,x)=>s+x.total,0);
+  if(real>0) reales['oriontech_'+m]=real; else delete reales['oriontech_'+m];
+  showToast('🗑️ Factura '+numero+' eliminada');
+  oriRenderKPIs();
+  oriRenderFacturas();
+  render();
+}
+
+function oriShowMsg(txt,type){ const e=document.getElementById('oriMsgFile');if(e){e.className='up-msg '+type;e.textContent=txt;} }
+
 // ── Fin Cabify + CALOG ────────────────────────────────────────────────────────
 
 // ── Telecom Personal state ───────────────────────────────────────────────────
@@ -5046,6 +5324,25 @@ async function loadFacturasFromDB() {
     });
     spbSyncReal();
   }
+  // Cargar facturas Oriontech (presupuesto_facturas con proveedor='oriontech'; total_usd × tc = pesos)
+  const { data: oriData, error: oriErr } = await sb.from('presupuesto_facturas')
+    .select('*').eq('proveedor','oriontech');
+  if(!oriErr && oriData && oriData.length){
+    oriData.forEach(row=>{
+      const m=row.mes;
+      if(!oriFacturas[m]) oriFacturas[m]=[];
+      if(!oriFacturas[m].find(f=>f.numero===row.numero)){
+        const tc=Number(row.tc)||1, totalUSD=Number(row.total_usd)||0;
+        oriFacturas[m].push({
+          numero:row.numero, fecha:row.fecha, tc,
+          subtotalUSD:Number(row.subtotal_usd)||0, ivaUSD:Number(row.iva_usd)||0, totalUSD,
+          total:Math.round(totalUSD*tc*100)/100,
+          adjuntos:row.adjuntos||[]
+        });
+      }
+    });
+    oriSyncReal();
+  }
   render();
   postResumenAlPortal();
 }
@@ -5461,6 +5758,41 @@ logiAgregar = async function() {
 
     <div class="logi-footer">
       <button class="btn-cancel" onclick="closeSpbModal()">Cerrar</button>
+    </div>
+  </div>
+</div>
+<!-- Modal Oriontech SA / Honorarios Alleata (factura A en USD) -->
+<div class="claro-bg" id="oriBg">
+  <div class="claro-modal">
+    <h3>Oriontech SA (Honorarios Alleata)</h3>
+    <p class="msub" id="oriSub" style="font-size:12px;color:var(--text-muted);margin-bottom:22px"></p>
+
+    <div class="claro-kpis" id="oriKpis" style="grid-template-columns:repeat(3,1fr)"></div>
+
+    <div style="font-size:11px;color:var(--text-muted);background:var(--navy-900);border:1px solid var(--border2);border-radius:9px;padding:10px 14px;margin-bottom:16px">
+      💡 Subí la factura (PDF o foto) de Oriontech — se lee N° de factura, fecha, período facturado, neto, IVA, total en USD y tipo de cambio. El REAL es el total en pesos (USD × TC). Revisá los datos antes de confirmar.
+    </div>
+
+    <div class="up-title">📎 Factura (PDF o foto)</div>
+    <div class="up-zone" id="oriZoneFile"
+      ondragover="event.preventDefault();this.classList.add('drag')"
+      ondragleave="this.classList.remove('drag')"
+      ondrop="this.classList.remove('drag');oriHandleFile({files:event.dataTransfer.files});event.preventDefault()">
+      <input type="file" id="oriFileInp" accept="image/*,application/pdf" onchange="oriHandleFile(this)">
+      <div class="uz-icon">🧾</div>
+      <div class="uz-lbl">Soltá o seleccioná la factura</div>
+      <div class="uz-sub">PDF o JPG/PNG — se lee automáticamente</div>
+      <div class="uz-fn" id="oriFileName"></div>
+    </div>
+    <div class="up-msg" id="oriMsgFile"></div>
+
+    <div id="oriPendingWrap" style="display:none"></div>
+
+    <div class="sec-lbl" id="oriFacSecLbl" style="display:none">Facturas cargadas este mes <span></span> <span id="oriFacBadge" style="background:rgba(29,191,142,.15);color:var(--teal);padding:1px 10px;border-radius:20px;font-size:10px;font-weight:700"></span></div>
+    <div id="oriFacWrap"></div>
+
+    <div class="logi-footer">
+      <button class="btn-cancel" onclick="closeOriModal()">Cerrar</button>
     </div>
   </div>
 </div>
