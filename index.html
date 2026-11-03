@@ -1425,6 +1425,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
   </div>
   <div style="font-size:10px;color:var(--text-muted);margin:-4px 0 12px 2px">Total OTs = Configurar terminal + En gestión (En proceso + Pre-colecta) + Gestionado (Despachado + Retirar terminal + Exitoso) + Otros estados.</div>
   <div id="mrDesgloseMes" style="display:none;margin-bottom:16px"></div>
+  <div id="mrCuentasBox" style="margin-bottom:16px"></div>
 
   <!-- Distribución geográfica (pedido 26/08) — CABA / AMBA (GBA) / Resto
        del país, con desglose por provincia para "Resto del país". Reusa
@@ -8793,6 +8794,7 @@ function mrRenderExplorador(){
     if(contGeoResumen)contGeoResumen.innerHTML='<div style="text-align:center;padding:16px;color:var(--text-muted);font-size:12px">Elegí una card de arriba (ej. "Total OTs") para ver el desglose por mes y la distribución geográfica.</div>';
     if(contGeoProv)contGeoProv.innerHTML='';
     if(contOts)contOts.innerHTML='';
+    mrRenderCuentas();
     return;
   }
 
@@ -8838,6 +8840,127 @@ function mrRenderExplorador(){
 
   const dataMes=_mrFiltro.mes ? dataMetrica.filter(r=>mrMesKeyDe(r)===_mrFiltro.mes) : dataMetrica;
   mrRenderGeoDrilldown(dataMes);
+  mrRenderCuentas();
+}
+
+// ── Cuentas de las OT (pedido 03/11) ──────────────────────────────────────
+// Cuántas cuentas distintas hay detrás de las OT del filtro actual (card + mes) y en qué
+// estado figuran HOY en Salesforce (Account.Estado_de_la_cuenta__c, TAL CUAL: sin unificar).
+// El dato sale de sf_cuentas_estado, que el agente refresca solo cada hora (cuentasEstadoSync.js).
+let _mrCuentasEstado={};   // account_id -> fila de sf_cuentas_estado
+let _mrCtaEstadoSel='';    // estado elegido para ver el listado ('' = ninguno)
+const MR_CTA_PEND='(pendiente de sincronizar)', MR_CTA_SINDATO='(sin estado en SF)';
+function mrEsc(v){ return String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+async function mrCargarCuentasEstado(){
+  try{
+    let todas=[]; const PAG=1000;
+    for(let desde=0;desde<100000;desde+=PAG){
+      const r=await sb.from('sf_cuentas_estado').select('account_id,cuenta,estado_cuenta,fecha_pedido_baja,motivo_baja,ultimo_sync')
+        .order('account_id',{ascending:true}).range(desde,desde+PAG-1);
+      if(r.error)throw r.error;
+      todas=todas.concat(r.data||[]);
+      if(!r.data||r.data.length<PAG)break;
+    }
+    _mrCuentasEstado={}; todas.forEach(x=>{ _mrCuentasEstado[x.account_id]=x; });
+  }catch(e){ console.warn('[MR cuentas] no se pudo leer sf_cuentas_estado:',e.message||e); }
+}
+
+// OT del filtro actual por métrica + mes (sin zona/provincia: esas son del drill-down geográfico).
+function mrCuentasDatos(){
+  const metrica=_mrFiltro.metrica||'total';
+  let datos=_mrIndData.filter(MR_METRICA_PREDICADO[metrica]||(()=>true));
+  if(_mrFiltro.mes) datos=datos.filter(r=>mrMesKeyDe(r)===_mrFiltro.mes);
+  return {datos,metrica};
+}
+function mrCuentasAgrupar(datos){
+  const porCta={};
+  datos.forEach(r=>{
+    const id=r.account_id||('sin-id:'+(r.cuenta||r.sf_id));
+    if(!porCta[id])porCta[id]={id,cuenta:r.cuenta||'(sin nombre)',ots:[]};
+    porCta[id].ots.push(r.workorder_number);
+  });
+  return Object.values(porCta).map(c=>{
+    const e=_mrCuentasEstado[c.id];
+    return {...c, estado: e ? (e.estado_cuenta||MR_CTA_SINDATO) : MR_CTA_PEND,
+      fecha_baja:e?.fecha_pedido_baja||'', motivo_baja:e?.motivo_baja||'', sync:e?.ultimo_sync||''};
+  });
+}
+
+function mrRenderCuentas(){
+  const box=document.getElementById('mrCuentasBox'); if(!box)return;
+  if(!_mrIndData.length){ box.innerHTML=''; return; }
+  const {datos,metrica}=mrCuentasDatos();
+  const cuentas=mrCuentasAgrupar(datos);
+  const porEstado={}; cuentas.forEach(c=>{ porEstado[c.estado]=(porEstado[c.estado]||0)+1; });
+  const filas=Object.entries(porEstado).sort((a,b)=>b[1]-a[1]);
+  const cfg=MR_METRICAS[metrica]||{label:'Total OTs'};
+  const mesTxt=_mrFiltro.mes?' · '+mrMesLabelDe(_mrFiltro.mes):'';
+  const ult=Object.values(_mrCuentasEstado).map(x=>x.ultimo_sync).filter(Boolean).sort().pop();
+  const hace=ult?Math.max(0,Math.round((Date.now()-new Date(ult).getTime())/60000)):null;
+  const haceTxt=hace==null?'todavía sin sincronizar':(hace<60?'hace '+hace+' min':'hace '+Math.round(hace/60)+' h');
+  const sel=_mrCtaEstadoSel&&porEstado[_mrCtaEstadoSel]?_mrCtaEstadoSel:'';
+  const lista=sel?cuentas.filter(c=>c.estado===sel).sort((a,b)=>a.cuenta.localeCompare(b.cuenta)):[];
+  box.innerHTML=`<div class="card" style="padding:14px 18px">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px">
+      <div>
+        <div style="font-size:13px;font-weight:700">🏢 Cuentas de las OT — ${mrEsc(cfg.label)}${mrEsc(mesTxt)}</div>
+        <div style="font-size:10px;color:var(--text-muted);margin-top:2px">Estado de la cuenta tal cual figura en Salesforce · actualizado ${haceTxt} · se refresca solo cada hora</div>
+      </div>
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-sm" id="mrCtaBtnSync" style="padding:4px 10px;font-size:11px" onclick="mrActualizarCuentasEstado()">↻ Actualizar desde SF</button>
+        <button class="btn btn-sm" style="padding:4px 10px;font-size:11px" onclick="mrDescargarCuentas()">⬇ Descargar (CSV)</button>
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:stretch">
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 16px;min-width:110px">
+        <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.4px">OT</div>
+        <div style="font-size:20px;font-weight:800;margin-top:2px">${datos.length}</div>
+      </div>
+      <div style="background:var(--surface2);border:1px solid var(--teal);border-radius:10px;padding:10px 16px;min-width:110px">
+        <div style="font-size:10px;color:var(--teal);text-transform:uppercase;letter-spacing:.4px">Cuentas distintas</div>
+        <div style="font-size:20px;font-weight:800;margin-top:2px;color:var(--teal)">${cuentas.length}</div>
+      </div>
+      ${filas.map(([est,n])=>`<div onclick="mrSelCuentaEstado(this.dataset.e)" data-e="${mrEsc(est)}" style="cursor:pointer;background:var(--surface2);border:1px solid ${sel===est?'var(--teal)':'var(--border)'};border-radius:10px;padding:10px 16px;min-width:110px" title="Ver las cuentas en este estado">
+        <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.4px">${mrEsc(est)}</div>
+        <div style="font-size:20px;font-weight:800;margin-top:2px">${n}</div>
+      </div>`).join('')}
+    </div>
+    ${sel?`<div style="margin-top:12px;max-height:320px;overflow:auto;border:1px solid var(--border);border-radius:8px">
+      <table style="width:100%;font-size:12px;border-collapse:collapse">
+        <thead><tr style="text-align:left;color:var(--text-muted);font-size:10px;text-transform:uppercase"><th style="padding:6px 10px">Cuenta</th><th style="padding:6px 10px">OT</th><th style="padding:6px 10px">Pedido de baja</th></tr></thead>
+        <tbody>${lista.map(c=>`<tr style="border-top:1px solid var(--border)"><td style="padding:6px 10px">${mrEsc(c.cuenta)}</td><td style="padding:6px 10px;font-family:'JetBrains Mono',monospace">${mrEsc(c.ots.join(', '))}</td><td style="padding:6px 10px">${mrEsc(c.fecha_baja||'—')}</td></tr>`).join('')}</tbody>
+      </table></div>`:''}
+  </div>`;
+}
+function mrSelCuentaEstado(est){ _mrCtaEstadoSel=(_mrCtaEstadoSel===est)?'':est; mrRenderCuentas(); }
+
+async function mrActualizarCuentasEstado(){
+  const btn=document.getElementById('mrCtaBtnSync');
+  if(btn){ btn.disabled=true; btn.textContent='↻ Consultando Salesforce...'; }
+  try{
+    const resp=await fetch(ALLY_RAILWAY_BASE+'/automations/cuentas-estado/run',{method:'POST',headers:{'Content-Type':'application/json'}});
+    const j=await resp.json().catch(()=>({}));
+    if(!resp.ok||!j.ok) throw new Error(j.error||('HTTP '+resp.status));
+    await mrCargarCuentasEstado();
+    mrRenderCuentas();
+    showToastPortal('✅ Estado de cuentas actualizado ('+j.actualizadas+' cuentas)');
+  }catch(e){
+    showToastPortal('⚠️ No se pudo actualizar: '+e.message);
+    if(btn){ btn.disabled=false; btn.textContent='↻ Actualizar desde SF'; }
+  }
+}
+
+function mrDescargarCuentas(){
+  const {datos,metrica}=mrCuentasDatos();
+  const cuentas=mrCuentasAgrupar(datos).sort((a,b)=>a.cuenta.localeCompare(b.cuenta));
+  const q=v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"';
+  const rows=[['Cuenta','Id cuenta SF','Estado de la cuenta (SF)','Cantidad de OT','OT','Fecha pedido de baja','Motivo de baja'].map(q).join(',')];
+  cuentas.forEach(c=>rows.push([c.cuenta,c.id.startsWith('sin-id:')?'':c.id,c.estado,c.ots.length,c.ots.join(' | '),c.fecha_baja,c.motivo_baja].map(q).join(',')));
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob(['﻿'+rows.join('\n')],{type:'text/csv;charset=utf-8'}));
+  a.download='cuentas_mision_rollout_'+metrica+(_mrFiltro.mes?'_'+_mrFiltro.mes:'')+'.csv';
+  document.body.appendChild(a); a.click(); a.remove();
 }
 
 // Pedido 16/09: desglose por logística (Logística / Cantidad / Costo total
@@ -9079,6 +9202,7 @@ async function cargarIndicadoresMisionRollout(){
     return;
   }
   _mrIndData=data||[];
+  await mrCargarCuentasEstado();
   renderIndicadoresMisionRollout();
 }
 
