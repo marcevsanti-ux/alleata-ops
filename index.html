@@ -11,7 +11,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.7.118</title>
+<title>Alleata · Operaciones v4.7.119</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -412,7 +412,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.118 · 04 nov 2026
+      v4.7.119 · 05 nov 2026
     </div>
   </div>
 </div>
@@ -537,7 +537,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.118 · 04 nov 2026
+      v4.7.119 · 05 nov 2026
     </div>
   </div>
 </nav>
@@ -606,7 +606,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.118</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.119</div>
   </div>
   <div class="content">
 
@@ -5467,7 +5467,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.7.118] OK');
+console.log('[Alleata v4.7.119] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -12264,7 +12264,16 @@ async function dsRecuperadaFiltrarPorMes(mesKey, esInicial){
       : `<span style="color:#f59e0b;font-weight:700">sin costo</span>`;
   };
 
-  cont.innerHTML=`${costoHtml}${barraFiltro}<div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:10px 12px;overflow-x:auto">
+  // Pedido 05/11: exportar a planilla lo que se está viendo (mes + filtro de
+  // logística / sin costo aplicados). Se guarda en window para que el onclick
+  // exporte exactamente la lista renderizada, con costo y logística resueltos.
+  window._dsRecExport={
+    lista:listaTabla, infoOT,
+    etiqueta:[_dsRecuperadaMesActivo||'todos-los-meses', f.log?(LBL_FILTRO[f.log]||f.log):null, f.sinCosto?'sin-costo':null].filter(Boolean).join('_')
+  };
+  const barraExport=`<div style="display:flex;justify-content:flex-end;margin-bottom:8px"><button class="btn-sm" onclick="dsRecuperadaExportar()" title="Descargar en Excel las ${listaTabla.length} OT que se ven en la tabla" style="font-size:11px">⬇ Exportar planilla (${listaTabla.length})</button></div>`;
+
+  cont.innerHTML=`${costoHtml}${barraFiltro}${barraExport}<div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:10px 12px;overflow-x:auto">
     <table style="width:100%;border-collapse:collapse;font-size:11px;white-space:nowrap">
       <thead><tr style="text-align:left;color:var(--text-muted);text-transform:uppercase;font-size:9px;letter-spacing:.03em">
         <th style="padding:4px 8px 4px 0">OT</th>
@@ -12273,6 +12282,7 @@ async function dsRecuperadaFiltrarPorMes(mesKey, esInicial){
         <th style="padding:4px 8px">Fecha recuperación</th>
         <th style="padding:4px 8px">Logística</th>
         <th style="padding:4px 8px">Costo</th>
+        <th style="padding:4px 8px" title="Responsable de la OT (Asignado_a__c en Salesforce)">Asignado a</th>
         <th style="padding:4px 8px">Cuenta</th>
         <th style="padding:4px 8px">CUIT</th>
         <th style="padding:4px 8px">Comercio</th>
@@ -12293,6 +12303,7 @@ async function dsRecuperadaFiltrarPorMes(mesKey, esInicial){
           <td style="padding:5px 8px;font-size:10px;color:var(--text-muted)">${o.fecha_recuperada?new Date(o.fecha_recuperada).toLocaleDateString('es-AR'):'—'}</td>
           <td style="padding:5px 8px;font-size:10px">${(infoOT[o.ot]||{}).log||'<span style="color:var(--text-muted)">—</span>'}</td>
           <td style="padding:5px 8px">${fmtCostoCelda(o)}</td>
+          <td style="padding:5px 8px">${celda(o.responsable&&o.responsable!=='Sin asignar'?o.responsable:'')}</td>
           <td style="padding:5px 8px">${celda(o.cuenta)}</td>
           <td style="padding:5px 8px;font-family:'JetBrains Mono',monospace">${celda(o.cuit)}</td>
           <td style="padding:5px 8px">${celda(o.comercio)}</td>
@@ -12306,6 +12317,40 @@ async function dsRecuperadaFiltrarPorMes(mesKey, esInicial){
   </div>`;
 }
 
+
+// Pedido 05/11: exporta a Excel la tabla de "Recuperada" tal como está filtrada.
+function dsRecuperadaExportar(){
+  const st=window._dsRecExport;
+  if(!st||!st.lista||!st.lista.length){ alert('No hay OT para exportar.'); return; }
+  const fmtF=v=>v?new Date(v).toLocaleDateString('es-AR'):'';
+  const filas=st.lista.map(o=>{
+    const inf=st.infoOT[o.ot]||{};
+    return {
+      'OT':o.ot||'',
+      'N° de seguimiento':o.tracking||'',
+      'Fecha creación':fmtF(o.fecha_creacion),
+      'Fecha recuperación':fmtF(o.fecha_recuperada),
+      'Logística':inf.log||'',
+      'Costo envío':(inf.costo>0)?Math.round(inf.costo):(inf.log==='ALLEATA'?'propia':'sin costo'),
+      'Asignado a (Asignado_a__c)':(o.responsable&&o.responsable!=='Sin asignar')?o.responsable:'',
+      'Cuenta':o.cuenta||'',
+      'CUIT':o.cuit||'',
+      'Comercio':o.comercio||'',
+      'Motivo':o.motivo||'',
+      'Contacto':o.contacto||'',
+      'Terminal ID':o.terminal_id||'',
+      'Ciudad':o.ciudad||'',
+      'Provincia':o.provincia||'',
+      'Nativa Napse':dsEsNativaNapse(o)?'Sí':'No',
+      'Link SF':o.sf_id?`https://alleata.lightning.force.com/lightning/r/WorkOrder/${o.sf_id}/view`:'',
+    };
+  });
+  const ws=XLSX.utils.json_to_sheet(filas);
+  ws['!cols']=[{wch:11},{wch:30},{wch:13},{wch:16},{wch:18},{wch:12},{wch:26},{wch:34},{wch:14},{wch:26},{wch:26},{wch:22},{wch:14},{wch:18},{wch:18},{wch:12},{wch:60}];
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Recuperadas');
+  XLSX.writeFile(wb,`Desinstalaciones_Recuperadas_${st.etiqueta}_${new Date().toISOString().slice(0,10)}.xlsx`);
+}
 
 // ── Backlog Histórico — Desinstalaciones (pedido 26/08) ────────────────────
 // MISMO patrón que Gestión OPS de arriba (mismo endpoint SF en vivo, mismo
