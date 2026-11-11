@@ -84,7 +84,7 @@
   <header>
     <div class="brand">
       <div class="brand-logo">alleata</div>
-      <div class="brand-sub">· Indicadores Operaciones <span style="opacity:.5">v2.9.3</span></div>
+      <div class="brand-sub">· Indicadores Operaciones <span style="opacity:.5">v2.10.0</span></div>
     </div>
     <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
       <div style="font-size:11px;color:var(--text-dim);text-align:right;line-height:1.4">
@@ -206,6 +206,7 @@
 </div>
 
 <script>
+// indicadores.html — v2.10.0 (11 nov 2026) — click en "Sin costo" lista las OT sin costo_envio (+ CSV)
 // indicadores.html — v2.9.3 (11 nov 2026) — columna "Despachado + Exitoso + Reprog." en OTs creadas por mes (+ listado clickeable)
 // indicadores.html — v2.9.2 (11 nov 2026) — fix: paginar consultas (tope 1000 filas de PostgREST subcontaba meses)
 // indicadores.html — v2.9.1 (01 oct 2026)
@@ -599,7 +600,31 @@ function indFilasMes(mesKey){
   });
 }
 function indTipoDe(r){ return r.record_type==='Instalación Equipo + Simcard'?'instalacion':(r.rollout===true?'rollout':'cambio'); }
+let _indFilasResumen=[]; // filas del último resumen por logística (para el click en "Sin costo")
+function indEsSinCosto(r){
+  const k=(r.logistica||'').toUpperCase().trim().replace(/^CABIFY FLOTA$/,'CABIFY')||'(SIN LOGÍSTICA)';
+  return k!=='ALLEATA'&&!(Number(r.costo_envio)||0);
+}
+// Click en un "Sin costo": lista las OT sin costo_envio (de una logística o de todas) para ir a cargarlas en SF.
+function indVerSinCosto(k){
+  const kk=x=>(x.logistica||'').toUpperCase().trim().replace(/^CABIFY FLOTA$/,'CABIFY')||'(SIN LOGÍSTICA)';
+  const filas=_indFilasResumen.filter(r=>indEsSinCosto(r)&&(k==='__todas'||kk(r)===k)).sort((a,b)=>String(a.workorder_number).localeCompare(String(b.workorder_number)));
+  const prevT=document.getElementById('indModalTitulo').textContent, prevB=document.getElementById('indModalBody').innerHTML;
+  window._indVolver=()=>{document.getElementById('indModalTitulo').textContent=prevT;document.getElementById('indModalBody').innerHTML=prevB;};
+  const tipoTxt=r=>indTipoDe(r)==='instalacion'?'Instalación':(indTipoDe(r)==='rollout'?'Rollout':'Cambio');
+  const csv='N° OT;Cuenta;Estado;Logística;Tipo;Responsable\n'+filas.map(r=>[r.workorder_number,r.cuenta,r.status,r.logistica,tipoTxt(r),r.responsable].map(v=>String(v??'').replace(/;/g,',')).join(';')).join('\n');
+  window._indCsvSinCosto=csv;
+  document.getElementById('indModalTitulo').textContent=`OTs sin costo de envío (${filas.length})`;
+  document.getElementById('indModalBody').innerHTML=`
+    <div style="margin-bottom:10px;display:flex;gap:8px">
+      <button class="btn-logout" onclick="window._indVolver()">← Volver</button>
+      <button class="btn-logout" onclick="(function(){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+window._indCsvSinCosto],{type:'text/csv'}));a.download='OTs_sin_costo.csv';a.click();})()">⬇ Exportar CSV</button>
+    </div>
+    <div style="overflow-x:auto"><table><thead><tr><th>N° OT</th><th>Cuenta</th><th>Estado</th><th>Logística</th><th>Tipo</th><th>Responsable</th></tr></thead><tbody>${
+      filas.length?filas.map(r=>`<tr><td style="font-family:var(--mono)">${r.workorder_number||'—'}</td><td>${r.cuenta||'—'}</td><td>${r.status||'—'}</td><td>${r.logistica||'—'}</td><td>${tipoTxt(r)}</td><td>${r.responsable||'—'}</td></tr>`).join(''):'<tr><td colspan="6" class="empty">Sin registros</td></tr>'}</tbody></table></div>`;
+}
 function indResumenLogistica(filas,conTipos){
+  _indFilasResumen=filas;
   const lab=Object.fromEntries(LOGISTICAS.map(l=>[l.key,l]));
   const g={};
   filas.forEach(r=>{
@@ -619,13 +644,13 @@ function indResumenLogistica(filas,conTipos){
     ${conTipos?`<td class="num">${x.instalacion||'—'}</td><td class="num">${x.cambio||'—'}</td><td class="num">${x.rollout||'—'}</td>`:''}
     <td class="num" style="font-weight:700">${fmt$(x.costo)}${x.k==='ALLEATA'?' <span style="color:var(--text-dim);font-weight:400" title="Costo simbólico: $1 por OT">*</span>':''}</td>
     <td class="num" style="color:var(--text-dim)">${x.n?fmt$(x.costo/x.n):'—'}</td>
-    <td class="num" style="color:${x.sinCosto?'var(--amber)':'var(--text-dim)'}">${x.sinCosto||'—'}</td>
+    <td class="num" style="color:${x.sinCosto?'var(--amber)':'var(--text-dim)'}${x.sinCosto?';cursor:pointer;text-decoration:underline dotted':''}"${x.sinCosto?` onclick="indVerSinCosto('${x.k.replace(/'/g,"\\'")}')" title="Click para ver qué OTs no tienen costo"`:''}>${x.sinCosto||'—'}</td>
   </tr>`;
   const totFila=`<tr style="border-top:2px solid var(--border2);font-weight:800">
     <td style="color:var(--teal)">TOTAL</td><td class="num">${tot.n}</td><td class="num">100%</td>
     ${conTipos?`<td class="num">${tot.instalacion}</td><td class="num">${tot.cambio}</td><td class="num">${tot.rollout}</td>`:''}
     <td class="num">${fmt$(tot.costo)}</td><td class="num" style="color:var(--text-dim)">${tot.n?fmt$(tot.costo/tot.n):'—'}</td>
-    <td class="num" style="color:${tot.sinCosto?'var(--amber)':'var(--text-dim)'}">${tot.sinCosto||'—'}</td></tr>`;
+    <td class="num" style="color:${tot.sinCosto?'var(--amber)':'var(--text-dim)'}${tot.sinCosto?';cursor:pointer;text-decoration:underline dotted':''}"${tot.sinCosto?` onclick="indVerSinCosto('__todas')" title="Click para ver qué OTs no tienen costo"`:''}>${tot.sinCosto||'—'}</td></tr>`;
   return `<div style="overflow-x:auto"><table>
     <thead><tr><th>Logística</th><th style="text-align:right">OTs</th><th style="text-align:right">%</th>
       ${conTipos?'<th style="text-align:right">Instalación</th><th style="text-align:right">Cambio</th><th style="text-align:right">Rollout</th>':''}
