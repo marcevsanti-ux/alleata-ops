@@ -84,7 +84,7 @@
   <header>
     <div class="brand">
       <div class="brand-logo">alleata</div>
-      <div class="brand-sub">· Indicadores Operaciones <span style="opacity:.5">v2.9.2</span></div>
+      <div class="brand-sub">· Indicadores Operaciones <span style="opacity:.5">v2.9.3</span></div>
     </div>
     <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
       <div style="font-size:11px;color:var(--text-dim);text-align:right;line-height:1.4">
@@ -150,9 +150,9 @@
       <thead><tr>
         <th>Mes de creación</th><th style="text-align:right">Total OTs creadas</th>
         <th style="text-align:right">Instalación</th><th style="text-align:right">Cambio + Rollout</th>
-        <th style="text-align:right">En Pre-Colecta hoy</th><th style="text-align:right">% sin despachar</th>
+        <th style="text-align:right">En Pre-Colecta hoy</th><th style="text-align:right" title="OTs en estado Despachado + Exitoso + Reprogramar">Despachado + Exitoso + Reprog.</th><th style="text-align:right">% sin despachar</th>
       </tr></thead>
-      <tbody id="tablaPrecolecta"><tr><td colspan="6" class="loading">Cargando...</td></tr></tbody>
+      <tbody id="tablaPrecolecta"><tr><td colspan="7" class="loading">Cargando...</td></tr></tbody>
     </table>
   </div>
   <div id="diagPrecolecta"></div>
@@ -206,6 +206,7 @@
 </div>
 
 <script>
+// indicadores.html — v2.9.3 (11 nov 2026) — columna "Despachado + Exitoso + Reprog." en OTs creadas por mes (+ listado clickeable)
 // indicadores.html — v2.9.2 (11 nov 2026) — fix: paginar consultas (tope 1000 filas de PostgREST subcontaba meses)
 // indicadores.html — v2.9.1 (01 oct 2026)
 // Changelog:
@@ -675,6 +676,18 @@ function indVerListadoCambio(mesKey,mesLabel){
 
 // Modal de solo lectura: lista las OTs que HOY siguen en Pre-Colecta, creadas
 // en un mes puntual — pedido 18/08, mismo patrón que indVerListadoCambio.
+// Listado de OT Despachado / Exitoso / Reprogramar de un mes (click en la columna nueva).
+function indVerGestionadas(mesKey,mesLabel){
+  const EST=['Despachado','Exitoso','Reprogramar','Reprogramado'];
+  const filas=indFilasMes(mesKey).filter(r=>EST.includes((r.status||'').trim())).sort((a,b)=>String(a.workorder_number).localeCompare(String(b.workorder_number)));
+  document.getElementById('indModalTitulo').textContent=`Despachado + Exitoso + Reprogramar — ${mesLabel} (${filas.length} OT${filas.length===1?'':'s'})`;
+  document.getElementById('indModalBody').innerHTML=`
+    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--teal);margin-bottom:8px">Por logística</div>
+    ${indResumenLogistica(filas,false)}
+    <div style="overflow-x:auto;margin-top:14px"><table><thead><tr><th>N° OT</th><th>Cuenta</th><th>Tipo</th><th>Estado</th><th>Logística</th><th>Responsable</th></tr></thead><tbody>${
+      filas.map(r=>`<tr><td style="font-family:var(--mono)">${r.workorder_number||'—'}</td><td>${r.cuenta||'—'}</td><td>${indTipoDe(r)==='instalacion'?'Instalación':(indTipoDe(r)==='rollout'?'Rollout':'Cambio')}</td><td>${(r.status||'').trim()}</td><td>${r.logistica||'—'}</td><td>${r.responsable||'—'}</td></tr>`).join('')||'<tr><td colspan="6" class="empty">Sin registros</td></tr>'}</tbody></table></div>`;
+  document.getElementById('indModalOverlay').style.display='flex';
+}
 function indVerListadoPrecolecta(mesKey,mesLabel){
   const filas=indFilasMes(mesKey).filter(r=>(r.status||'').trim()==='Pre-Colecta');
 
@@ -885,12 +898,13 @@ async function cargarPrecolecta(){
     .not('sf_created_at','is',null)
     .not('cuenta','is',null));
 
-  if(error){ tbody.innerHTML=`<tr><td colspan="6" style="color:var(--red)">Error: ${error.message}</td></tr>`; return; }
-  if(!dataCruda?.length){ tbody.innerHTML='<tr><td colspan="6" class="empty">Sin datos</td></tr>'; return; }
+  if(error){ tbody.innerHTML=`<tr><td colspan="7" style="color:var(--red)">Error: ${error.message}</td></tr>`; return; }
+  if(!dataCruda?.length){ tbody.innerHTML='<tr><td colspan="7" class="empty">Sin datos</td></tr>'; return; }
 
   const ESTADOS_PREVIOS=['Credenciales Pendientes','Pendiente'];
+  const ESTADOS_GESTIONADAS=['Despachado','Exitoso','Reprogramar','Reprogramado']; // en SF el estado se llama 'Reprogramar'
   const data=dataCruda.filter(r=>!ESTADOS_PREVIOS.includes((r.status||'').trim()));
-  if(!data.length){ tbody.innerHTML='<tr><td colspan="6" class="empty">Sin datos</td></tr>'; return; }
+  if(!data.length){ tbody.innerHTML='<tr><td colspan="7" class="empty">Sin datos</td></tr>'; return; }
 
   _datosCrudosPrecolecta=data; // guardado para el listado clickeable de Cambio + Rollout por mes
 
@@ -906,10 +920,12 @@ async function cargarPrecolecta(){
   data.forEach(r=>{
     const d=new Date(r.sf_created_at);
     const key=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
-    if(!porMes[key])porMes[key]={key,label:MESES_NOMBRE[d.getMonth()]+' '+d.getFullYear(),total:0,precolecta:0,precolectaCambio:0,precolectaRollout:0,instalacion:0,cambioRollout:0,cambio:0,rollout:0};
+    if(!porMes[key])porMes[key]={key,label:MESES_NOMBRE[d.getMonth()]+' '+d.getFullYear(),total:0,gestionadas:0,desp:0,exit:0,reprog:0,precolecta:0,precolectaCambio:0,precolectaRollout:0,instalacion:0,cambioRollout:0,cambio:0,rollout:0};
     porMes[key].total+=1;
     const enPrecolecta=(r.status||'').trim()==='Pre-Colecta';
     if(enPrecolecta)porMes[key].precolecta+=1;
+    const stN=(r.status||'').trim();
+    if(ESTADOS_GESTIONADAS.includes(stN)){ porMes[key].gestionadas+=1; if(stN==='Despachado')porMes[key].desp+=1; else if(stN==='Exitoso')porMes[key].exit+=1; else porMes[key].reprog+=1; }
     if(r.record_type==='Instalación Equipo + Simcard')porMes[key].instalacion+=1;
     else if(r.record_type==='Cambio de Terminal'){
       porMes[key].cambioRollout+=1;
@@ -949,6 +965,7 @@ async function cargarPrecolecta(){
       <td class="num" style="color:var(--text-dim);cursor:pointer;text-decoration:underline dotted" onclick="indVerPorLogistica('${m.key}','${m.label}','instalacion')" title="Click para ver cantidad y costo por logística">${m.instalacion}</td>
       <td class="num" style="color:var(--text-dim);cursor:pointer" onclick="indVerListadoCambio('${m.key}','${m.label}')" title="Cambio: ${m.cambio} · Rollout: ${m.rollout} — Click para ver el listado de OTs">${m.cambio} + ${m.rollout}</td>
       <td class="num" style="color:${m.precolecta?'var(--amber)':'var(--text-dim)'};cursor:pointer" onclick="indVerListadoPrecolecta('${m.key}','${m.label}')" title="Instalación: ${m.precolecta-m.precolectaCambio-m.precolectaRollout} · Cambio: ${m.precolectaCambio} · Rollout: ${m.precolectaRollout} — Click para ver el listado de OTs">${m.precolecta}<div style="font-size:9px;font-weight:400;opacity:.75">${m.precolectaCambio} + ${m.precolectaRollout}</div></td>
+      <td class="num" style="cursor:pointer;text-decoration:underline dotted" onclick="indVerGestionadas('${m.key}','${m.label}')" title="Despachado: ${m.desp} · Exitoso: ${m.exit} · Reprogramar: ${m.reprog} — Click para ver el listado">${m.gestionadas}<div style="font-size:9px;font-weight:400;opacity:.75">${m.desp} + ${m.exit} + ${m.reprog}</div></td>
       <td class="num">${pct}%</td>
     </tr>`;
   }).join('');
@@ -956,8 +973,8 @@ async function cargarPrecolecta(){
   const tot=meses.reduce((a,m)=>({total:a.total+m.total,instalacion:a.instalacion+m.instalacion,
     cambioRollout:a.cambioRollout+m.cambioRollout,cambio:a.cambio+m.cambio,rollout:a.rollout+m.rollout,
     precolecta:a.precolecta+m.precolecta,precolectaCambio:a.precolectaCambio+m.precolectaCambio,
-    precolectaRollout:a.precolectaRollout+m.precolectaRollout}),
-    {total:0,instalacion:0,cambioRollout:0,cambio:0,rollout:0,precolecta:0,precolectaCambio:0,precolectaRollout:0});
+    precolectaRollout:a.precolectaRollout+m.precolectaRollout,gestionadas:a.gestionadas+m.gestionadas,desp:a.desp+m.desp,exit:a.exit+m.exit,reprog:a.reprog+m.reprog}),
+    {gestionadas:0,desp:0,exit:0,reprog:0,total:0,instalacion:0,cambioRollout:0,cambio:0,rollout:0,precolecta:0,precolectaCambio:0,precolectaRollout:0});
   const totPct=tot.total?Math.round(tot.precolecta/tot.total*100):0;
   tbody.innerHTML+=`<tr style="border-top:2px solid var(--border2)">
     <td style="font-weight:800;color:var(--teal)">TOTAL</td>
@@ -965,6 +982,7 @@ async function cargarPrecolecta(){
     <td class="num" style="font-weight:700;cursor:pointer;text-decoration:underline dotted" onclick="indVerPorLogistica('__todos','Todos los meses','instalacion')" title="Click para ver cantidad y costo por logística">${tot.instalacion}</td>
     <td class="num" style="font-weight:700;cursor:pointer;text-decoration:underline dotted" onclick="indVerListadoCambio('__todos','Todos los meses')" title="Cambio: ${tot.cambio} · Rollout: ${tot.rollout} — Click para ver el listado y el desglose por logística">${tot.cambio} + ${tot.rollout}</td>
     <td class="num" style="font-weight:700;color:var(--amber);cursor:pointer" onclick="indVerListadoPrecolecta('__todos','Todos los meses')" title="Instalación: ${tot.precolecta-tot.precolectaCambio-tot.precolectaRollout} · Cambio: ${tot.precolectaCambio} · Rollout: ${tot.precolectaRollout} — Click para ver el listado de OTs">${tot.precolecta}<div style="font-size:9px;font-weight:400;opacity:.75">${tot.precolectaCambio} + ${tot.precolectaRollout}</div></td>
+    <td class="num" style="font-weight:700;cursor:pointer;text-decoration:underline dotted" onclick="indVerGestionadas('__todos','Todos los meses')" title="Despachado: ${tot.desp} · Exitoso: ${tot.exit} · Reprogramar: ${tot.reprog}">${tot.gestionadas}<div style="font-size:9px;font-weight:400;opacity:.75">${tot.desp} + ${tot.exit} + ${tot.reprog}</div></td>
     <td class="num" style="font-weight:700">${totPct}%</td>
   </tr>`;
 
