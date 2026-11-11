@@ -84,7 +84,7 @@
   <header>
     <div class="brand">
       <div class="brand-logo">alleata</div>
-      <div class="brand-sub">· Indicadores Operaciones <span style="opacity:.5">v2.10.0</span></div>
+      <div class="brand-sub">· Indicadores Operaciones <span style="opacity:.5">v2.11.0</span></div>
     </div>
     <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
       <div style="font-size:11px;color:var(--text-dim);text-align:right;line-height:1.4">
@@ -145,12 +145,17 @@
     <span class="filter-tag">Estado ≠ Credenciales Pendientes | Pendiente</span>
   </div>
   <div style="font-size:12px;color:var(--text-dim);margin-bottom:14px">Cuántas OTs se crearon cada mes, y de esas, cuántas siguen HOY en Pre-Colecta (sin despachar todavía) — sin importar la logística.</div>
+  <div style="margin-bottom:8px;font-size:12px;color:var(--text-dim)">Estados que cuentan en Total / Instalación / Cambio + Rollout:
+    <select id="indSelEstados" onchange="_indSoloGest=this.value==='gest';cargarPrecolecta()" style="margin-left:6px;background:var(--surface2,#0f172a);color:inherit;border:1px solid var(--border2);border-radius:6px;padding:3px 8px">
+      <option value="gest" selected>Solo Exitoso + Despachado</option><option value="todos">Todos los estados</option>
+    </select>
+    <span style="opacity:.7;margin-left:8px">(Pre-Colecta y % sin despachar siempre miran todas las OT creadas)</span></div>
   <div style="overflow-x:auto">
     <table>
       <thead><tr>
         <th>Mes de creación</th><th style="text-align:right">Total OTs creadas</th>
         <th style="text-align:right">Instalación</th><th style="text-align:right">Cambio + Rollout</th>
-        <th style="text-align:right">En Pre-Colecta hoy</th><th style="text-align:right" title="OTs en estado Despachado + Exitoso + Reprogramar">Despachado + Exitoso + Reprog.</th><th style="text-align:right">% sin despachar</th>
+        <th style="text-align:right">En Pre-Colecta hoy</th><th style="text-align:right" title="OTs en estado Despachado + Exitoso">Despachado + Exitoso</th><th style="text-align:right">% sin despachar</th>
       </tr></thead>
       <tbody id="tablaPrecolecta"><tr><td colspan="7" class="loading">Cargando...</td></tr></tbody>
     </table>
@@ -206,6 +211,7 @@
 </div>
 
 <script>
+// indicadores.html — v2.11.0 (11 nov 2026) — Total/Instalación/Cambio+Rollout cuentan solo Exitoso+Despachado (selector para ver todos); % sin despachar sobre todas las OT
 // indicadores.html — v2.10.0 (11 nov 2026) — click en "Sin costo" lista las OT sin costo_envio (+ CSV)
 // indicadores.html — v2.9.3 (11 nov 2026) — columna "Despachado + Exitoso + Reprog." en OTs creadas por mes (+ listado clickeable)
 // indicadores.html — v2.9.2 (11 nov 2026) — fix: paginar consultas (tope 1000 filas de PostgREST subcontaba meses)
@@ -384,6 +390,8 @@ let _todosLosMeses=[];
 let _mesesPrecolecta=[]; // resumen mensual de "OTs creadas" (cargarPrecolecta), para exportar
 let _mesesLogicalis=[]; // resumen mensual de Logicalis (cargarLogicalis), para exportar
 let _datosCrudosCostos=[]; // sf_workorders crudo de cargarDatos(), para el modal de listado de OTs
+let _indSoloGest=true; // pedido 11/11: Total/Instalación/Cambio+Rollout cuentan solo OT Exitoso o Despachado (reporte SF)
+const IND_EST_CUENTAN=['Exitoso','Despachado'];
 let _datosCrudosPrecolecta=[]; // sf_workorders crudo de cargarPrecolecta(), para el modal de Cambio+Rollout
 let _mesActivo='__todos';
 
@@ -592,8 +600,9 @@ function indCerrarModal(){
 // OT usaron y cuánto costaron. Costo = misma convención que el resto de la página: Alleata $1
 // simbólico por OT (COSTO_FIJO_ALLEATA), las demás su costo_envio. "Sin costo" cuenta las OT
 // no-Alleata sin costo cargado (las que siguen en Pre-Colecta, por ejemplo, todavía no lo tienen).
-function indFilasMes(mesKey){
+function indFilasMes(mesKey,todosEstados){
   return _datosCrudosPrecolecta.filter(r=>{
+    if(_indSoloGest&&!todosEstados&&!IND_EST_CUENTAN.includes((r.status||'').trim()))return false;
     if(mesKey==='__todos')return true;
     const d=new Date(r.sf_created_at);
     return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')===mesKey;
@@ -703,9 +712,9 @@ function indVerListadoCambio(mesKey,mesLabel){
 // en un mes puntual — pedido 18/08, mismo patrón que indVerListadoCambio.
 // Listado de OT Despachado / Exitoso / Reprogramar de un mes (click en la columna nueva).
 function indVerGestionadas(mesKey,mesLabel){
-  const EST=['Despachado','Exitoso','Reprogramar','Reprogramado'];
+  const EST=['Despachado','Exitoso'];
   const filas=indFilasMes(mesKey).filter(r=>EST.includes((r.status||'').trim())).sort((a,b)=>String(a.workorder_number).localeCompare(String(b.workorder_number)));
-  document.getElementById('indModalTitulo').textContent=`Despachado + Exitoso + Reprogramar — ${mesLabel} (${filas.length} OT${filas.length===1?'':'s'})`;
+  document.getElementById('indModalTitulo').textContent=`Despachado + Exitoso — ${mesLabel} (${filas.length} OT${filas.length===1?'':'s'})`;
   document.getElementById('indModalBody').innerHTML=`
     <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--teal);margin-bottom:8px">Por logística</div>
     ${indResumenLogistica(filas,false)}
@@ -714,7 +723,7 @@ function indVerGestionadas(mesKey,mesLabel){
   document.getElementById('indModalOverlay').style.display='flex';
 }
 function indVerListadoPrecolecta(mesKey,mesLabel){
-  const filas=indFilasMes(mesKey).filter(r=>(r.status||'').trim()==='Pre-Colecta');
+  const filas=indFilasMes(mesKey,true).filter(r=>(r.status||'').trim()==='Pre-Colecta');
 
   const filasHtml=filas.length
     ? filas.map(r=>{
@@ -927,7 +936,7 @@ async function cargarPrecolecta(){
   if(!dataCruda?.length){ tbody.innerHTML='<tr><td colspan="7" class="empty">Sin datos</td></tr>'; return; }
 
   const ESTADOS_PREVIOS=['Credenciales Pendientes','Pendiente'];
-  const ESTADOS_GESTIONADAS=['Despachado','Exitoso','Reprogramar','Reprogramado']; // en SF el estado se llama 'Reprogramar'
+  const ESTADOS_GESTIONADAS=['Despachado','Exitoso'];
   const data=dataCruda.filter(r=>!ESTADOS_PREVIOS.includes((r.status||'').trim()));
   if(!data.length){ tbody.innerHTML='<tr><td colspan="7" class="empty">Sin datos</td></tr>'; return; }
 
@@ -945,25 +954,27 @@ async function cargarPrecolecta(){
   data.forEach(r=>{
     const d=new Date(r.sf_created_at);
     const key=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
-    if(!porMes[key])porMes[key]={key,label:MESES_NOMBRE[d.getMonth()]+' '+d.getFullYear(),total:0,gestionadas:0,desp:0,exit:0,reprog:0,precolecta:0,precolectaCambio:0,precolectaRollout:0,instalacion:0,cambioRollout:0,cambio:0,rollout:0};
-    porMes[key].total+=1;
+    if(!porMes[key])porMes[key]={key,label:MESES_NOMBRE[d.getMonth()]+' '+d.getFullYear(),total:0,totalTodos:0,gestionadas:0,desp:0,exit:0,reprog:0,precolecta:0,precolectaCambio:0,precolectaRollout:0,instalacion:0,cambioRollout:0,cambio:0,rollout:0};
+    porMes[key].totalTodos+=1;
+    const cuenta=!_indSoloGest||IND_EST_CUENTAN.includes((r.status||'').trim());
+    if(cuenta)porMes[key].total+=1;
     const enPrecolecta=(r.status||'').trim()==='Pre-Colecta';
     if(enPrecolecta)porMes[key].precolecta+=1;
     const stN=(r.status||'').trim();
-    if(ESTADOS_GESTIONADAS.includes(stN)){ porMes[key].gestionadas+=1; if(stN==='Despachado')porMes[key].desp+=1; else if(stN==='Exitoso')porMes[key].exit+=1; else porMes[key].reprog+=1; }
-    if(r.record_type==='Instalación Equipo + Simcard')porMes[key].instalacion+=1;
+    if(cuenta&&ESTADOS_GESTIONADAS.includes(stN)){ porMes[key].gestionadas+=1; if(stN==='Despachado')porMes[key].desp+=1; else if(stN==='Exitoso')porMes[key].exit+=1; else porMes[key].reprog+=1; }
+    if(r.record_type==='Instalación Equipo + Simcard'){ if(cuenta)porMes[key].instalacion+=1; }
     else if(r.record_type==='Cambio de Terminal'){
-      porMes[key].cambioRollout+=1;
+      if(cuenta)porMes[key].cambioRollout+=1;
       // Rollout = campo booleano Rollout__c de SF, sincronizado como
       // `rollout` en Supabase — es independiente del Perfil (confirmado
       // con caso real: Perfil=NAPSE y Rollout=true al mismo tiempo, la OT
       // 00022... de Andres Veyga). No usar Perfil=PRISMA como proxy, estaba
       // mal (daba 2 en vez de ~165 según el módulo Rollout Piloto del portal).
       if(r.rollout===true){
-        porMes[key].rollout+=1;
+        if(cuenta)porMes[key].rollout+=1;
         if(enPrecolecta)porMes[key].precolectaRollout+=1;
       } else {
-        porMes[key].cambio+=1;
+        if(cuenta)porMes[key].cambio+=1;
         if(enPrecolecta)porMes[key].precolectaCambio+=1;
       }
     }
@@ -983,14 +994,14 @@ async function cargarPrecolecta(){
   _mesesPrecolecta=meses;
 
   tbody.innerHTML=meses.map(m=>{
-    const pct=m.total?Math.round(m.precolecta/m.total*100):0;
+    const pct=m.totalTodos?Math.round(m.precolecta/m.totalTodos*100):0;
     return `<tr>
       <td style="font-weight:700">${m.label}</td>
       <td class="num" style="cursor:pointer;text-decoration:underline dotted" onclick="indVerPorLogistica('${m.key}','${m.label}','total')" title="Click para ver cantidad y costo por logística">${m.total}</td>
       <td class="num" style="color:var(--text-dim);cursor:pointer;text-decoration:underline dotted" onclick="indVerPorLogistica('${m.key}','${m.label}','instalacion')" title="Click para ver cantidad y costo por logística">${m.instalacion}</td>
       <td class="num" style="color:var(--text-dim);cursor:pointer" onclick="indVerListadoCambio('${m.key}','${m.label}')" title="Cambio: ${m.cambio} · Rollout: ${m.rollout} — Click para ver el listado de OTs">${m.cambio} + ${m.rollout}</td>
       <td class="num" style="color:${m.precolecta?'var(--amber)':'var(--text-dim)'};cursor:pointer" onclick="indVerListadoPrecolecta('${m.key}','${m.label}')" title="Instalación: ${m.precolecta-m.precolectaCambio-m.precolectaRollout} · Cambio: ${m.precolectaCambio} · Rollout: ${m.precolectaRollout} — Click para ver el listado de OTs">${m.precolecta}<div style="font-size:9px;font-weight:400;opacity:.75">${m.precolectaCambio} + ${m.precolectaRollout}</div></td>
-      <td class="num" style="cursor:pointer;text-decoration:underline dotted" onclick="indVerGestionadas('${m.key}','${m.label}')" title="Despachado: ${m.desp} · Exitoso: ${m.exit} · Reprogramar: ${m.reprog} — Click para ver el listado">${m.gestionadas}<div style="font-size:9px;font-weight:400;opacity:.75">${m.desp} + ${m.exit} + ${m.reprog}</div></td>
+      <td class="num" style="cursor:pointer;text-decoration:underline dotted" onclick="indVerGestionadas('${m.key}','${m.label}')" title="Despachado: ${m.desp} · Exitoso: ${m.exit} — Click para ver el listado">${m.gestionadas}<div style="font-size:9px;font-weight:400;opacity:.75">${m.desp} + ${m.exit}</div></td>
       <td class="num">${pct}%</td>
     </tr>`;
   }).join('');
@@ -998,16 +1009,16 @@ async function cargarPrecolecta(){
   const tot=meses.reduce((a,m)=>({total:a.total+m.total,instalacion:a.instalacion+m.instalacion,
     cambioRollout:a.cambioRollout+m.cambioRollout,cambio:a.cambio+m.cambio,rollout:a.rollout+m.rollout,
     precolecta:a.precolecta+m.precolecta,precolectaCambio:a.precolectaCambio+m.precolectaCambio,
-    precolectaRollout:a.precolectaRollout+m.precolectaRollout,gestionadas:a.gestionadas+m.gestionadas,desp:a.desp+m.desp,exit:a.exit+m.exit,reprog:a.reprog+m.reprog}),
-    {gestionadas:0,desp:0,exit:0,reprog:0,total:0,instalacion:0,cambioRollout:0,cambio:0,rollout:0,precolecta:0,precolectaCambio:0,precolectaRollout:0});
-  const totPct=tot.total?Math.round(tot.precolecta/tot.total*100):0;
+    precolectaRollout:a.precolectaRollout+m.precolectaRollout,totalTodos:a.totalTodos+m.totalTodos,gestionadas:a.gestionadas+m.gestionadas,desp:a.desp+m.desp,exit:a.exit+m.exit,reprog:a.reprog+m.reprog}),
+    {totalTodos:0,gestionadas:0,desp:0,exit:0,reprog:0,total:0,instalacion:0,cambioRollout:0,cambio:0,rollout:0,precolecta:0,precolectaCambio:0,precolectaRollout:0});
+  const totPct=tot.totalTodos?Math.round(tot.precolecta/tot.totalTodos*100):0;
   tbody.innerHTML+=`<tr style="border-top:2px solid var(--border2)">
     <td style="font-weight:800;color:var(--teal)">TOTAL</td>
     <td class="num" style="font-weight:800;color:var(--teal);cursor:pointer;text-decoration:underline dotted" onclick="indVerPorLogistica('__todos','Todos los meses','total')" title="Click para ver cantidad y costo por logística">${tot.total}</td>
     <td class="num" style="font-weight:700;cursor:pointer;text-decoration:underline dotted" onclick="indVerPorLogistica('__todos','Todos los meses','instalacion')" title="Click para ver cantidad y costo por logística">${tot.instalacion}</td>
     <td class="num" style="font-weight:700;cursor:pointer;text-decoration:underline dotted" onclick="indVerListadoCambio('__todos','Todos los meses')" title="Cambio: ${tot.cambio} · Rollout: ${tot.rollout} — Click para ver el listado y el desglose por logística">${tot.cambio} + ${tot.rollout}</td>
     <td class="num" style="font-weight:700;color:var(--amber);cursor:pointer" onclick="indVerListadoPrecolecta('__todos','Todos los meses')" title="Instalación: ${tot.precolecta-tot.precolectaCambio-tot.precolectaRollout} · Cambio: ${tot.precolectaCambio} · Rollout: ${tot.precolectaRollout} — Click para ver el listado de OTs">${tot.precolecta}<div style="font-size:9px;font-weight:400;opacity:.75">${tot.precolectaCambio} + ${tot.precolectaRollout}</div></td>
-    <td class="num" style="font-weight:700;cursor:pointer;text-decoration:underline dotted" onclick="indVerGestionadas('__todos','Todos los meses')" title="Despachado: ${tot.desp} · Exitoso: ${tot.exit} · Reprogramar: ${tot.reprog}">${tot.gestionadas}<div style="font-size:9px;font-weight:400;opacity:.75">${tot.desp} + ${tot.exit} + ${tot.reprog}</div></td>
+    <td class="num" style="font-weight:700;cursor:pointer;text-decoration:underline dotted" onclick="indVerGestionadas('__todos','Todos los meses')" title="Despachado: ${tot.desp} · Exitoso: ${tot.exit}">${tot.gestionadas}<div style="font-size:9px;font-weight:400;opacity:.75">${tot.desp} + ${tot.exit}</div></td>
     <td class="num" style="font-weight:700">${totPct}%</td>
   </tr>`;
 
