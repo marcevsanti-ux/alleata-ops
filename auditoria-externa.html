@@ -364,10 +364,16 @@ async function cargarLogicalis(){
 // ── OTs creadas por mes vs. cuántas siguen en Pre-Colecta HOY ───────────
 async function cargarPrecolecta(){
   const tbody=document.getElementById('tablaPrecolecta');
-  const{data,error}=await sb.from('sf_workorders')
-    .select('sf_created_at,status')
-    .in('record_type',['Instalación Equipo + Simcard','Cambio de Terminal'])
-    .not('sf_created_at','is',null);
+  // Paginado: PostgREST corta en 1000 filas y subcontaba los meses.
+  const data=[]; let error=null;
+  for(let desde=0;;desde+=1000){
+    const r=await sb.from('sf_workorders').select('sf_id,sf_created_at,status')
+      .in('record_type',['Instalación Equipo + Simcard','Cambio de Terminal'])
+      .not('sf_created_at','is',null).order('sf_id',{ascending:true}).range(desde,desde+999);
+    if(r.error){error=r.error;break;}
+    data.push(...(r.data||[]));
+    if((r.data||[]).length<1000)break;
+  }
 
   if(error){ tbody.innerHTML=`<tr><td colspan="4" style="color:var(--red)">Error: ${error.message}</td></tr>`; return; }
   if(!data?.length){ tbody.innerHTML='<tr><td colspan="4" class="empty">Sin datos</td></tr>'; return; }
