@@ -84,7 +84,7 @@
   <header>
     <div class="brand">
       <div class="brand-logo">alleata</div>
-      <div class="brand-sub">· Indicadores Operaciones <span style="opacity:.5">v2.9.1</span></div>
+      <div class="brand-sub">· Indicadores Operaciones <span style="opacity:.5">v2.9.2</span></div>
     </div>
     <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
       <div style="font-size:11px;color:var(--text-dim);text-align:right;line-height:1.4">
@@ -206,6 +206,7 @@
 </div>
 
 <script>
+// indicadores.html — v2.9.2 (11 nov 2026) — fix: paginar consultas (tope 1000 filas de PostgREST subcontaba meses)
 // indicadores.html — v2.9.1 (01 oct 2026)
 // Changelog:
 //  v1.0.0 — versión inicial (costo logística por mes, Logicalis, % Pre-Colecta, SLA Operaciones/Logística)
@@ -304,6 +305,18 @@
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_ANON);
+// PostgREST corta cada respuesta en 1000 filas: sin paginar, los totales por mes quedaban
+// subcontados (oct mostraba 77 instalaciones vs 141 reales). Pide de a 1000 hasta agotar.
+async function fetchTodo(armarQuery){
+  const PAG=1000, out=[];
+  for(let desde=0;;desde+=PAG){
+    const{data,error}=await armarQuery().order('sf_id',{ascending:true}).range(desde,desde+PAG-1);
+    if(error)return{data:null,error};
+    out.push(...(data||[]));
+    if(!data||data.length<PAG)break;
+  }
+  return{data:out,error:null};
+}
 
 // ── Sync / auto-refresh (18/08) ──────────────────────────────────────────
 // "Actualizar" solo vuelve a leer Supabase (rápido, no toca Salesforce).
@@ -462,12 +475,12 @@ async function cargarDatos(){
   // "estimado" (nunca se pisa el dato real en Supabase, solo se aproxima acá
   // para mostrar). Si tampoco hay fecha_pre_colecta, sigue cayendo en el
   // bucket "Sin fecha despacho".
-  const{data,error}=await sb.from('sf_workorders')
-    .select('workorder_number,cuenta,responsable,logistica,costo_envio,fecha_despacho,fecha_pre_colecta,status,perfil,record_type')
+  const{data,error}=await fetchTodo(()=>sb.from('sf_workorders')
+    .select('sf_id,workorder_number,cuenta,responsable,logistica,costo_envio,fecha_despacho,fecha_pre_colecta,status,perfil,record_type')
     .eq('perfil','NAPSE')
     .in('record_type',['Instalación Equipo + Simcard','Cambio de Terminal'])
     .in('status',['Despachado','Exitoso'])
-    .or(`fecha_despacho.is.null,fecha_despacho.gte.${FECHA_CORTE}`);
+    .or(`fecha_despacho.is.null,fecha_despacho.gte.${FECHA_CORTE}`));
 
   if(error){
     cardsWrap.innerHTML=`<div class="empty" style="color:var(--red)">Error cargando datos: ${error.message}</div>`;
@@ -865,12 +878,12 @@ async function cargarLogicalis(){
 // filtros el total quedó en 850, calzando exacto con el reporte SF real.
 async function cargarPrecolecta(){
   const tbody=document.getElementById('tablaPrecolecta');
-  const{data:dataCruda,error}=await sb.from('sf_workorders')
+  const{data:dataCruda,error}=await fetchTodo(()=>sb.from('sf_workorders')
     .select('sf_id,sf_created_at,status,record_type,perfil,rollout,workorder_number,cuenta,responsable,logistica,costo_envio')
     .in('record_type',['Instalación Equipo + Simcard','Cambio de Terminal'])
     .gte('sf_created_at',FECHA_CORTE)
     .not('sf_created_at','is',null)
-    .not('cuenta','is',null);
+    .not('cuenta','is',null));
 
   if(error){ tbody.innerHTML=`<tr><td colspan="6" style="color:var(--red)">Error: ${error.message}</td></tr>`; return; }
   if(!dataCruda?.length){ tbody.innerHTML='<tr><td colspan="6" class="empty">Sin datos</td></tr>'; return; }
@@ -1075,12 +1088,12 @@ async function cargarSLA(){
   // paso posterior, "En Proceso") — confirmado con el historial real de la
   // OT 00023019 en Salesforce: Credenciales Pendientes → Configurar Terminal
   // → ... → Pre-Colecta. Antes esto inflaba/distorsionaba el SLA Operaciones.
-  const{data:dataCruda,error}=await sb.from('sf_workorders')
-    .select('record_type,fecha_configurar_terminal,fecha_pre_colecta,fecha_exitoso,sla_total_dias,logistica,status,cuenta')
+  const{data:dataCruda,error}=await fetchTodo(()=>sb.from('sf_workorders')
+    .select('sf_id,record_type,fecha_configurar_terminal,fecha_pre_colecta,fecha_exitoso,sla_total_dias,logistica,status,cuenta')
     .in('record_type',['Instalación Equipo + Simcard','Cambio de Terminal'])
     .gte('fecha_configurar_terminal',FECHA_CORTE)
     .not('fecha_configurar_terminal','is',null)
-    .not('cuenta','is',null);
+    .not('cuenta','is',null));
 
   if(error){
     cardsWrap.innerHTML=`<div class="empty" style="color:var(--red)">Error cargando SLA: ${error.message}</div>`;
