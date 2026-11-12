@@ -19864,14 +19864,15 @@ async function napseMatchSF(serialNumber, node, store, btn){
           if(dups.length){
             const extra = dups.reduce((n,a)=>n+a.length-1,0);
             const lista = dups.slice(0,15).map(a=>`• ${a[0].serie} — ${a.length} veces (filas ${a.map(x=>x.fila).join(', ')})${new Set(a.map(x=>x.solucion)).size>1?' ⚠ con Solución distinta':''}`).join('\n');
-            const msg = `⚠️ SERIES REPETIDAS EN EL ARCHIVO\n\n${dups.length} serie(s) aparecen más de una vez (${extra} fila(s) de más). Revisalo con Logicalis: puede estar facturada dos veces.\n\n${lista}${dups.length>15?`\n… y ${dups.length-15} más`:''}\n\nAceptar = importar usando cada serie UNA sola vez (se toma la primera fila).\nCancelar = no importar nada.`;
-            console.warn('[Terminales] series repetidas en el archivo:', dups.map(a=>({serie:a[0].serie, filas:a.map(x=>x.fila)})));
-            if(!confirm(msg)){ termReset(true); return; }
-            const vistos = new Set();
-            series = series.filter(s=>{ const k=clave(s.serie); if(vistos.has(k)) return false; vistos.add(k); return true; });
-            window._termDupsDescartados = extra;
-          } else { window._termDupsDescartados = 0; }
+            const msg = `⛔ NO SE IMPORTÓ — SERIES REPETIDAS EN EL ARCHIVO\n\nCada N° de serie debe figurar UNA sola vez. ${dups.length} serie(s) aparecen más de una vez (${extra} fila(s) de más):\n\n${lista}${dups.length>15?`\n… y ${dups.length-15} más`:''}\n\nCorregí el archivo (o pedile a Logicalis que lo corrija: puede estar facturada dos veces) y volvé a cargarlo.`;
+            console.warn('[Terminales] series repetidas en el archivo — import bloqueado:', dups.map(a=>({serie:a[0].serie, filas:a.map(x=>x.fila)})));
+            alert(msg);
+            const fi=document.getElementById('term-file-input'); if(fi) fi.value='';
+            termReset(true);
+            return;
+          }
         }
+        window._termDupsDescartados = 0;
         termSeries = series;
         termMesAno = mes;
         termMeta = {};
@@ -20041,7 +20042,6 @@ async function napseMatchSF(serialNumber, node, store, btn){
     }
 
     const errorCount = termPreview.filter(r=>termMeta[r.serie]?.esError).length;
-    if(window._termDupsDescartados) addLog(`[warn] ${window._termDupsDescartados} fila(s) repetida(s) del archivo descartadas (cada serie se procesa una sola vez).`,'warn');
     if(skippedYa.length) addLog(`[info] ${skippedYa.length} omitidas — ya están al día.`);
     if(toUpdate.length)  addLog(`[info] ${toUpdate.length} a actualizar en SF.`);
     if(toCreate.length)  addLog(`[info] ${toCreate.length} a crear en SF.`,'warn');
