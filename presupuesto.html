@@ -1233,6 +1233,23 @@ async function logiParsearRTOExcel(buf){
     const col=Math.max(0,header.findIndex(h=>String(h).toLowerCase().includes('serie')));
     const colSolucion=header.findIndex(h=>String(h).toLowerCase().includes('soluci'));
     const colModelo=header.findIndex(h=>/modelo|model/i.test(String(h)));
+    // VALIDACIÓN (pedido 12/11): cada N° de serie debe figurar UNA sola vez en el archivo. La factura 2444
+    // traía 6 series duplicadas (150 personalizaciones facturadas, 144 reales = USD 102 de más) y nadie lo notó.
+    // Se compara sin espacios y en mayúsculas, sobre TODAS las filas (personalización e irreparables).
+    {
+      const norm=x=>String(x||'').replace(/\s+/g,'').toUpperCase();
+      const mapa=new Map();
+      for(let i=1;i<data.length;i++){
+        const sv=norm(data[i][col]);
+        if(sv.length>8&&/^\d+$/.test(sv)){ if(!mapa.has(sv))mapa.set(sv,[]); mapa.get(sv).push(i+1); }
+      }
+      const dups=[...mapa.entries()].filter(([,f])=>f.length>1);
+      if(dups.length){
+        const extra=dups.reduce((n,[,f])=>n+f.length-1,0);
+        const lista=dups.slice(0,10).map(([sv,f])=>sv+' (filas '+f.join(', ')+')').join(' · ');
+        throw new Error('SERIES REPETIDAS en el archivo: '+dups.length+' serie(s), '+extra+' fila(s) de más — cada serie debe figurar una sola vez. '+lista+(dups.length>10?' · … y '+(dups.length-10)+' más':'')+'. No se cargó nada: corregí el archivo con Logicalis (puede estar facturada dos veces).');
+      }
+    }
     for(let i=1;i<data.length;i++){
       // Solo contar terminales con Solución = Personalización — "Sin
       // reparación" se factura a USD 0 y no debe sumar a la lista de
@@ -1282,6 +1299,15 @@ async function logiHandleXLS(input){
     const buf=await file.arrayBuffer();
     const {terminales,irreparables,series,totalUSD:rtoTotalUSD,irreparablesDetalle}=await logiParsearRTOExcel(buf);
     logiPendingRTO={terminales, irreparables, series, totalUSD:rtoTotalUSD, irreparablesDetalle, _fileXls:file};
+    // Aviso (no bloquea): series que ya figuran en OTRA factura de Logicalis cargada — puede ser un reingreso
+    // legítimo (ej. primero cambio de pila, después personalización), pero conviene confirmarlo antes de pagar dos veces.
+    let avisoCruce='';
+    try{
+      const ya=new Map();
+      Object.values(logiFacturas||{}).forEach(arr=>(arr||[]).forEach(f=>(f.series||[]).forEach(sv=>{ if(!ya.has(String(sv)))ya.set(String(sv),f.numero); })));
+      const cruces=series.filter(sv=>ya.has(String(sv)));
+      if(cruces.length) avisoCruce=' ⚠️ '+cruces.length+' serie(s) ya figuran en otra factura: '+cruces.slice(0,5).map(sv=>sv+' ('+ya.get(String(sv))+')').join(', ')+(cruces.length>5?' …':'')+' — verificá que no se facture dos veces.';
+    }catch(_){}
     document.getElementById('upZoneXls').classList.add('loaded');
     logiShowPreview('prevXls',[
       ['Terminales facturables (Personalización)',terminales.toString()],
@@ -1291,7 +1317,7 @@ async function logiHandleXLS(input){
       ['Series registradas',series.length.toString()],
       ...(rtoTotalUSD?[['Total RTO (sin IVA)','USD '+rtoTotalUSD.toLocaleString('en-US',{minimumFractionDigits:2})]]:[]),
     ]);
-    logiShowMsg('msgXls','✓ RTO leído: '+series.length+' series'+(irreparables?' + '+irreparables+' irreparables':''),'ok');
+    logiShowMsg('msgXls','✓ RTO leído: '+series.length+' series'+(irreparables?' + '+irreparables+' irreparables':'')+avisoCruce,avisoCruce?'err':'ok');
     logiCheckBtn();
   }catch(e){logiShowMsg('msgXls','Error: '+e.message,'err');}
 }
