@@ -11,7 +11,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.7.122</title>
+<title>Alleata · Operaciones v4.7.123</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -412,7 +412,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.122 · 12 nov 2026
+      v4.7.123 · 12 nov 2026
     </div>
   </div>
 </div>
@@ -537,7 +537,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.122 · 12 nov 2026
+      v4.7.123 · 12 nov 2026
     </div>
   </div>
 </nav>
@@ -606,7 +606,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.122</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.123</div>
   </div>
   <div class="content">
 
@@ -5467,7 +5467,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.7.122] OK');
+console.log('[Alleata v4.7.123] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -19842,7 +19842,7 @@ async function napseMatchSF(serialNumber, node, store, btn){
               // para considerarla un caso normal — cualquier otra cosa
               // (una reparación real, por ejemplo) sigue cayendo en error.
               const esError = solIdx>-1 && sol!=='' && !normTxt(sol).startsWith('personalizacion');
-              if(v.length>10) series.push({serie:v, modelo:m||'D7 Axium', solucion:sol, esError});
+              if(v.length>10) series.push({serie:v, modelo:m||'D7 Axium', solucion:sol, esError, fila:i+1});
             }
             const mr=rows.find(r=>String(r[1]||'').toLowerCase().includes('mes'));
             if(mr){ const mv=String(mr[2]||'').trim(); if(mv) mes=mv; }
@@ -19852,6 +19852,27 @@ async function napseMatchSF(serialNumber, node, store, btn){
           if(series.length>0){ if(series[0].modelo) modelo=series[0].modelo; break; }
         }
         if(!series.length){ alert('No se encontraron series. Verificá que sea el reporte de Logicalis.'); return; }
+
+        // VALIDACIÓN (pedido 12/11): un N° de serie repetido dentro del mismo archivo infla la cantidad,
+        // se procesa dos veces y puede estar facturado dos veces. Antes se colaba sin avisar.
+        // Se compara normalizado (sin espacios, mayúsculas) para agarrar también repetidos "disfrazados".
+        {
+          const clave = x => String(x).replace(/\s+/g,'').toUpperCase();
+          const porSerie = new Map();
+          series.forEach(s=>{ const k=clave(s.serie); if(!porSerie.has(k)) porSerie.set(k,[]); porSerie.get(k).push(s); });
+          const dups = [...porSerie.values()].filter(a=>a.length>1);
+          if(dups.length){
+            const extra = dups.reduce((n,a)=>n+a.length-1,0);
+            const lista = dups.slice(0,15).map(a=>`• ${a[0].serie} — ${a.length} veces (filas ${a.map(x=>x.fila).join(', ')})${new Set(a.map(x=>x.solucion)).size>1?' ⚠ con Solución distinta':''}`).join('\n');
+            const msg = `⛔ NO SE IMPORTÓ — SERIES REPETIDAS EN EL ARCHIVO\n\nCada N° de serie debe figurar UNA sola vez. ${dups.length} serie(s) aparecen más de una vez (${extra} fila(s) de más):\n\n${lista}${dups.length>15?`\n… y ${dups.length-15} más`:''}\n\nCorregí el archivo (o pedile a Logicalis que lo corrija: puede estar facturada dos veces) y volvé a cargarlo.`;
+            console.warn('[Terminales] series repetidas en el archivo — import bloqueado:', dups.map(a=>({serie:a[0].serie, filas:a.map(x=>x.fila)})));
+            alert(msg);
+            const fi=document.getElementById('term-file-input'); if(fi) fi.value='';
+            termReset(true);
+            return;
+          }
+        }
+        window._termDupsDescartados = 0;
         termSeries = series;
         termMesAno = mes;
         termMeta = {};
