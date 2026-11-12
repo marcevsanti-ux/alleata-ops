@@ -11,7 +11,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.7.121</title>
+<title>Alleata · Operaciones v4.7.122</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -412,7 +412,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.121 · 11 nov 2026
+      v4.7.122 · 12 nov 2026
     </div>
   </div>
 </div>
@@ -537,7 +537,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.121 · 11 nov 2026
+      v4.7.122 · 12 nov 2026
     </div>
   </div>
 </nav>
@@ -606,7 +606,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.121</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.122</div>
   </div>
   <div class="content">
 
@@ -5467,7 +5467,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.7.121] OK');
+console.log('[Alleata v4.7.122] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -15801,6 +15801,9 @@ async function renderEnviosTable(list){
              <div style="font-size:12px;color:var(--teal);font-weight:700">${e.track||'—'}</div>`
           : (e.logistica||'').toUpperCase()==='CABIFY'
           ? `<div id="cabify-track-${e.id}">${renderCabifyTrackCell(e)}</div>`
+          : (e.logistica||'').toUpperCase()==='EPSA'
+          ? `<div style="font-size:9px;color:#f59e0b;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px">🚚 EPSA · guía</div>
+             <div class="mono" style="font-size:10px;word-break:break-all">${e.track||'—'}</div>`
           : `<div class="mono" style="font-size:10px;word-break:break-all">${e.track||'—'}</div>
              ${e.track?`<a href="https://www.correoargentino.com.ar/formularios/e-commerce?id=${e.track}" target="_blank" style="font-size:10px;color:var(--blue);text-decoration:none;">🔗 Correo Arg.</a>`:''}`
         }
@@ -15858,7 +15861,9 @@ async function renderEnviosTable(list){
               : `<button title="Imprimir rótulo envío" style="background:var(--surface2);border:1px solid var(--border2);color:var(--teal);font-size:11px;padding:4px 7px;border-radius:6px;cursor:pointer;${isLogistica?'display:none':''}" onclick="printRotulo('${e.id}')">🖨️</button>`
           }
           <button title="Actualizar observación" style="background:var(--surface2);border:1px solid var(--border2);color:var(--text-muted);font-size:11px;padding:4px 7px;border-radius:6px;cursor:pointer" onclick="openUpdateEvento('${e.id}','${(e.ultimo_evento||'').replace(/'/g,'&#39;')}')">✏️</button>
-          ${e.track&&(e.logistica||'').toUpperCase()!=='ALLEATA'?`<button id="track-btn-${e.id}" title="Actualizar tracking CA" style="background:var(--surface2);border:1px solid var(--border2);color:var(--blue);font-size:11px;padding:4px 7px;border-radius:6px;cursor:pointer" onclick="consultarTracking('${e.id}','${e.track}')">🔍</button>`:''}
+          ${(e.logistica||'').toUpperCase()==='EPSA'
+            ? (isAdmin?`<button id="track-btn-${e.id}" title="Consultar EPSA y actualizar en SF" style="background:var(--surface2);border:1px solid var(--border2);color:#f59e0b;font-size:11px;padding:4px 7px;border-radius:6px;cursor:pointer" onclick="consultarEpsaOT('${e.id}','${e.ot_numero}')">🔍</button>`:'')
+            : e.track&&(e.logistica||'').toUpperCase()!=='ALLEATA'?`<button id="track-btn-${e.id}" title="Actualizar tracking CA" style="background:var(--surface2);border:1px solid var(--border2);color:var(--blue);font-size:11px;padding:4px 7px;border-radius:6px;cursor:pointer" onclick="consultarTracking('${e.id}','${e.track}')">🔍</button>`:''}
           ${tieneRetorno?`<button title="Imprimir rótulo RETORNO" style="background:rgba(245,158,11,.15);border:1px solid #f59e0b;color:#f59e0b;font-size:11px;padding:4px 7px;border-radius:6px;cursor:pointer" onclick="printRotuloDevolucion('${e.id}')">↩️🖨️</button>`:''}
           ${isAdmin?`<button title="Cambiar logística en SF" style="background:var(--surface2);border:1px solid var(--border2);color:var(--text-muted);font-size:11px;padding:4px 7px;border-radius:6px;cursor:pointer" onclick="abrirCambiarLogistica('${e.id}','${e.sf_id}','${e.ot_numero}','${(e.logistica||'')}')">🔄 Log.</button>`:''}
 
@@ -16125,6 +16130,32 @@ async function fetchTrackingCA(trackNum) {
   // Obtener pieza (HC-XXXXXX-AR)
   const pieza = doc.querySelector('.badge')?.textContent?.trim()||'';
   return { eventos, pieza };
+}
+
+// Lupa de OT EPSA (pedido 12/11, OT 25344): consulta la guía en EPSA por remito (= N° de OT), guarda el seguimiento y,
+// con la misma regla del módulo EPSA Envíos, actualiza la OT en SF (guía / costo / estado) si corresponde.
+// Backend: POST /automations/epsa/seguimiento/sync { remitos:[ot] } (admin). Es idempotente.
+async function consultarEpsaOT(id, otNumero){
+  const btn=document.getElementById(`track-btn-${id}`);
+  if(btn){ btn.textContent='⏳'; btn.disabled=true; }
+  showTrackingToast(`🔄 Consultando EPSA para la OT ${otNumero}...`, 'teal');
+  try{
+    const r = await railwayFetch('/automations/epsa/seguimiento/sync', { method:'POST', body: JSON.stringify({ remitos:[String(otNumero)] }) });
+    const j = await r.json().catch(()=>({}));
+    if(!r.ok || j.ok===false){ showTrackingToast(`⚠️ EPSA: ${j.error || j.message || ('error '+r.status)}`, 'yellow'); return; }
+    if(!j.con_guia){ showTrackingToast(`⚠️ EPSA no tiene guía para la OT ${otNumero} (¿logística correcta? ¿remito cargado?)`, 'yellow'); return; }
+    const d=(j.sf_detalle||[]).find(x=>String(x.ot).replace(/\D/g,'')===String(otNumero).replace(/\D/g,''));
+    if(d?.error){ showTrackingToast(`⚠️ Guía ${d.guia} (${d.estado_epsa||'—'}): SF rechazó el cambio: ${String(d.error).slice(0,120)}`, 'yellow'); }
+    else if(d?.aplicado){ showTrackingToast(`✅ Guía ${d.guia} · EPSA: ${d.estado_epsa||'—'} → SF actualizado${d.transiciones?.length?' ('+d.transiciones.join(' → ')+')':''}`, 'teal'); }
+    else if(d && (d.accion==='REVISAR'||d.accion==='NO_ENCONTRADA')){ showTrackingToast(`⚠️ Guía ${d.guia} (${d.estado_epsa||'—'}): revisar a mano — ${d.detalle||''}`, 'yellow'); }
+    else if(j.sf?.modo==='off'||j.sf?.modo==='dry'){ showTrackingToast(`ℹ️ EPSA consultado (modo SF: ${j.sf.modo}, no escribió)`, 'teal'); }
+    else { showTrackingToast(`✅ EPSA consultado · SF ya estaba al día`, 'teal'); }
+    loadBadges(); renderEnvios();
+  }catch(err){
+    showTrackingToast('⚠️ Error de red consultando EPSA', 'yellow');
+  }finally{
+    if(btn){ btn.textContent='🔍'; btn.disabled=false; }
+  }
 }
 
 async function consultarTracking(id, trackNum){
