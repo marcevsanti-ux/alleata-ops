@@ -11,7 +11,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Alleata · Operaciones v4.7.123</title>
+<title>Alleata · Operaciones v4.7.124</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -412,7 +412,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
       <a href="#" onclick="doReset()" style="font-size:12px;color:var(--text-muted);text-decoration:none;">¿Olvidaste tu contraseña?</a>
     </div>
     <div style="text-align:center;margin-top:20px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.123 · 12 nov 2026
+      v4.7.124 · 18 nov 2026
     </div>
   </div>
 </div>
@@ -537,7 +537,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     </div>
     <button class="logout-btn" onclick="doLogout()">← Cerrar sesión</button>
     <div style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;letter-spacing:1px;opacity:0.7;">
-      v4.7.123 · 12 nov 2026
+      v4.7.124 · 18 nov 2026
     </div>
   </div>
 </nav>
@@ -606,7 +606,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
         <div id="sf-sync-summary" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border2);font-size:11px;color:var(--text-muted);"></div>
       </div>
     </div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.123</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#fff;margin-left:12px;opacity:0.7;">v4.7.124</div>
   </div>
   <div class="content">
 
@@ -5467,7 +5467,7 @@ async function retRunScorer() {
   }
 }
 
-console.log('[Alleata v4.7.123] OK');
+console.log('[Alleata v4.7.124] OK');
 const SUPABASE_URL='https://njkstpfmcfhqxdadqbdy.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qa3N0cGZtY2ZocXhkYWRxYmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTkxMTksImV4cCI6MjA4ODczNTExOX0.7T0cZz1aGTWQZsjy7zeWsRWeG1SLw9y8cPK6RGVG8BA';
 const GEMINI_PROXY='https://njkstpfmcfhqxdadqbdy.supabase.co/functions/v1/gemini-proxy';
@@ -6260,6 +6260,50 @@ async function ttBuscarFicha() {
       html += `<div class="card" style="margin-bottom:14px;color:#f59e0b">⚠️ No se encontró esta terminal en Salesforce en este momento (puede haberse borrado, o el serial no matchea). Se muestra igual el historial guardado.</div>`;
     }
 
+    // ── Resumen para garantía (pedido 18/11) ─────────────────────────────
+    // Junta lo que ya existe: estado SF en vivo + Lote__c / Fecha reparación
+    // (preview-sf) + primer y último registro Logicalis (Supabase).
+    // OJO: la fecha de los registros Logicalis es la de CARGA del reporte
+    // (importado_en), no la fecha física de entrega a Logicalis.
+    let sfCur = null;
+    if (data.encontrada && serialSf) {
+      try {
+        const rp = await fetch(`${SF_AGENT_URL}/terminales/preview-sf`, { method:'POST', headers:{'Content-Type':'application/json','x-automation-secret':SF_SYNC_SECRET}, body: JSON.stringify({ series:[serialSf] }) });
+        const dp = await rp.json();
+        sfCur = (dp.results||[])[0]?.current || null;
+      } catch (e) { console.warn('[Trazabilidad Terminal] preview-sf', e); }
+    }
+    const logiPrim = (logi||[]).length ? logi[logi.length-1] : null;
+    const logiUlt  = (logi||[]).length ? logi[0] : null;
+    const ultFalla = (logi||[]).find(r => r.es_error);
+    const lineaRes = (k, v) => `<div><span style="color:var(--text-muted)">${k}:</span> <strong>${v}</strong></div>`;
+    const t0 = data.terminal || {};
+    const resumen = [
+      `Serial: ${serialSf || serial}${t0.producto?` (${t0.producto})`:''}`,
+      `Cuenta actual: ${t0.cuenta || 'sin asignar'}`,
+      `Estado SF: ${t0.estado||'—'} · Ubicación: ${t0.ubicacion||'—'} · Perfil: ${t0.perfil||'—'}`,
+      `Primer registro Logicalis: ${logiPrim ? ttFecha(logiPrim.importado_en)+(logiPrim.mes_ano?` (${logiPrim.mes_ano})`:'') : 'sin registros'}`,
+      `Último registro Logicalis: ${logiUlt ? ttFecha(logiUlt.importado_en) : 'sin registros'}`,
+      `Falla informada por Logicalis: ${ultFalla ? (ultFalla.solucion||'sin detalle') : (sfCur?.Lote__c || 'sin datos')}`,
+      `Fecha de reparación (SF): ${sfCur?.Ingrese_fecha2__c || '—'}`,
+      `Lote (SF): ${sfCur?.Lote__c || '—'}`,
+    ];
+    html += `<div class="card" style="margin-bottom:14px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px">
+        <div style="font-size:13px;font-weight:700">🛡️ Resumen para garantía</div>
+        <button class="btn btn-sm" onclick="ttCopiarResumen()">📋 Copiar</button>
+      </div>
+      <div style="font-size:12px;line-height:1.8">
+        ${lineaRes('Primer registro Logicalis', logiPrim ? ttFecha(logiPrim.importado_en) : 'sin registros')}
+        ${lineaRes('Último registro Logicalis', logiUlt ? ttFecha(logiUlt.importado_en) : 'sin registros')}
+        ${lineaRes('Falla informada', ttEsc(ultFalla ? (ultFalla.solucion||'sin detalle') : (sfCur?.Lote__c || 'sin datos')))}
+        ${lineaRes('Fecha de reparación (SF)', ttEsc(sfCur?.Ingrese_fecha2__c || '—'))}
+        ${lineaRes('Lote (SF)', ttEsc(sfCur?.Lote__c || '—'))}
+      </div>
+      <div style="font-size:10px;color:var(--text-muted);margin-top:6px">Las fechas Logicalis son las de carga del reporte en el portal, no la fecha física de entrega. Para el reclamo confirmar con el RTO/remito.</div>
+      <textarea id="ttResumenTxt" style="display:none">${ttEsc(resumen.join('\n'))}</textarea>
+    </div>`;
+
     const linea = (fecha, icono, titulo, detalle) => `
       <div style="display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
         <div style="font-size:10px;color:var(--text-muted);white-space:nowrap;min-width:75px">${ttFecha(fecha)}</div>
@@ -6287,6 +6331,12 @@ async function ttBuscarFicha() {
     console.error('[Trazabilidad Terminal] ficha', e);
     msg.innerHTML = `<span style="color:#f87171">⛔ ${ttEsc(e.message||e)}</span>`;
   }
+}
+
+function ttCopiarResumen() {
+  const el = document.getElementById('ttResumenTxt');
+  if (!el) return;
+  navigator.clipboard.writeText(el.value).then(() => { const m = document.getElementById('ttFichaMsg'); if (m) { m.textContent = 'Resumen copiado.'; setTimeout(() => { m.textContent=''; }, 2000); } });
 }
 
 // ── Importar reporte TEM (Excel, hoja "globalReport") ───────────────────
