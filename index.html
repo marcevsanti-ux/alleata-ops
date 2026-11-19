@@ -492,6 +492,9 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
     <div class="nav-item" data-mod="terminal-trazabilidad" id="nav-terminal-trazabilidad" onclick="goTo('terminal-trazabilidad')">
       <div class="active-bar"></div><span class="nav-icon-wrap">🔎</span> Trazabilidad Terminal
     </div>
+    <div class="nav-item" data-mod="versiones" id="nav-versiones" onclick="goTo('versiones')">
+      <div class="active-bar"></div><span class="nav-icon-wrap">🏷️</span> Versiones
+    </div>
     <div class="nav-item" data-mod="irreparables" id="nav-irreparables" onclick="goTo('irreparables')">
       <div class="active-bar"></div><span class="nav-icon-wrap">🧰</span> Irreparables
     </div>
@@ -1143,6 +1146,7 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
             <div class="mod-pill" data-mod="terminales" onclick="toggleCreateMod(this)"><span class="pill-dot"></span>🖥️ Terminales</div>
             <div class="mod-pill" data-mod="irreparables" onclick="toggleCreateMod(this)"><span class="pill-dot"></span>🧰 Irreparables</div>
             <div class="mod-pill" data-mod="insumos" onclick="toggleCreateMod(this)"><span class="pill-dot"></span>📦 Insumos</div>
+            <div class="mod-pill" data-mod="versiones" onclick="toggleCreateMod(this)"><span class="pill-dot"></span>🏷️ Versiones</div>
             <div class="mod-pill" data-mod="retencion" onclick="toggleCreateMod(this)"><span class="pill-dot"></span>🛡️ Retención</div>
             <div class="mod-pill" data-mod="store" onclick="toggleCreateMod(this)"><span class="pill-dot"></span>🏦 Bancos</div>
             <div class="mod-pill" data-mod="recuperadas" onclick="toggleCreateMod(this)"><span class="pill-dot"></span>🔁 Recuperadas</div>
@@ -1285,6 +1289,8 @@ tr:not(.row-deny):hover td{background:var(--surface2)}
 <div class="module" id="mod-irreparables"></div>
 <!-- ── MÓDULO INSUMOS (04/11/2026) — lógica en insumos.js · SQL en doc/setup_insumos.sql ── -->
 <div class="module" id="mod-insumos"></div>
+<!-- ── MÓDULO VERSIONES (19/11/2026) — lógica en versiones.js · usa terminal_tem_historial / v_terminal_tem_ultimo ── -->
+<div class="module" id="mod-versiones"></div>
 
 <div class="module" id="mod-terminal-trazabilidad">
   <!-- Trazabilidad Terminal (pedido 28/09): cruza lo que ya hace el módulo
@@ -6954,7 +6960,7 @@ function showApp(){
   // abajo — un módulo del CEO se oculta solo si NO está en su lista. ──
   if(isCeo){
     ['nav-sims','nav-envios','nav-rollout','nav-rollout-vip','nav-desinstalaciones','nav-store','nav-recuperadas',
-     'nav-ally','nav-distri','nav-ajustes','nav-retencion','nav-terminales','nav-irreparables','nav-insumos','nav-section-config','nav-napse']
+     'nav-ally','nav-distri','nav-ajustes','nav-retencion','nav-terminales','nav-irreparables','nav-insumos','nav-versiones','nav-section-config','nav-napse']
       .forEach(id=>{
         const mod=id.replace('nav-','');
         if(modulos.includes(mod)) return; // asignado en Ajustes → se muestra igual
@@ -6969,7 +6975,7 @@ function showApp(){
   // 26/08) — Rosario/Juan Ignacio no necesitan ver el resto del portal. ──
   if(isCustomer){
     ['nav-sims','nav-envios','nav-rollout','nav-rollout-piloto','nav-rollout-vip','nav-terminal-trazabilidad','nav-store','nav-recuperadas',
-     'nav-ally','nav-distri','nav-ajustes','nav-retencion','nav-terminales','nav-irreparables','nav-insumos','nav-section-config',
+     'nav-ally','nav-distri','nav-ajustes','nav-retencion','nav-terminales','nav-irreparables','nav-insumos','nav-versiones','nav-section-config',
      'nav-napse','nav-churn-producto','nav-hoja-ruta','nav-zonas-amba','nav-indicadores',
      'nav-despacho-epsa','nav-epsa-envios','nav-presupuesto','nav-auditoria']
       .forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display='none'; });
@@ -7005,7 +7011,7 @@ function showApp(){
   if(navDespachoEpsa&&!isCeo&&(isAdmin||modulos.includes('despacho-epsa')))navDespachoEpsa.style.display='flex';
   const navEpsaEnvios=document.getElementById('nav-epsa-envios');
   if(navEpsaEnvios&&!isCeo&&!isCustomer&&(isAdmin||modulos.includes('epsa-envios')))navEpsaEnvios.style.display='flex';
-  ['sims','envios','desinstalaciones','churn-producto','hoja-ruta','napse','store','recuperadas','rollout','rollout-piloto','rollout-vip','retencion','terminales','terminal-trazabilidad','irreparables','insumos','zonas-amba'].forEach(mod=>{
+  ['sims','envios','desinstalaciones','churn-producto','hoja-ruta','napse','store','recuperadas','rollout','rollout-piloto','rollout-vip','retencion','terminales','terminal-trazabilidad','versiones','irreparables','insumos','zonas-amba'].forEach(mod=>{
     const el=document.getElementById('nav-'+mod);
     if(el&&!modulos.includes(mod)&&!isAdmin&&!isCeo&&!isCustomer){el.classList.add('locked');el.onclick=null;}
   });
@@ -7083,6 +7089,7 @@ function buildDashCards(modulos,isAdmin,isCeo){
     {mod:'napse',icon:'🔍',title:'NAPSE',desc:'Analizador de Logs VTOL',stat:''},
     {mod:'terminales',icon:'🖥️',title:'Terminales',desc:'Reporte Logicalis → Salesforce',stat:'Logicalis'},
     {mod:'terminal-trazabilidad',icon:'🔎',title:'Trazabilidad Terminal',desc:'Logicalis + versión de app (TEM)',stat:''},
+    {mod:'versiones',icon:'🏷️',title:'Versiones',desc:'App instalada por terminal y cuenta (TEM)',stat:''},
     {mod:'irreparables',icon:'🧰',title:'Irreparables',desc:'Terminal → caja → pallet → SPP',stat:''},
     {mod:'insumos',icon:'📦',title:'Insumos',desc:'Stock, rótulos y avisos de compra',stat:''},
     {mod:'store',icon:'🏦',title:'Bancos',desc:'Terminales disponibles Barracas',stat:'cargando...'},
@@ -7109,7 +7116,7 @@ function buildDashCards(modulos,isAdmin,isCeo){
   try{ const _irr=new URLSearchParams(location.search).get('irr'); if(_irr){ history.replaceState(null,'',location.pathname); setTimeout(()=>{ goTo('irreparables'); window.Irr?.abrir(_irr); },400); } }catch(e){}
 }
 
-const MOD_INFO={home:'Dashboard',irreparables:'Irreparables — trazabilidad a SPP',insumos:'Insumos — stock, rótulos y compras',sims:'Verificador SIMs',envios:'Envíos',rollout:'Rollout','rollout-piloto':'Misión Rollout — Trazabilidad','rollout-vip':'Rollout VIP — seguimiento del ranking de Ventas',desinstalaciones:'Desinstalaciones','churn-producto':'Churn Producto — NAPSE / PRISMA / Sin Perfil','hoja-ruta':'Hoja de Ruta — por chofer',napse:'NAPSE — Logs VTOL',instalaciones:'Instalaciones SF',retencion:'Retención de Cuentas',ajustes:'Ajustes',ally:'Configuración Ally',distri:'Distribuidores',terminales:'Terminales — Logicalis','terminal-trazabilidad':'Trazabilidad Terminal — Logicalis + TEM',store:'Bancos — Terminales disponibles',presupuesto:'Presupuesto de Operaciones','zonas-amba':'Zonas AMBA — correcciones por CP',indicadores:'Indicadores Operaciones — Logística','despacho-epsa':'Despacho EPSA — colecta','epsa-envios':'EPSA Envíos — conciliación de guías'};
+const MOD_INFO={home:'Dashboard',irreparables:'Irreparables — trazabilidad a SPP',insumos:'Insumos — stock, rótulos y compras',versiones:'Versiones — app por terminal (TEM + SF)',sims:'Verificador SIMs',envios:'Envíos',rollout:'Rollout','rollout-piloto':'Misión Rollout — Trazabilidad','rollout-vip':'Rollout VIP — seguimiento del ranking de Ventas',desinstalaciones:'Desinstalaciones','churn-producto':'Churn Producto — NAPSE / PRISMA / Sin Perfil','hoja-ruta':'Hoja de Ruta — por chofer',napse:'NAPSE — Logs VTOL',instalaciones:'Instalaciones SF',retencion:'Retención de Cuentas',ajustes:'Ajustes',ally:'Configuración Ally',distri:'Distribuidores',terminales:'Terminales — Logicalis','terminal-trazabilidad':'Trazabilidad Terminal — Logicalis + TEM',store:'Bancos — Terminales disponibles',presupuesto:'Presupuesto de Operaciones','zonas-amba':'Zonas AMBA — correcciones por CP',indicadores:'Indicadores Operaciones — Logística','despacho-epsa':'Despacho EPSA — colecta','epsa-envios':'EPSA Envíos — conciliación de guías'};
 
 function goTo(mod){
   const el=document.getElementById('nav-'+mod);
@@ -7151,6 +7158,7 @@ function goTo(mod){
   if(mod==='terminal-trazabilidad')ttInit();
   if(mod==='irreparables')window.Irr?.init();
   if(mod==='insumos')window.Ins?.init();
+  if(mod==='versiones')window.Ver?.init();
   // Pedido 31/08: este `goTo()` forzaba SIEMPRE la pestaña "Gestión OPS"
   // al entrar a Desinstalaciones, sin importar el rol — por eso a Rosario
   // (rol customer) le dejó de aparecer su vista simplificada (backlog) y
@@ -7428,6 +7436,7 @@ const ALL_MODS = [
   {id:'terminales',label:'🖥️ Terminales'},
   {id:'irreparables',label:'🧰 Irreparables'},
   {id:'insumos',label:'📦 Insumos'},
+  {id:'versiones',label:'🏷️ Versiones'},
   {id:'retencion',label:'🛡️ Retención'},
   {id:'store',      label:'🏦 Bancos'},
   {id:'recuperadas',label:'🔁 Recuperadas'},
@@ -21170,5 +21179,6 @@ function epsaEnvExportar(){
 <script src="desinstalaciones.js"></script>
 <script src="irreparables.js?v=4.7.106"></script>
 <script src="insumos.js?v=4.7.118"></script>
+<script src="versiones.js?v=4.7.118"></script>
 </body>
 </html>
